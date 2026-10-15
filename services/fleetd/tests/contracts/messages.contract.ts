@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ServerResponse } from 'node:http';
 import type { TestContext } from 'node:test';
@@ -17,9 +17,9 @@ function lastUser(request: unknown): string {
 export async function messageContracts(scope: TestContext, fixture: MessageFixture): Promise<void> {
   const { platform, agent, provider } = fixture; const roomPath = (room: string) => '/_matrix/client/v3/rooms/' + encodeURIComponent(room);
   async function matrix(method: string, path: string, body?: unknown) { const response = await contractHttp(platform.origin, method, '/_matrix/client/v3' + path, body, { Authorization: 'Bearer ' + platform.owner.nativeToken }); assert.equal(response.status, 200, JSON.stringify(response.body).slice(0, 1024)); return record(response.body); }
-  async function listener(input: unknown, status = 200) {
+  async function listener(input: unknown, status: number | readonly number[] = 200) {
     const file = join(fixture.fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/listener.json'); const binding = record(JSON.parse(readFileSync(file, 'utf8')) as unknown); assert.equal(statSync(file).mode & 0o777, 0o600);
-    const response = await contractHttp('http://127.0.0.1:' + String(binding.port), 'POST', '/bindings/' + encodeURIComponent(text(binding.binding)) + '/control', input, { Authorization: 'Bearer ' + text(binding.secret) }); assert.equal(response.status, status, JSON.stringify(response.body).slice(0, 1024)); return record(response.body);
+    const response = await contractHttp('http://127.0.0.1:' + String(binding.port), 'POST', '/bindings/' + encodeURIComponent(text(binding.binding)) + '/control', input, { Authorization: 'Bearer ' + text(binding.secret) }); assert((typeof status === 'number' ? [status] : status).includes(response.status), 'Unexpected listener status ' + response.status + ': ' + JSON.stringify(response.body).slice(0, 1024)); return record(response.body);
   }
   async function query(room?: string) {
     const result = await listener({ action: 'read', input: { kind: 'history', ...(room ? { room } : {}), limit: 10, outputBytes: 4096, direction: 'b', cursors: { entries: [] } } }); assert.equal(result.ok, true); return record(result.value);
@@ -48,12 +48,29 @@ export async function messageContracts(scope: TestContext, fixture: MessageFixtu
     await observe(() => provider.requests.length === 3 && provider.held() !== undefined, 'Large chat batch reaches native input'); const input = lastUser(provider.requests[2]); assert(Buffer.byteLength(input) <= 65536); const pointerLine = input.split('\n').find(value => value.startsWith('{') && value.includes('crossfire-message-files')); assert(pointerLine, 'Large native input must be a file pointer, not the full messages'); const pointer = record(JSON.parse(pointerLine) as unknown);
     const manifest = text(pointer.manifest); assert(manifest.startsWith(join(fixture.fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst') + '/')); assert.equal(statSync(manifest).mode & 0o777, 0o600); const bundle = record(JSON.parse(readFileSync(manifest, 'utf8')) as unknown); const messages = list(bundle.messages).map(record);
     const contents = messages.map(value => readFileSync(text(value.file), 'utf8')); assert(contents.some(value => value.includes(marker + 'A'.repeat(40000)))); assert(contents.some(value => value.includes(marker + 'B'.repeat(40000))));
-    provider.finish(); await observe(fixture.idle, 'Large batch completes'); const before = provider.requests.length; const specific = await query(room); assert.equal(specific.queryId, null); assert(text(specific.text).includes(room) || text(specific.text).includes('crossfire-message-files')); const global = await query(); assert.equal(global.queryId, null); assert(text(global.text).length > 0); assert.equal(provider.requests.length, before, 'History browsing never invokes the model');
+    provider.finish(); await observe(fixture.idle, 'Large batch completes');
+    await observe(() => !existsSync(join(fixture.fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/cursors.json.chat-publication')), 'Native receipt and Matrix checkpoints settle before the next delivery pause');
+    const before = provider.requests.length; const specific = await query(room); assert.equal(specific.queryId, null); assert(text(specific.text).includes(room) || text(specific.text).includes('crossfire-message-files')); const global = await query(); assert.equal(global.queryId, null); assert(text(global.text).length > 0); assert.equal(provider.requests.length, before, 'History browsing never invokes the model');
     const denied = await listener({ action: 'read', input: { kind: 'history', room: '!not-granted:architecture.localhost', limit: 10, outputBytes: 4096, direction: 'b', cursors: { entries: [] } } }, 409); assert.equal(denied.ok, false); assert.equal(record(denied.error).code, 'forbidden');
   });
   await scope.test('explicit unread reads and acknowledgment advance only observed records without model calls', async () => {
-    await fixture.delivery(false); const before = provider.requests.length; const marker = 'Read only through the history tool ' + randomUUID(); await send(marker);
-    let answer: Record<string, unknown> = {}; await observe(async () => { const response = await listener({ action: 'read', input: { kind: 'unread', room, limit: 100, outputBytes: 4096, direction: 'f', cursors: { entries: [] } } }); if (response.ok !== true) return false; answer = record(response.value); return true; }, 'Paused listener permits an explicit authorized unread query');
-    const id = text(answer.queryId); assert(text(answer.text).includes(marker)); const acknowledged = await listener({ action: 'acknowledge', queryId: id }); assert.equal(acknowledged.ok, true); assert.equal(record(acknowledged.value).accepted, true); await fixture.delivery(true); await observe(fixture.idle, 'Delivery resumes without replaying acknowledged tool input'); assert.equal(provider.requests.length, before);
+    await fixture.delivery(false); const before = provider.requests.length; const marker = 'Read only through the history tool ' + randomUUID();
+    try {
+      await send(marker);
+      let answer: Record<string, unknown> = {}; let reported = false; await observe(async () => {
+        const response = await listener({ action: 'read', input: { kind: 'unread', room, limit: 100, outputBytes: 4096, direction: 'f', cursors: { entries: [] } } }, [200, 409]);
+        if (response.ok !== true) {
+          assert.equal(record(response.error).code, 'conflict', 'Only an actual publication/query ownership conflict is retryable');
+          if (!reported) {
+            reported = true; const path = join(fixture.fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/cursors.json.chat-publication'); const plan = existsSync(path) ? record(JSON.parse(readFileSync(path, 'utf8')) as unknown) : null;
+            scope.diagnostic(JSON.stringify({ unreadConflict: record(response.error).message, steps: plan === null ? null : list(plan.steps).map(value => record(value).status), pendingCheckpoint: existsSync(path.replace('.chat-publication', '.ack')) }));
+          }
+          return false;
+        }
+        answer = record(response.value); return true;
+      }, 'Paused listener settles any prior publication and permits authorized unread queries');
+      const id = text(answer.queryId); assert(text(answer.text).includes(marker)); const acknowledged = await listener({ action: 'acknowledge', queryId: id }); assert.equal(acknowledged.ok, true); assert.equal(record(acknowledged.value).accepted, true);
+    } finally { await fixture.delivery(true); }
+    await observe(fixture.idle, 'Delivery resumes without replaying acknowledged tool input'); assert.equal(provider.requests.length, before);
   });
 }

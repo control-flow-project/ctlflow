@@ -15,8 +15,8 @@ owns enrollment, room permissions, wake rules and listener activity.
 - [Updates, backups and troubleshooting](docs/operations.md)
 - [Controller API and ownership](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/README.md)
 - [Crossfire management](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/management.md)
-- [C# CLI/controller distribution and readiness](../crossfire/csharp/README.md)
-- [Shared implementation contracts](../../docs/verification/shared-contracts.md)
+- [C# CLI/controller distribution and readiness](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/csharp/README.md)
+- [Shared implementation contracts](https://github.com/control-flow-project/crossfire/blob/main/docs/verification/shared-contracts.md)
 
 ## First setup
 

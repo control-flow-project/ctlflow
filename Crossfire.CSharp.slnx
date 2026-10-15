@@ -15,7 +15,7 @@
     <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterRuntime/Crossfire.AdapterRuntime.csproj" />
     <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterToml/Crossfire.AdapterToml.csproj" />
     <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterProcess/Crossfire.AdapterProcess.csproj" />
-    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterClient/Crossfire.AdapterClient.csproj" />
+    <Project Path="services/crossfire/csharp/packages/Crossfire.AdapterCrossfire/Crossfire.AdapterCrossfire.csproj" />
   </Folder>
   <Folder Name="/fleetd/">
     <Project Path="services/fleetd/csharp/apps/Fleetd.Daemon/Fleetd.Daemon.csproj" />

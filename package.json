@@ -12,7 +12,8 @@
   "workspaces": [
     "services/*",
     "services/*/apps/*",
-    "services/*/packages/*",
+    "services/*/node/apps/*",
+    "services/*/node/packages/*",
     "services/*/database"
   ],
   "scripts": {
@@ -29,7 +30,8 @@
     "verify:csharp:core": "node services/crossfire/csharp/scripts/verify.mjs",
     "verify:csharp:runtime": "node services/crossfire/csharp/scripts/verify-runtime.mjs",
     "publish:csharp": "node scripts/publish-csharp.mjs",
-    "verify:contracts": "node scripts/verify-contracts.mjs"
+    "verify:contracts": "node scripts/verify-contracts.mjs",
+    "verify:parity": "node scripts/verify-parity.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

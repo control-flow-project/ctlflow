@@ -4,7 +4,7 @@
 - [Controller roots, lifecycle, execution and security](operations.md)
 - [Canonical context storage and explicit migration](storage.md)
 - [Role coordination settings, owner review and room invitations](coordination.md)
-- [Native fleet inspection and preservation](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/tools/README.md)
+- [Native fleet inspection and preservation](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/node/tools/README.md)
 - [CLI command and SSH guide](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/commands.md)
 - [Fleet configuration and native runtime settings](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/configuration.md)
 - [Canonical private API, operations and storage contracts](https://github.com/control-flow-project/crossfire/blob/main/docs/specification.md)

@@ -1,13 +1,14 @@
 # Development and verification
 
-Node.js 26+, npm 11.17+ and Git are required.
+Node.js 26+, npm 11.17+ and Git are required. The complete Node/C# parity gate
+also needs the pinned .NET 11 SDK, GCC/AOT prerequisites and rootless Docker.
 Install dependencies at the repository root:
 
 ```sh
 systemd-run --user --scope --quiet \
-  --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
-  --property=TasksMax=4096 /bin/bash -c \
-  'npm ci --ignore-scripts && npm run typecheck && npm test && npm run verify:architecture && npm run verify:installation && npm run verify:container'
+  --property=MemoryMax=34359738368 --property=MemorySwapMax=0 \
+  --property=TasksMax=8192 /bin/bash -c \
+  'npm ci --ignore-scripts && npm run verify:parity -- /absolute/new-evidence-directory'
 ```
 
 The root container gate creates one temporary, finite user slice with the
@@ -17,6 +18,10 @@ the calling CLI's cgroup. The gate verifies the slice and container parent and
 stops only that private test slice on completion. No persistent/global unit,
 daemon reconfiguration, production stack or fleet is touched. Run this gate
 from the root, not directly through the service workspace command.
+For a separately built distribution matrix, use
+`npm run verify:container -- /absolute/implementation-matrix.json`.
+See [shared contracts](verification/shared-contracts.md) for matrix creation,
+standalone gates and the complete serialized verification order.
 
 The lockfile and npm policy enforce engine versions, dependency age and disabled
 implicit installation scripts. `.npmrc` keeps a seven-day minimum release age
@@ -72,7 +77,7 @@ test-selection command inside a verified scope; an unbounded runner fails closed
 This resource guard is Linux-specific and does not certify macOS test execution.
 
 Browser fixtures use real HTTPS and trust only their pinned test certificate;
-Node/curl child clients inherit that test authority. Production TLS verification
+Node, .NET and curl child clients inherit that test authority. Production TLS verification
 and Secure host-only cookie attributes are never relaxed for tests.
 
 Default native tests require Codex 0.158.0+, Git, OpenSSH client/server, Chrome
@@ -86,7 +91,8 @@ untested-platform certification. Fixtures do not use production accounts.
 ## Ownership
 
 Domain modules use ports and Result values, not transport or concrete adapters.
-Composition roots wire functional adapters. Tinqer owns application queries;
+Composition roots wire functional adapters. Tinqer owns Node application queries;
+EF Core owns C# queries over the identical Knex-created database;
 raw SQL is reserved for schema and metadata. All product source and tests live
 inside their owning service. Expected transaction failures roll back; native
 operations stay outside database transactions.

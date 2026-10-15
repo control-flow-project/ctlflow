@@ -5,6 +5,6 @@
     <ProjectReference Include="../Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj" />
     <ProjectReference Include="../Crossfire.AdapterProcess/Crossfire.AdapterProcess.csproj" />
     <ProjectReference Include="../Crossfire.AdapterRuntime/Crossfire.AdapterRuntime.csproj" />
-    <EmbeddedResource Include="../../../packages/adapter-pi/native/owned-extension.mjs" LogicalName="Crossfire.Native.PiExtension" />
+    <EmbeddedResource Include="../../../node/packages/adapter-pi/native/owned-extension.mjs" LogicalName="Crossfire.Native.PiExtension" />
   </ItemGroup>
 </Project>

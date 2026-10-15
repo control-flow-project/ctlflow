@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Crossfire.AdapterClient;
+using Crossfire.AdapterCrossfire;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AgentCore;
 using Crossfire.Contracts;
@@ -44,10 +44,10 @@ public sealed partial class ExecutionHost
         async Task Close()
         {
             List<Exception> errors = []; async Task Finish(Func<Task> action) { try { await action(); } catch (Exception error) { errors.Add(error); } }
-            await Finish(stop.CancelAsync); var received = receiving; var observed = observation; var activated = activation; var ownedNative = native; var reported = activity;
+            await Finish(stop.CancelAsync); var received = receiving; var observed = observation; var activated = activation; var ownedNative = native;
             if (received is not null) await Finish(async () => { await received; }); if (observed is not null) await Finish(() => observed); if (activated is not null) await Finish(() => activated);
             var nativeClosed = ownedNative is null; if (ownedNative is not null) await Finish(async () => { await ownedNative.DisposeAsync(); nativeClosed = true; });
-            if (nativeClosed && reported is not null) await Finish(() => { connection.Reports.Closed(reported); return Task.CompletedTask; });
+            if (nativeClosed && activity is { } reported) await Finish(() => { connection.Reports.Closed(reported); return Task.CompletedTask; });
             if (control is not null) await Finish(() => { connection.Control.Unbind(identity.AgentId); return Task.CompletedTask; });
             if (nativeClosed) await Finish(() => { owner?.Dispose(); return Task.CompletedTask; }); stop.Dispose(); if (errors.Count != 0) throw new AggregateException("Native instance shutdown requires inspection", errors);
         }

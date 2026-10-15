@@ -38,7 +38,7 @@ public sealed partial class ListenerReceiver
     private async ValueTask Wait(long previous, int milliseconds = 0)
     {
         lock (gate) acquiring = false; lifetime.Token.ThrowIfCancellationRequested(); if (Interlocked.Read(ref revision) != previous) return;
-        var timeout = milliseconds == 0 ? options.ReconcileMs : milliseconds; if (activity is not null && synchronized && !state.Paused && options.Control.Current().Active) timeout = Math.Min(timeout, scheduled.WaitMilliseconds);
+        var timeout = milliseconds == 0 ? options.ReconcileMs : milliseconds; if (activity.RunId is not null && synchronized && !state.Paused && options.Control.Current().Active) timeout = Math.Min(timeout, scheduled.WaitMilliseconds);
         await changed.Wait(TimeSpan.FromMilliseconds(Math.Max(1, timeout)), options.Clock, lifetime.Token); lifetime.Token.ThrowIfCancellationRequested();
     }
     private async Task PublishLoop()
@@ -48,6 +48,7 @@ public sealed partial class ListenerReceiver
             artifacts.Cleanup(); var previous = Interlocked.Read(ref revision); var generation = options.Control.Current().Generation;
             try
             {
+                if ((!options.Control.Current().Active || state.Paused) && chat.Unpublished) { Take(chat.DiscardUnpublished()); completed = null; }
                 if (!options.Control.Current().Active) { await PauseActivity(); await Wait(previous); continue; } if (!await Activate() || generation.IsCancellationRequested) continue;
                 if (!synchronized) { await Wait(previous); continue; }
                 lock (gate) { if (controlling && (completed is null || ordinary.IsCancellationRequested || Urgent() is not null)) previous = -1; }

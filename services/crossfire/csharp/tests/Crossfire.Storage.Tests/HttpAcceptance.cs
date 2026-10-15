@@ -24,6 +24,13 @@ public static class HttpAcceptance
         {
             Interlocked.Increment(ref requests); context.Response.ContentType = "application/json";
             var path = context.Request.Path.Value;
+            if (path is "/api/releases/current" or "/api/agents/11111111-1111-4111-8111-111111111111" or "/api/agents/11111111-1111-4111-8111-111111111111/owner-conversation")
+            {
+                Equal(context.Request.Headers.Authorization.ToString(), path == "/api/releases/current" ? "" : "Bearer exact-agent-token", "operation authentication follows its declared public or agent boundary");
+                if (context.Request.Method == "POST") { using var input = await JsonDocument.ParseAsync(context.Request.Body); Equal(input.RootElement.GetRawText(), "{}", "bodyless operation arguments still serialize the canonical empty JSON object"); }
+                else Equal(context.Request.ContentLength ?? 0, 0L, "GET operations do not transmit JSON bodies");
+                await context.Response.WriteAsync("{\"data\":{},\"meta\":{\"requestId\":\"11111111-1111-4111-8111-111111111111\"}}"); return;
+            }
             if (path == "/redirect") { context.Response.StatusCode = 302; context.Response.Headers.Location = "/unexpected"; await context.Response.WriteAsync("{}"); return; }
             if (path == "/too-large") { await context.Response.WriteAsync("{\"body\":\"" + new string('a', 2048) + "\"}"); return; }
             if (path == "/invalid-json") { await context.Response.WriteAsync("not json"); return; }
@@ -59,6 +66,11 @@ public static class HttpAcceptance
         try
         {
             var origin = server.Urls.Single(); using var client = NativeHttp.Client(); var before = requests;
+            var operations = new OperationClient(client, origin, () => "exact-agent-token", RestOperations.All);
+            Equal((await operations.Call(new("release", new Dictionary<string, string>()), CancellationToken.None)).IsSuccess, true, "public operation omits an available bearer credential");
+            Equal((await operations.Call(new("agent", new Dictionary<string, string> { ["agentId"] = "11111111-1111-4111-8111-111111111111" }), CancellationToken.None)).IsSuccess, true, "authenticated operation retains its exact credential");
+            Equal((await operations.Call(new("ownerConversation", new Dictionary<string, string> { ["agentId"] = "11111111-1111-4111-8111-111111111111" }), CancellationToken.None)).IsSuccess, true, "empty operation input remains valid at the real HTTP boundary");
+            before = requests;
             Equal((await NativeHttp.Json(client, new(origin), "GET", "//bad-origin/path")).Error.Code, "invalid", "origin escape rejected");
             Equal(requests, before, "no request on rejected origin");
             Equal((await NativeHttp.Json(client, new(origin), "GET", "/redirect")).Error.Code, "native", "redirect rejection");

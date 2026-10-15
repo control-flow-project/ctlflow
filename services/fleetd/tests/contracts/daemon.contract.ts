@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, delimiter } from 'node:path';
 import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
@@ -12,6 +12,7 @@ import { contractProcess, integer, list, observe, record, text, type ContractTar
 import type { ContractPlatform } from '@ctlflow/crossfire-test-support/contract-platform';
 import { operations } from '@ctlflow/fleetd-contracts/api';
 import { decodeResponse } from '@ctlflow/crossfire-contracts/rest/envelope';
+import { operations as coordinationOperations } from '@ctlflow/crossfire-contracts/rest/operations';
 import type { Parser } from '@ctlflow/crossfire-contracts/schema/validation';
 import { messageContracts } from './messages.contract.js';
 
@@ -23,7 +24,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   async function call(operation: Declaration, parameters: Record<string, string> = {}, body?: unknown, query = '') {
     const path = operation.path.replace(/\{([A-Za-z]+)\}/gu, (_match, key: string) => encodeURIComponent(parameters[key] ?? assert.fail('Missing parameter ' + key))); const response = await raw(path + query, operation.method, operation.method === 'GET' ? undefined : body ?? {}); assert.equal(response.status, operation.status, operation.path + ': ' + JSON.stringify(response.body).slice(0, 2048)); const parsed = decodeResponse(response.body, operation.output, operation.collection); assert(parsed.ok, operation.path + ': ' + (parsed.ok ? '' : parsed.error.message)); return parsed.value;
   }
-  await observe(async () => { assert.equal(daemon.child.exitCode, null, daemon.errors()); try { return (await raw('/api/status')).status === 200; } catch { return false; } }, 'Private daemon must start');
+  await observe(async () => { assert.equal(daemon.alive(), true, daemon.errors()); try { return (await raw('/api/status')).status === 200; } catch { return false; } }, 'Private daemon must start');
   cleanup(scope, async () => { try { await call(operations.operate, {}, { operationId: randomUUID(), action: 'stop', target: { kind: 'daemon' }, expectedRevision: 0 }); } catch { await daemon.close(); } });
   const role = join(fleetDirectory, 'agents/analyst'); mkdirSync(role, { recursive: true, mode: 0o700 });
   const effort = runtime === 'codex' ? 'model_reasoning_effort' : 'thinking_level'; const defaults = runtime === 'codex' ? 'sandbox_mode = "read-only"\napproval_policy = "never"\n' : 'provider = "fixture"\nmodel = "fixture-model"\n';
@@ -38,12 +39,22 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     const added = record((await call(operations.addFleet, {}, { directory: fleetDirectory })).data); fleetId = text(added.fleetId); revision = integer(added.revision); contractError(await raw('/api/fleets/' + fleetId, 'PATCH', { expectedRevision: revision + 1, label: 'Wrong' }), 409, 'stale_revision');
     const page = await call(operations.fleets, {}, undefined, '?pageSize=1'); assert.equal(page.meta.totalItems, 1); assert.equal(list(page.data).length, 1); assert.equal((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data instanceof Array, true); assert.equal(provider.requests.length, 0, 'Inspection and contexts make no model call');
   });
+  await scope.test('inspection is read-only and refuses unsafe or dangling work-area ancestors', async () => {
+    const workarea = join(role, 'workarea'); assert(!existsSync(workarea), 'Inspecting an unstarted instance does not create private runtime state');
+    symlinkSync(join(directory, 'missing-native-state'), workarea);
+    try { contractError(await raw('/api/fleets/' + fleetId + '/agents/analyst/contexts'), 400, 'invalid'); }
+    finally { unlinkSync(workarea); }
+    chmodSync(role, 0o777);
+    try { contractError(await raw('/api/fleets/' + fleetId + '/agents/analyst/contexts'), 400, 'invalid'); }
+    finally { chmodSync(role, 0o700); }
+    assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, []); assert.equal(provider.requests.length, 0);
+  });
   async function operate(action: 'start' | 'stop' | 'reset') {
     const current = record((await call(operations.fleet, { fleetId })).data); const request = { operationId: randomUUID(), target: { kind: 'fleet', fleetId }, action, expectedRevision: integer(current.revision) }; const accepted = record((await call(operations.operate, {}, request)).data); assert.equal(accepted.operationId, request.operationId); let operation = accepted; const approvals = new Set<string>();
     await observe(async () => {
       operation = record((await call(operations.operation, { operationId: request.operationId })).data);
       if (operation.approval !== null) { const approval = record(operation.approval), url = new URL(text(approval.url)); const id = url.pathname.split('/').at(-1)!; if (!approvals.has(id)) { approvals.add(id); await platform.approve(id, text(approval.code)); } }
-      assert.notEqual(operation.status, 'failed', JSON.stringify(operation.errors)); return operation.status === 'succeeded';
+      assert.notEqual(operation.status, 'failed', JSON.stringify(operation.errors) + '\n' + daemon.errors()); return operation.status === 'succeeded';
     }, 'Actual native lifecycle must complete: ' + action, 90000); return operation;
   }
   await scope.test('enroll, validate exact settings and start without model housekeeping', async () => {
@@ -63,5 +74,23 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     await call(operations.operate, {}, { operationId: randomUUID(), target: { kind: 'daemon' }, action: 'stop', expectedRevision: 0 }); await daemon.ended; daemon = contractProcess(scope, selected.daemon, ['--root', root], directory, environment);
     await observe(async () => { try { return (await raw('/api/status')).status === 200; } catch { return false; } }, 'Restarted daemon becomes ready'); const retained = record((await call(operations.fleet, { fleetId })).data); assert.equal(record(list(retained.instances)[0]).desiredActive, false); await operate('start'); assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved); assert.equal(provider.requests.length, completedRequests, 'Restart and explicit resume do not inject another model turn for finished work');
     await operate('stop');
+  });
+  await scope.test('management session requests reach the actual controller and retain native history', async () => {
+    const binding = record(JSON.parse(readFileSync(join(fleetDirectory, '.fleet/binding.json'), 'utf8')) as unknown), remoteFleetId = text(binding.fleetId), before = provider.requests.length;
+    async function human(operation: Declaration, input?: unknown) {
+      const response = await contractHttp(platform.origin, operation.method, operation.path.replace('{fleetId}', remoteFleetId), input, { Cookie: platform.owner.cookie, Origin: platform.origin, 'X-Crossfire-CSRF': platform.owner.csrf });
+      assert.equal(response.status, operation.status, JSON.stringify(response.body)); const parsed = decodeResponse(response.body, operation.output, operation.collection); assert(parsed.ok, 'Management response follows the canonical contract'); return parsed.value;
+    }
+    for (const action of ['start', 'stop'] as const) {
+      const current = record((await human(coordinationOperations.fleet)).data); const operationId = randomUUID();
+      await human(coordinationOperations.requestFleetRuntime, { operationId, agentId: null, action, expectedRevision: integer(current.revision), confirmFreshHistory: false });
+      await observe(async () => {
+        const rows = list((await human(coordinationOperations.fleetRuntimeOperations)).data).map(record), operation = rows.find(value => value.operationId === operationId); assert(operation, 'Management retains its requested operation');
+        assert.notEqual(operation.status, 'failed', String(operation.errorMessage) + '\n' + daemon.errors()); return operation.status === 'succeeded';
+      }, 'Management receives actual controller completion: ' + action, 90000);
+      const state = record((await call(operations.fleet, { fleetId })).data), instance = record(list(state.instances)[0]); assert.equal(instance.desiredActive, action === 'start'); assert.equal(instance.phase, action === 'start' ? 'running' : 'stopped');
+      assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
+    }
+    assert.equal(provider.requests.length, before, 'Management lifecycle control makes no model call for finished work');
   });
 }

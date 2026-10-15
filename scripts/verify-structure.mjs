@@ -6,6 +6,7 @@ import { verifyTestTiming } from './verify-test-timing.mjs';
 import { testOptions } from './test-options.mjs';
 import { verifyPackageOwnership } from './verify-packages.mjs';
 import { verifyCsharpArchitecture } from './verify-csharp-architecture.mjs';
+import { verifyImplementationLayout } from './verify-implementation-layout.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 assert.deepEqual(readdirSync(join(root, 'services')).sort(), ['crossfire', 'fleet', 'fleetd']);
 for (const name of ['apps', 'packages', 'tests', 'skills', 'src', 'third-party']) {
@@ -18,9 +19,10 @@ for (const name of ['crossfire', 'fleetd', 'fleet']) {
   assert.equal(manifest.type, 'module');
 }
 const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-assert.deepEqual(manifest.workspaces, ['services/*', 'services/*/apps/*', 'services/*/packages/*', 'services/*/database']);
+assert.deepEqual(manifest.workspaces, ['services/*', 'services/*/apps/*', 'services/*/node/apps/*', 'services/*/node/packages/*', 'services/*/database']);
 verifyPackageOwnership(root);
 verifyCsharpArchitecture(root);
+verifyImplementationLayout(root);
 console.log('Structure verified: service-local Crossfire, fleetd and fleet; no root application/package pool.');
 verifyTestTiming(root);
 assert.equal(testOptions([]), undefined);

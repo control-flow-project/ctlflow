@@ -4,10 +4,11 @@ The .NET 11 source implements Crossfire, fleetd and Fleet through the same publi
 contracts as Node. The React management UI and four intentional agent-tool assets
 remain shared. Rust is a separate implementation/PR using the same contract suite.
 
-**Readiness:** the latest listener/controller/CLI/distribution source and shared
-tests are written but unverified. The owner requested coding first, testing later.
-Earlier passing checkpoints do not certify these changes. No C# production
-deployment, package publication or completed release is claimed.
+The complete `verify:parity` gate builds both distributions and verifies Node,
+managed C# and actual NativeAOT against the same external assertions, including
+real containers. Current results, diagnostic dispositions and evidence limits
+are recorded in the linked implementation-readiness report. No production
+deployment or registry publication is implied by a local verification pass.
 
 ## Ownership
 
@@ -23,7 +24,7 @@ services/
         Crossfire.Contracts/          validation and REST metadata
         Crossfire.Domain/             functional application/policy modules
         Crossfire.AgentCore/          receiver, history, output and decisions
-        Crossfire.AdapterClient/      coordination and private tool host
+        Crossfire.AdapterCrossfire/   coordination and private tool host
         Crossfire.AdapterCodex/       native Codex protocol and histories
         Crossfire.AdapterPi/          native Pi RPC and common owned extension
         Crossfire.AdapterRuntime/     runtime ports and durable delivery
@@ -67,7 +68,7 @@ files implement the common locking protocol, not application databases.
 The pinned .NET 11 RC1 SDK, GCC/AOT prerequisites, Node 26+, npm and restored
 dependencies are required. Set `DOTNET_EXECUTABLE` to the absolute SDK executable
 if it is not on `PATH`. Build inside a finite aggregate Linux process-group scope.
-These are commands for the later build/verification phase, not completed evidence:
+To build distributions independently of the complete gate:
 
 ```sh
 systemd-run --user --scope --quiet \
@@ -142,9 +143,9 @@ runs actual Codex and Pi with inert providers, actual pinned Conduit, unchanged
 React, private daemon/CLI operations and same-file database reopening. Missing
 configured binaries fail; reports identify exactly the tested implementations.
 
-- [Shared matrix, commands and coverage](../../../docs/verification/shared-contracts.md)
-- [Implementation status and evidence limits](../../../docs/architecture/native-implementations.md)
-- [Canonical Knex databases and upgrade containers](../database/README.md)
+- [Shared matrix, commands and coverage](https://github.com/control-flow-project/crossfire/blob/main/docs/verification/shared-contracts.md)
+- [Implementation status and evidence limits](https://github.com/control-flow-project/crossfire/blob/main/docs/architecture/native-implementations.md)
+- [Canonical Knex databases and upgrade containers](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/database/README.md)
 
 `npm run verify:csharp` runs managed/native core and runtime acceptance; focused
 owner commands are `verify:csharp:core` and `verify:csharp:runtime`.
@@ -156,4 +157,6 @@ These are internal state-transition checks, not native-integration evidence.
 All applicable Node, shared contract, browser/container, architecture, distribution, performance
 and trim/AOT warning-audit gates remain mandatory. Initial managed deployment is
 allowed after gates; it does not substitute for AOT execution. Native EF warnings
-remain visible and their final audit is unfinished.
+remain visible; their scope and disposition belong to the implementation-readiness
+report. The pinned .NET/EF preview is an explicit framework limitation, not a
+silent managed or Node fallback.

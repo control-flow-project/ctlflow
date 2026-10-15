@@ -31,9 +31,8 @@ public sealed partial class ListenerReceiver
     private ListenerStatistics statistics;
     private OwnerObservation? observer;
     private DecisionBroker? approval;
-    private ListenerActivity? activity;
-    private CancellationTokenRegistration activityFailure, nativeFailure;
-    private CancellationTokenSource? reportingScope;
+    private readonly ListenerReporting activity;
+    private CancellationTokenRegistration nativeFailure;
     private MessageArtifacts artifacts = null!;
     private ChatPublication chat = null!, priorityChat = null!;
     private ControlledPublication controlled = null!;
@@ -58,7 +57,12 @@ public sealed partial class ListenerReceiver
     private string File => options.CursorFile;
     private string ControlFile => File + ".control";
     private long Now => options.Clock.GetUtcNow().ToUnixTimeMilliseconds();
-    private ListenerReceiver(ListenerOptions options, CancellationToken stop) { this.options = options; lifetime = CancellationTokenSource.CreateLinkedTokenSource(stop); statistics = new(options.Profile.Account.UserId, options.Clock); }
+    private ListenerReceiver(ListenerOptions options, CancellationToken stop)
+    {
+        this.options = options; lifetime = CancellationTokenSource.CreateLinkedTokenSource(stop); statistics = new(options.Profile.Account.UserId, options.Clock);
+        activity = new(new(options.Coordination, options.Profile.Id, options.Release, options.Control, statistics, options.Clock, options.Log,
+            release => { updates.Available(release); Change(); }, (run, binding) => { reporting.TrySetResult(run); approval!.Start(); observer!.Start(run); options.Activity?.Invoke(run, binding); }, Fail), lifetime.Token);
+    }
     private static T Take<T>(Result<T> value) => value.IsSuccess ? value.Value : throw new ReceiverFailure(value.Error);
     private void Fail(Failure error) { lock (gate) failure ??= error; lifetime.Cancel(); changed.Wake(); }
     private void Change() { Interlocked.Increment(ref revision); changed.Wake(); }
@@ -96,14 +100,14 @@ public sealed partial class ListenerReceiver
             lock (gate) return ReceiveSnapshots.ContentFiles(Storage, File).Concat(chat?.ContentFiles ?? []).Concat(priorityChat?.ContentFiles ?? []).Concat(queries?.ContentFiles ?? []).ToHashSet(StringComparer.Ordinal);
         });
         chat = new(Storage, File + ".chat-publication", options.Profile.Settings, Runtime, options.HistoryMode, () => maximum, artifacts,
-            Accept, observer.Delivered, count => activity?.Delivered(count), events => statistics.Record(events, true));
+            Accept, observer.Delivered, activity.Delivered, events => statistics.Record(events, true));
         priorityChat = new(Storage, File + ".steering-publication", options.Profile.Settings, Runtime, options.HistoryMode, () => maximum, artifacts,
-            _ => true, observer.Delivered, count => activity?.Delivered(count), events => { statistics.Record(events, true); AcceptedSteering(events); }, InputPriority.Steering);
+            _ => true, observer.Delivered, activity.Delivered, events => { statistics.Record(events, true); AcceptedSteering(events); }, InputPriority.Steering);
         controlled = new(Storage, File + ".controller-input", options.Control, Runtime, artifacts, () => maximum, options.Clock);
-        scheduled = new(Storage, File + ".wake-input", options.Coordination, options.Profile, Runtime, () => new(activity?.RunId ?? throw new InvalidOperationException("Scheduled delivery requires a reporting listener"), Runtime.SessionId), artifacts, () => maximum, options.Clock);
+        scheduled = new(Storage, File + ".wake-input", options.Coordination, options.Profile, Runtime, () => new(activity.RunId ?? throw new InvalidOperationException("Scheduled delivery requires a reporting listener"), Runtime.SessionId), artifacts, () => maximum, options.Clock);
         queries = new(Storage, File, options.Matrix, options.Profile, options.Coordination, options.Clock, artifacts,
-            () => { lock (gate) return acquiring || controlling || chat.Pending || priorityChat.Pending || Urgent() is not null || completed is not null; },
-            events => statistics.Record(events, false), events => { statistics.Record(events, true); activity?.Delivered(events.Count(value => value.Type == "m.room.message")); },
+            () => { lock (gate) return chat.Pending || priorityChat.Pending || state.Controls.Any(value => value.Status is "interrupting" or "interrupted") || completed is not null; },
+            events => statistics.Record(events, false), events => { statistics.Record(events, true); activity.Delivered(events.Count(value => value.Type == "m.room.message")); },
             () => { lock (gate) { cycle = null; ReceiveSnapshots.SaveWake(Storage, File, null); windowEnd = 0; } Change(); }, lifetime.Token, gate);
         maintenance = new(Storage, File + ".maintenance", options.Profile.Id, options.Coordination, options.Clock, options.ReconcileMs, options.Invitations);
         Take(await OwnerAuthority.Authorize(options.Coordination, options.Matrix, options.Profile, lifetime.Token)); await Access(lifetime.Token); Take(await ReceiveState.Flush(Storage, options.Matrix, File, lifetime.Token));
@@ -124,17 +128,8 @@ public sealed partial class ListenerReceiver
         lock (gate) { foreach (var value in events) { var control = state.Controls.FirstOrDefault(control => control.Room == value.RoomId && control.Event == value.EventId); if (control?.Status != "delivered") receipts.Publish(value, "accepted"); if (control is not null) SetControl(control, control with { Status = "delivered" }); } SaveControl(); } Change();
     }
     private void ControlChanged() { if (!options.Control.Current().Active) { Interlocked.Increment(ref membershipRevision); lock (gate) sending?.Cancellation.Cancel(); } Change(); }
-    private async ValueTask<bool> Activate()
-    {
-        var current = options.Control.Current(); if (!current.Active) { await PauseActivity(); return false; }
-        if (activity is not null && !activity.Failed.IsCancellationRequested && current.Generation == activityGeneration) return true; await PauseActivity(); if (!options.Control.Current().Active) return false;
-        reportingScope = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token, current.Generation); var binding = options.Control.Binding(); var result = await ListenerActivity.Start(options.Coordination, options.Profile.Id, options.Release, binding, statistics, options.Clock, reportingScope.Token, options.Log, release => { updates.Available(release); Change(); });
-        if (!result.IsSuccess) { if (Retryable(result.Error)) { options.Control.Unavailable(result.Error.Message); return false; } throw new ReceiverFailure(result.Error); }
-        activity = result.Value; activityGeneration = current.Generation; activityFailure = activity.Failed.Register(() => { var error = activity?.Error ?? new Failure("unavailable", "Listener reporting unavailable"); if (Retryable(error)) options.Control.Unavailable(error.Message); else Fail(error); });
-        reporting.TrySetResult(activity.RunId); approval!.Start(); observer!.Start(activity.RunId); options.Activity?.Invoke(activity.RunId, binding); return !current.Generation.IsCancellationRequested && options.Control.Current().Active;
-    }
-    private CancellationToken activityGeneration;
-    private async ValueTask PauseActivity() { activityFailure.Dispose(); var previous = activity; activity = null; try { if (previous is not null) await previous.DisposeAsync(); } finally { reportingScope?.Dispose(); reportingScope = null; } }
+    private async ValueTask<bool> Activate() => Take(await activity.Activate());
+    private ValueTask PauseActivity() => activity.Pause();
     private async ValueTask Close()
     {
         List<Exception> errors = []; async Task Finish(Func<Task> action) { try { await action(); } catch (Exception error) { errors.Add(error); } }

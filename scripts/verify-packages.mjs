@@ -72,7 +72,7 @@ export function verifyPackageOwnership(root) {
       assert.equal(manifest.version, workspace.version, 'Database assets share the coordinated release');
       manifests['services/' + service + '/database'] = manifest;
     }
-    for (const kind of ['apps', 'packages']) {
+    for (const kind of ['apps', 'node/apps', 'node/packages']) {
       const parent = join(directory, kind);
       if (!existsSync(parent)) continue;
       for (const entry of readdirSync(parent, { withFileTypes: true })) {

@@ -172,7 +172,7 @@ activity/decisions, controller diagnostics and ordinary room/DM steering. An
 independent native TUI is not part of the fleet-managed conversation.
 
 ## Related guides
-- [Explicit isolated live-provider acceptance](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/tools/README.md#explicit-pi-provider-acceptance)
+- [Explicit isolated live-provider acceptance](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/node/tools/README.md#explicit-pi-provider-acceptance)
 - [Common configuration and coordination defaults](configuration.md)
 - [Sleep, stop, saved-history resume and fresh-history confirmation](sessions.md)
 - [Management and owner decisions](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/runtime.md)

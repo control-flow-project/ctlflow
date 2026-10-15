@@ -6,7 +6,7 @@
   "private": false,
   "publishConfig": { "access": "public" },
   "type": "module",
-  "devDependencies": { "@ctlflow/crossfire-client": "0.1.20", "@ctlflow/crossfire-test-support": "0.1.20", "@ctlflow/crossfire-operator-support": "0.1.20", "@ctlflow/crossfire-agent-core": "0.1.20", "@ctlflow/fleetd-domain": "0.1.20", "@ctlflow/fleet-daemon-client": "0.1.20", "@ctlflow/fleetd-storage": "0.1.20", "@ctlflow/fleetd-contracts": "0.1.20", "@ctlflow/crossfire-adapter-codex": "0.1.20", "@ctlflow/crossfire-adapter-pi": "0.1.20", "@ctlflow/crossfire-adapter-matrix": "0.1.20", "@ctlflow/crossfire-adapter-runtime": "0.1.20", "@ctlflow/crossfire-adapter-filesystem": "0.1.20", "@ctlflow/crossfire-contracts": "0.1.20", "@ctlflow/crossfire-kernel": "0.1.20", "ws": "8.21.3" },
+  "devDependencies": { "@ctlflow/fleetd-adapter-execution": "0.1.20", "@ctlflow/crossfire-client": "0.1.20", "@ctlflow/crossfire-test-support": "0.1.20", "@ctlflow/crossfire-operator-support": "0.1.20", "@ctlflow/crossfire-agent-core": "0.1.20", "@ctlflow/fleetd-domain": "0.1.20", "@ctlflow/fleet-daemon-client": "0.1.20", "@ctlflow/fleetd-storage": "0.1.20", "@ctlflow/fleetd-contracts": "0.1.20", "@ctlflow/crossfire-adapter-codex": "0.1.20", "@ctlflow/crossfire-adapter-pi": "0.1.20", "@ctlflow/crossfire-adapter-matrix": "0.1.20", "@ctlflow/crossfire-adapter-runtime": "0.1.20", "@ctlflow/crossfire-adapter-filesystem": "0.1.20", "@ctlflow/crossfire-contracts": "0.1.20", "@ctlflow/crossfire-kernel": "0.1.20", "ws": "8.21.3" },
   "bin": { "fleetd": "./dist/bin/fleetd.mjs" },
   "files": ["LICENSE", "dist/bin", "dist/assets", "docs", "README.md"],
   "exports": { "./executable": "./dist/bin/fleetd.mjs", "./artifacts": "./dist/assets/manifest.json", "./package.json": "./package.json" },
@@ -15,9 +15,9 @@
     "npm": ">=11.17.0"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p node/tsconfig.json --noEmit",
     "build": "node ../../scripts/build-service.mjs fleetd",
-    "build:package": "node scripts/build-package.mjs",
+    "build:package": "node node/scripts/build-package.mjs",
     "test": "node ../../scripts/test.mjs fleetd all",
     "tools": "node dist/tools/main.js"
   }

@@ -74,8 +74,8 @@ disposed in reverse acquisition order.
 | Aggregate resource limits | Final tests/gates use verified 24 GiB memory, zero swap and 8,192 tasks; Docker descendants share the finite test slice. Focused/baseline probes use verified 8 GiB/no-swap/1,024-task limits. |
 
 The three full-test failures are in the unchanged native Codex tests:
-`services/crossfire/scripts/native-tests/codex.test.ts` (two failures) and
-`services/crossfire/tests/codex-process-restart.test.ts` (one failure).
+`services/crossfire/node/scripts/native-tests/codex.test.ts` (two failures) and
+`services/crossfire/node/tests/codex-process-restart.test.ts` (one failure).
 They also reproduce using a clean detached checkout of exact main `8842dd8`,
 its own compiled sources/package resolutions and the same installed Codex 0.162.1.
 The baseline tests cover queued-input/replay and cancellation assumptions. This

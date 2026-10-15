@@ -10,6 +10,7 @@
   "type": "module",
   "description": "Human-led Matrix coordination and agent management",
   "devDependencies": {
+    "@ctlflow/crossfire-web": "0.1.20",
     "@ctlflow/crossfire-test-support": "0.1.20",
     "@ctlflow/crossfire-data": "0.1.20",
     "knex": "3.2.10",
@@ -36,7 +37,7 @@
     "migrate:latest:management:sqlite": "knex migrate:latest --knexfile ./knexfile.management.mjs --env production",
     "migrate:status:management:sqlite": "knex migrate:list --knexfile ./knexfile.management.mjs --env production",
     "migrate:make:management:sqlite": "knex migrate:make --knexfile ./knexfile.management.mjs --env development -x mjs",
-    "typecheck": "tsc -p tsconfig.core.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
+    "typecheck": "tsc -p node/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
     "build": "node ../../scripts/build-service.mjs crossfire",
     "test": "node ../../scripts/test.mjs crossfire all",
     "test:browser": "node ../../scripts/test.mjs crossfire browser",
@@ -45,8 +46,8 @@
     "start": "node crossfire start",
     "crossfire": "node crossfire",
     "tools": "node dist/tools/main.js",
-    "verify:architecture": "node scripts/verify-architecture.ts",
-    "verify:installation": "node scripts/verify-architecture.ts installation",
-    "verify:container": "node dist/scripts/verify-container.js"
+    "verify:architecture": "node node/scripts/verify-architecture.ts",
+    "verify:installation": "node node/scripts/verify-architecture.ts installation",
+    "verify:container": "node ../../scripts/verify-container.mjs"
   }
 }
