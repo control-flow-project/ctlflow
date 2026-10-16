@@ -1,128 +1,74 @@
-# Fleet sessions
+# Session controls
 
-## Management
+## Separate controls
 
-Open a fleet's **Sessions** tab for fleet-wide controls. Its **Agents** tab keeps
-the agent list separate. For one agent, open its **Session** tab.
-The fleet owner and administrators can request:
+| Control | Effect |
+| --- | --- |
+| Stop sessions | Saves enabled selection, removes desired activation, closes listeners/native engines |
+| Resume sessions | Restores saved selection and exact histories |
+| Pause delivery | Stops new input; retains controller/native sessions and unread state |
+| Idle sleep | Stops idle native engines; listener remains ready for eligible input |
+| Fresh history | Explicit controller reset after verified history/config export |
+| Account suspension | Removes account authority; not a native process receipt |
+| Fleet archive/agent retirement | Decommissions operational authority after settled stop evidence |
 
-| Action | Native execution | History and delivery |
-| --- | --- | --- |
-| Resume session(s) | Start stopped agents or wake sleeping native engines; retain active bindings. | Resume full saved native histories, identities and current configured parameters. Delivery follows the fleet's existing setting. |
-| Stop session(s) | Close the selected listeners and owned engines. | Retain native histories, accounts, permissions and unread positions. The controller remains connected. |
-| Start with fresh history | Stop selected agents, prepare private exports and restart with fresh model contexts. | Archive old bindings; retain identity, credentials, permissions, Matrix messages and configured parameters. Confirmation is required. |
+Fleet Stop remembers exactly which instances were enabled. Resume restores that
+selection plus currently enabled instances, not every enrolled account.
+Repeated Stop retains the original selection; an empty selection resumes nobody.
+Per-agent Stop removes that instance from the saved selection.
 
-Fleet Stop remembers the enabled agents. Fleet Resume restores that selection and
-any already enabled agents, leaving deliberately stopped agents off. Repeated Stop
-while stopped retains the selection; individual Stop removes its member. An empty
-saved selection resumes nobody. Initial fleet startup without a saved selection
-or active intent starts its configured roster. Fresh history still targets every
-agent in the confirmed fleet scope; agent scope means only the selected agent.
-Fresh-history confirmation names the scope and explains that model
-context is being replaced. Cancelling confirmation submits nothing. Stopping also
-confirms that running operating-system commands are not frozen for later continuation.
+## Default resume
 
-The paginated operations table shows pending, running, succeeded or failed results
-reported by the controller. Acceptance is not completion. A failed fleet operation
-may contain successful peers; inspect the per-agent errors before retrying. An
-offline controller cannot accept a session operation through management.
+UI and CLI ordinary start resumes full saved history with the same identity and
+configured native parameters. Current provider authentication is recopied on
+activation. Unread positions and pending receipts are retained.
 
-**Delivery** is separate: pausing delivery retains active bindings and any live
-native engines. Resuming sessions does not silently enable a fleet whose delivery
-was paused. fleetd itself hosts the listeners: one binding per active agent, not
-one listener process per agent. Each fleet has its scoped controller connection.
+When unfinished-work evidence exists, the adapter first settles older input.
+It then inserts one receipt-backed restart instruction to reread AGENTS.md,
+inspect prior effects and continue unfinished authorized work.
+Idle/sleeping contexts receive no dummy task.
 
-## Automatic sleep
+The native process does not resurrect an old operating-system command or active
+turn. Uncertain earlier delivery is explicitly supplied as restart context, not
+reported as a receipt from the previous process.
 
-Crossfire's Policy page sets fleet idle sleep; the default is 30 minutes and zero
-disables it. An idle native engine can be closed while its receiver remains
-online. Sleeping is not stopped: eligible chat, scheduled or broadcast input
-wakes it and resumes the exact saved history. Busy histories, pending decisions,
-input or receipts and unknown activity prevent sleep.
+## Fresh history
 
-`fleet show` exposes native phase, desired binding intent, last native activity,
-listener activity and history availability separately. `fleet agent contexts`
-reads saved context IDs while sleeping or stopped without waking a process.
-Codex attachment requires a live native endpoint; GET never launches one. Use Resume
-sessions or `fleet agent start` to wake a sleeping native engine for a terminal
-without changing its binding. Idle histories receive no model prompt; interrupted
-work receives the continuation instruction described below.
-Pi cannot attach a TUI to its existing RPC process; attachment reports unavailable
-without launching a second writer. Its status, contexts, sleep and resume still
-use these same lifecycle interfaces.
-
-Orderly daemon shutdown preserves desired activation. Starting the same daemon
-root after a reboot restores active bindings with retained histories; explicitly
-stopped agents remain stopped. No automatic operating-system boot service is
-installed. Preserve the controller root as well as fleet workareas and credentials.
-
-## CLI
-
-```sh
-fleet stop research
-fleet start research
-fleet agent stop research analyst-west
-fleet agent start research analyst-west
-```
-
-Start defaults to full saved native history. No resume flag or transcript replay is
-needed. The runtime retains its full conversation context even though controller
-RPC responses omit old turn payloads. Missing or broken established bindings cause
-a visible failure; they never silently fall back to new history.
-
-Working histories and unanswered questions/approvals have a private unfinished-work
-checkpoint. After Stop, daemon restart or native recovery, their exact saved history
-receives: "Your saved session was restarted... If your previous task is unfinished
-and still authorized, resume that task." The notice is not a new assignment and
-does not approve a pending decision. It retains the task's original reply
-destination; room-isolated histories stay isolated. Idle/sleeping contexts receive
-no synthetic prompt. Native delivery receipts prevent duplicate notices on retries,
-but an interrupted operating-system command is terminated, not frozen, and external
-effects are not guaranteed exactly once. The agent must check completed work first.
-
-Only an explicit flag selects fresh history:
+Management requires explicit confirmation. CLI requires:
 
 ```sh
 fleet start research --fresh-history
-fleet agent start research analyst-west --fresh-history
-fleet agent start research analyst-west --fresh-history --operation-id YOUR_UUID
+fleet agent start research analyst-east --fresh-history
 ```
 
-The flag is the CLI's explicit destructive intent. The command prints an operation
-ID; retry uncertain submission with that same ID and identical arguments, not a
-new ID. Fleet-wide and per-agent start and stop commands accept `--operation-id UUID`.
-The controller persists outcomes and pins unacknowledged remote operations
-so reconnects cannot repeat a completed reset. If the controller dies during an
-operation, it reports that interrupted operation as failed rather than guessing
-that it completed or silently performing another reset.
+Only fleetd performs reset. It stops selected execution, verifies available
+authorized Matrix history and nonsecret configuration exports, archives old
+bindings/checkpoints and starts fresh contexts with the same identity/settings.
+Interrupted phases retain their operation identity. Failed exports cannot replace
+a context. Chats, media, credentials and archived histories are not erased.
 
-## Boundaries
+## Native activity and attachment
 
-First enrollment authorizes initialization of an agent's primary native history.
-Successful binding consumes that authorization. Explicit fresh history authorizes
-another initialization only after the old context is safely retired. In per-room
-mode, a new room obtains its own history when first used; changing history mode is
-an explicit configuration change, not an ordinary restart fallback.
+```sh
+fleet show research
+fleet agent contexts research analyst-east
+fleet agent attach research analyst-east
+```
 
-Every Crossfire agent is fleet-owned. The coding session performing setup remains
-independent and is never adopted, stopped or reset. Native history is not a
-guarantee that an unfinished shell process survives a stop.
-This feature does not delete workarea files, Matrix chats or old native archives.
+Working, waiting, idle, sleeping, stopped and unknown are different states.
+A heartbeat is not evidence of progress. Context listing is read-only.
+Attach returns the exact running native command; it does not create another
+engine or history. Pi live attachment is unsupported.
 
-A full machine restart and abruptly killing only fleetd are different. A native
-app-server can survive `SIGKILL` of fleetd and retain its history's writer lock.
-The replacement refuses that competing writer, not silently resumes or adopts
-it. Safely stop the verified orphan before ordinary saved-history restoration.
+## Host/controller restart
 
-Local stop records actual native close through the same current controller/run
-receipt used by management operations. If acknowledgment fails, native processes
-remain stopped and the error stays visible; automatic recovery is not blocked by
-that network failure. Retry stop with a new operation ID after checking the
-reported outcome. Pending proofs retry only while their exact controller
-generation remains valid. After generation turnover, explicitly resume and stop
-the binding to obtain current evidence. Retirement and fleet archive stay refused
-until Crossfire confirms settled receipts and actual native stop.
+Start the original controller root after reboot. Durable desired intent restores
+enabled bindings; explicit stopped selections remain stopped.
+No boot service is installed automatically.
 
-- [History exports, unread positions and reset preparation](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)
-- [Configured runtime parameters and history modes](configuration.md)
-- [Controller recovery and private API](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/operations.md)
+A killed controller can leave a native writer alive. Its lock prevents competing
+history ownership; resolve that exact process before resuming.
+Retained data alone does not guarantee a provider/native service is available.
+
+- [Controller operations](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/operations.md)
+- [History and uncertainty](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)

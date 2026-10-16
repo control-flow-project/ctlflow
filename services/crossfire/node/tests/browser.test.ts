@@ -115,7 +115,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const service = createHttpServer(application, worker, release);
   service.listen(0, '127.0.0.1'); await once(service, 'listening');
   const address = service.address(); assert(address && typeof address === 'object');
-  const routes = { publicOrigin: config.publicOrigin, matrixOrigin: matrix.base, serviceOrigin: 'http://127.0.0.1:' + address.port,
+  const routes = { publicOrigin: config.publicOrigin, matrixOrigin: matrix.base, service,
     web: join(process.cwd(), 'dist/web'), element };
   cleanup(scope, async () => { await worker.stop(); service.closeAllConnections();
     await new Promise<void>(resolve => service.close(() => resolve())); application.close(); });

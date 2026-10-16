@@ -12,25 +12,9 @@ public static class ApiPipeline
     {
         if (endpoints.Select(endpoint => endpoint.OperationName).Distinct(StringComparer.Ordinal).Count() != endpoints.Count)
             throw new InvalidOperationException("REST operations must have exactly one C# implementation");
-        var limits = new Dictionary<string, (int Count, long ExpiresAt)>(StringComparer.Ordinal); var rateGate = new object();
+        var rate = PublicRequestBudget.Create(state.Now, state.Configuration.TrustedProxyAddresses);
         var registration = new RegistrationTransport(state);
         var changes = new FleetChanges();
-        bool Rate(HttpContext http)
-        {
-            lock (rateGate)
-            {
-                var now = state.Now();
-                foreach (var key in limits.Where(entry => entry.Value.ExpiresAt <= now).Select(entry => entry.Key).ToArray()) limits.Remove(key);
-                var address = http.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-                if (!limits.TryGetValue(address, out var limit))
-                {
-                    if (limits.Count >= 4096) return false;
-                    limit = (0, now + 60000);
-                }
-                limit = (limit.Count + 1, limit.ExpiresAt); limits[address] = limit;
-                return limit.Count <= 120;
-            }
-        }
         return async http =>
         {
             var requestId = Identity.Identifier();
@@ -53,8 +37,11 @@ public static class ApiPipeline
                 if (await PlatformRoutes.Handle(state, http, path, requestId, presentation)) return;
                 if (registration.Handles(path))
                 {
-                    if ((path == RegistrationTransport.RegisterPath || http.Request.Method == "POST") && !Rate(http))
-                    { http.Response.Headers.RetryAfter = "60"; await NativeResponses.Error(http, requestId, 429, "M_LIMIT_EXCEEDED", "Request rate exceeded"); return; }
+                    if (path == RegistrationTransport.RegisterPath || http.Request.Method == "POST")
+                    {
+                        var admitted = rate(http);
+                        if (!admitted.IsSuccess) { if (admitted.Error.Code == "rate_limit") http.Response.Headers.RetryAfter = "60"; await NativeResponses.Error(http, requestId, admitted.Error.Code == "rate_limit" ? 429 : 403, admitted.Error.Code == "rate_limit" ? "M_LIMIT_EXCEEDED" : "M_FORBIDDEN", admitted.Error.Message); return; }
+                    }
                     await registration.Handle(http, path, requestId); if (http.Request.Method == "POST" && http.Response.StatusCode == 200) wake(); return;
                 }
                 if (MatrixRoutes.Handles(path, http.Request.Method)) { await MatrixRoutes.Handle(state, http, path, requestId); return; }
@@ -74,10 +61,10 @@ public static class ApiPipeline
                     if (allowed.Count != 0) http.Response.Headers.Allow = string.Join(", ", allowed);
                     await Transport.Send(http, requestId, Results.Fail<ApiReply>(allowed.Count == 0 ? "missing" : "method_not_allowed", allowed.Count == 0 ? "Route not found" : "Method not allowed"), 200); return;
                 }
-                if (selected.Operation.Authentication == "public" && selected.Operation.Method != "GET" && !Rate(http))
+                if (selected.Operation.Authentication == "public" && selected.Operation.Method != "GET")
                 {
-                    http.Response.Headers.RetryAfter = "60";
-                    await Transport.Send(http, requestId, Results.Fail<ApiReply>("rate_limit", "Request rate exceeded"), 200); return;
+                    var admitted = rate(http);
+                    if (!admitted.IsSuccess) { if (admitted.Error.Code == "rate_limit") http.Response.Headers.RetryAfter = "60"; await Transport.Send(http, requestId, Result<ApiReply>.Fail(admitted.Error), 200); return; }
                 }
                 using var database = new CrossfireDbContext(state.Database);
                 var authenticated = await ApiAuthentication.Authenticate(state, database, http, selected, requestId, changes);

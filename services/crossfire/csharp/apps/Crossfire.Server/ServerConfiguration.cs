@@ -3,11 +3,12 @@ using System.Text.RegularExpressions;
 using Crossfire.Contracts;
 using Crossfire.Domain;
 using Crossfire.Kernel;
+using Crossfire.Server.Http;
 
 namespace Crossfire.Server;
 
 public sealed record ServerConfiguration(string Instance, string ServerName, string PublicOrigin, string ContentOrigin, string MatrixOrigin,
-    string Administrator, string JwtSecret, string RegistrationSecret, PublicationBudget PublicationBudget, long LoggingRetentionDays)
+    string Administrator, string JwtSecret, string RegistrationSecret, PublicationBudget PublicationBudget, long LoggingRetentionDays, IReadOnlyList<string>? TrustedProxyAddresses = null)
 {
     public string ServiceMatrixId => "@crossfire-" + Instance + ":" + ServerName;
 }
@@ -17,7 +18,7 @@ public static partial class Configurations
     public static Result<ServerConfiguration> Parse(JsonElement input)
     {
         var fields = Validation.Fields(input, ["instance", "serverName", "publicOrigin", "contentOrigin", "matrixOrigin", "administrator", "jwtSecret", "registrationSecret"],
-            ["publicationBudget", "loggingRetentionDays"]);
+            ["publicationBudget", "loggingRetentionDays", "trustedProxyAddresses"]);
         if (!fields.IsSuccess) return Result<ServerConfiguration>.Fail(fields.Error);
         var instance = Validation.Text(input.GetProperty("instance"), 40);
         var server = Validation.Text(input.GetProperty("serverName"), 200);
@@ -40,8 +41,10 @@ public static partial class Configurations
         if (!budget.IsSuccess) return Result<ServerConfiguration>.Fail(budget.Error);
         var retention = input.TryGetProperty("loggingRetentionDays", out var days) ? Validation.Integer(days, 1, Validation.MaxWireInteger / 86400000) : Result<long>.Success(7);
         if (!retention.IsSuccess) return Result<ServerConfiguration>.Fail(retention.Error);
+        var proxies = input.TryGetProperty("trustedProxyAddresses", out var addresses) ? PublicRequestBudget.Proxies(addresses) : Result<IReadOnlyList<string>>.Success([]);
+        if (!proxies.IsSuccess) return Result<ServerConfiguration>.Fail(proxies.Error);
         return Result<ServerConfiguration>.Success(new(instance.Value, server.Value, publicOrigin.Value, contentOrigin.Value, matrixOrigin.Value,
-            administrator.Value, jwt.Value, registration.Value, budget.Value, retention.Value));
+            administrator.Value, jwt.Value, registration.Value, budget.Value, retention.Value, proxies.Value));
     }
 
     private static Result<string> ReadOrigin(JsonElement input, string name)

@@ -1,75 +1,74 @@
 # Crossfire
 
-This repository contains three services:
-- `services/crossfire`: Matrix coordination, REST API, React management and the shared listener/tool capabilities.
-- `services/fleetd`: named user-scoped controllers that own agent execution.
-- `services/fleet`: local and SSH management CLI for those controllers.
+Crossfire coordinates Matrix identities, room access and message delivery for
+fleet-managed coding agents. The repository contains three products.
 
-Each service owns its applications, packages, tests and assets. Shared runtime
-behavior has one functional adapter owner and declared package exports.
+| Product | Responsibility | Distribution |
+| --- | --- | --- |
+| Crossfire | REST API, Matrix integration, management UI, authorization and coordination records | Private |
+| fleetd | User-scoped controller, shared listener and native session lifecycle | `@ctlflow/fleetd` |
+| Fleet | CLI for the controller's private API, locally or through SSH | `@ctlflow/fleet` |
 
-Every agent belongs to a fleet, including a one-agent setup. fleetd embeds the
-listener and owns native sessions. The coding assistant performing setup remains
-independent; its process and conversation are not attached or imported.
+Every agent belongs to a fleet. A single agent uses a one-agent fleet.
+Setup creates a separate managed conversation; it does not attach the coding
+assistant that runs setup.
 
-Only `@ctlflow/fleet` and `@ctlflow/fleetd` are public npm packages. All other
-workspaces remain private; public builds bundle their declared internal modules.
-Use the personalized management setup guide to install the exact release and
-run `fleet setup`. It asks no configuration questions, preserves saved identity
-and history on repetition, and waits for the required human enrollment approval.
+Node, C# and Rust implement the same products. C# targets .NET 11 with managed and
+NativeAOT outputs. They share the React UI, wire contracts and SQLite database.
+Knex alone owns database creation and migrations for all implementations. The
+combined gate selects Node, C# managed, C# NativeAOT and Rust explicitly.
 
 ## Documentation
+
 - [Documentation index](docs/README.md)
-- [Reusable operator verification](docs/operator-tools.md)
-- [Crossfire: installation, agents, permissions and administration](services/crossfire/README.md)
-- [fleet: configuration, commands, remote access and operations](services/fleet/README.md)
-- [fleetd: controller lifecycle and private API](services/fleetd/README.md)
-- [Earendil Pi runtime: setup, settings, questions and limitations](services/fleet/docs/pi.md)
-- [Architecture, data model, REST contracts and acceptance requirements](docs/specification.md)
-- [Repository instructions](AGENTS.md)
-- [Language-independent Knex databases and migration containers](services/crossfire/database/README.md)
-- [C# products, distributions and verification](services/crossfire/csharp/README.md)
-- [Rust products, distributions and verification](services/crossfire/rust/README.md)
-- [Shared Node/C#/Rust contract suite](docs/verification/shared-contracts.md)
+- [Crossfire installation](services/crossfire/docs/getting-started.md)
+- [Agent and fleet setup](services/fleet/docs/getting-started.md)
+- [Controller operation](services/fleetd/docs/operations.md)
+- [Architecture and contracts](docs/specification.md)
+- [C# build and distribution](services/crossfire/csharp/README.md)
+- [Rust build and distribution](services/crossfire/rust/README.md)
+- [Native ownership layout](docs/architecture/native-layout.md)
+- [Rust integration review](docs/architecture/rust-review.md)
+- [Development and verification](docs/development.md)
+- [Shared executable tests](docs/verification/shared-contracts.md)
+- [Implementation boundaries](docs/architecture/native-implementations.md)
 
 ## Development
-Requires Node.js 26+ and npm 11.17+. On Linux, from this directory, run all
-installation/build/test children inside one verified finite process-group scope:
+
+Use Linux, Node.js 26+, npm 11.17+ and the versions pinned in this checkout.
+The combined gate also requires the pinned .NET SDK, native compilation tools,
+the pinned Rust toolchain, rootless Docker, Chrome, Codex and pinned Pi assets.
+
+Run installation and verification inside a finite process-group resource scope:
 
 ```sh
 systemd-run --user --scope --quiet \
-  --property=MemoryMax=16G --property=MemorySwapMax=0 \
+  --property=MemoryMax=34359738368 --property=MemorySwapMax=0 \
   --property=TasksMax=2048 /bin/bash -c \
   'npm ci --ignore-scripts && npm run verify:parity -- /absolute/new-evidence-directory'
 ```
 
-`npm test` builds once and runs isolated test files across available cores.
-It includes Codex, Pi, browser and fleet integration tests. Claude remains
-unimplemented; unsupported runtimes have no selectable product path or test flag.
-Builds/tests require a verified finite process-group resource scope.
-The pinned SQLite package includes the verified Linux native binary; source
-compilation is required only on platforms without a usable bundled binary.
-Tests use disposable private state, Conduit and inert providers, not production
-credentials or paid models.
-The complete gate also requires the pinned .NET 11 SDK, native AOT toolchain and
-Rust toolchain. It builds managed, NativeAOT and Rust distributions and runs the
-same API, native-engine, CLI, browser, container and migration assertions against
-all four targets. Rust-only internal checks use a scope bounded to 16 GiB,
-no swap and 2,048 tasks; run that stricter scope for the combined gate as well.
-Implementations share one
-React UI, REST/daemon contracts and Knex-created SQLite representation; the
-shared contract suite accepts explicit backend executables. Source lives under
-each product's `node/`, `csharp/` and `rust/` owners; UI, database and external contracts
-remain shared. Current four-target evidence and scope limits are in the
-[Rust integration review](docs/architecture/rust-review.md); the merged C#
-preview-framework diagnostic disposition remains in
-[implementation readiness](docs/architecture/native-implementations.md).
-- [Test selection, prerequisites and evidence](docs/development.md)
+Size the finite limits for the host. Heap limits alone do not bound child
+processes. Do not rebuild a checkout while tests consume its generated output.
+Fixtures use separate state and inert providers, not production accounts.
+
+## Limits
+
+Codex and Earendil Pi are implemented. Claude is not selectable.
+Agent memory, filesystem access, native permissions and Matrix room access are
+different boundaries. Per-room history is not a process or credential sandbox.
+Static reports are public to anyone with their link.
+
+The .NET SDK and EF dependencies are pinned previews. NativeAOT emits dependency
+diagnostics; passing supported-path tests does not establish arbitrary EF query
+or reflection support. Test results identify their actual platform and providers.
 
 ## License
 
 Copyright (c) 2026 Jeswin P Kumar. All rights reserved.
+First-party code, documentation and assets require a separate written commercial
+license. Public npm distribution does not grant open-source rights.
 
-First-party code, documentation and assets are proprietary and require a separate
-written commercial license. See [LICENSE](LICENSE). Contact: jeswinpk@agilehead.com.
-Third-party software and materials retain their own licenses.
+- [License](LICENSE)
+
+Contact: jeswinpk@agilehead.com. Third-party licenses are unchanged.

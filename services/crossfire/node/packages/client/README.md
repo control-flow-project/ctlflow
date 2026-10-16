@@ -1,21 +1,20 @@
 # Crossfire HTTP client
 
-Private, browser-safe transport for the current Crossfire contracts. This package
-depends only on the kernel and wire contracts; it contains no server composition,
-native runtime, concrete database or Node platform imports.
+Private browser-safe transport for the current wire contracts.
 
-- `client` exports `createClient`, the validated, typed REST client. Browser
-  cookie/CSRF and agent/controller bearer authentication remain mutually exclusive.
-- `binary-request` streams bounded uploads without retaining a second payload.
-- `matrix-login` exports `login` for Matrix password authentication over HTTP.
+| Export | Responsibility |
+| --- | --- |
+| client | Typed validated REST requests and responses |
+| binary-request | Bounded binary upload transport |
+| matrix-login | Native Matrix password login over HTTP |
 
-The React UI, fleetd composition and Crossfire tools consume these declared
-exports. Coordination adapters compose them rather than implementing HTTP
-request/response handling again. The former backend-named client exports are
-removed, not retained as aliases.
+Dependencies are kernel and contracts, not server composition, storage, native
+runtime or Node platform APIs.
+React, coordination adapters and operator tools consume declared exports.
 
-Requests and responses use the same operation descriptors, byte bounds,
-cancellation, strict response envelopes and error results for every backend.
-Selecting another server language does not alter this package or the browser UI.
-See the [native implementation report](../../../../docs/architecture/native-implementations.md)
-for backend readiness; this client is not a native backend.
+Cookie/CSRF and bearer authentication are mutually exclusive.
+Requests use explicit origin, finite byte bounds and cancellation.
+Responses are decoded by the operation's canonical output schema.
+Selecting a server language does not change this client or the UI.
+
+- [Implementation ownership](../../../../../docs/architecture/native-implementations.md)

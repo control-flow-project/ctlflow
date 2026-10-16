@@ -1,51 +1,42 @@
 # Fleet configuration
 
-## Files and ownership
+A fleet directory contains a roster, role definitions and private instance state.
+The loader rejects unknown fields, invalid names, unsafe paths and contradictory
+settings. Definitions are trackable; `.fleet/` and workareas are private state.
+
+## Directory
 
 ```text
 research/
   runtime.toml
   rooms.toml
+  .fleet/
   agents/
     analyst/
       agent.toml
       AGENTS.md
       workarea/
         analyst-east/
+          .codex/ or .pi/
+          .crossfire/
         analyst-west/
+          .codex/ or .pi/
+          .crossfire/
 ```
 
-A definition owns native settings/instructions. Instances share a definition,
-not mutable sessions or work areas. Definitions supply native setting defaults;
-each instance may explicitly select different native values without copying the
-definition, instructions or skills. Listener history settings remain instance-owned.
-The fleet's private `.fleet` state holds bindings, desired enrollment and reset
-evidence. Each instance's private workarea holds `.codex` or `.pi` native provider/history
-and `.crossfire` delivery/tool state. Never commit private state.
+Workareas are distinct non-overlapping relative descendants of
+`agents/<definition>/workarea/`. They own identity, cursors, histories and
+receipts. Optional `workspace` changes native cwd, not state ownership.
 
-## runtime.toml
-
-An optional `[instances.runtime_options]` table selects native values for that
-instance, for example `model_reasoning_effort = "medium"` for a fast worker on
-the same analyst definition. Only supplied top-level keys replace defaults;
-nested tables replace their entire default value. All effective selections are
-validated by the runtime adapter. Native inspection, start/resume, recovery,
-history reset and operator verification resolve them identically. The API uses
-`runtimeOptions`; only the TOML boundary uses `runtime_options`.
-Runtime kind, role instructions, skills and coordination policy stay definition-owned.
-Codex supports explicit `low`, `medium`, `high`, `xhigh` and `max` reasoning
-efforts; the chosen model must actually advertise the requested effort. There
-is no silent effort substitution or `med` alias for native `medium`.
-Explicit configuration is not authority from a source or agent chat. Apply
-changes through the existing stopped-controller and revision-checked procedures.
+## Roster
 
 ```toml
 fleet = "research"
 
 [coordination]
 adapter = "crossfire"
-server = "https://YOUR_SERVER"
-owner = "@YOUR_ACCOUNT:YOUR_SERVER"
+server = "https://example.test"
+owner = "@member:example.test"
 
 [[instances]]
 key = "analyst-east"
@@ -62,79 +53,32 @@ name = "analyst-west"
 definition = "analyst"
 workarea = "agents/analyst/workarea/analyst-west"
 
+[instances.runtime_options]
+model_reasoning_effort = "high"
+
 [instances.listener_options]
 history_mode = "per-room"
 ```
 
-Keys/names start with a lowercase letter, contain lowercase letters, digits or
-hyphens, and are at most 40 characters. Instance names, keys and work areas must
-be distinct. Work areas are non-overlapping relative children of
-`agents/<definition>/workarea/`; symlinked or unsafe private paths fail.
+Fleet/definition/instance keys and registered names begin with a lowercase letter,
+then lowercase letters, digits or hyphens, maximum forty characters.
+Instance keys remain local identity selectors. Registered names are globally
+unique on the Crossfire instance. A collision rejects the entire introduction;
+there is no automatic suffix or name-based takeover.
 
-Optional `workspace = "/absolute/project"` on an instance changes only the native
-cwd. It defaults to that instance's private workarea. It must be canonical, owned
-and not writable by other users; existing project modes are not tightened.
-Private state remains in the workarea, passed separately to the native adapter as
-`stateDirectory`. The adapter's private native home retains the managed histories
-and intended provider configuration, without overwriting or
-importing the project's `.codex/config.toml`, history or coding session. Role
-instructions, administrator setup instructions and the pinned Crossfire skill
-are delivered via native developer instructions on both create and resume;
-external cwd does not rely on private workarea ancestor skill discovery.
+A definition supplies defaults. Each provided top-level native instance value
+replaces its default; nested tables replace whole values, not recursive fields.
+The adapter validates the same result during inspection, start/resume, recovery
+and reset. Changes apply at a stopped-to-running transition.
 
-Every native start/resume, including automatic wake and recovery, atomically
-recopies the current host Codex `auth.json` from `CODEX_HOME` (default `~/.codex`).
-Sign in with `codex login` on the controller host before resuming. Changing that
-host login changes the provider account used on subsequent activations, not the
-agent's Matrix identity or saved conversation. Already-running engines retain
-their current login until stopped/resumed. Preflight checks the host login and
-does not rewrite running agents. Invalid or unsafe source files fail before
-startup; absence removes the stale file copy rather than reusing it. Native
-environment-only provider authentication does not require a file login.
-
-Default project setup generates this same roster with one `project` definition,
-the chosen project as `workspace` and a stable private workarea. Definitions
-without `workspace` keep their original private cwd; this is one configuration
-model, not another deployment mode.
-
-The coordination block supplies server/owner once. It contains no approval room,
-runtime transport, session UUID or secret. The private owner DM opens automatically
-on first owner contact, terminal output or native decision, not at fleet startup.
-
-### Listener options
-
-| Field | Accepted values | When omitted |
-| --- | --- | --- |
-| `history_mode` | `shared`, `per-room` | `shared` |
-
-Crossfire instance policy owns the incoming inline-message threshold, default
-65536 UTF-8 bytes, including origin and verified sender metadata. It applies to
-every agent and is not a roster override. Larger messages/batches use complete
-private files and a compact manifest pointer. Ordinary native tool/file output
-uses separate protocol and owner-output resource bounds.
-- [Message files, catch-up and reset](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)
-
-Shared history preserves context across all rooms, DMs and private operator
-input. Per-room history retains one exact native conversation per room ID and a
-separate private control history for fleet messages, schedules and maintenance.
-It is the same workarea and identity. Codex uses one native engine; Pi uses one
-owned RPC process per open context. Returning to a room resumes its
-history, not an empty conversation. Files/tools/credentials remain shared;
-terminal output still goes privately to the owner. This is not a security sandbox.
-
-Listener changes apply on stopped-to-running transition. A pending publication
-must finish receipt recovery before its history configuration changes.
-History-mode changes preserve old sessions/cursors without copying, merging,
-forking or replaying them. Pending native decisions also prevent a mode switch.
-
-## agent.toml
+## Role
 
 ```toml
 name = "Research analyst"
 runtime = "codex"
 
 [runtime_options]
-model = "YOUR_SUPPORTED_MODEL"
+model = "EXACT_AVAILABLE_MODEL_ID"
 model_reasoning_effort = "high"
 sandbox_mode = "danger-full-access"
 approval_policy = "on-request"
@@ -144,109 +88,62 @@ wake_mode = "selected"
 permissions = ["room.agent.invite"]
 
 [[coordination_options.wake_senders]]
-matrix_user_id = "@owner:YOUR_SERVER"
+matrix_user_id = "@member:example.test"
 include_agents = true
 ```
 
-The roster's optional workspace, or private workarea by default, supplies native
-cwd. The companion `AGENTS.md` supplies
-role instructions. The selected functional runtime adapter alone validates native
-options; fleetd does not interpret engine-specific settings. The table below is
-Codex-specific. Pi uses `provider`, `model` and `thinking_level`, with no emulated
-Codex options; see [Pi configuration and limitations](pi.md).
+`name` is the role label, not an account override. `AGENTS.md` supplies native
+role instructions; nested project instructions retain their native semantics.
+Several instances reuse definitions, not mutable histories.
 
-The role's separate `coordination_options` declares Crossfire wake authority and
-invitation defaults for every instance. Owner approval applies the exact policy
-to current ordinary grants and future admissions without another setup step.
-Omitting the whole block requests an explicit person-only selection for the
-actual configured owner and no invitation delegation. Each selected person can
-include their currently owned agents. Multiple entries combine; individual
-agents require `include_agents = false`. Use `wake_senders = []` for no entries.
-Changed coordination policies require explicit `fleet enroll` while stopped and
-owner review. Ordinary restarts validate existing identities and preserve live
-wake rules and manual room-specific edits. Configuration grants no room membership
-or native power.
-- [Fields, selected identities, approval and removal rules](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/coordination.md)
+## Native options
 
-| Field | Accepted values | When omitted |
-| --- | --- | --- |
-| `model` | Nonempty native model ID, up to 200 characters | Native provider/config selection |
-| `model_reasoning_effort` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, `ultra` | Native config selection |
-| `sandbox_mode` | `read-only`, `workspace-write`, `danger-full-access` | `danger-full-access` |
-| `approval_policy` | `untrusted`, `on-failure`, `on-request`, `never` | `on-request` |
-| `dangerously_bypass_approvals_and_sandbox` | Boolean | Disabled |
-| `features.default_mode_request_user_input` | Boolean in `[runtime_options.features]` | Native default (off in verified Codex 0.160.0) |
+Codex owns `model`, `model_reasoning_effort`, `sandbox_mode`,
+`approval_policy`, `dangerously_bypass_approvals_and_sandbox` and supported
+native feature options. Its admitted effort strings are none, minimal, low,
+medium, high, xhigh, max and ultra, subject to actual selected-model support.
 
-The selected model/provider must support the chosen effort and native policy.
-Unknown keys, wrong types, unavailable models and refused settings fail; they are
-not silently ignored. Native effective settings are checked after create/resume.
-`max` is passed unchanged to Codex; it is not an alias for `xhigh` or `ultra`.
-Check the selected native model catalog before choosing it. `ultra` can enable
-native automatic delegation and is not selected by requesting `max`.
+Omitted sandbox/approval selects danger-full-access/on-request.
+An explicit true bypass selects danger-full-access/never; conflicting explicit
+settings fail. Max is not an alias for xhigh or ultra.
+Default-mode structured questions require the native
+`features.default_mode_request_user_input` capability.
+Unknown or unavailable options fail rather than silently clamp.
 
-Full access is unsandboxed execution with the controller user's filesystem and
-network privileges, not root access. It does not imply automatic approval:
-`on-request` still routes native permission review links to the owner's private DM.
-Restricted sandbox choices remain available. Native restricted-policy defects
-are not repaired by changing one utility or weakening project privacy checks.
+Pi owns provider/model/thinking_level and rejects Codex permission fields.
+Its exact available model and level are checked natively.
 
-### Native bypass option
+- [Pi configuration](pi.md)
 
-This uses Codex's native flag name, expressed as a TOML key:
-```toml
-[runtime_options]
-model = "YOUR_SUPPORTED_MODEL"
-model_reasoning_effort = "high"
-dangerously_bypass_approvals_and_sandbox = true
-```
+## Coordination defaults
 
-It selects `sandbox_mode = "danger-full-access"` and
-`approval_policy = "never"`, equivalent to
-`--dangerously-bypass-approvals-and-sandbox`. The app-server CLI does not accept
-that TUI flag; the adapter supplies the corresponding native thread settings.
-Conflicting explicit sandbox/approval values fail. Compatible explicit values
-are allowed. `false` leaves ordinary values/defaults in effect. There is no
-`yolo` configuration alias. Use only when this unsandboxed, no-confirmation
-execution is intended.
+Modes are `selected`, `humans` and `everyone`.
+Selected entries combine with OR. A human always includes themselves; true
+`include_agents` also includes their currently active agents.
+An individual agent entry requires false. Empty selected wakes nobody.
+Everyone requires an empty list.
 
-### Structured questions
+The only role admission capability is `room.agent.invite`, absent by default.
+It grants no room membership, enrollment approval or process control.
+It is materialized through ordinary generation-bound room permissions.
 
-To offer native human questions in Codex Default mode:
-```toml
-[runtime_options.features]
-default_mode_request_user_input = true
-```
+Owner approval reviews the exact roster and defaults. Existing approved resume
+uses saved authority without overwriting management-edited wake/room rules.
+Use explicit stopped-fleet enrollment to propose new/renamed identities or changed
+coordination defaults. Controller proof cannot approve its own policy.
 
-This is an explicit native under-development feature, not global configuration
-or terminal prose interception. Enabling it requires the selected native binary
-to expose `default_mode_request_user_input` in `codex features list`. Startup
-checks the capability before spawning an engine, in addition to the baseline
-stock Codex 0.158.0+ requirement. Missing capabilities fail explicitly, never
-silently disable the option. All native questions
-in one request retain their identities, option/free/secret-answer flags and
-deadline. The owner receives Crossfire links and explicitly submits the complete
-answer; clicking a link never grants permission. Native Default-mode questions
-may be nonblocking and expire. Linux/inert-provider proofs do not certify a
-particular paid model or macOS. Unsupported interactive stdin is not emulated.
-- [Human decisions and disclosure boundaries](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/runtime.md)
+## History and size
 
-### Apply changes
+Shared is the default. Per-room retains an exact history for each immutable room
+and a private control context. Changing mode does not copy/merge/replay histories.
+Neither mode isolates tools, files or credentials.
 
-Stop and start the affected agent:
-```sh
-fleet agent stop research analyst-east
-fleet agent start research analyst-east
-```
+Crossfire instance policy, not the roster, owns the inline byte limit and idle
+sleep timeout. Large complete input uses private files. Native output/patches
+do not inherit that incoming-message budget.
 
-Or stop/start the fleet. Current definition model, reasoning, sandbox and approval
-settings apply to the original saved history/histories; identity/cursors remain intact.
-Editing a running definition does not hot-reconfigure an engine.
-Do not append native permission flags to a remote TUI resume command.
+## Room plan
 
-## rooms.toml
-
-Rooms must already exist in Matrix. This file is a reviewed management plan, not
-an implicit startup action or room creator:
 ```toml
 fleet = "research"
 
@@ -254,23 +151,28 @@ fleet = "research"
 instance = "analyst-east"
 
 [[agents.grants]]
-room = "!EXISTING_STABLE_ROOM_ID:YOUR_SERVER"
+room = "!EXACT_ROOM_ID:example.test"
 access = "reply"
 muted = false
 ```
 
-Open the fleet Room plan tab, submit the plan, review its diff and explicitly
-confirm. Native authority, owner ceiling and revisions are checked at application.
-Read-only, reply and custom-power grants remain separate from wake selection.
-Custom access uses `access = "custom"` with an integer `level`. Invitation
-defaults come from owner-approved `agent.toml` coordination settings; management
-can adjust a room's applied permission set. Neither belongs in `rooms.toml`.
-Empty grants remove discretionary access for included instances; the built-in
-owner DM is preserved. Omitted instances are untouched. Owner DM access and
-delegation cannot be edited through this plan.
+The selected immutable fleet plus instance key resolves the agent.
+Access is read, reply or custom; only custom includes integer `level`.
+A plan replaces discretionary grants for listed instances only. Omitted grants
+for those instances are removals; `grants = []` removes all discretionary access.
+It never creates rooms, enrolls identities or removes a protected owner DM.
+Preview/apply checks exact input, revisions and current native authority.
 
-Invitation permission allows an agent to invite registered agents across owners
-and remove admissions it introduced, subject to Matrix authority. Membership
-alone does not wake all agents. Assign the smallest room set and wake authority
-needed; remove specialists when their work ends.
-- [Permissions and wake rules](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/management.md)
+## Secrets and activation
+
+Do not put tokens, passwords, endpoints, session IDs or shell commands in tracked
+roster/role files. Private directories use 0700 and state files 0600.
+The adapter refreshes current host provider login at actual native activation.
+It does not copy the setup assistant's history, trust settings or bypass policy.
+
+A missing/corrupt established history fails. Only explicit fresh-history reset
+authorizes replacement. Inspect effective settings and each instance outcome
+after an update.
+
+- [Session controls](sessions.md)
+- [Crossfire history](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)

@@ -7,6 +7,7 @@ import { target } from '../services/crossfire/node/packages/test-support/dist/co
 import { contractStack } from '../services/crossfire/dist/tests/contracts/fixture.js';
 import { serverContracts } from '../services/crossfire/dist/tests/contracts/server.contract.js';
 import { browserContracts } from '../services/crossfire/dist/tests/contracts/browser.contract.js';
+import { ingressContracts } from '../services/crossfire/dist/tests/contracts/ingress.contract.js';
 import { daemonContracts } from '../services/fleetd/dist/tests/contracts/daemon.contract.js';
 import { cliContracts } from '../services/fleet/dist/tests/contracts/cli.contract.js';
 
@@ -21,6 +22,7 @@ test('shared product contracts: ' + selected.name, { timeout: 780000 }, async sc
   for (const runtime of ['codex', 'pi']) await scope.test('fleetd lifecycle contract with actual ' + runtime, child => daemonContracts(child, platform, selected, runtime));
   await scope.test('Fleet CLI contract', child => cliContracts(child, platform, selected));
   await scope.test('Shared React contract', child => browserContracts(child, platform));
+  await scope.test('Trusted ingress contract', child => ingressContracts(child, platform));
   await platform.close();
   scope.diagnostic(JSON.stringify({ target: selected.name, implementation: selected.implementation, runtimeAdapters: ['codex', 'pi'], matrixTargets: targets.map(value => value.name), data: join(platform.state, 'management.sqlite') }));
 });

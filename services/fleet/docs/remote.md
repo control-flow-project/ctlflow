@@ -1,51 +1,36 @@
-# Remote controllers and agent terminals
+# Remote controllers
 
-## SSH management
+Remote Fleet commands use SSH forwarding to fleetd's private Unix socket.
+The controller has no public HTTP/TCP management port.
 
-Start fleetd as the normal user on the controller computer. Then:
 ```sh
 fleet remote add office --ssh operator@office-host --root /absolute/private/controller
 fleet --remote office list
-fleet --remote office add /absolute/private/research
-fleet --remote office start research
-fleet --remote office agent attach research analyst-east
+fleet --remote office show research
 fleet --remote office agent contexts research analyst-east
-fleet --remote office agent attach research analyst-east --context '!ORIGINAL_ROOM_ID:YOUR_SERVER'
-fleet --remote office stop research
+fleet --remote office agent attach research analyst-east
 ```
 
-Remote directories refer to that computer. Existing SSH authentication, host-key
-verification and Unix-socket forwarding authorize the connection. The CLI changes
-no SSH configuration, keys, permissions or public listening ports. Closing its
-temporary tunnel does not stop the controller.
+Use normal SSH authentication and host-key verification. A profile contains the
+connection description, not copied SSH/provider credentials. Do not disable host
+verification to make setup pass. Remote filesystem paths refer to the controller
+host, not the laptop running Fleet.
 
-## Native TUI pointer
+Attachment wraps the runtime adapter's exact command through the verified SSH
+connection. The native endpoint remains loopback-only; its private token is read
+on the controller host, not printed or copied into the profile.
+Closing the CLI or native TUI does not stop the managed engine.
 
-For Codex, `fleet agent attach research analyst-east` prints a ready-to-run native command
-for the exact running saved session. Copy and run it manually. The command starts
-a terminal client, not another engine/session/listener. Closing the TUI leaves
-fleet execution running.
+Remote update consumes already installed remote assets:
 
-For a per-room instance, first list contexts. Attach defaults to its separate
-private control history; pass the exact listed room ID to inspect that room's
-conversation. Codex histories share one engine; Pi opens one owned RPC process
-per active history with the same identity/workarea. A pointer
-does not create, seed or replay a conversation. The coding session performing
-setup is independent and has no fleet attachment pointer.
+```sh
+fleet --remote office update research \
+  --release-directory /absolute/private/install/node_modules/@ctlflow/fleetd/dist/assets
+```
 
-Pi cannot attach a TUI to an existing RPC process. Both local and remote
-attachment requests report unavailable without starting another engine. Status,
-saved-context discovery, stop and resume work through the normal controller API.
+Install the selected release there first and restart the controller using its new
+executable. There is no HTTP download fallback, process adoption or guessed
+remote session.
 
-The runtime adapter owns session selection and native arguments. The private
-token is read from a run-local file into the client's environment, never printed
-in command text/API/logs. The engine's native home, executable and search path
-are retained, including software installed through NVM.
-
-Remote attachment prints an SSH-wrapped command that executes on the controller.
-No additional public port or forwarding service is needed. Request a fresh pointer
-after engine restart; old run-local credentials are removed.
-
-Model and permissions belong in the definition, not remote resume overrides.
-Stop/start applies configuration to the saved session.
-- [Runtime configuration](configuration.md)
+- [Commands](commands.md)
+- [Update procedure](operations.md)

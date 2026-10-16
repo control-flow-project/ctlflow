@@ -25,6 +25,13 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
   const configuration = { instance: text(config.instance), serverName: text(config.serverName), publicOrigin: text(config.publicOrigin), contentOrigin: text(config.contentOrigin), matrixOrigin: text(config.matrixOrigin), administrator: text(config.administrator), jwtSecret: text(config.jwtSecret), registrationSecret: text(config.registrationSecret) };
   const bootstrap = record(JSON.parse(readFileSync(join(state, 'bootstrap.json'), 'utf8')) as unknown), containerName = 'crossfire-' + createHash('sha256').update(state).digest('hex').slice(0, 16);
   let selected = initial, running: ContractProcess | undefined;
+  const abandoned = new Set<string>();
+  cleanup(scope, () => {
+    for (const identity of abandoned) {
+      const present = execFileSync('docker', ['container', 'ls', '--all', '--no-trunc', '--filter', 'id=' + identity, '--format', '{{.ID}}'], { encoding: 'utf8', timeout: 30000 }).trim();
+      if (present) { assert.equal(present, identity); execFileSync('docker', ['rm', '--force', identity], { timeout: 30000 }); }
+    }
+  });
   async function close() {
     const owned = running; running = undefined; if (!owned) return;
     let failure: unknown;
@@ -39,8 +46,7 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
     if (failure !== undefined) throw failure;
   }
   cleanup(scope, close);
-  async function start(target: ContractTarget) {
-    selected = target;
+  function launch(target: ContractTarget) {
     const options: string[] = [];
     if (target.implementation === 'csharp') {
       const distribution = record(JSON.parse(readFileSync(resolve(dirname(target.server.binary), '../distribution.json'), 'utf8')) as unknown);
@@ -48,14 +54,24 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
       options.push('--source', repository, '--runtime', distribution.mode);
     }
     if (target.implementation === 'rust') options.push('--source', repository);
-    running = contractProcess(scope, target.server, ['start', '--directory', state, '--port', String(port), '--content-port', String(contentPort), '--cgroup-parent', parent!, ...options], repository);
+    return contractProcess(scope, target.server, ['start', '--directory', state, '--port', String(port), '--content-port', String(contentPort), '--cgroup-parent', parent!, ...options], repository);
+  }
+  async function start(target: ContractTarget) {
+    selected = target; running = launch(target);
     await observe(async () => {
       assert.equal(running?.alive(), true, 'Container operator must remain running\n' + running?.errors() + '\n' + running?.output());
+      if (!running?.output().includes('Public: ' + origin + '/')) return false;
       try { return (await contractHttp(origin, 'GET', '/api/health')).status === 200; } catch { return false; }
     }, 'Owned container must become ready: ' + target.name, 1800000);
   }
   await start(initial);
   const client = await contractClient({ directory, state, origin, contentOrigin, configuration, bootstrap: { administratorPassword: text(bootstrap.administratorPassword) }, native: { base: origin }, targets, release: builtRelease(),
     restart: async (target = selected) => { await close(); await start(target); }, close, current: () => selected });
-  return { ...client, port, contentPort, containerName };
+  return { ...client, port, contentPort, containerName, launch, start,
+    async abandon() {
+      const owned = running; assert(owned, 'The fixture must own its launcher'); assert(owned.alive(), 'Only the fixture-owned live launcher can be terminated');
+      const identity = execFileSync('docker', ['inspect', '--format', '{{.Id}}', containerName], { encoding: 'utf8', timeout: 30000 }).trim();
+      assert.match(identity, /^[a-f0-9]{64}$/u); abandoned.add(identity);
+      owned.child.kill('SIGKILL'); await owned.ended; running = undefined;
+    } };
 }

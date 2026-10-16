@@ -85,7 +85,7 @@ test('listener policy is explicit and rejects missing authority, self triggers a
 
 test("pagination rejects duplicate parameters and unbounded pages", () => {
   assert.deepEqual(page(new URLSearchParams('page=2&pageSize=1')), { ok: true, value: { page: 2, pageSize: 1 } });
-  for (const query of ['page=0', 'pageSize=101', 'pageSize=1&pageSize=2', 'after=old']) assert.equal(page(new URLSearchParams(query)).ok, false);
+  for (const query of ['page=0', 'pageSize=101', 'pageSize=1&pageSize=2', 'after=old', 'page=01', 'page=%2B1', 'page=1.0', 'page=1e0', 'page=0x1', 'page=%201', 'page=1%0A', 'page=١', 'page=', 'page=100001']) assert.equal(page(new URLSearchParams(query)).ok, false, query);
 });
 
 test('administrator instructions are required plain text with an exact UTF-8 bound', () => {

@@ -1,69 +1,61 @@
-# Fleet statistics
+# Fleet traffic and native usage
 
-Open a fleet's **Activity** view and select **Traffic & usage**
-(`/manage/fleets/{fleetId}/activity?view=traffic`). It shows traffic, per-agent counts, sender-to-recipient
-flows and optional native usage. Select the last hour, day, week or thirty days;
-refresh explicitly. Message flows are paginated. Only the fleet owner or an
-administrator can read this view or its API.
+Open Fleet Activity, then Traffic & usage:
+`/manage/fleets/{fleetId}/activity?view=traffic`.
+Only the fleet owner or an administrator can read it.
 
 ## Measurements
 
-| Measurement | Meaning |
+| Field | Interpretation |
 | --- | --- |
-| Observed messages | Non-self, non-internal chat seen by each recipient listener. |
-| Delivered messages | Chat confirmed as input by native receipt or exact explicit catch-up acknowledgment. |
-| Content bytes | UTF-8 serialized content, not provider tokens. |
-| Attachment bytes | Declared media metadata, not downloaded or verified file sizes. |
-| Largest message | Largest observed content size. |
-| Untracked samples | Bounded collection overflow or rejected native counter regressions. |
-| Native tokens | Adapter-reported input, cached input, output, reasoning output and total. |
-| Cache-write input | Reported only when supported; otherwise unknown. |
-| Reasoning output | Reported only when supported; Pi's cumulative native API does not provide this split. |
-| Provider spend | Unknown when the adapter provides no measured billing; never estimated from an unverified model price. |
+| Observed | Eligible non-self, non-internal traffic seen per recipient |
+| Delivered | Input confirmed by a native receipt or explicit catch-up acknowledgment |
+| Content bytes | UTF-8 serialized message content, not tokens |
+| Attachment bytes | Declared media metadata, not verified downloads |
+| Largest content | Largest observed message content |
+| Dropped/untracked | Bounded sampling overflow or rejected counter regressions |
+| Input/cached input/output/reasoning/total tokens | Optional runtime measurements |
+| Cache-write input | Null unless supplied by the adapter |
+| Provider spend | Null unless measured by a supported billing source |
 
-Messages observed by several agents count per recipient. Historical browsing is
-not new message delivery. Cached input is a subset of input; reasoning output is
-a subset of output. The first cumulative native usage sample establishes a
-baseline, so previous session usage is not attributed to the current interval.
-Native counters are self-reported runtime measurements, not billing certification.
-Pi obtains one native baseline on each activation and adds usage from native
-message and summary events, without repeatedly fetching full transcripts or
-polling the model. Pi's input total includes native uncached, cache-read and
-cache-write tokens; cached input remains a subset. Runtime pricing estimates
-are not trusted provider spend. Mixed-runtime summaries retain unknown splits
-when any included interval cannot report them.
+One event observed by several agents counts per recipient. Historical browsing
+does not count as new delivery. Cached input is a subset of input; reasoning is a
+subset of output. Never add those subsets to their containing totals.
 
-## Collection and retention
+The first cumulative usage observation establishes a baseline. Prior session use
+is not charged to the interval. Codex uses native token-usage events. Pi obtains
+a baseline and adds native message/summary usage; its unavailable reasoning split
+remains null. Native estimates are not provider billing.
 
-The shared listener owns bounded RAM counters: 256 flows, 32 native sessions and
-2048 recent event identities. It retains no message bodies for analytics and no
-long-term local statistics store. Approximate deduplication and discarded-sample
-counts keep overhead bounded. Runtime adapters can omit the optional typed usage
-hook; unsupported counters stay unknown.
+## Collection
 
-Every approximately five minutes, an immutable summary is attached to the normal
-heartbeat. Exact sequence/digest acknowledgment makes retries idempotent. Failed
-statistics ingestion does not cancel a successful heartbeat or message delivery.
-Acknowledged summaries are released locally; shutdown attempts a final flush.
-Process death can lose unsent approximate counters, not delivery checkpoints.
+The listener holds at most 256 flows, 32 sessions and 2048 recent event IDs.
+It stores no analytics message bodies or long-term local statistics database.
+Overflow changes a dropped-sample count, not chat delivery.
 
-Crossfire aggregates normalized indexed hourly relations and follows the shared
-`loggingRetentionDays` policy (default seven days). Cleanup runs at startup and
-hourly even without ingestion; the configured retention bounds every period view.
-Reads aggregate and page
-in SQL. Period windows use summary capture time, not exact per-message billing
-timestamps. No polling model calls, message-body archive, pricing requests or
-realtime analytics stream are involved.
-- [Platform logging retention and protected state](logging.md)
+About every five minutes an immutable summary accompanies a normal heartbeat.
+Exact run/sequence/digest acknowledgment makes retries idempotent.
+A failed summary does not roll back a heartbeat or chat receipt.
+Acknowledged data is released locally; shutdown attempts a final flush.
+Process death may lose unsent approximate statistics.
 
-## REST
+Crossfire stores indexed normalized hourly summaries under
+`loggingRetentionDays`, default seven days. Cleanup starts at startup and runs
+hourly. A thirty-day query does not restore records already expired.
+
+## API
 
 ```text
 GET /api/fleets/{fleetId}/statistics?hours=24&page=1&pageSize=20
 ```
 
-`hours` accepts 1, 24, 168 or 720, default 24. `page` is a positive canonical
-integer; `pageSize` defaults to 20 and is at most 100. Unknown/duplicate query
-fields fail validation. The normal authenticated REST envelope contains fleet
-totals, per-agent totals/tokens, paginated flows, summary times, dropped counts,
-retention days and explicit nulls for unsupported usage/spend.
+`hours` is 1, 24, 168 or 720; default 24. Page size defaults to 20, maximum 100.
+Canonical pagination, unknown/duplicate query refusal and owner/admin scope apply.
+The response contains totals, per-agent data, paginated sender/recipient flows,
+capture times, retention and nullable unsupported measurements.
+
+These are asynchronous operational summaries, not realtime analytics, precise
+per-message accounting, a billing ledger or a performance guarantee.
+
+- [Retention](logging.md)
+- [Management views](management.md)

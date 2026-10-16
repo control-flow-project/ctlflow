@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { withDockerTestResources } from '../../../scripts/docker-test-resources.mjs';
 import { imageName, migrationImageName } from '../dist/apps/server/src/operator.js';
-import { migrationArguments, ownedDocker } from '../dist/apps/server/src/container-commands.js';
+import { migrationArguments } from '../dist/apps/server/src/container-commands.js';
+import { ownedDocker } from '../dist/apps/server/src/container-lifecycle.js';
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { schema13Store } from '../dist/tests/support/schema13.js';
 

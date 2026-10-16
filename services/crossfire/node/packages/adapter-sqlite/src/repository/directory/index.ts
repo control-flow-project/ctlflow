@@ -79,7 +79,7 @@ function agentRecord(row: AgentRow): AgentRecord { return {
     ownerMember: { principalId: row.ownerMember_principal_id, principalKind: row.ownerMember_principal_kind, displayName: row.ownerMember_display_name }, name: row.name
   }; }
 export function page<T>(items: T[], totalItems: number, input: PageRequest): Page<T> {
-  return { items, totalItems, page: input.page, pageSize: input.pageSize, totalPages: Math.ceil(totalItems / input.pageSize) };
+  return { items, totalItems, page: input.page, pageSize: input.pageSize, totalPages: Math.max(1, Math.ceil(totalItems / input.pageSize)) };
 }
 
 function allAgents(database: Database.Database, filter: DirectoryFilter): Page<AgentRecord> {

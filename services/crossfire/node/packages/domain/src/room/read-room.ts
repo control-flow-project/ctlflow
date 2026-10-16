@@ -53,5 +53,5 @@ export async function listRooms(services: Dependencies, actor: Actor, input: Pag
   rooms.sort((left, right) => left.name.localeCompare(right.name) || left.roomId.localeCompare(right.roomId));
   const totalItems = rooms.length;
   return success({ items: rooms.slice((input.page - 1) * input.pageSize, input.page * input.pageSize),
-    page: input.page, pageSize: input.pageSize, totalItems, totalPages: Math.ceil(totalItems / input.pageSize) });
+    page: input.page, pageSize: input.pageSize, totalItems, totalPages: Math.max(1, Math.ceil(totalItems / input.pageSize)) });
 }

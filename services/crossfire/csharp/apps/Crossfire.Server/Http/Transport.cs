@@ -82,28 +82,7 @@ public static class Transport
 
     public static Result<PageRequest> Page(IReadOnlyDictionary<string, string> values)
     {
-        var page = Integer(values.GetValueOrDefault("page", "1")); var size = Integer(values.GetValueOrDefault("pageSize", "20"));
-        return page is >= 1 and <= 100000 && size is >= 1 and <= 100 ? Result<PageRequest>.Success(new((int)page.Value, (int)size.Value))
-            : Results.Fail<PageRequest>("invalid", "Use page ≥ 1 and pageSize 1–100");
-    }
-
-    private static double? Integer(string value)
-    {
-        var trimmed = TextRules.Trim(value);
-        if (trimmed.Length == 0) return 0;
-        if (trimmed.StartsWith("0b", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith("0o", StringComparison.OrdinalIgnoreCase))
-        {
-            var radix = char.ToLowerInvariant(trimmed[1]) == 'b' ? 2 : 8; double digits = 0;
-            if (trimmed.Length == 2) return null;
-            foreach (var character in trimmed.AsSpan(2))
-            {
-                var digit = character - '0';
-                if (digit < 0 || digit >= radix) return null;
-                digits = digits * radix + digit;
-            }
-            return double.IsFinite(digits) ? digits : null;
-        }
-        if (trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase) && long.TryParse(trimmed[2..], System.Globalization.NumberStyles.HexNumber, null, out var hexadecimal)) return hexadecimal;
-        return double.TryParse(trimmed, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var result) && double.IsFinite(result) && Math.Truncate(result) == result ? result : null;
+        var parsed = Pagination.Parse(values);
+        return parsed.IsSuccess ? Result<PageRequest>.Success(new(parsed.Value.Page, parsed.Value.PageSize)) : Result<PageRequest>.Fail(parsed.Error);
     }
 }
