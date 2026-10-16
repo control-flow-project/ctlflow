@@ -1,236 +1,146 @@
 # Crossfire operator tools
 
-Run from the repository root after the normal build:
+Build the workspace, then run from the repository root:
 
 ```sh
 node services/crossfire/dist/tools/main.js --help
 ```
 
-`npm run tools --workspace=@ctlflow/crossfire -- <command> <options>` invokes the
-same implementation. Use absolute filesystem paths. Examples use an example
-server and operator paths, not deployment defaults. JSON inputs must be existing
-owned, private, bounded, nonsymlink files. Write them with `umask 077` and keep
-them out of Git. Every command accepts `--output /absolute/private/report.json`.
+All paths are absolute. Input/evidence files must be owned, private, bounded and
+nonsymlink. Every command accepts `--output /absolute/private/report.json`.
+Unknown or repeated options fail.
 
 ## Commands
 
-| Command | Required options | Optional options | Checks |
-| --- | --- | --- | --- |
-| `release` | `--origin`, `--release-directory` | `--web-directory` | Local manifest/artifact contract; live release; exact published bytes and hashes; optional management entry/assets |
-| `server` | `--origin`, `--credentials` | `--expect` | Anonymous access refusal, normal human login, complete visible roster, native invite discovery, runtime observations and fleet maps |
-| `browser` | `--origin`, `--credentials`, `--browser`, `--evidence` | None | Real login, authorized management sections, desktop/mobile geometry, tables, software history, wake picker inspection/cancel without writes, map selection/URL/keyboard and personalized onboarding link |
-| `content` | `--url`, `--main-origin`, `--browser`, `--evidence` | None | An existing public HTML report's headers, opaque browser origin, blocked cookies/storage/main-site reads and absent application routes; no upload or deletion |
-| `database` | `--file` | `--expect`, `--schema` | Current Crossfire application/schema, integrity, foreign keys and every table count; optional columns/keys/index metadata |
-| `preservation` | `--before`, `--after` | None | Protected existing domain records unchanged, allowing appended records |
-| `files` | `--plan` | None | Owned regular-file fingerprints and optional exact expected hashes |
-| `archive` | `--file`, `--sha256` | None | Exact archive hash, readable tar listing, no absolute/traversing member names; no extraction |
-| `source` | `--directory` | `--revision`, `--tree` | Clean Git root and exact full revision/tree when supplied |
-| `host` | `--plan` | None | Rootless Docker, exact image/provenance, health, readonly filesystem, dropped capabilities, no-new-privileges and loopback published ports |
-| `enrollment` | `--origin`, `--credentials`, `--plan` | `--execute` | Exact pending owner/controller/roster/code, human authority and revision-checked approval only when explicitly selected |
-| `fleet-wake` | `--origin`, `--credentials`, `--plan` | `--execute` | Exact fleet/owner/controller/complete roster, current policies, optional revision-checked updates and complete result verification |
+| Command | Required options | Optional |
+| --- | --- | --- |
+| release | --origin, --release-directory | --web-directory |
+| server | --origin, --credentials | --expect |
+| browser | --origin, --credentials, --browser, --evidence | none |
+| content | --url, --main-origin, --browser, --evidence | none |
+| database | --file | --expect, --schema |
+| preservation | --before, --after | --logging-retention-days and --retention-at together |
+| files | --plan | none |
+| archive | --file, --sha256 | none |
+| source | --directory | --revision, --tree |
+| host | --plan | none |
+| enrollment | --origin, --credentials, --plan | --execute |
+| fleet-wake | --origin, --credentials, --plan | --execute |
+
+These commands do not replace Fleet lifecycle controls.
+Only enrollment/fleet-wake have explicit reviewed mutation modes.
+Browser/content checks execute selected pages, including their JavaScript;
+they do not call a model or publish a report.
 
 ## Authentication
 
-The credentials file has one shape:
+Private credentials input:
 
 ```json
-{"matrixUserId":"@operator:example.test","password":"operator-supplied-secret"}
+{"matrixUserId":"@operator:example.test","password":"supplied-secret"}
 ```
 
-The account is dynamic. Login uses the native Matrix password API, then the
-current Crossfire cookie/CSRF session. The returned account is verified twice.
-Tools use normal permission-scoped APIs; a member sees only permitted data.
-Native tokens, cookies, passwords and enrollment claim secrets are never printed.
-REST failure output identifies the method, route template and error code without
-printing a private response body. Cleanup uses independent deadlines so an
-interrupted inspection can still log out. Temporary authentication/audit records
-are normal server activity, not a zero-write claim.
+Tools use native Matrix login and the ordinary Crossfire cookie/CSRF session.
+The returned account is verified; no role bypass or owner impersonation occurs.
+Cleanup has independent deadlines for logout. Login/audit rows are ordinary
+server activity, so this is not a zero-write claim.
+Tokens, passwords and claim secrets are not printed.
 
-```sh
-node services/crossfire/dist/tools/main.js server --origin https://example.test --credentials /home/operator/evidence/credentials.json --expect /home/operator/evidence/server.json
-```
-
-An optional server expectation file:
+Optional server expectations are exact:
 
 ```json
-{"release":"selected-release-id","agents":2,"names":["analyst","helper"],"online":true,"emptyRooms":true,"fleetKey":"research","controllerName":"laptop"}
+{"release":"selected-release","agents":2,"names":["analyst","helper"],"online":true,"emptyRooms":true,"fleetKey":"research","controllerName":"workstation"}
 ```
 
-Every field is optional. `names` means the exact visible roster, not a subset.
-`online` requires exactly one live reporting run and available runtime observations
-for every visible agent. `release` also checks active listener versions.
-`emptyRooms` checks assigned agent access, fleet-map rooms and the human's native
-joined rooms; use fleetd `--no-rooms` for every enrolled agent's native membership.
-Paginated reads reject changed totals, missing records and repeated identities.
-Concurrent edits require rerunning the check, not silently accepting a partial list.
+Names means the complete visible roster, not a subset.
+Online requires current listener/native evidence.
+Empty rooms checks assigned access and visible native/map rooms; use fleetd's
+native membership check for every enrolled account.
+Changing totals or repeated/missing paginated identities fails the check.
 
-## Release and browser
+## Releases and browser
 
-The release directory is the selected immutable
-`services/crossfire/dist/onboarding/<release>` directory. The optional web
-directory is `services/crossfire/dist/web`. No release ID is inferred from an
-unrelated checkout. Published artifacts are bounded by the canonical release
-contract; management entry/assets are bounded to 1 MiB/32 MiB respectively.
-HTTPS is required except for explicit loopback development origins. Redirects
-and cross-origin credential forwarding are refused.
+Select the exact local immutable onboarding release and optional web output.
+The release check verifies manifest, artifact bytes/hashes and live endpoints.
+It does not infer a release from an unrelated checkout.
 
-```sh
-node services/crossfire/dist/tools/main.js release --origin https://example.test --release-directory /home/operator/crossfire/services/crossfire/dist/onboarding/selected-release --web-directory /home/operator/crossfire/services/crossfire/dist/web
-node services/crossfire/dist/tools/main.js browser --origin https://example.test --credentials /home/operator/evidence/credentials.json --browser /usr/bin/google-chrome --evidence /home/operator/evidence/browser
-```
+The browser check uses actual login, visible authorized pages and desktop/mobile
+geometry. It does not create rooms/rules/users, approve native decisions, change
+delivery or send tasks. Element signup/messaging remains separate regression
+or site-deployment coverage.
 
-Browser inspection uses the UI's normal login, all visible fleets' sections and
-statistics and one visible agent's detail sections. Administrator-only pages are visited only
-for an administrator. Screenshots are private. It does not create users, rules,
-rooms or messages, pause fleets, select native answers or call a model. Element
-theme/signup/messaging checks remain application regression or deployment-owner
-checks; this command makes no claim to cover them.
-The browser's native login request is fetched from the selected real server,
-without redirects, and its unchanged response is delivered to the UI only after
-capturing the credential for cleanup. This avoids reading a discarded response
-body after the UI navigates. It neither stubs authentication nor substitutes data.
+Content checks inspect one existing public HTML report's headers, opaque origin,
+blocked cookies/storage/main-site reads and absent application routes.
+This establishes credential isolation, not report correctness or confidentiality.
 
 ## Database and preservation
 
-`content` visits only the explicitly selected public report. Use it after publishing
-nonsecret deployment-proof content; it does not authenticate, publish a directory,
-invoke a model or change a report. It verifies isolation, not report correctness
-or confidentiality. Its browser runs the selected report's JavaScript.
-
-Inspect an owned private SQLite snapshot made by SQLite backup or a quiescent
-deployment procedure. Do not copy only a live database file while ignoring its
-WAL. The database is opened readonly with `fileMustExist`; no migrations, tables
-or missing files are created. Current normalized tables are queried through
-Tinqer. SQL/PRAGMA is used only for SQLite schema, integrity and metadata.
+Inspect a consistent private SQLite snapshot produced by SQLite backup or a
+quiescent procedure. Do not copy only a live main file while ignoring WAL.
+Reads do not create schemas, migrate or print stored credentials.
 
 ```json
-{"schemaVersion":15,"counts":{"agent":2,"agent_owner_conversation":0,"management_conversation":0,"publication":0,"publication_file":0}}
+{"schemaVersion":17,"counts":{"agent":2,"agent_owner_conversation":0}}
 ```
 
-The schema version and table counts are optional exact expectations. `--schema`
-prints columns, foreign keys and index metadata, not rows or stored credentials.
-Unknown, incomplete or unreadable schemas fail. Use tools built from the same
-canonical schema as the selected snapshots.
+Expectations are optional exact values. Schema mode includes columns, keys and
+indexes. Use tools built for the selected snapshot's actual schema.
 
-`preservation` compares actual snapshots, not lossy JSON count reports. It checks
-principals, members, agents/credentials/names, policy, permission/role relations,
-selected wake senders, room grants/permissions, invitations, owner/management
-conversations, wake rules/assignments, fleets/instances/controller metadata/
-credentials, requested/approved fleet coordination policies, immutable archived
-enrollment relations, native-close receipt state, publications/files and existing
-audit events. Credential refresh timestamps and wake
-assignment deadlines are intentionally not immutable fields. Existing protected
-rows must still exist unchanged; additions are allowed. Volatile listener,
-session, reconciliation, delivery, observation, decision and incident rows are
-not preservation assertions. Each protected relation is bounded to 100,000 rows;
-exceeding that bound fails explicitly. Hashes are used internally for comparison;
-reports contain counts, not private row data or credential hashes.
+Preservation compares existing protected rows exactly and permits appended rows
+under its contract. Credential-refresh times and schedule deadlines are not
+immutable state. Old logging may be absent only with both actual retention days
+and the exact canonical UTC cleanup timestamp. Surviving rows, pending work and
+current authority remain protected.
 
-After authorized logging cleanup, pass `--logging-retention-days DAYS` and
-`--retention-at UTC_ISO` together to `preservation`. Both are required; omission
-retains strict preservation. The proof permits only absent eligible logging
-records and reports their counts separately. Changed retained records, current
-native-stop evidence, credentials, active signup claims and business state remain
-strictly protected. Match the actual service configuration and cleanup timestamp;
-do not move the cutoff to excuse unrelated loss.
-- [Complete logging policy and preservation example](../docs/logging.md)
+- [Logging families and cutoff rules](../../docs/logging.md)
 
-This comparison is strict: configuration writes between snapshots, including a
-revision-only controller update, a fleet pause/resume or renewed native
-observations invalidating a close receipt, cause a conflict. Review
-intentional changes against their audit records separately; do not modify a
-snapshot or suppress fields to make preservation pass.
+## Files, source and host
 
-## Files, archives, source and host
-
-A file plan:
+File plan:
 
 ```json
-{"files":[{"path":"/home/operator/evidence/backup.tar.gz","private":true,"sha256":"64-lowercase-hex-characters"}]}
+{"files":[{"path":"/absolute/private/backup.tar.gz","private":true}]}
 ```
 
-`sha256` is optional and must be an actual 64-character digest when supplied.
-File checks stream bytes with bounded memory, reject symlinks/nonregular files,
-verify ownership/privacy and detect changes during reading. `private:false`
-allows checking owned public build assets without weakening private-input rules.
-Archive listing verifies readability, not restore completeness, symlink-target
-safety for extraction or semantic integrity of every archived application.
+Optional sha256 must be an actual lowercase 64-character digest.
+Reads are streamed and detect changed files.
+Private false permits owned public assets, not unsafe evidence traversal.
 
-A Docker host plan:
+Archive verifies the selected hash and bounded tar listing, not restore
+completeness or extraction safety. Source verifies a clean root and optional
+exact revision/tree. Host checks use exact container/image/label expectations:
 
 ```json
-{"container":"instance-crossfire-1","image":"instance-runtime:immutable-tag","labels":{"org.opencontainers.image.revision":"full-source-revision"}}
+{"container":"instance-crossfire-1","image":"runtime:immutable-tag","labels":{"org.opencontainers.image.revision":"exact-revision"}}
 ```
 
-Labels are operator-selected exact expectations. Only allowlisted inspection
-fields are reported; container environment/configuration secrets are not printed.
-These are read-only Docker/Git/tar operations. No shell evaluation of plan values,
-container restart, extraction, privileged command or package installation occurs.
+No plan value is evaluated as a shell command. No restart, package installation
+or environment dump is performed.
 
-## Enrollment review
+## Enrollment
 
-```json
-{"enrollmentId":"00000000-0000-4000-8000-000000000001","ownerMatrixId":"@operator:example.test","verificationCode":"ABCDEF123456","fleetKey":"research","controllerName":"laptop","instances":[{"instanceKey":"helper","currentName":null,"requestedName":"helper","coordinationPolicy":{"wakeMode":"selected","senders":[{"matrixUserId":"@operator:example.test","includeAgents":true}],"permissions":["room.agent.invite"]}}]}
-```
+The plan identifies exact enrollment UUID, owner Matrix ID, verification code,
+fleet key, controller name and complete instances.
+Each instance includes instanceKey, currentName (null for new), requestedName and
+coordinationPolicy with wakeMode, senders and permissions.
 
-Every enrollment supplies its fleet key, controller name and each item's complete
-`coordinationPolicy`, including a one-item roster. Plans specify exact policies, including
-selected Matrix IDs and permission codes. The complete pending roster, policy,
-current and requested names (`currentName` is null for a new identity),
-exact owner, controller and code must match; failed
-items or nonpending requests are refused. Without `--execute`, this is review
-only. With it, the tool invokes the existing revision-checked approval REST
-operation only as the intended owner. An administrator cannot approve another
-owner's enrollment. It neither claims credentials nor starts
-listeners, creates rooms or bypasses native/user permissions.
+Review-only is default. Execute calls the same revision-checked decision as the
+named owner. Nonpending, changed or incomplete requests fail.
+It does not exchange credentials, create rooms or start native sessions.
 
-## Fleet wake configuration
+## Fleet wake changes
 
-This command is an explicit human adjustment, not a fleet setup requirement.
-Role `coordination_options` applies reviewed defaults during enrollment; use the
-management editor or this tool only when intentionally adjusting current policies.
+The plan identifies exact fleet UUID/key, owner, controller and complete current
+instance roster. Each instance supplies its registered name, mode and entries
+with immutable principalId/includeAgents.
+Empty selected wakes nobody; only humans may include agents.
 
-The plan specifies every enrolled instance in the fleet, not a subset:
+Review-only compares current and desired policy.
+Execute uses existing per-agent revision-checked updates and verifies all results.
+This is not a fleet-atomic transaction. On network/race failure it reports
+verified writes and the last attempted instance, then fails.
+An uncertain write must be reviewed again, not retried blindly or rolled back.
 
-```json
-{"fleetId":"00000000-0000-4000-8000-000000000001","fleetKey":"research","ownerMatrixId":"@operator:example.test","controllerName":"laptop","instances":[{"instanceKey":"analyst","name":"analyst","mode":"selected","senders":[{"principalId":"00000000-0000-4000-8000-000000000002","includeAgents":true}]},{"instanceKey":"helper","name":"helper","mode":"selected","senders":[{"principalId":"00000000-0000-4000-8000-000000000002","includeAgents":false}]}]}
-```
-
-Use the actual immutable fleet ID and exact current owner, controller name,
-instance keys and enrolled agent names. Every instance selects `selected`,
-`humans` or `everyone`. Entries contain immutable registered principal UUIDs,
-not display names or Matrix IDs, and `includeAgents` Boolean flags. Only humans
-can include their agents; everyone requires no entries. Empty selected wakes nobody.
-Duplicate instances/senders, self-selection, unavailable senders, inactive agents,
-wrong owners/controllers and incomplete rosters fail before policy writes.
-
-```sh
-node services/crossfire/dist/tools/main.js fleet-wake --origin https://example.test --credentials /home/operator/evidence/credentials.json --plan /home/operator/evidence/fleet-wake.json --output /home/operator/evidence/fleet-wake-review.json
-node services/crossfire/dist/tools/main.js fleet-wake --origin https://example.test --credentials /home/operator/evidence/credentials.json --plan /home/operator/evidence/fleet-wake.json --execute --output /home/operator/evidence/fleet-wake-applied.json
-```
-
-The first command reviews current and desired policies without changing them.
-Verify a fresh consistent backup before execution. The second calls the existing
-audited `PUT /api/agents/{agentId}/wake-policy` as the human owner/administrator,
-using each reviewed revision. Identical policies are not rewritten. All policies
-and the exact identity-to-instance mapping are reread before success is reported.
-There is no fleet-wide transaction: a race or network failure stops execution,
-reports the verified writes and last attempted instance, and exits nonzero.
-An attempted write may have succeeded even if its response was lost. Review
-again before continuing; no automatic retry, rollback or permission overwrite.
-
-A person entry with `includeAgents: true` allows that person and their current
-active agents, including agents outside this fleet. Entries combine; selecting
-several people does not admit unrelated owners. Self is always excluded. Room membership,
-read/write access, mute state, invitation authority and wake authority stay
-separate. This command changes only wake policies: it neither enrolls, starts nor
-restarts agents, joins rooms, sends prompts or changes native settings.
-
-Listeners refresh policies automatically without restarting Codex. Previously
-non-waking unread messages remain pending and can wake an authorized listener
-after the change. The tool itself makes no model calls; enabling delivery may
-start ordinary model work on those messages. Wake modes are persisted Crossfire
-configuration. Role `agent.toml` coordination options declare enrollment defaults;
-this command adjusts the persisted policy only when explicitly requested. Neither
-`runtime.toml` nor `rooms.toml` defines wake authority. Review intended changes
-again after intentionally replacing identities.
+Room access, invitation powers, native settings and lifecycle are unchanged.
+Enabling sources may release existing pending context and start ordinary model
+work; the tool itself makes no model call.

@@ -3,7 +3,8 @@ import { mkdtempSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { main } from '../apps/server/src/operator.js';
-import { runArguments, cgroupArguments, ownedDocker } from '../apps/server/src/container-commands.js';
+import { runArguments, cgroupArguments } from '../apps/server/src/container-commands.js';
+import { ownedDocker } from '../apps/server/src/container-lifecycle.js';
 
 test('initialization is private, explicit, non-destructive and rejects unrelated options', async () => {
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });

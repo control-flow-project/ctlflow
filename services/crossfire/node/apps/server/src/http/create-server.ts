@@ -1,5 +1,5 @@
 import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
-import { createServer, type IncomingMessage } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { HTTP_LIMITS } from '@ctlflow/crossfire-contracts/rest/limits';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
@@ -29,21 +29,21 @@ import { registrationTransport, invitationCookie, setInvitationCookie, registrat
 import { verifyInvitation } from '@ctlflow/crossfire-domain/member/registration';
 import { searchMatrixDirectory } from './matrix-directory.js';
 import { changeMatrixProfile } from './matrix-profile.js';
+import { publicRequestBudget } from './public-request-budget.js';
 export function createHttpServer(application: Application, worker: ReturnType<typeof createWorker>, release: Release, presentation: ElementPresentation = {}) {
   const { services, config } = application;
   const register = registrationTransport(services);
   const fleetChanges = createFleetChanges();
   const endpoints = [...sessionRoutes(), ...enrollmentRoutes(), ...fleetRoutes(), ...agentRoutes(), ...wakeUpRoutes(), ...roomRoutes(), ...memberRoutes(),
     ...runtimeRoutes(), ...publicationRoutes(), ...instanceRoutes(config.instance, services.clock.now(), application.diagnostics.error)];
-  const limits = new Map<string, { count: number; expiresAt: number }>();
-  function rate(request: IncomingMessage): boolean {
-    const now = services.clock.now();
-    for (const [key, entry] of limits) if (entry.expiresAt <= now) limits.delete(key);
-    const key = request.socket.remoteAddress ?? 'unknown';
-    const entry = limits.get(key) ?? { count: 0, expiresAt: now + 60_000 };
-    if (!limits.has(key) && limits.size >= 4096) return false;
-    entry.count++; limits.set(key, entry);
-    return entry.count <= HTTP_LIMITS.publicMutationsPerMinute;
+  const rate = publicRequestBudget(services.clock.now, config.trustedProxyAddresses);
+  function admitNative(request: IncomingMessage, response: ServerResponse, requestId: string): boolean {
+    const admitted = rate(request);
+    if (admitted.ok) return true;
+    response.writeHead(admitted.error.code === 'rate_limit' ? 429 : 403, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff', 'X-Request-ID': requestId, ...(admitted.error.code === 'rate_limit' ? { 'Retry-After': '60' } : {}) });
+    response.end(JSON.stringify({ errcode: admitted.error.code === 'rate_limit' ? 'M_LIMIT_EXCEEDED' : 'M_FORBIDDEN', error: admitted.error.message }));
+    return false;
   }
   async function authenticate(request: IncomingMessage, endpoint: Endpoint, requestId: string, signal: AbortSignal): Promise<Result<Context>> {
     const authorization = request.headers.authorization, credential = cookie(request);
@@ -85,11 +85,11 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
         await searchMatrixDirectory(services, request, response, url, requestId); return;
       }
       if (url.pathname === '/_matrix/client/v3/register') {
-        if (!rate(request)) { response.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' }); response.end(JSON.stringify({ errcode: 'M_LIMIT_EXCEEDED', error: 'Too many signup requests' })); return; }
+        if (!admitNative(request, response, requestId)) return;
         await register.register(request, response, requestId); if (response.statusCode === 200) worker.wake(); return;
       }
       if (url.pathname === '/_matrix/client/v3/auth/' + registrationStage + '/fallback/web') {
-        if (method === 'POST' && !rate(request)) { response.writeHead(429, { 'Retry-After': '60' }); response.end('Too many signup requests'); return; }
+        if (method === 'POST' && !admitNative(request, response, requestId)) return;
         await register.fallback(request, response, url); return;
       }
       if (url.pathname === '/config.json' || url.pathname === '/config.' + new URL(config.publicOrigin).hostname + '.json') {
@@ -139,9 +139,9 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
         else send(response, requestId, failure('missing', 'Route not found'));
         return;
       }
-      if (endpoint.auth === 'public' && method !== 'GET' && !rate(request)) {
-        response.setHeader('Retry-After', '60');
-        send(response, requestId, failure('rate_limit', 'Request rate exceeded')); return;
+      if (endpoint.auth === 'public' && method !== 'GET') {
+        const admitted = rate(request);
+        if (!admitted.ok) { if (admitted.error.code === 'rate_limit') response.setHeader('Retry-After', '60'); send(response, requestId, admitted); return; }
       }
       if (endpoint.path === '/api/sessions' && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin human login required')); return; }
       if (endpoint.path === operations.claimInvitation.path && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin invitation claim required')); return; }

@@ -98,7 +98,7 @@ export function secureProxy(scope: Scope, destination: string) {
   const target = new URL(destination); assert.equal(target.protocol, 'http:'); assert.equal(target.hostname, '127.0.0.1');
   return secureRouter(scope, createHttpServer((request, response) => {
     const upstream = forward({ hostname: target.hostname, port: target.port, method: request.method,
-      path: request.url, headers: request.headers, timeout: 30000 }, incoming => {
+      path: request.url, headers: { ...request.headers, 'x-forwarded-for': request.socket.remoteAddress }, timeout: 30000 }, incoming => {
       response.writeHead(incoming.statusCode ?? 502, incoming.headers);
       incoming.on('error', () => response.destroy()); incoming.pipe(response);
     });

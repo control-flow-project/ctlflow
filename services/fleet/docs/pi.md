@@ -1,17 +1,11 @@
-# Earendil Pi runtime
+# Earendil Pi
 
-## Scope and prerequisites
+## Supported integration
 
-Pi uses the same fleet setup, enrollment, listener, Matrix permissions, message
-files, unread positions, sleep, owner decisions and stop/resume/reset operations
-as Codex. Only the native adapter differs. There is no standalone agent mode,
-import of an existing coding conversation or second listener implementation.
-Claude remains unimplemented.
-
-The admitted executable is **@earendil-works/pi-coding-agent 1.0.0**. `pi` must be
-available on the controller's PATH. Other versions fail admission until their
-actual protocol is verified. Setup does not install or silently upgrade Pi.
-Use an operator-approved native installation, for example in a private directory:
+The admitted native executable is `@earendil-works/pi-coding-agent@1.0.0`.
+It must be available as `pi` on the controller's PATH.
+Other versions fail until their actual RPC behavior is verified.
+Setup does not install or silently upgrade the runtime.
 
 ```sh
 npm install --prefix /absolute/private/pi-install @earendil-works/pi-coding-agent@1.0.0
@@ -19,162 +13,102 @@ export PATH="/absolute/private/pi-install/node_modules/.bin:$PATH"
 pi --version
 ```
 
-Configure provider authentication on that host through Pi. The source home is
-`PI_CODING_AGENT_DIR`, defaulting to the native `~/.pi/agent`. Do not submit keys,
-OAuth tokens or provider configuration containing secrets through Matrix.
-Native environment authentication remains available. Linux is verified with an
-inert local provider and actual OpenAI inference through native
-`openai-codex`, `gpt-6-luna`, `medium`. Live acceptance covers responses, file tools,
-owner answers, hard interruption, saved-history resume, idle crash recovery and
-per-room histories. This does not certify every provider/model. macOS ownership
-primitives are admitted but have not been certified on hardware.
+Configure provider login through native Pi on that host.
+The source home is `PI_CODING_AGENT_DIR`, otherwise native `~/.pi/agent`.
+Never send provider secrets through Matrix.
 
-## Configuration
-
-Put this in an ordinary definition's `agents/analyst/agent.toml`:
+## Definition
 
 ```toml
 name = "Research analyst"
 runtime = "pi"
 
 [runtime_options]
-provider = "YOUR_NATIVE_PROVIDER"
-model = "YOUR_EXACT_NATIVE_MODEL"
+provider = "EXACT_NATIVE_PROVIDER"
+model = "EXACT_AVAILABLE_MODEL"
 thinking_level = "high"
 ```
 
-Provider/model must be supplied together or both omitted. When omitted, native
-available-model/default selection applies and is verified before readiness.
-The adapter does not interpret provider aliases or substitute another model.
+Provider/model must be supplied together or both omitted.
+Omitted fields use verified native selection.
+Thinking levels are off, minimal, low, medium, high, xhigh and max, subject to
+actual available-model/available-level responses. Effective selections are checked
+after setting; silent clamping is rejected.
 
-| Field | Values | Omitted |
-| --- | --- | --- |
-| `provider` | Exact native provider ID, 1–200 characters | Native selection |
-| `model` | Exact native model ID, 1–200 characters | Native selection |
-| `thinking_level` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` | Native selection |
+Per-instance overrides use the common top-level replacement resolver.
+Inspection, startup, resume, recovery and reset validate the same effective values.
 
-Schema acceptance does not mean a model supports a level. Native
-`get_available_models` and `get_available_thinking_levels` own admission.
-Unsupported combinations fail before a model request. Effective selections are
-verified after `set_model`/`set_thinking_level`; silent clamping is rejected.
-Per-instance `[instances.runtime_options]` overrides use the same resolver as
-Codex. Inspection, enrollment, first start, resume, recovery and explicit fresh
-history all validate the same effective options.
+Pi rejects Codex sandbox, approval, bypass and effort options.
+Its tools run with the controller user's privileges; owner questions are not an
+emulated filesystem/network sandbox.
 
-Pi has no implemented Codex-style sandbox/approval policy. Unknown options,
-including `sandbox_mode`, `approval_policy`, `model_reasoning_effort` and Codex's
-bypass setting, are rejected. Pi tools execute with the controller user's normal
-filesystem/network privileges. Owner questions are not a filesystem security
-sandbox, and sending a prompt saying “ask permission” does not create one.
+## State and instructions
 
-Definitions retain the same companion `AGENTS.md` and Crossfire coordination
-options. An optional roster workspace is native cwd; private state remains in
-the instance workarea. Use the normal `fleet setup --config /absolute/runtime.toml`
-workflow and required owner enrollment approval.
+Private `.pi` owns copied auth/models files, exact format-3 native histories,
+the context registry, receipt journals and the owned extension.
+Every activation refreshes validated host auth/models files; an absent source
+removes stale copies. Running engines are not hot-switched.
 
-## Histories and instructions
+Native SessionManager initializes an allocated empty private history file.
+Native appendEntry records verified instructions with zero model turns.
+Established file/session/workspace bindings cannot be replaced silently.
+Discovery is read-only; reset archives exact files.
 
-Private workarea `.pi` owns auth/models copies, the canonical context registry,
-native format-3 history files, delivery journals and the adapter extension.
-Each native activation recopies bounded, validated host `auth.json` and
-`models.json`; absent files remove old copies. Already-running engines are not
-hot-switched. Workspaces, native history and Matrix identities are not replaced.
+Shared history is default. Per-room opens a native RPC process/file for each
+retained active room plus a private control context. These share one agent,
+identity, workarea and receiver. They do not isolate tools/files/credentials.
 
-The registry durably records an exact empty-file allocation. Stock native
-SessionManager initializes that file and creates its session UUID. The adapter
-uses native `appendEntry` to retain an exact effective-instruction receipt before
-readiness. Startup and changed instruction publication make zero model calls and
-do not add synthetic chat messages. Reopening an established context requires
-its exact file, session UUID and workspace. Missing/corrupt history is an error,
-not permission to create a replacement. Context discovery does not initialize
-files or wake a process. Explicit fresh history archives old files and receipts.
+## Delivery and steering
 
-Shared history is the default. Per-room mode retains a separate native file and
-RPC process for each opened room and a private control context. These processes
-still belong to one fleet agent, workarea, identity and shared receiver. Files,
-tools and credentials remain shared: separate conversations are not isolation
-from another context's filesystem. Fleet sleep/stop closes owned engines and
-resumes saved identities later.
+A durable common journal precedes native publication.
+Receipt requires exact custom correlation plus the persisted user entry on the
+active native branch. A successful command response alone is insufficient.
+Proven bytes are flushed before unread advancement.
 
-## Delivery and interruption
+Busy input remains in the common journal, not a hidden native queue.
+Accepted mentions capture the current run, abort that exact generation and wait
+for native idle before replacement input. Stale captures cannot interrupt a new
+run/process. Deliberate interruption cancels its question without reporting a crash.
 
-The common journal retains each exact message before publication. Native custom
-metadata correlates its ID/text with the actual persisted native user entry.
-Receipt requires the current native branch to include that entry. A successful
-RPC command is not evidence that the model received a message. Proven receipt
-is flushed before unread positions advance.
+Unknown receipt after restart uses the common exact-message file and restart
+instruction. It states uncertainty and prohibits repeating completed effects;
+it does not promise exactly-once external execution.
 
-Normal busy delivery remains durable in the common journal. It is not placed in
-a native follow-up/steering queue. An accepted mention captures the current run,
-checks that exact generation inside Pi, aborts it immediately and waits for native
-idle before publishing the replacement. A stale capture cannot abort a new run
-or a restarted process. Cancellation closes the original owner question without
-treating deliberate interruption as a native crash.
+## Questions and output
 
-When restart cannot establish the last message was received, the common recovery
-contract preserves its verbatim text in a private file and supplies a correlated
-continuation explaining the uncertainty and prohibiting repetition of completed
-actions. It does not claim the previous input was received or exactly-once
-external side effects. Verified original receipts prevent duplicate delivery.
-Native failures reach the owner and the shared fleet lifecycle owns recovery.
-Failure diagnostics obey the shared 4,000-UTF-8-byte plain-text status contract,
-without splitting characters or retaining control codes. Ordinary output is not
-truncated to that diagnostic limit.
+The owned extension is loaded explicitly. Automatic native extensions, skills,
+templates and themes are disabled. Instructions come from the role/admin/skill
+producer, not global installation.
 
-The short-lived mention admission can cancel a room's startup before readiness;
-after readiness it does not own the engine's lifetime. A completed Matrix poll
-cycle therefore cannot stop the resumed room or a subsequent task.
-
-Orderly shutdown and hard interruption stop tested native shell-tool children.
-An abrupt `SIGKILL` while a detached native tool is running can leave that tool
-outside the dead process's lifetime. Crossfire does not claim arbitrary subprocess
-containment or adopt orphaned processes. The Linux idle-process crash and exact
-saved-history recovery are tested; this is not proof of every crash/tool case.
-
-## Output and owner questions
-
-Structured text and native tool-result text are mirrored only to the owner's
-private DM. Thinking traces and tool-call arguments are not forwarded. Public
-room replies still use intentional Crossfire tools and recipient permissions.
-The adapter loads its own extension explicitly; automatic native extensions,
-skills, templates and themes are disabled. Role/administrator/Crossfire skill
-instructions use the verified native instruction input, not global installation.
-
-The extension exposes `crossfire_question` to the model:
+The model's `crossfire_question` tool accepts:
 
 ```json
-{"title":"Select approach","prompt":"Which report should I prepare?","options":["Brief","Detailed","Cancel"]}
+{"title":"Select approach","prompt":"Which report?","options":["Brief","Detailed","Cancel"]}
 ```
 
-Omit `options` for a free-text question. Native confirm/select/input/editor
-requests use the shared typed owner-decision interface. The original session,
-run and request identity stay bound; only an explicit validated owner answer is
-returned. No answer, expiry or interruption is not permission. Secret answers
-are not requested through this tool. Prose questions and arbitrary interactive
-stdin are not converted into invented controls.
-The prompt limit is 16,000 UTF-8 bytes; titles and option labels follow the shared
-1,000-character text limit. Invalid model arguments return a native tool error
-for correction, not a question to the owner or a native process failure.
+Omit options for free text. Native confirm/select/input/editor requests use the
+same owner-decision port. Only explicit verified owner answers resolve the exact
+request. No reply, expiry or interruption grants permission.
+Secret answers and arbitrary stdin prompt scraping are not provided by this tool.
 
-## Activity, usage and terminal limitations
+Text and visible tool-result output goes to the owner's DM.
+Thinking and tool-call arguments are excluded. Room replies still require the
+intentional messaging tool.
 
-Management shows effective provider, model, thinking level and native version.
-Activity follows native events, including questions, retry and compaction; normal
-status checks make no model call. Usage uses one cumulative native baseline per
-activation and incremental native events. Input/cache/output totals are reported;
-reasoning split and trusted provider spend remain “Not reported.” No pricing
-estimate is promoted to billed spend.
+## Observations and limits
 
-Pi's RPC process does not expose an attachment API for an existing interactive
-TUI. `fleet terminal` therefore reports unsupported; it neither launches another
-writer nor pretends `pi --session` attaches to the running engine. Use management
-activity/decisions, controller diagnostics and ordinary room/DM steering. An
-independent native TUI is not part of the fleet-managed conversation.
+Management exposes native version/provider/model/thinking and activity.
+Usage uses one cumulative baseline plus incremental native events.
+Unavailable reasoning splits and trusted provider spend remain null.
 
-## Related guides
-- [Explicit isolated live-provider acceptance](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/node/tools/README.md#explicit-pi-provider-acceptance)
-- [Common configuration and coordination defaults](configuration.md)
-- [Sleep, stop, saved-history resume and fresh-history confirmation](sessions.md)
-- [Management and owner decisions](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/runtime.md)
-- [Fleet statistics](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/statistics.md)
-- [Controller operations and failure boundaries](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/operations.md)
+Pi RPC does not expose live TUI attachment to an existing engine.
+`fleet agent attach` returns unsupported; launching `pi --session` would be
+another writer, not an attachment.
+
+Orderly shutdown/interruption and idle crash recovery have test coverage.
+SIGKILL during a detached tool can leave that tool alive. Linux inert-provider
+coverage does not certify every provider/model or another platform.
+
+- [Common session controls](sessions.md)
+- [Explicit provider acceptance](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/node/tools/README.md)
+- [Runtime contract](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/runtime.md)

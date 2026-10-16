@@ -1,103 +1,94 @@
-# Platform logging retention
+# Logging retention
 
-Crossfire and fleetd accept the same optional `loggingRetentionDays` setting.
-Omitting it means **7 days**. Explicit values must be positive exact integers;
-zero, fractions, strings and unsafe durations fail configuration validation.
-There is no unlimited-log option or separate statistics-only retention policy.
+Crossfire and fleetd accept private `loggingRetentionDays`.
+Omitted means seven days. Values must be positive exact integers.
+There is no unlimited-log setting.
 
-Set the field in the Crossfire instance's private `config.json` to control its
-management database and server/Matrix diagnostics. Set it in the fleetd
-controller root's private `config.json` to control that controller's diagnostic
-files and completed operation history. A controller can serve independent
-Crossfire instances, so its local storage has its own explicit configuration.
-For example, either file can include `"loggingRetentionDays": 14`. The controller
-configuration currently accepts only this field. Restart the affected service
-normally to apply a change; preserve deliberate stopped selections and histories.
+Set it independently in the Crossfire instance and controller root
+`config.json`; restart the affected process normally.
+A controller may serve several Crossfire instances, so its local retention
+cannot be selected by whichever remote instance connected first.
 
-## Records covered
+## Covered records
 
-| Logging family | Age basis and preservation boundary |
+| Family | Age basis and retained state |
 | --- | --- |
-| Audit events | Creation time. |
-| Historical listener runs, observations and settings | Last reporting time; delete the whole historical run family together. The latest run per agent and runs referenced by retained work are current/recovery state, not disposable logging. |
-| Traffic, sender/recipient and token summaries | Capture time; hourly intervals, flow/usage children and statistics/native-usage checkpoints share this policy. |
-| Native permissions/questions and their child records | Creation time after terminal status. Pending and answered requests remain recovery state. |
-| Runtime incidents and owner-notification records | Recovery time, only after every required notice was sent. Active incidents and unsent notices remain work. |
-| Wake notices | Sent time, or reservation time for denied notices. Pending notices remain work. |
-| Scheduled-delivery history | Delivered time, or creation time for cancelled deliveries. Pending deliveries remain work. |
-| Fleet message history and recipient outcomes | Message expiry plus the configured retention duration. Expired input is no longer a new execution request; local evidence of already-started native publication remains separately protected. |
-| Crossfire session-operation outcomes | Completion time. Pending/running requests remain work. The latest successful stop per fleet/agent scope remains bounded current lifecycle evidence, not a retirement proof or execution permission. |
-| Historical enrollment archives and normalized children | Creation time. Rejected/expired current requests expire after decision/expiry time once no name claim remains. Approved exchange records, identity and credentials remain state. |
-| Expired member-invitation history | Expiry time, after any unconsumed native signup claim has been cleared. Native account cleanup cannot be skipped. |
-| Historical native-close receipts | Native stop time. The latest sequence per agent remains current stop/retirement evidence, even when old or invalidated; pruning never authorizes a new generation. |
-| fleetd completed operation records | Completion time. Unfinished operations and completed outcomes still awaiting Crossfire acknowledgment remain state. |
-| Owned server, Matrix and controller diagnostic files | Timestamp of each output chunk. UTC daily JSONL partitions are private and rotated without restarting the writer. |
+| Audit | Creation time |
+| Historical listener runs/settings/observations | Last report; latest per-agent run and referenced work remain |
+| Traffic/usage intervals, flows and checkpoints | Capture time |
+| Terminal native decisions and children | Creation time; pending/answered remain |
+| Recovered incidents/notices | Recovery time, after required notices sent |
+| Wake notices | Sent time, or denied reservation time; pending remains |
+| Scheduled deliveries | Delivered time, or cancelled creation time; pending remains |
+| Fleet messages/outcomes | Message expiry plus retention |
+| Session operations | Completion time; pending/running and required latest successful Stop remain |
+| Enrollment archives | Creation time; rejected/expired requests use decision/expiry once claims release |
+| Member invitations | Expiry after unconsumed native signup claims clear |
+| Native-close receipts | Native stop time; latest sequence per agent remains |
+| fleetd operation files | Completion time; unfinished/unacknowledged remain |
+| Owned diagnostics | Timestamp of each output chunk |
 
-Cleanup starts with the service, runs hourly even without traffic, and drains
-large backlogs in bounded batches with five-second rescheduling. An entry exactly
-at the cutoff remains until it is older. This is periodic retention, not an
-exact-time deletion guarantee. Database deletion is transactional, child before
-parent. Indexed scans keep small in-memory continuations only after successful
-transactions; protected state cannot starve eligible later history. Restarting
-discards scan optimizations, not business or recovery state.
+Cleanup starts at startup, runs hourly while idle and drains backlogs in
+500-record family batches with five-second retries.
+Exact cutoff equality is retained.
+Child-before-parent database deletion is transactional.
+Protected current records cannot starve later eligible history.
 
-Matrix chats/media, static reports, native conversation histories, prepared inputs
-awaiting native confirmation, credentials, configuration, current authority and
-desired stop/resume selections are **not logs**. They retain their existing
-ownership and explicit deletion/expiry rules. Native SQLite/RocksDB journals and
-WAL files are database recovery machinery; never delete them as diagnostic logs.
-Completed private message-artifact files retain their existing 24-hour policy.
-Expired web sessions retain their authentication expiry cleanup. Host-controlled
-copies of CLI output, Docker log archives and system journals are outside the
-platform's owned stores; configure their host rotation separately.
+## Not logs
 
-## Files, failure and recovery
+Do not rotate chats/media, static reports, native histories, credentials,
+configuration, current authority, desired/resume selections, prepared input or
+unconfirmed native receipts under this policy.
+SQLite/RocksDB journals and WAL are recovery machinery, not diagnostic output.
+Settled private message artifacts retain their separate 24-hour policy.
 
-Server and managed Matrix output live in `management.sqlite.logs/` beside the
-management store. fleetd diagnostics live in `logs/` under its private root.
-Files are `0600`, directories `0700`, and link/unowned-file traversal is refused.
-Each JSONL entry contains integer UTC milliseconds in `at` and a bounded output
-chunk in `message`. Boundary-day filtering streams through a temporary file and
-replaces only an unchanged source; malformed records remain for inspection.
+Host-controlled CLI output, Docker logs and system journals require host rotation.
+Backups follow the operator's backup policy, not diagnostic retention.
 
-fleetd converts an actual deployed `daemon.log` once, then removes the old file.
-It did not have per-entry timestamps: converted chunks use its modification time
-as a conservative upper bound, explicitly marked
-`timeBasis: "file-modification-upper-bound"`. No invented precise timestamps or
-second runtime log reader exists. A wholly expired source can be removed directly.
-Invalid private files remain for inspection, and conversion retries are idempotent.
-The former `operations.json` array similarly converts once to private
-`operations/OPERATION_UUID.json` records; there is no count-only history cap.
+## Diagnostic files
 
-`GET /health` and `fleet daemon status` expose `loggingRetentionDays` and nullable
-`loggingError`. Cleanup failure is reported and retried; it does not falsely
-complete native work or create a replacement history. Space reclaimed by SQLite
-deletion becomes reusable pages. It need not reduce the physical database file;
-there is no automatic VACUUM or database reset.
+Server/managed Matrix diagnostics live in `management.sqlite.logs/`.
+Controller diagnostics live in its `logs/`.
+Private daily JSONL partitions contain integer UTC milliseconds in `at`
+and bounded `message` chunks.
 
-Receipt-only acknowledgments report `{recorded: true}` while their record exists,
-or `{recorded: false}` after history expired. The latter claims no retained outcome
-and performs no new native action. Required actor/fleet authority remains checked;
-known ownership, outcome and generation conflicts remain errors. Admission,
-claim, answer and execution requests do not become permissive when history is gone.
-This lets a delayed controller clear its already-settled local record instead of
-replaying a native task or disconnecting because an old log was removed.
+Pruning streams boundary-day records and replaces only an unchanged source.
+Links, hardlinks, unowned/public files and malformed records are retained with
+an error for inspection. Files are 0600; directories 0700.
 
-## Backup and preservation
+The supported old `daemon.log` converts once. Its untimestamped chunks use the
+explicit file-modification-time upper bound, never invented entry timestamps.
+The old `operations.json` converts once to UUID operation files.
+Current runtime does not retain dual readers or a count-only history cap.
 
-Use the transactional forward migration to schema 17 after verifying a production
-backup. No production reset is permitted. Migration itself retains all rows;
-normal maintenance subsequently applies the configured policy.
+## Errors and delayed receipts
 
-Operator `preservation` remains strict unless the operator supplies both the exact
-policy and cleanup timestamp:
+`GET /api/health` and daemon status expose configured days and nullable
+maintenance/logging errors. Failure retries independently of native work.
+SQLite-deleted pages are reusable; automatic VACUUM/physical shrink is not promised.
+
+Receipt-only acknowledgments return `{recorded: false}` after eligible remote
+history expires, following actor/fleet authorization.
+They do not reconstruct an outcome, replay native work or relax claim/answer/
+execution admission. Existing ownership/generation conflicts still fail.
+
+## Upgrade and preservation
+
+Verify production backup before the forward migration.
+Migration retains rows; later maintenance applies the policy.
+
+Strict operator preservation may explicitly allow absent age-eligible logging:
 
 ```sh
-node dist/tools/main.js preservation --before /absolute/private/before.sqlite --after /absolute/private/after.sqlite --logging-retention-days 7 --retention-at 2026-10-13T12:00:00.000Z
+node services/crossfire/dist/tools/main.js preservation \
+  --before /absolute/private/before.sqlite \
+  --after /absolute/private/after.sqlite \
+  --logging-retention-days 7 --retention-at 2026-10-15T00:00:00.000Z
 ```
 
-These parameters authorize only absent records eligible under that same policy.
-They never excuse changed surviving records, lost credentials, pending claims,
-latest stop evidence or deleted protected business state. Reports separate
-preserved and expired counts without printing private record contents. Retain
-verified backups under the operator's backup policy, not diagnostic retention.
+Use the actual policy and cleanup time.
+Surviving records must remain exact. This never excuses lost credentials,
+current stop evidence, pending claims or protected business state.
+
+- [Server operations](operations.md)
+- [Controller storage](../../fleetd/docs/storage.md)

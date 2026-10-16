@@ -6,8 +6,11 @@ import { integer, list, observe, record, text } from '@ctlflow/crossfire-test-su
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import type { ContractStack } from './fixture.js';
 import { publicationBrowser } from './browser.contract.js';
+import { paginationContracts } from '@ctlflow/crossfire-test-support/contract-pagination';
+import { resourceContracts } from './resources.contract.js';
 
 export async function serverContracts(scope: TestContext, fixture: ContractStack): Promise<void> {
+  await paginationContracts(scope, query => fixture.raw('/api/fleets' + query, 'GET', undefined, fixture.headers()));
   await scope.test('every protected canonical route authenticates before exposing resources', async () => {
     for (const [name, operation] of Object.entries(operations)) {
       if (operation.auth === 'public') continue;
@@ -55,6 +58,7 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
   await scope.test('static publications are separate-origin, immutable, readable by link and owner-deletable', async () => {
     const bytes = Buffer.from('<!doctype html><body>Shared report<script>document.body.dataset.origin=globalThis.origin;try{document.cookie;document.body.dataset.cookie="readable"}catch{document.body.dataset.cookie="blocked"}try{localStorage.length;document.body.dataset.storage="readable"}catch{document.body.dataset.storage="blocked"}document.body.dataset.report="ready";</script></body>'); const publication = await fixture.data(operations.createPublication, {}, { title: 'Shared report', files: [{ path: 'index.html', bytes: bytes.length, mediaType: 'text/html', sha256: createHash('sha256').update(bytes).digest('hex') }] }, agent.token);
     const publicationId = text(publication.id); const file = record(list(publication.files)[0]); await fixture.operation(operations.uploadPublicationFile, { publicationId, fileId: text(file.id) }, bytes, agent.token); const committed = await fixture.data(operations.commitPublication, { publicationId }, { expectedRevision: integer(publication.revision) }, agent.token); const url = new URL(text(committed.url)); assert.equal(url.origin, fixture.contentOrigin);
+    await fixture.operation(operations.publications); await fixture.operation(operations.publication, { publicationId });
     const published = await contractHttp(fixture.contentOrigin, 'GET', url.pathname); assert.equal(published.status, 200); assert.equal(published.headers['set-cookie'], undefined); assert.equal(published.headers['access-control-allow-origin'], '*'); assert.equal(published.headers['access-control-allow-credentials'], undefined); assert.match(text(published.headers['content-security-policy']), /sandbox allow-scripts(?:;|$)/u); assert(!text(published.headers['content-security-policy']).includes('allow-same-origin'));
     await publicationBrowser(url.href);
     await fixture.operation(operations.deletePublication, { publicationId }, { expectedRevision: integer(committed.revision) }); assert.equal((await contractHttp(fixture.contentOrigin, 'GET', url.pathname)).status, 404);
@@ -78,4 +82,6 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
     samples.sort((left, right) => left - right);
     scope.diagnostic(JSON.stringify({ measurement: 'loopback TLS plus authenticated SQLite policy read', target: fixture.current().name, samples: samples.length, p50Ms: samples[49], p95Ms: samples[94] }));
   });
+  await resourceContracts(scope, fixture);
+  await scope.test('successful shared scenarios cover every declared REST operation', () => fixture.assertOperationCoverage());
 }

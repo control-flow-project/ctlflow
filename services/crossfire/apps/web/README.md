@@ -1,32 +1,34 @@
-# Crossfire management UI
+# Management UI
 
-This private project owns the single React management UI. Backend language
-selection does not select another UI, another API or another asset layout.
-Browser helpers come from `@ctlflow/crossfire-client`; backend implementations
-and Node platform APIs are prohibited by the architecture tests.
+This project owns the React UI used by every server implementation.
+There is no Node-specific or C#-specific frontend.
 
-From the repository root, after installing the locked workspace dependencies:
+The private `@ctlflow/crossfire-client` package owns browser-safe REST and
+binary clients. UI code cannot import backend applications, storage adapters or
+native platform APIs. Authorization remains server-owned.
 
-```sh
-npm run typecheck --workspace=@ctlflow/crossfire-web
-npm run build --workspace=@ctlflow/crossfire-web
-```
+## Build
 
-The default output is this project's `dist` directory. A release builder can
-instead supply one absolute output directory:
+Run `npm run build` from the repository root. The workspace coordinator builds
+this project once and consumers reuse its content-addressed assets.
+The output includes Element's shared English typing-translation override.
 
-```sh
-npm run build --workspace=@ctlflow/crossfire-web -- /tmp/crossfire-management
-```
+## Interaction
 
-The backend serves `index.html` for management views and `assets` at
-`/manage/assets/`. JavaScript and stylesheet names contain content hashes;
-Element translations retain their canonical
-`/manage/assets/element-translations.json` URL. The product build invokes this
-same project-owned build command; it does not maintain another bundler path.
+Durable views, complex pickers and filters use URLs. Browser
+`alert`, `confirm` and `prompt` are not used. Destructive confirmation uses the
+shared themed dialog with cancel-first focus, inert background and explicit
+submission. Pending requests cannot be dismissed or duplicated.
 
-The UI neither selects a runtime nor calls Node, C# or Rust processes. It calls
-the existing Crossfire HTTP contract. Native backend readiness is separate from
-UI build readiness; see the repository's native implementation report.
-The [native implementation report](../../../../docs/architecture/native-implementations.md)
-records the unfinished backend scope and its dependency decision.
+Forms retain a dirty draft across refresh. A stale server revision blocks saving
+until the human discards it and loads the current state. UI visibility and
+`allowedActions` are explanations, not authorization boundaries.
+
+## Verification
+
+The shared executable browser bank runs the same built UI against every target at
+390px and 1440px widths. Language-local tests retain focused internal/failure
+injection coverage. Layout checks do not replace successful mutation assertions.
+
+- [Management routes and behavior](../../docs/management.md)
+- [Shared tests](../../../../docs/verification/shared-contracts.md)

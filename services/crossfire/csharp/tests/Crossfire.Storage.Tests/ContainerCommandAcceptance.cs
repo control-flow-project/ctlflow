@@ -17,7 +17,7 @@ public static class ContainerCommandAcceptance
         foreach (var option in new[] { "--rm", "--rm=true", "--rm=false" })
         {
             var rejected = false;
-            try { await ContainerCommands.Owned(["run", option, "--name", "fixture"], "fixture", "/", CancellationToken.None); }
+            try { await ContainerLifecycle.Owned(["run", option, "--name", "fixture"], "/", CancellationToken.None); }
             catch (ArgumentException) { rejected = true; }
             Equal(rejected, true, "automatic removal is rejected rather than competing with explicit cleanup");
         }

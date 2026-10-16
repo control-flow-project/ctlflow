@@ -2,76 +2,71 @@
 
 ## Requirements
 
-Use Node.js 26+, npm 11.17+, Git and an existing
-rootless Docker setup. Crossfire does not install services, alter firewall/DNS
-configuration or grant machine-wide permissions.
+Use Linux, Node.js 26+, npm 11.17+, Git and an existing rootless Docker engine.
+C# additionally needs the repository-pinned .NET SDK and selected build tools.
+Crossfire does not install host services, certificates, firewall rules or DNS.
 
-From the repository root:
+Build the selected checkout inside the finite resource scope described in the
+development guide. Do not use an active test output tree for deployment.
+
+- [Development prerequisites](../../../docs/development.md)
+- [C# operator](../csharp/README.md)
+
+## Initialize a local instance
+
+From `services/crossfire`:
 
 ```sh
-systemd-run --user --scope --quiet \
-  --property=MemoryMax=25769803776 --property=MemorySwapMax=0 \
-  --property=TasksMax=4096 /bin/bash -c \
-  'npm ci --ignore-scripts && npm run typecheck && npm run build'
-cd services/crossfire
 node crossfire init --directory /absolute/private/crossfire-state \
   --instance team --origin http://127.0.0.1:8098 \
   --content-origin http://localhost:8099 \
   --server-name team.localhost --administrator admin
-./start.sh --directory /absolute/private/crossfire-state --port 8098 --content-port 8099
+./start.sh --directory /absolute/private/crossfire-state \
+  --port 8098 --content-port 8099
 ```
 
-The pinned SQLite package includes the verified Linux native binary. Only a
-platform without a usable bundled binary needs explicit source compilation;
-follow the [development prerequisites](../../../docs/development.md). The
-deployment image retains its own Alpine build requirements.
+Initialization refuses a nonempty directory. The initial password is the
+`administratorPassword` value in private `bootstrap.json`.
+Restart does not reset a password changed through Matrix.
 
-Initialization refuses a nonempty state directory. Read its private
-`bootstrap.json` for the initial administrator password; do not publish it.
-A password changed through Matrix is not reset at restart.
+The application port serves Element, management and the API. The separate
+content port serves committed public reports only; its root returns 404.
+Host port publication is loopback-only. Public use requires HTTPS.
 
-The container contains Conduit, Element, REST/React applications and immutable
-intentional tool releases. Its application and content ports are published only on loopback:
-- [Element](http://127.0.0.1:8098/)
-- [Management](http://127.0.0.1:8098/manage/)
+The operator builds content-addressed images, acquires exclusive instance
+ownership, reconciles abandoned owned containers, verifies an upgrade backup
+when needed, runs Knex and starts the runtime only after success.
+`--compile` rebuilds selected images. Ctrl+C stops and removes the owned
+container while retaining state.
 
-Published reports use `http://localhost:8099/OPAQUE_PUBLIC_KEY/index.html` in this
-local setup. The content root itself returns 404 and exposes no application API.
+A live competing launcher is refused. If a launcher dies, start the instance
+again with the same directory. Takeover validates exact ownership and cleanup;
+foreign labels, an unavailable Docker daemon or unconfirmed removal remain
+errors, not permission to delete guessed containers.
 
-First startup builds content-addressed server and Knex migration images.
-Startup stops existing writers, verifies an upgrade backup, runs the one-shot
-migration container and starts the server only after successful migration.
-The migration image is shared by Node, managed .NET and NativeAOT implementations.
-Neither an application nor EF creates or upgrades the database at startup.
-`--compile` explicitly rebuilds both images.
-Ctrl+C or orderly terminal closure stops this instance. A force-killed launcher
-may leave its exact container running; stop it explicitly through Docker.
-The chosen state directory persists across starts.
+## Public deployment
 
-## First use
+Set the exact main and content HTTPS origins. Configure separate reverse-proxy
+vhosts for their loopback ports and preserve Host. Configure the actual trusted
+ingress peer and overwrite the client-address header. Do not expose the private
+Matrix/API upstream or serve report storage through an nginx directory alias.
 
-Sign in to Element and management with the same Matrix account. Open Connect
-an agent in management and paste its short personalized link into the coding
-assistant. It runs the noninteractive setup command, which starts or reuses
-fleetd and creates a separate managed agent conversation. The assistant's own
-session is not connected or imported. Approve the exact matching enrollment
-code once. Enrollment creates no chats. Open a DM
-in Element when needed; its private read/write access is automatic. A native
-approval request can also open that conversation. Other rooms are chosen separately.
+- [Trusted ingress and quotas](configuration.md)
+- [Backup and upgrade procedure](operations.md)
+- [Content isolation](publications.md)
 
-Create/configure ordinary rooms in Element. Crossfire does not expose general
-room creation or human membership management.
-- [Agent setup](onboarding/README.md)
-- [Management workflows](management.md)
+## First agent
 
-## Public HTTPS
+1. Sign in to Element and management with the same human account.
+2. Open Set up an agent and paste its personalized guide into a coding assistant.
+3. The assistant runs pinned noninteractive Fleet setup. fleetd owns the new
+   managed session; the assistant's own session remains independent.
+4. Approve the exact displayed roster/code as its owner.
+5. Create ordinary rooms in Element and assign only needed agent access.
 
-Use an operator-owned reverse proxy with separate application and content HTTPS
-vhosts in front of their respective loopback ports. Set `publicOrigin` and required
-`contentOrigin` explicitly and preserve Host. The content hostname must differ
-from the application and Matrix hosts; do not expose private report storage as
-an nginx directory alias. The reverse proxy owns TLS, certificates and DNS.
-Private API/Matrix upstream ports must not be exposed. Crossfire makes no
-host-wide changes.
-- [Static content configuration and browser sandbox](publications.md)
-- [Deployment and backup rules](operations.md)
+Enrollment and readiness do not create chats. An owner DM is established on
+actual contact, terminal output or a native question. Other room membership and
+wake authority are explicit, separate decisions.
+
+- [Enrollment and updates](onboarding/README.md)
+- [Management](management.md)

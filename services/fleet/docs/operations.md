@@ -1,112 +1,59 @@
 # Fleet operations
 
-## Enroll without starting
+## Inspect before acting
 
-`fleet enroll FLEET` reviews the complete roster of an already registered,
-stopped fleet. It uses the same enrollment and owner-approval flow as start,
-when start introduces new or renamed identities. Ordinary resume of an approved
-roster does not request enrollment or overwrite owner-edited coordination policy.
-Enroll never starts/resets native sessions or enables message delivery. An active
-fleet or per-agent enrollment target is rejected. Inspect `fleet show FLEET`
-after completion; starting later remains a separate explicit resume.
+Use `fleet daemon status`, `fleet show`, `fleet agent list` and `fleet test`.
+Read controller contact, listener readiness, native state and original error
+separately. Saved credentials are not readiness evidence.
 
-Change an instance's `name` in `runtime.toml` to propose a new registered name.
-Keep its immutable `key`, workarea and saved credentials. The approval page shows
-the old and requested names. Only that active human owner can approve; collision,
-rejection or expiry cannot replace the current name/account. Approved names replace
-old names without aliases. Matrix IDs, grants, rooms and native histories remain
-the same. Existing automatically named owner DMs follow the new display name;
-human conversation titles stay unchanged. No new conversations are created.
+Model-free checks do not create chats, advance unread state or submit dummy
+turns. Busy, paused, unavailable and stopped remain distinct.
+Sleeping can be ready without a running native engine.
 
-Local Crossfire profiles and unread cursors use the immutable instance key.
-The owning storage migration moves previously display-name-keyed state once,
-with an identity-checked durable journal, exclusive listener lock checks and no
-history merging, overwrite or alternate runtime reader. Back up before upgrading.
+## Update software
 
-## Update and deploy
+1. Record exact controller root, fleet directory, selected release and desired
+   active/stopped instances.
+2. Verify a private backup of controller/fleet/native state, credentials and
+   receipt journals.
+3. Install the approved exact public release in private storage.
+4. Use the newly installed CLI to update the selected fleet or instances.
+5. Restart fleetd with the same root using that installed executable.
+6. Verify each target's release, configured/effective settings, exact histories,
+   unread positions and intended activation.
 
-Use an exact verified public package release after human consent. Before changing
-production state, back up and verify the private controller root, fleet directory
-and provider state. Preserve private modes; keep credentials out of logs/source.
+Only previously desired-active targets resume. Updates never silently enroll a
+replacement identity or choose another model. A changed skill uses the same
+native instruction receipt owner. No HTTP software fallback is used.
 
-Install the new matching `@ctlflow/fleet`/`@ctlflow/fleetd` release into the private
-durable user prefix. Merely installing a package does not replace live code.
-Using that new installed executable, run `fleet update FLEET` for each addressed
-fleet, or `fleet agent update FLEET INSTANCE`. The canonical lifecycle operation
-stops selected receivers/native processes, validates and installs the package's
-pinned local tools/skill assets, then resumes only previously desired agents.
-Stopped agents stay stopped. Exact identities, histories and unread positions are
-retained. Failures are per-instance, without discarding successful peers. If a
-daemon restart refuses restoration because reviewed fleet files changed, run the
-explicit update operation to validate and accept those files without clearing
-saved activation. The controller owns lifecycle validation; a prior status error
-does not prevent submitting the operation that repairs it.
+## Power failure
 
-Then `fleet daemon restart` replaces the controller binary at the same private
-root, preserving desired activation and exact histories. Do not reverse this
-order and resume with old skills before update. Native approval requests use the
-protected owner DM. Check `fleet show FLEET`, `fleet test FLEET` and effective
-settings, not just controller connectivity. No room grants are needed for a
-model-free readiness check.
+Restart fleetd with its original root. It loads its explicit registry, desired
+intent, saved stopped selection and exact histories. It does not discover new
+directories or initialize replacement conversations.
 
-Running releases are never silently replaced. Update notices ask for owner
-consent and direct the model to the controller-owned command; no standalone
-agent connect, second installer or competing receiver exists. The advanced
-`--release-directory` addresses an actual immutable installed artifact directory
-on the controller computer, including SSH targets; it is validated before use.
+Unfinished checkpoints can trigger one receipt-backed continuation after older
+input settles. A quiet/idle context does not receive a synthetic task.
+Pending decisions and unconfirmed delivery remain recovery state, not logs.
 
-## Backup and portability
+## Failures
 
-A stopped fleet directory contains its definitions, private Crossfire binding,
-work areas, sessions and receipts. Preserve private modes, credentials and native
-provider configuration when transferring it. The target requires the same runtime
-and provider prerequisites. Register its new absolute directory explicitly.
-Preserve the private controller root, including `desired-intent.json`, when
-restarting on the same machine. Daemon shutdown retains active intent; explicit
-fleet/agent stop clears it. The controller registry is machine-local; the fleet's private state is not a
-public lookup or identity-recovery credential substitute.
-
-Never run two controllers against the same active private fleet state. Exclusive
-native locks own controller, fleet and receiver lifetimes; timeout guessing is
-not ownership. Do not remove state to bypass a lock or failed resume.
-
-## Troubleshooting
-
-| Symptom | Action |
+| Error | Response |
 | --- | --- |
-| Pending approval | Review the roster URL/code; do not enroll again or poll with a model. |
-| Name collision | Choose an authorized distinct name before creating the instance. |
-| Runtime unavailable | Inspect the exact controller error and executable/provider prerequisites. |
-| Native history has an active writer after controller death | Safely stop the verified orphaned Codex app-server on its owning machine; retain private state and history. Never delete locks or guess processes. |
-| Native state sleeping | The listener can still be online. Eligible input resumes retained history; metadata GETs never wake it. |
-| Permission/question waits | Open its owner-DM Crossfire review link and explicitly submit the complete native decision. |
-| Listener offline | Check controller connection, agent phase, native binding and account access. |
-| Room messages do not wake | Check grants, native membership, wake sources and fleet delivery intent. |
-| Config change not applied | Stop/start the affected instance; inspect effective native settings. |
-| Terminal pointer expired | Obtain a fresh attachment after restart. |
-| One failed agent | Inspect its original error; do not restart successful peers unnecessarily. |
-| Shared/per-room switch refused | Recover original pending publications/decisions; do not discard journals or copy histories. |
-| Room reply absent despite work | Inspect the exact room context and owner DM; terminal output is private, room replies require an intentional tool call. |
+| Name collision | Choose a unique registered name and submit a new exact review |
+| Missing private credentials | Recover through authorized owner/controller proof, not public name lookup |
+| Unsupported native setting | Select an actually available model/effort and restart explicitly |
+| Established history missing | Restore/diagnose its exact binding; do not create a new one implicitly |
+| Live writer lock | Resolve the exact owned writer before replacement |
+| Native question | Answer its authenticated owner decision page |
+| Cleanup failed | Retain the failed generation; do not start a competing one |
+| Server unavailable | Delivery gate closes; retained unread state resumes after authenticated reconnection |
+| Old terminal pointer | Obtain a new attachment descriptor for the current generation |
 
-Session in management shows native state/settings and decisions independently of
-heartbeats. One private Crossfire management DM per member reports confirmed
-failures or unknown lost contact, deduplicated by episode with recovery updates.
-Controller failures persist in `.fleet/failures.json` until the scoped report is
-accepted. A reporting failure is visible in controller status; it does not
-silently discard the original failure. The controller closes the exact failed
-generation and retries transient failures with one-to-sixty-second exponential
-backoff, preserving deployed parameters, installed software, identity and native
-history. Explicit stop cancels recovery. Permanent configuration/authorization
-errors and failed cleanup require operator action. Uncertain publications remain
-receipt-safe; recovery never silently replaces context or upgrades software.
-- [Runtime observation, privacy and decisions](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/runtime.md)
+A killed controller may leave a native process or detached tool alive.
+Neither process-name scanning nor history copying is an approved recovery method.
+No system here guarantees arbitrary subprocess cleanup after SIGKILL.
 
-Normal stop ends owned listeners and Codex engines. Abruptly killing fleetd can
-leave the native WebSocket app-server alive; a competing history writer is
-refused rather than adopted or replaced. This is not automatic crash recovery.
-A full machine restart ends the native engine and allows ordinary saved-history
-restoration. The product also does not supervise every detached tool descendant
-after force-kill/crash. It installs no systemd,
-global skills, privileged supervisor or host service.
-
-- [Abrupt controller death and native writer ownership](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/operations.md#abrupt-controller-death)
+- [Controller failure boundaries](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/operations.md)
+- [Session controls](sessions.md)
+- [Operator inspection tools](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/node/tools/README.md)

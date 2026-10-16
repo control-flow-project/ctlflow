@@ -22,7 +22,7 @@ async function fixture(scope: TestContext) {
   writeFileSync(join(directory, 'outside.html'), 'private file');
   symlinkSync(join(directory, 'outside.html'), join(element, 'escape.html'));
   symlinkSync(directory, join(element, 'escape'));
-  const routes = { element, web, publicOrigin: 'http://127.0.0.1', matrixOrigin: 'http://127.0.0.1', serviceOrigin: 'http://127.0.0.1' };
+  const routes = { element, web, publicOrigin: 'http://127.0.0.1', matrixOrigin: 'http://127.0.0.1', service: createServer() };
   const server = publicRouter(routes);
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -44,9 +44,9 @@ test('only exact current native registration and fallback paths reach Crossfire;
     cleanup(scope, () => { server.closeAllConnections(); return new Promise<void>(resolve => server.close(() => resolve())); });
     return 'http://127.0.0.1:' + address.port;
   }
-  const serviceOrigin = await listen(createServer((request, response) => { management.push(request.url!); response.end('management'); }));
+  const service = createServer((request, response) => { management.push(request.url!); response.end('management'); });
   const matrixOrigin = await listen(createServer((request, response) => { matrix.push(request.url!); response.end('matrix'); }));
-  const routes = { publicOrigin: 'http://127.0.0.1', serviceOrigin, matrixOrigin, web: '/', element: '/' };
+  const routes = { publicOrigin: 'http://127.0.0.1', service, matrixOrigin, web: '/', element: '/' };
   const router = publicRouter(routes); routes.publicOrigin = await listen(router);
   const origin = new URL(routes.publicOrigin);
   const request = (path: string) => new Promise<{ status: number; cache: string | undefined }>((resolve, reject) => {

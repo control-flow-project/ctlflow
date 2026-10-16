@@ -1,49 +1,7 @@
-# Fleet coordination settings
+# Coordination defaults
 
-## Define a role
-
-Keep Crossfire settings separate from the runtime adapter's native options in
-`agents/<role>/agent.toml`. Every instance referencing the role inherits the same
-complete coordination policy:
-
-```toml
-name = "Analyst"
-runtime = "codex"
-
-[runtime_options]
-model = "YOUR_SUPPORTED_MODEL"
-model_reasoning_effort = "high"
-
-[coordination_options]
-wake_mode = "selected"
-permissions = ["room.agent.invite"]
-
-[[coordination_options.wake_senders]]
-matrix_user_id = "@owner:YOUR_SERVER"
-include_agents = true
-```
-
-| Field | Values | Default |
-| --- | --- | --- |
-| `wake_mode` | `selected`, `humans`, `everyone` | `selected` when the whole block is absent |
-| `permissions` | `[]` or `["room.agent.invite"]` | `[]` when the whole block is absent |
-| `wake_senders` | Up to 2000 unique entries with `matrix_user_id` and Boolean `include_agents`; only humans can include agents | Explicit actual owner, person only, when the whole block is absent |
-
-An explicit block requires `wake_mode`, `permissions` and `wake_senders`. Use
-`wake_senders = []` for an empty list. `everyone` requires an empty list. Unknown
-fields, old preset/flat-ID inputs, capabilities, duplicate IDs and invalid flags
-fail validation. Different
-role coordination policies require different definitions; native runtime-option
-selections do not override this policy.
-Every Crossfire agent belongs to a fleet; this role policy applies equally to
-one-agent project setup and larger fleets.
-
-An owner entry with `include_agents = true` includes the owner and their active agents,
-including agents outside this fleet. `humans` additionally includes other humans.
-`everyone` includes humans and their active agents. Self messages never wake the
-receiver. Suspended/revoked people and agents with inactive owners cannot wake it.
-
-To allow a specific cross-owner worker and human:
+Role `coordination_options` is separate from native `runtime_options`.
+Instances inherit the role's complete policy; native overrides cannot change it.
 
 ```toml
 [coordination_options]
@@ -51,80 +9,67 @@ wake_mode = "selected"
 permissions = ["room.agent.invite"]
 
 [[coordination_options.wake_senders]]
-matrix_user_id = "@human:YOUR_SERVER"
+matrix_user_id = "@owner:example.test"
 include_agents = true
 
 [[coordination_options.wake_senders]]
-matrix_user_id = "@another-person:YOUR_SERVER"
-include_agents = false
-
-[[coordination_options.wake_senders]]
-matrix_user_id = "@agent-IMMUTABLE_UUID:YOUR_SERVER"
+matrix_user_id = "@another-person:example.test"
 include_agents = false
 ```
 
-Use actual registered Matrix IDs from the directory or agent details, not display
-names or role labels. Entries combine with OR: this example allows the first
-person and their agents, the second person only, and the selected individual
-agent. Ownership is dynamic, so subsequently enrolled active agents are included
-only for true person entries. `humans` allows all active people plus these extra
-entries; it has no implicit owner-agent allowance. `everyone` allows all active
-people and agents. Empty selected authority wakes nobody; owner is not implicit
-and self is always excluded. The server resolves IDs to immutable principals and rechecks their
-authority at approval. Enrollment cannot select an uncreated identity by name.
+## Wake modes
 
-## Approval and changes
+| Mode | Eligible sources |
+| --- | --- |
+| selected | Explicit entries only |
+| humans | Active registered humans plus explicit entries |
+| everyone | Active humans and agents; no explicit entries |
 
-1. Initial `fleet start <fleet>` or explicit `fleet enroll <fleet>` submits names,
-   controller identity and each exact policy.
-2. The owner opens the displayed approval URL, verifies the code and reviews the
-   complete roster, wake authors and invitation capability.
-3. Approval applies wake rules and invitation defaults atomically. No additional
-   management configuration or model call is required.
+A human entry includes that person; true also includes their currently owned
+active agents, including later additions and agents outside this fleet.
+Individual agent entries require false. Entries combine with OR.
+Empty selected wakes nobody; there is no implicit owner or self allowance.
+Inactive people/agents or agents with inactive owners cannot wake a listener.
 
-An existing identity or controller credential cannot authorize new capabilities.
-Changed coordination policies require explicit `fleet enroll <fleet>` while
-stopped and owner review, including existing agents. Normal start/resume of an
-approved roster checks current fleet/account authority without enrollment or
-policy writes. Owner-edited wake rules remain authoritative even when they differ
-from the original TOML defaults. Invalid saved authority fails; it never silently
-requests replacement enrollment.
-Stale agent revisions, changed senders or expired/rejected requests cannot grant
-authority. An explicit subsequent start can request a fresh review; the daemon
-does not resubmit a rejected request while waiting.
+An explicit block requires mode, permissions and senders.
+At most 2000 distinct entries are allowed. Unknown capabilities, duplicate IDs,
+old presets and flat sender-ID forms fail validation.
+Omitting the block requests the actual owner, person only, and no invitation
+permission.
 
-Unchanged reconnects preserve identities, histories and room-specific permission
-edits. Management remains available for deliberate adjustments. A changed policy
-approval replaces defaults on all current ordinary grants and future admissions;
-the review explicitly describes this effect. Editing a running file has no effect
-until explicit enrollment. Native runtime options instead take effect on native
-resume. New or renamed identities require the normal enrollment review. Retiring
-an instance or archiving a fleet requires confirmed
-native stop and settled decisions. The identity remains fleet-bound and preserved
-for audit; no independent listener or detach path is created.
+## Approval
 
-## Room admission and removal
+Enrollment reviews exact names, controller, complete policy and current ownership.
+Only the named human owner can approve. Private controller/agent proof cannot
+approve policy. Room membership remains a separate native-authorized decision.
 
-Configuration creates or joins no room. `rooms.toml` remains an optional explicit
-existing-room access plan, not an automatic startup action. Humans create rooms
-in Element and invite only the workers they need.
+New ordinary room generations materialize approved invitation defaults through
+the canonical room-permission owner. Owner/management DMs never delegate.
+Current human edits remain authoritative during ordinary resume.
+Use explicit stopped-fleet enrollment when proposing changed defaults.
 
-On a new authorized ordinary-room admission, Crossfire applies that receiver's
-own approved invitation defaults to the new membership generation. This also
-works for native Element invitations and cross-owner agent invitations. Existing
-manual room edits persist within that generation; readmission applies defaults
-again. Authorization reads the resulting canonical room permission rows, not a
-global permission union or a controller-side permission system.
+## Invitations
 
-An agent with `room.agent.invite` and applicable native Matrix authority may invite
-another registered agent across owners. It may remove only additions attributed
-to itself in the current generation. Owners manage their own agents; administrators
-have their separately verified authority. Removing an owner-added worker or
-another agent's addition is denied. Native room ceilings and current delegation
-still apply. The inviter never transfers its own permissions to the target.
+`room.agent.invite` allows an authorized agent to add existing registered agents,
+including another owner's, within its current native room authority.
+It does not create identities, start processes, approve enrollment or add
+permission beyond the native ceiling.
 
-Owner and management DMs exclude third-agent delegation. These private channels
-are protected even while native admission is pending. Fleet configuration does
-not grant native power, ownership, enrollment approval or permission to edit
-another agent's settings. Wake eligibility, room membership and invitation
-capability remain separate.
+Removal is limited to additions attributed to the invoking agent.
+A duplicate add does not transfer provenance; remove/re-add creates a new
+generation. Targets retain their own independently approved defaults.
+Invitation authority does not imply wake authority.
+
+## Delivery
+
+The listener verifies current account/owner, room membership, unmuted access,
+wake source and exact controller generation before native input.
+A native user mention steers only if that source is accepted.
+Quoted names, old context and automated notices never become controls.
+
+Unknown or blocked traffic does not call the model.
+Non-waking messages remain pending context for a later authorized trigger.
+Housekeeping, heartbeats, enrollment and policy checks are ordinary code.
+
+- [Definitions](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/configuration.md)
+- [Crossfire runtime behavior](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/runtime.md)

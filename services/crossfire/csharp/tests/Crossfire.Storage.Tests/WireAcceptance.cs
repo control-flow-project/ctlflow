@@ -10,6 +10,9 @@ public static class WireAcceptance
 {
     public static void Verify()
     {
+        Equal(Pagination.Parse(new Dictionary<string, string>()).Value, (1, 20), "pagination defaults are shared by public and private APIs");
+        foreach (var value in new[] { "01", "+1", "1.0", "1e0", "0x1", " 1", "1\n", "١", "", "100001" }) Equal(Pagination.Parse(new Dictionary<string, string> { ["page"] = value }).IsSuccess, false, "noncanonical pagination is rejected: " + value);
+        Equal(Pagination.Parse(new Dictionary<string, string> { ["page"] = "100000", ["pageSize"] = "100" }).Value, (100000, 100), "pagination upper bounds are inclusive");
         Equal(IdentitySyntax.Identifier("12345678-abcd-0000-ffff-123456789abc"), true, "canonical identifier belongs to the pure kernel");
         Equal(IdentitySyntax.Identifier("12345678-ABCD-0000-ffff-123456789abc"), false, "identifier validation preserves lowercase wire identity");
         Equal(IdentitySyntax.Identifier("12345678_abcd-0000-ffff-123456789abc"), false, "identifier validation requires exact separators");

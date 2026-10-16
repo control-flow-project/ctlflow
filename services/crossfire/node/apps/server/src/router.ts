@@ -1,8 +1,8 @@
-import { createServer, request as forward, type ServerResponse, type IncomingHttpHeaders } from 'node:http';
+import { createServer, request as forward, type ServerResponse, type IncomingHttpHeaders, type Server } from 'node:http';
 import { createReadStream, realpathSync, statSync } from 'node:fs';
 import { extname, resolve, sep } from 'node:path';
 
-type Routes = { publicOrigin: string; matrixOrigin: string; serviceOrigin: string; web: string; element: string };
+type Routes = { publicOrigin: string; matrixOrigin: string; service: Server; web: string; element: string };
 const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff': 'font/woff',
@@ -51,8 +51,9 @@ export function publicRouter(routes: Routes) {
     }
     const elementConfiguration = path === '/config.json' || path === '/config.' + new URL(routes.publicOrigin).hostname + '.json';
     const management = profileWrite || path === '/_matrix/client/v3/user_directory/search' || registration || registrationAuthentication || elementConfiguration || path.startsWith('/api/') || path.startsWith('/onboarding/');
-    if (native || management) {
-      const target = new URL(management ? routes.serviceOrigin : routes.matrixOrigin);
+    if (management) { routes.service.emit('request', request, response); return; }
+    if (native) {
+      const target = new URL(routes.matrixOrigin);
       const headers: IncomingHttpHeaders = { ...request.headers, host: new URL(routes.publicOrigin).host };
       delete headers['forwarded']; delete headers['x-forwarded-for']; delete headers['x-forwarded-host'];
       const upstream = forward({ hostname: target.hostname, port: target.port, method: request.method,
