@@ -74,7 +74,10 @@ async function buildProduct(service) {
   await bundle({ entryPoints: entries, outdir: join(root, 'dist'), outbase: join(root, 'node'), platform: 'node', format: 'esm', target: 'node26' });
   const contracts = join(root, 'tests/contracts');
   if (existsSync(contracts)) await bundle({ entryPoints: readdirSync(contracts).filter(file => file.endsWith('.ts')).map(file => join(contracts, file)), outdir: join(root, 'dist/tests/contracts'), bundle: true, packages: 'external', platform: 'node', format: 'esm', target: 'node26' });
-  if (service === 'crossfire') await command(process.execPath, [join(root, 'dist/scripts/build-release.js'), '--root', root, '--web-directory', join(root, 'apps/web/dist')], root);
+  if (service === 'crossfire') {
+    await bundle({ entryPoints: [join(root, 'node/scripts/container-package-tool.ts')], outfile: join(root, 'dist/container-package-tool.mjs'), bundle: true, platform: 'node', format: 'esm', target: 'node26' });
+    await command(process.execPath, [join(root, 'dist/scripts/build-release.js'), '--root', root, '--web-directory', join(root, 'apps/web/dist')], root);
+  }
   else await command(process.execPath, [join(root, 'node/scripts/build-package.mjs')], root);
 }
 

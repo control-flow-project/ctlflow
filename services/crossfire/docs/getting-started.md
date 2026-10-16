@@ -2,9 +2,11 @@
 
 ## Requirements
 
-Select Node, C# managed, C# NativeAOT or Rust before building. Each guide lists
-its build dependencies, installed dependencies and packaging commands. All
-server operators require an existing rootless Docker engine.
+Use Linux, an installed Crossfire operator and an existing rootless Docker engine.
+The Node operator needs Node.js 26+. Packaged C# operators include their runtime
+or are NativeAOT. Rust operators are native executables. Select Node, C# managed,
+C# NativeAOT or Rust explicitly. The selected Docker package carries the server dependencies.
+Source builds additionally need npm 11.17+, Git and the pinned .NET/native tools.
 Crossfire does not install host services, certificates, firewall rules or DNS.
 
 Build the selected checkout inside the finite resource scope described in the
@@ -15,6 +17,8 @@ development guide. Do not use an active test output tree for deployment.
 - [C# managed installation and packaging](../../../docs/distributions/csharp-managed.md)
 - [C# NativeAOT installation and packaging](../../../docs/distributions/csharp-nativeaot.md)
 - [Rust installation and packaging](../../../docs/distributions/rust.md)
+- [C# operator](../csharp/README.md)
+- [Build and transfer Docker packages](container-packages.md)
 
 ## Initialize a local instance
 
@@ -26,13 +30,12 @@ node crossfire init --directory /absolute/private/crossfire-state \
   --content-origin http://localhost:8099 \
   --server-name team.localhost --administrator admin
 ./start.sh --directory /absolute/private/crossfire-state \
-  --port 8098 --content-port 8099
+  --package /absolute/packages/node --port 8098 --content-port 8099
 ```
 
-The other guides use their installed native operator with an explicit source
-checkout. C# additionally selects its runtime image with `--runtime managed`
-or `--runtime nativeaot`. Do not mix an installation's default mode with the
-intended container mode.
+The other guides use their installed native operator with an explicit package.
+The package selects the runtime backend independently of the operator's language.
+The deployment host does not need a source checkout or build toolchain.
 
 Initialization refuses a nonempty directory. The initial password is the
 `administratorPassword` value in private `bootstrap.json`.
@@ -42,10 +45,10 @@ The application port serves Element, management and the API. The separate
 content port serves committed public reports only; its root returns 404.
 Host port publication is loopback-only. Public use requires HTTPS.
 
-The operator builds content-addressed images, acquires exclusive instance
-ownership, reconciles abandoned owned containers, verifies an upgrade backup
+The operator acquires exclusive instance ownership, verifies and imports the
+selected package, reconciles abandoned owned containers, verifies an upgrade backup
 when needed, runs Knex and starts the runtime only after success.
-`--compile` rebuilds selected images. Ctrl+C stops and removes the owned
+It never builds source or substitutes another backend. Ctrl+C stops and removes the owned
 container while retaining state.
 
 A live competing launcher is refused. If a launcher dies, start the instance

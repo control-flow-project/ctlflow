@@ -5,6 +5,7 @@ import test from 'node:test';
 import { main } from '../apps/server/src/operator.js';
 import { runArguments, cgroupArguments } from '../apps/server/src/container-commands.js';
 import { ownedDocker } from '../apps/server/src/container-lifecycle.js';
+import { checkContainerConfiguration } from '../scripts/container-configuration.js';
 
 test('initialization is private, explicit, non-destructive and rejects unrelated options', async () => {
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
@@ -12,11 +13,17 @@ test('initialization is private, explicit, non-destructive and rejects unrelated
   const args = ['init', '--directory', directory, '--instance', 'preview', '--origin', 'http://127.0.0.1:8098',
     '--content-origin', 'http://localhost:8099',
     '--server-name', 'preview.localhost', '--administrator', 'admin'];
-  await assert.rejects(main([...args, '--compile']), /Invalid option/);
+  await assert.rejects(main([...args, '--package', '/package']), /Invalid option/);
+  for (const option of ['--compile', '--source', '--runtime']) await assert.rejects(main(['start', option, 'old']), /Unknown option/);
   await assert.rejects(main([...args, '--cgroup-parent', 'app-test.slice']), /Invalid option/);
   await assert.rejects(main(['start', '--directory', directory, '--instance', 'ignored']), /Invalid option/);
   for (const action of ['reset', 'install', 'run', 'kill']) await assert.rejects(main([action]), /Use init or start/);
   await main(args);
+  const configurationArguments = args.slice(1).filter((value, index, values) => value !== '--administrator' && values[index - 1] !== '--administrator');
+  const configuration = readFileSync(join(directory, 'config.json'), 'utf8');
+  checkContainerConfiguration(configurationArguments);
+  assert.throws(() => checkContainerConfiguration([...configurationArguments, '--origin', 'https://different.example']), /deployment identity/u);
+  assert.equal(readFileSync(join(directory, 'config.json'), 'utf8'), configuration, 'Maintenance validation cannot rewrite private configuration');
   const first = readFileSync(join(directory, 'bootstrap.json'), 'utf8');
   const secrets = JSON.parse(first) as { administratorPassword: string; servicePassword: string };
   assert.equal(secrets.administratorPassword.length, 43);

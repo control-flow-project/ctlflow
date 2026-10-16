@@ -14,8 +14,10 @@ test('contract process distinguishes signal termination from a running process',
 });
 
 test('contract process observes successful and unsuccessful exits', async context => {
+  const command = { binary: process.execPath, arguments: ['-e', 'process.exit(0)'] };
+  for (const budget of [0, -1, NaN, 0.5, 2147483648]) assert.throws(() => contractProcess(context, command, [], process.cwd(), process.env, budget), /positive native shutdown/u);
   for (const code of [0, 7]) {
-    const running = contractProcess(context, { binary: process.execPath, arguments: ['-e', 'process.exit(' + code + ')'] }, [], process.cwd());
+    const running = contractProcess(context, { binary: process.execPath, arguments: ['-e', 'process.exit(' + code + ')'] }, [], process.cwd(), process.env, 180000);
     assert.equal(await running.ended, code);
     assert.equal(running.alive(), false);
     await running.close();

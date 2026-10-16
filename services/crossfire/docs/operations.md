@@ -2,12 +2,13 @@
 
 ## Deploy or upgrade
 
-1. Identify the exact source revision, runtime, instance directory and endpoints.
+1. Obtain the exact trusted Docker package; identify its source digest/backend,
+   instance directory and endpoints.
 2. Verify a private backup of configuration, credentials, management SQLite and
    report storage. A SQLite backup must include committed WAL state; do not copy
    only a live main file.
 3. Stop any live operator normally. A second live operator is refused.
-4. Start the selected release against the same private directory.
+4. Start the selected release using --package against the same private directory.
 5. The operator validates and removes exact owned runtime/migration orphans,
    stops writers, verifies the required upgrade backup, runs Knex, then starts
    the selected application.
@@ -24,7 +25,7 @@ Website deployment, npm publication and starting fleets are separate actions.
 ## Operator ownership
 
 The Node, C# and Rust operators share the private `operator.lock` inode and exclusive
-SQLite locking protocol. The lock spans build, reconciliation, backup, migration,
+SQLite locking protocol. The lock spans package verification/import, reconciliation, backup, migration,
 runtime execution and cleanup. It is not an expiring PID lease; process death
 releases the lock. Never delete its inode to bypass a live owner.
 
@@ -50,6 +51,7 @@ owners and are not reset by a SQL migration. Replacing the backend does not
 import/export management data.
 
 - [Migration layout and commands](../database/README.md)
+- [Docker package format and site adoption](container-packages.md)
 - [Logging retention and protected records](logging.md)
 - [Public report storage](publications.md)
 

@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { contractProcess, freePorts, observe, record, text, type ContractProcess, type ContractTarget } from '@ctlflow/crossfire-test-support/contract-process';
@@ -13,7 +13,7 @@ import { builtRelease } from '../../node/scripts/test-support/release.js';
 import { contractClient } from './fixture.js';
 
 export type ContainerStack = Awaited<ReturnType<typeof containerStack>>;
-export async function containerStack(scope: TestContext, initial: ContractTarget, targets: readonly ContractTarget[]) {
+export async function containerStack(scope: TestContext, initial: ContractTarget, targets: readonly ContractTarget[], packages: string) {
   const parent = process.env.CROSSFIRE_TEST_CGROUP_PARENT;
   assert(parent && /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,180}\.slice$/u.test(parent), 'Use the finite Docker verification slice');
   const repository = resolve(process.cwd(), '../..'), directory = mkdtempSync(join(tmpdir(), 'cf-container-')), state = join(directory, 'state');
@@ -46,18 +46,11 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
     if (failure !== undefined) throw failure;
   }
   cleanup(scope, close);
-  function launch(target: ContractTarget) {
-    const options: string[] = [];
-    if (target.implementation === 'csharp') {
-      const distribution = record(JSON.parse(readFileSync(resolve(dirname(target.server.binary), '../distribution.json'), 'utf8')) as unknown);
-      assert.equal(distribution.implementation, 'csharp'); assert(distribution.mode === 'managed' || distribution.mode === 'nativeaot');
-      options.push('--source', repository, '--runtime', distribution.mode);
-    }
-    if (target.implementation === 'rust') options.push('--source', repository);
-    return contractProcess(scope, target.server, ['start', '--directory', state, '--port', String(port), '--content-port', String(contentPort), '--cgroup-parent', parent!, ...options], repository);
+  function launch(target: ContractTarget, packageDirectory = join(packages, target.name)) {
+    return contractProcess(scope, target.server, ['start', '--directory', state, '--package', packageDirectory, '--port', String(port), '--content-port', String(contentPort), '--cgroup-parent', parent!], directory, process.env, 180000);
   }
-  async function start(target: ContractTarget) {
-    selected = target; running = launch(target);
+  async function start(target: ContractTarget, packageDirectory = join(packages, target.name)) {
+    selected = target; running = launch(target, packageDirectory);
     await observe(async () => {
       assert.equal(running?.alive(), true, 'Container operator must remain running\n' + running?.errors() + '\n' + running?.output());
       if (!running?.output().includes('Public: ' + origin + '/')) return false;
@@ -67,7 +60,7 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
   await start(initial);
   const client = await contractClient({ directory, state, origin, contentOrigin, configuration, bootstrap: { administratorPassword: text(bootstrap.administratorPassword) }, native: { base: origin }, targets, release: builtRelease(),
     restart: async (target = selected) => { await close(); await start(target); }, close, current: () => selected });
-  return { ...client, port, contentPort, containerName, launch, start,
+  return { ...client, port, contentPort, containerName, launch, start, packages,
     async abandon() {
       const owned = running; assert(owned, 'The fixture must own its launcher'); assert(owned.alive(), 'Only the fixture-owned live launcher can be terminated');
       const identity = execFileSync('docker', ['inspect', '--format', '{{.Id}}', containerName], { encoding: 'utf8', timeout: 30000 }).trim();

@@ -61,6 +61,11 @@ stores before removing obsolete migration inputs; never reset production to avoi
 designing the correct migration. Required native protocol behavior is not an
 excuse for speculative support of older contracts.
 
+On 2026-10-16 the owner selected C# NativeAOT as the GAAP and Bad Bets server
+deployment default. Node and managed C# remain explicit package choices, never
+fallbacks. Fleet attachment continues to install the Node @ctlflow/fleet CLI and
+Node fleetd on every server implementation. The setup harness remains independent.
+
 ## Source ownership
 All product code is under services/crossfire, services/fleetd or services/fleet.
 Each service owns apps, packages, tests and product-specific assets. The repository

@@ -136,6 +136,29 @@ crossfire-client.mjs and matrix-spec-LICENSE.txt. One private build export
 produces the server/fleetd bytes. Activation verifies the complete local release.
 Recovery and wake do not download or silently install software.
 
+Server deployment uses a transferable per-backend Docker package: bounded
+release.json plus images.tar, containing an exact runtime image and the common
+Knex image. Both operators use --package; image construction belongs to the build,
+not a source-dependent deployment mode. Archive/image digests, platform and release
+labels are checked before touching writers. Backend selection is explicit, never
+chosen from the operator's language or substituted after failure.
+GAAP and Bad Bets select C# NativeAOT server packages by default. Their branding,
+DNS/TLS and deployment state remain site-owned. This does not change fleet
+attachment: generated instructions are addressed to the coding harness and always
+install the pinned Node @ctlflow/fleet CLI with Node fleetd, independent of the
+server backend. The setup harness's own process/history is never adopted.
+Images own readiness and entrypoints; site-specific branding uses build stages,
+not language-specific commands injected into another backend's runtime.
+Container removal is complete only after the exact immutable container identity
+is absent. An already-removing container is observed, not stopped/deleted again.
+Both operators bound that observation and preserve explicit cleanup failures;
+test-process guards allow the complete native stop/cleanup budget before killing
+their owned launcher. No presence/ownership assertion is waived for slow I/O.
+The current verified package platform is Linux amd64. Other native host/CPU
+targets require their platform adapters and test evidence, not a changed RID alone.
+
+- [Package format, site adoption and Rust integration](../services/crossfire/docs/container-packages.md)
+
 ## 4. HTTP contract and trusted ingress
 
 The [Crossfire operation catalog](../services/crossfire/node/packages/contracts/src/rest/operations.ts)
@@ -807,7 +830,7 @@ lease, lock-inode deletion or external lock executable supplies another owner.
 
 Rootless Docker and explicit private instance configuration are required.
 No host services or machine-wide permission changes are installed.
-One operator owns the directory for its complete lifetime: image preparation,
+One operator owns the directory for its complete lifetime: package verification/import,
 reconciliation, backup, migration, runtime attachment and cleanup.
 A second live operator fails before those actions.
 

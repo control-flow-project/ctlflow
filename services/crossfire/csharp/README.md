@@ -44,15 +44,18 @@ Keep sibling directories together so the CLI resolves its installed controller.
   --origin https://example.test --content-origin https://content.example.test \
   --server-name example.test --administrator admin
 /absolute/distribution/crossfire/Crossfire.Server start \
-  --directory /absolute/private/state --source /absolute/crossfire \
-  --runtime managed --port 8080 --content-port 8082
+  --directory /absolute/private/state \
+  --package /absolute/packages/csharp-managed --port 8080 --content-port 8082
 ```
 
-`--runtime` explicitly selects managed or nativeaot; omission selects nativeaot.
-It is not an automatic fallback. The operator requires rootless Docker and
-builds the common assets/migrations plus the selected runtime image.
+The package explicitly selects Node, C# managed or C# nativeaot, independently
+of the installed operator's language. There is no automatic fallback or source
+build during deployment. The operator requires rootless Docker and verifies/imports
+the selected runtime image and common Knex migration image.
 Instance ownership, orphan reconciliation and backup/migration order are the
 same as Node. Private state and backend selection are independent.
+
+- [Build, transfer and deploy Docker packages](../docs/container-packages.md)
 
 Installed Fleet and fleetd use the same commands/configuration/private API.
 Setup keeps the invoking coding conversation independent.
