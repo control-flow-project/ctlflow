@@ -33,6 +33,11 @@ The listener holds at most 256 flows, 32 sessions and 2048 recent event IDs.
 It stores no analytics message bodies or long-term local statistics database.
 Overflow changes a dropped-sample count, not chat delivery.
 
+Message-type labels retain at most 100 UTF-16 units without splitting a Unicode
+scalar. Empty/control labels are summarized as `unknown`. Invalid usage and
+overflowing counter samples are dropped atomically; prior valid counters and
+listener heartbeats remain usable. No message body is stored in these labels.
+
 About every five minutes an immutable summary accompanies a normal heartbeat.
 Exact run/sequence/digest acknowledgment makes retries idempotent.
 A failed summary does not roll back a heartbeat or chat receipt.

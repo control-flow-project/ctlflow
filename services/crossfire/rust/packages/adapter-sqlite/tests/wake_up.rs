@@ -216,12 +216,26 @@ fn rule_crud_is_revision_checked_idempotent_scoped_and_transactional()
             .len(),
         1
     );
+    let missing = read::list(
+        &mut scenario.store,
+        &scenario.owner,
+        &ListFilter {
+            owner_id: None,
+            search: "unmatched-directory-search",
+            page: 1,
+            page_size: 1,
+        },
+        NOW,
+    )?;
+    assert_eq!(missing.total_items, 0);
+    assert_eq!(missing.total_pages, 1);
+    assert!(missing.items.is_empty());
     let page = read::list(
         &mut scenario.store,
         &scenario.owner,
         &ListFilter {
             owner_id: None,
-            search: "SCHEDULED",
+            search: "SCHEDULED_REVIEW",
             page: 1,
             page_size: 1,
         },

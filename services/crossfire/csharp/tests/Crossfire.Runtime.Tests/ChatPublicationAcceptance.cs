@@ -37,24 +37,11 @@ public static class ChatPublicationAcceptance
         Equal((await publication.Recover(allowed, CancellationToken.None)).IsSuccess, true, "native receipt resolves the original input");
         Equal(publication.Unpublished, false, "delivered input still requires acknowledgment"); Equal(publication.DiscardUnpublished().IsSuccess, false, "delivered evidence cannot be dropped as unsent");
         Equal(publication.Acknowledge().IsSuccess, true, "exact confirmed publication can be acknowledged"); Equal(runtime.Inputs, 1, "receipt recovery does not replay the original input");
-        runtime.Uncertain = false; runtime.SettlementFailure = true;
-        ChatPublication Steering() => new(storage, "steering", settings, runtime, NativeHistoryMode.Shared, () => 65536, artifacts,
-            _ => true, (_, _) => ValueTask.FromResult(Results.Done()), _ => { }, _ => { }, InputPriority.Steering);
-        var steering = Steering(); Equal(steering.Prepare(batch, events, identities).IsSuccess, true, "steering input is prepared");
-        Equal((await steering.Publish(allowed, CancellationToken.None)).IsSuccess, false, "preceding settlement failure is retained");
-        Equal(steering.Recovering, false, "no steering input has reached the native runtime"); Equal(runtime.Inputs, 1, "failed predecessor settlement makes no new model call");
-        steering = Steering(); var recoveries = runtime.Recoveries;
-        var restored = await steering.Recover(allowed, CancellationToken.None); Equal(restored.IsSuccess && restored.Value is null, true, "prepared steering survives restart without a false native receipt");
-        Equal(runtime.Recoveries, recoveries, "never recover steering against its predecessor's native journal");
-        Equal((await steering.Publish(allowed, CancellationToken.None)).IsSuccess, true, "settled predecessor permits steering");
-        Equal(runtime.Inputs, 2, "steering is submitted exactly once"); Equal(steering.Acknowledge().IsSuccess, true, "steering receipt is acknowledged");
     }
     private sealed class MemoryRuntime : RuntimeConnection
     {
         public int Inputs { get; private set; }
         public bool Uncertain { get; set; }
-        public bool SettlementFailure { get; set; }
-        public int Recoveries { get; private set; }
         public string SessionId => "same-session";
         public RuntimeApproval Approval => RuntimeApproval.None;
         public CancellationToken Lifetime => CancellationToken.None;
@@ -63,10 +50,8 @@ public static class ChatPublicationAcceptance
         public ValueTask<Result<bool>> Inspect() => ValueTask.FromResult(Result<bool>.Success(false));
         public ValueTask<Result<Unit>> Deliver(string text, string messageId, CancellationToken cancellation = default, InputPriority? priority = null)
         { Inputs++; return ValueTask.FromResult(Uncertain ? Results.Fail<Unit>("unavailable", "Receipt is uncertain") : Results.Done()); }
-        public ValueTask<Result<bool>> Settle(CancellationToken cancellation = default)
-        { var failure = SettlementFailure; SettlementFailure = false; return ValueTask.FromResult(failure ? Results.Fail<bool>("unavailable", "Preceding receipt is not yet settled") : Result<bool>.Success(true)); }
-        public ValueTask<Result<bool>> Recover(string text, string messageId, CancellationToken cancellation = default)
-        { Recoveries++; return ValueTask.FromResult(Result<bool>.Success(true)); }
+        public ValueTask<Result<bool>> Settle(CancellationToken cancellation = default) => ValueTask.FromResult(Result<bool>.Success(true));
+        public ValueTask<Result<bool>> Recover(string text, string messageId, CancellationToken cancellation = default) => ValueTask.FromResult(Result<bool>.Success(true));
         public Result<Unit> Acknowledge(IReadOnlyList<string> messageIds) => Results.Done();
         public ValueTask<Result<RuntimeConnection>> Conversation(string room, InputAdmission? admission = null) => ValueTask.FromResult(Result<RuntimeConnection>.Success(this));
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;

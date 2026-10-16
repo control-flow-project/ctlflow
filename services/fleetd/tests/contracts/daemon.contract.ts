@@ -41,6 +41,17 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     const added = record((await call(operations.addFleet, {}, { directory: fleetDirectory })).data); fleetId = text(added.fleetId); revision = integer(added.revision); contractError(await raw('/api/fleets/' + fleetId, 'PATCH', { expectedRevision: revision + 1, label: 'Wrong' }), 409, 'stale_revision');
     const page = await call(operations.fleets, {}, undefined, '?pageSize=1'); assert.equal(page.meta.totalItems, 1); assert.equal(list(page.data).length, 1); assert.equal((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data instanceof Array, true); assert.equal(provider.requests.length, 0, 'Inspection and contexts make no model call');
   });
+  await scope.test('fleet labels retain canonical Unicode and UTF-16 length limits', async () => {
+    let current = record((await call(operations.fleet, { fleetId })).data);
+    const exact = '😀'.repeat(50);
+    current = record((await call(operations.changeFleet, { fleetId }, { expectedRevision: integer(current.revision), label: exact })).data);
+    assert.equal(current.label, exact);
+    contractError(await raw('/api/fleets/' + fleetId, 'PATCH', { expectedRevision: integer(current.revision), label: exact + '😀' }), 400, 'invalid');
+    current = record((await call(operations.changeFleet, { fleetId }, { expectedRevision: integer(current.revision), label: 'Valid\u0080label' })).data);
+    assert.equal(current.label, 'Valid\u0080label');
+    revision = integer(current.revision);
+    assert.equal(provider.requests.length, 0);
+  });
   await scope.test('inspection is read-only and refuses unsafe or dangling work-area ancestors', async () => {
     const workarea = join(role, 'workarea'); assert(!existsSync(workarea), 'Inspecting an unstarted instance does not create private runtime state');
     symlinkSync(join(directory, 'missing-native-state'), workarea);

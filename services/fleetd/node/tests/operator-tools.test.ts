@@ -44,7 +44,7 @@ test('fleet growth preserves every earlier account, exact history and provider f
 });
 
 test('fleet verification uses only daemon GETs, exact native identities and the actual ancestor Git skill boundary', async scope => {
-  const directory = mkdtempSync(join(tmpdir(), 'fc-')), root = join(directory, 'controller'), fleetDirectory = join(directory, 'fleet');
+  const directory = mkdtempSync(join(tmpdir(), 'fleetd-operator-')), root = join(directory, 'controller'), fleetDirectory = join(directory, 'fleet');
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const definition = join(fleetDirectory, 'agents', 'analyst'), workspace = join(definition, 'workarea', 'helper');
   mkdirSync(workspace, { recursive: true, mode: 0o700 }); mkdirSync(root, { mode: 0o700 });

@@ -31,7 +31,7 @@ impl Pagination {
             page: self.page,
             page_size: self.size,
             total_items: total,
-            total_pages: (total + self.size - 1) / self.size,
+            total_pages: ((total + self.size - 1) / self.size).max(1),
         }
     }
 }

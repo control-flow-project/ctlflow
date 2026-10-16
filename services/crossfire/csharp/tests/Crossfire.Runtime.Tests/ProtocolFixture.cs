@@ -26,7 +26,7 @@ public sealed class ProtocolFixture : IAsyncDisposable
     public static async Task<ProtocolFixture> Open(bool unix = false)
     {
         var builder = WebApplication.CreateSlimBuilder(); builder.Logging.ClearProviders();
-        var directory = unix ? PrivateFiles.Directory(Directory.CreateTempSubdirectory("rpc-").FullName) : null;
+        var directory = unix ? PrivateFiles.Directory(Path.Combine(Path.GetTempPath(), "crossfire-rpc-" + Guid.NewGuid().ToString("N"))) : null;
         var socket = directory is null ? null : Path.Combine(directory, "native.sock");
         if (socket is null) builder.WebHost.UseUrls("http://127.0.0.1:0");
         else builder.WebHost.ConfigureKestrel(options => options.ListenUnixSocket(socket));

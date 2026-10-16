@@ -6,6 +6,7 @@ import { verifyTestResources } from './test-resources.mjs';
 import { prepareTimezones } from '../services/crossfire/scripts/timezones.mjs';
 import { execFileSync } from 'node:child_process';
 import { stageRustLicenses } from './rust-licenses.mjs';
+import { stageDistributionDocumentation } from './distribution-documentation.mjs';
 
 const { values, positionals } = parseArgs({ options: { output: { type: 'string' }, profile: { type: 'string', default: 'release' } }, allowPositionals: true });
 if (positionals.length || !values.output || !isAbsolute(values.output) || !['debug', 'release'].includes(values.profile)) throw new Error('Use publish-rust.mjs --output /absolute/new-directory [--profile debug|release]');
@@ -16,7 +17,7 @@ const stage = mkdtempSync(join(parent, '.crossfire-rust-publish-'));
 try {
   const timezones = await prepareTimezones();
   await buildProducts(products);
-  await command(process.execPath, ['services/crossfire/scripts/generate-rust-pi-extension.mjs'], repository);
+  await command(process.execPath, ['services/crossfire/scripts/generate-native-pi-extension.mjs', '--check'], repository);
   await command('cargo', ['build', '--workspace', '--locked', ...(values.profile === 'release' ? ['--release'] : [])], repository);
   const metadata=JSON.parse(execFileSync('cargo',['metadata','--locked','--filter-platform','x86_64-unknown-linux-gnu','--format-version','1'],{cwd:repository,encoding:'utf8',maxBuffer:16*1024*1024,timeout:60000}));
   const notices=join(stage,'third-party-licenses');stageRustLicenses(metadata,notices);
@@ -36,7 +37,7 @@ try {
   cpSync(join(repository, 'services/crossfire/dist/web'), join(stage, 'crossfire/web'), { recursive: true });
   cpSync(timezones,join(stage,'crossfire/zoneinfo'),{recursive:true});
   cpSync(join(repository, 'LICENSE'), join(stage, 'LICENSE'));
-  cpSync(join(repository, 'services/crossfire/rust/README.md'), join(stage, 'README.md'));
+  stageDistributionDocumentation(repository, stage, 'rust');
   writeFileSync(join(stage, 'distribution.json'), JSON.stringify({ schemaVersion: 1, implementation: 'rust', mode: 'native', profile: values.profile, platform: 'linux-x64', version: release.version, release: release.release, executables: { crossfire: 'crossfire/crossfire', fleetd: 'fleetd/fleetd', fleet: 'fleet/fleet' } }, null, 2) + '\n');
   renameSync(stage, output);
   console.log(JSON.stringify({ status: 'built-not-certified', output, resources, release: release.release, profile: values.profile }));

@@ -21,6 +21,7 @@ combined gate selects Node, C# managed, C# NativeAOT and Rust explicitly.
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [Installation and packaging by target](docs/distributions/README.md)
 - [Crossfire installation](services/crossfire/docs/getting-started.md)
 - [Agent and fleet setup](services/fleet/docs/getting-started.md)
 - [Controller operation](services/fleetd/docs/operations.md)
@@ -43,12 +44,12 @@ Run installation and verification inside a finite process-group resource scope:
 
 ```sh
 systemd-run --user --scope --quiet \
-  --property=MemoryMax=34359738368 --property=MemorySwapMax=0 \
+  --property=MemoryMax=17179869184 --property=MemorySwapMax=0 \
   --property=TasksMax=2048 /bin/bash -c \
   'npm ci --ignore-scripts && npm run verify:parity -- /absolute/new-evidence-directory'
 ```
 
-Size the finite limits for the host. Heap limits alone do not bound child
+This scope uses 16 GiB, zero swap and 2048 tasks. Heap limits alone do not bound child
 processes. Do not rebuild a checkout while tests consume its generated output.
 Fixtures use separate state and inert providers, not production accounts.
 

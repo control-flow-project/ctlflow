@@ -72,7 +72,7 @@ await execute('node', ['services/crossfire/scripts/generate-rust-operations.mjs'
 await execute('node', ['services/crossfire/scripts/generate-rust-onboarding.mjs','--check']);
 await execute('node', ['services/fleetd/scripts/generate-rust-operations.mjs','--check']);
 await execute('node', ['services/crossfire/scripts/generate-rust-timezones.mjs','--check']);
-await execute('node', ['services/crossfire/scripts/generate-rust-pi-extension.mjs']);
+await execute('node', ['services/crossfire/scripts/generate-native-pi-extension.mjs', '--check']);
 const examples = new Map();
 await execute('cargo', ['build','--workspace','--bins','--examples','--locked','--message-format=json'], {line:text => {
   const event = JSON.parse(text);

@@ -10,7 +10,6 @@ import { API, segment, json } from '@ctlflow/crossfire-contracts/matrix';
 import { endpoint } from '@ctlflow/crossfire-contracts/origin';
 import { markdownMessage } from './message.js';
 import { roomState, type RoomStateEvent } from '@ctlflow/crossfire-contracts/matrix-room';
-import { truncateUtf16 } from '@ctlflow/crossfire-contracts/text';
 
 export async function nativeOpen(client: Native, method: string, path: string, body?: Buffer | Readable,
   contentType = "application/json"): Promise<Result<Response>> {
@@ -73,7 +72,7 @@ export function matrix(client: Native) {
     if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code });
     if (result.value.status >= 300) {
       const content = object(result.value.body);
-      const code = content.ok && typeof content.value.errcode === "string" ? truncateUtf16(content.value.errcode, 80) : "ERROR";
+      const code = content.ok && typeof content.value.errcode === "string" ? content.value.errcode.slice(0, 80) : "ERROR";
       throw Object.assign(new Error("Native HTTP " + result.value.status + ": " + code), { status: result.value.status });
     }
     return result.value.body as T;
@@ -120,7 +119,7 @@ export async function nativeOk(client: Native, method: string, path: string, bod
   if (!response.ok) return response;
   if (response.value.status < 200 || response.value.status >= 300) {
     const code = response.value.body.errcode;
-    return failure("native", "Native HTTP " + response.value.status + (typeof code === "string" ? ": " + truncateUtf16(code, 80) : ""));
+    return failure("native", "Native HTTP " + response.value.status + (typeof code === "string" ? ": " + code.slice(0, 80) : ""));
   }
   return success(response.value.body);
 }

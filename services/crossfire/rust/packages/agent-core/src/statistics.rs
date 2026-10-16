@@ -1,3 +1,4 @@
+use crossfire_contracts::validation::{truncate_utf16, utf16_length};
 use crossfire_domain::statistics::{
     Batch, Flow, INTERVAL_MS, MAX_FLOWS, MAX_SESSIONS, RECENT_EVENTS, Totals, Usage,
 };
@@ -68,10 +69,20 @@ impl Collector {
             self.dropped();
             return;
         }
+        let prefix = truncate_utf16(event.message_type, 100);
+        let message_type = if prefix.is_empty()
+            || prefix
+                .chars()
+                .any(|value| value <= '\u{1f}' || value == '\u{7f}')
+        {
+            "unknown"
+        } else {
+            prefix
+        };
         let key = (
             event.room_id.to_owned(),
             event.sender.to_owned(),
-            event.message_type.to_owned(),
+            message_type.to_owned(),
         );
         if !self.flows.contains_key(&key) && self.flows.len() >= MAX_FLOWS {
             self.dropped();
@@ -80,7 +91,7 @@ impl Collector {
         let flow = self.flows.entry(key).or_insert_with(|| Flow {
             room_id: event.room_id.to_owned(),
             sender_matrix_id: event.sender.to_owned(),
-            message_type: event.message_type.to_owned(),
+            message_type: message_type.to_owned(),
             totals: Totals::default(),
         });
         let mut totals = flow.totals.clone();
@@ -141,10 +152,14 @@ impl Collector {
         }
     }
     pub fn usage(&mut self, sample: &Usage) {
-        let valid = sample.tokens.valid()
-            && ["codex", "pi"].contains(&sample.runtime.as_str())
-            && !sample.session_id.is_empty()
-            && sample.session_id.len() <= 255;
+        let text = |value: &str, maximum| {
+            (1..=maximum).contains(&utf16_length(value))
+                && !value
+                    .chars()
+                    .any(|value| value <= '\u{1f}' || value == '\u{7f}')
+        };
+        let valid =
+            sample.tokens.valid() && text(&sample.runtime, 100) && text(&sample.session_id, 255);
         if !valid {
             self.dropped();
             return;

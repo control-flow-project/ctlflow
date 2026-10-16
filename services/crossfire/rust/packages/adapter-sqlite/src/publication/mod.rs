@@ -1,7 +1,6 @@
 mod rows;
 use crate::{
     error::failure,
-    expression::instr,
     listener::ListenerRow,
     store::Store,
     tables::{
@@ -189,6 +188,7 @@ impl PublicationRepository for Store {
         let offset = (input.page - 1)
             .checked_mul(input.page_size)
             .ok_or_else(|| Failure::new(ErrorCode::Invalid, "Invalid report pagination"))?;
+        let search = format!("%{}%", input.search);
         macro_rules! query {
             () => {{
                 let mut query = records!().into_boxed();
@@ -201,7 +201,7 @@ impl PublicationRepository for Store {
                 if let Some(state) = input.state {
                     query = query.filter(report::state.eq(state.as_str()));
                 }
-                query.filter(instr(report::title, &input.search).gt(0))
+                query.filter(report::title.like(&search))
             }};
         }
         let total_items: i64 = query!()

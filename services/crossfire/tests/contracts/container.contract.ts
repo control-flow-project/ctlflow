@@ -43,6 +43,9 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
       assert.deepEqual(await discovery.json(), { 'm.homeserver': { base_url: origin } });
       assert.equal((await fetch(origin + '/_matrix/client/versions')).status, 200);
       assert.equal((await fetch(origin + '/config.json')).status, 200);
+      for (const path of ['/config.json/../bootstrap.json', '/manage/assets/%2e%2e%2fpackage.json', '/_coord/install.mjs']) {
+        assert.equal((await fetch(origin + path)).status, 404);
+      }
       const health = (await (await fetch(origin + '/api/health')).json() as { data: { instance: string; version: string; release: string; startedAt: number } }).data;
       assert.equal(health.instance, 'verification');
       const sourceExclusion = spawnSync('docker', ['exec', name, 'sh', '-c', 'test ! -d /app/services/crossfire/csharp && test ! -d /app/services/crossfire/node/tests && test ! -d /app/services/crossfire/dist/tests && test ! -d /app/services/crossfire/node/packages/domain/src'], { encoding: 'utf8' });

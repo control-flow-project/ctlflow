@@ -13,7 +13,7 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { operations } from '@ctlflow/fleetd-contracts/api';
 
 test('CLI fleet-wide and per-agent start resume by default; only --fresh-history selects reset', async scope => {
-  const directory = mkdtempSync(join(tmpdir(), 'fc-')), root = join(directory, 'controller'), home = join(directory, 'home');
+  const directory = mkdtempSync(join(tmpdir(), 'fleet-session-cli-')), root = join(directory, 'controller'), home = join(directory, 'home');
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(root, { mode: 0o700 }); mkdirSync(home, { mode: 0o700 });
   const fleetId = randomUUID(), inputs: { operationId: string; action: string; target: { kind: string; instanceKey?: string } }[] = [];

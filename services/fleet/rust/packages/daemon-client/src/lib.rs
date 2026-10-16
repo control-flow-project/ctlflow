@@ -16,6 +16,7 @@ impl Client {
                 NativeHttp::unix(socket, stop)?,
                 None,
                 Duration::from_secs(120),
+                16 * 1024 * 1024,
             )?,
         })
     }

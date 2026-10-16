@@ -7,7 +7,6 @@ use crossfire_domain::{
     session,
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, secret::Secret};
-use std::{collections::BTreeMap, net::IpAddr, sync::Mutex};
 use url::Url;
 
 pub const SESSION_COOKIE: &str = "__Host-crossfire";
@@ -216,26 +215,4 @@ where
     result.actor = Some(session.actor.clone());
     result.session = Some(session);
     Ok(result)
-}
-#[derive(Default)]
-pub struct RateLimit(Mutex<BTreeMap<IpAddr, (u16, i64)>>);
-impl RateLimit {
-    pub fn admit(&self, address: IpAddr, now: i64) -> Result<()> {
-        let mut records = self
-            .0
-            .lock()
-            .map_err(|_| Failure::new(ErrorCode::Unavailable, "Request rate ownership failed"))?;
-        records.retain(|_, (_, expiry)| *expiry > now);
-        if !records.contains_key(&address) && records.len() >= 4096 {
-            return Err(Failure::new(ErrorCode::RateLimit, "Request rate exceeded"));
-        }
-        let record = records
-            .entry(address)
-            .or_insert((0, now.saturating_add(60000)));
-        record.0 = record.0.saturating_add(1);
-        if record.0 > 120 {
-            return Err(Failure::new(ErrorCode::RateLimit, "Request rate exceeded"));
-        }
-        Ok(())
-    }
 }

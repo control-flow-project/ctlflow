@@ -14,6 +14,8 @@ COPY --from=build /native-metadata.json /native-metadata.json
 COPY --from=build /usr/local/cargo/registry/src /usr/local/cargo/registry/src
 COPY scripts/rust-licenses.mjs /rust-licenses.mjs
 RUN node /rust-licenses.mjs --metadata /native-metadata.json --output /licenses
+COPY services/crossfire/timezones.json /timezones.json
+RUN node -e 'const fs=require("node:fs"),assert=require("node:assert/strict"),pin=require("/timezones.json");assert.equal(pin.version,process.versions.tz);fs.writeFileSync("/timezone-version",pin.version+"\n")'
 
 FROM debian:bookworm-slim@sha256:a4672c0cb26fbdde88e38fa2dfb6c681942306680e41e4378b28770b6e79ee91 AS production
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libgcc-s1 && rm -rf /var/lib/apt/lists/*
@@ -23,6 +25,7 @@ COPY --from=assets /web ./web
 COPY --from=assets /onboarding ./onboarding
 COPY --from=assets /element ./element
 COPY --from=assets /zoneinfo ./zoneinfo
+COPY --from=licenses /timezone-version ./zoneinfo/version
 COPY --from=build /app/target/release/crossfire ./server/crossfire
 COPY --from=build /app/target/release/crossfire-native-guard ./server/crossfire-native-guard
 COPY LICENSE ./LICENSE

@@ -116,7 +116,7 @@ impl InvitationRepository for Store {
             .get_result::<i64>(self.database.connection())
             .map_err(failure)?;
         let items = items
-            .order((invitation::created_at.desc(), invitation::id.desc()))
+            .order((invitation::created_at.desc(), invitation::id.asc()))
             .limit(size)
             .offset((page - 1) * size)
             .select(Row::as_select())
@@ -130,7 +130,7 @@ impl InvitationRepository for Store {
             page,
             page_size: size,
             total_items: total,
-            total_pages: (total + size - 1) / size,
+            total_pages: ((total + size - 1) / size).max(1),
         })
     }
     fn invitation_by_claim(&mut self, user: &str) -> Result<Option<Invitation>> {

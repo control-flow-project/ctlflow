@@ -12,9 +12,13 @@ use serde_json::json;
 use std::sync::Arc;
 
 pub fn failure(error: Failure, request_id: &str) -> Result<Response<Body>> {
-    Response::builder()
+    let mut response = Response::builder()
         .status(envelope::http_status(error.code))
-        .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
+        .header(header::CONTENT_TYPE, "application/json; charset=utf-8");
+    if error.code == ErrorCode::RateLimit {
+        response = response.header(header::RETRY_AFTER, "60");
+    }
+    response
         .body(server::full(
             serde_json::to_vec(&envelope::ErrorResponse {
                 error,
@@ -89,13 +93,7 @@ async fn apply(
     let selection = request::select(input.method(), path)?;
     let operation = selection.operation;
     if operation.auth == Authentication::Public && input.method() != Method::GET {
-        let Peer::Tcp(peer) = peer else {
-            return Err(Failure::new(
-                ErrorCode::Forbidden,
-                "Public mutation requires a network peer",
-            ));
-        };
-        state.rate.admit(peer.ip(), identity::now()?)?;
+        state.rate.admit(peer, input.headers(), identity::now()?)?;
     }
     if [OperationId::CreateSession, OperationId::ClaimInvitation].contains(&operation.id) {
         security::same_origin(input.headers(), &state.configuration.public_origin, true)?;

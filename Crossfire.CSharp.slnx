@@ -34,7 +34,6 @@
     <Project Path="services/crossfire/csharp/build/Crossfire.EfHost/Crossfire.EfHost.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="services/crossfire/csharp/tests/Crossfire.Contracts.Tests/Crossfire.Contracts.Tests.csproj" />
     <Project Path="services/crossfire/csharp/tests/Crossfire.Storage.Tests/Crossfire.Storage.Tests.csproj" />
     <Project Path="services/crossfire/csharp/tests/Crossfire.Runtime.Tests/Crossfire.Runtime.Tests.csproj" />
     <Project Path="services/fleetd/csharp/tests/Fleetd.Domain.Tests/Fleetd.Domain.Tests.csproj" />

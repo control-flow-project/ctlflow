@@ -87,12 +87,5 @@ fn navigation_origins_cookies_and_bearers_are_unambiguous() -> Result<(), Box<dy
         cookie.to_str()?,
         "__Host-crossfire=private; Path=/; Max-Age=28800; HttpOnly; SameSite=Strict; Secure"
     );
-    let rate = security::RateLimit::default();
-    let address = "127.0.0.1".parse()?;
-    for _request in 0..120 {
-        rate.admit(address, 1000)?;
-    }
-    assert!(rate.admit(address, 1000).is_err());
-    assert!(rate.admit(address, 61000).is_ok());
     Ok(())
 }

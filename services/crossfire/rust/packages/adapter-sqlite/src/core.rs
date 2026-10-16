@@ -204,7 +204,7 @@ impl CoreRepository for Store {
             page,
             page_size,
             total_items,
-            total_pages: (total_items + page_size - 1) / page_size,
+            total_pages: ((total_items + page_size - 1) / page_size).max(1),
         })
     }
     fn active_administrator_count(&mut self) -> Result<i64> {

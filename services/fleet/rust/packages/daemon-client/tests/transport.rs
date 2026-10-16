@@ -87,7 +87,7 @@ async fn every_daemon_operation_uses_the_same_contract_transport_over_a_real_pri
                 metadata["page"] = json!(1);
                 metadata["pageSize"] = json!(20);
                 metadata["totalItems"] = json!(0);
-                metadata["totalPages"] = json!(0);
+                metadata["totalPages"] = json!(1);
                 json!([])
             } else {
                 json!({"operation":template.name})
@@ -129,6 +129,7 @@ async fn every_daemon_operation_uses_the_same_contract_transport_over_a_real_pri
         let response = client.call(&request, CancellationToken::new()).await?;
         if operation.collection {
             assert!(response["items"].is_array());
+            assert_eq!(response["meta"]["totalPages"], 1);
         } else {
             assert_eq!(response["operation"], operation.name);
         }

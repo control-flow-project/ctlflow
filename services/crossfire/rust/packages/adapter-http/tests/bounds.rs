@@ -11,6 +11,53 @@ use tokio::{
     task::JoinHandle,
 };
 use tokio_util::sync::CancellationToken;
+#[tokio::test]
+async fn operation_clients_enforce_the_selected_product_response_bound()
+-> Result<(), Box<dyn std::error::Error>> {
+    use crossfire_adapter_http::operation;
+    use crossfire_contracts::{call::Call, operations::OperationId};
+    let body = json!({"data":{"text":"x".repeat(2048)},"meta":{"requestId":"00000000-0000-4000-8000-000000000000"}}).to_string();
+    for maximum in [1024, 4096] {
+        let fixture = self::fixture(
+            "200 OK",
+            body.as_bytes(),
+            "Content-Type: application/json\r\n",
+        )
+        .await?;
+        let client = operation::Client::from_http(
+            NativeHttp::new(&fixture.origin, CancellationToken::new())?,
+            None,
+            Duration::from_secs(5),
+            maximum,
+        )?;
+        let result = client
+            .call(&Call::new(OperationId::Release), CancellationToken::new())
+            .await;
+        if maximum == 1024 {
+            assert_eq!(
+                result.err().map(|error| error.code),
+                Some(ErrorCode::BodyTooLarge)
+            );
+        } else {
+            assert!(
+                result.is_ok(),
+                "configured operation response bound is honored"
+            );
+        }
+    }
+    for maximum in [0, 32 * 1024 * 1024 + 1] {
+        assert!(
+            operation::Client::from_http(
+                NativeHttp::new("http://127.0.0.1:8080", CancellationToken::new())?,
+                None,
+                Duration::from_secs(5),
+                maximum
+            )
+            .is_err()
+        );
+    }
+    Ok(())
+}
 
 struct Fixture {
     origin: String,

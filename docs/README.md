@@ -2,6 +2,11 @@
 
 ## Installation and operation
 
+- [Target selection and packaging](distributions/README.md)
+- [Node installation](distributions/node.md)
+- [C# managed installation](distributions/csharp-managed.md)
+- [C# NativeAOT installation](distributions/csharp-nativeaot.md)
+- [Rust installation](distributions/rust.md)
 - [Crossfire service](../services/crossfire/README.md)
 - [Fleet CLI](../services/fleet/README.md)
 - [fleetd controller](../services/fleetd/README.md)
@@ -26,6 +31,8 @@
 
 - [Normative specification](specification.md)
 - [Implementation ownership and limits](architecture/native-implementations.md)
+- [Current file-by-file audit](architecture/native-file-audit.md)
+- [Rust integration review](architecture/rust-review.md)
 - [Development commands](development.md)
 - [Shared executable test matrix](verification/shared-contracts.md)
 - [Native decision diagnosis](runtime-approval-readiness.md)

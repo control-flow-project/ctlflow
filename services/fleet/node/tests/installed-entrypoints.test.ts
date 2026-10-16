@@ -24,7 +24,7 @@ function installedFiles(directory: string): string[] {
 }
 
 test('installed fleetd symlink starts the exact private daemon and stops normally', { timeout: 15000 }, async scope => {
-  const directory = mkdtempSync(join(tmpdir(), 'fc-'));
+  const directory = mkdtempSync(join(tmpdir(), 'fleetd-installed-'));
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const installed = join(directory, 'fleetd'), root = join(directory, 'controller');
   symlinkSync(fileURLToPath(import.meta.resolve('@ctlflow/fleetd/executable')), installed);
@@ -48,7 +48,7 @@ test('installed fleetd symlink starts the exact private daemon and stops normall
 });
 
 test('clean installed public tarballs resolve only public dependencies and own one reusable private controller', { timeout: 45000 }, async scope => {
-  const directory = mkdtempSync(join(tmpdir(), 'fc-')), prefix = join(directory, 'toolchain'), home = join(directory, 'home'), root = join(directory, 'controller');
+  const directory = mkdtempSync(join(tmpdir(), 'fleet-public-install-')), prefix = join(directory, 'toolchain'), home = join(directory, 'home'), root = join(directory, 'controller');
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true })); mkdirSync(home, { mode: 0o700 }); mkdirSync(prefix, { mode: 0o700 });
   const execute = promisify(execFile), env: NodeJS.ProcessEnv = { ...process.env, HOME: home, XDG_CONFIG_HOME: join(directory, 'config'), npm_config_cache: join(directory, 'npm-cache'), npm_config_registry: 'https://registry.invalid.test' };
   const provider = await piProvider(scope), nativeBin = join(directory, 'native-bin'); mkdirSync(nativeBin, { mode: 0o700 });

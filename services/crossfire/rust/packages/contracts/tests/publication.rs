@@ -26,14 +26,7 @@ fn publication_boundaries_reject_unknown_fields_duplicates_and_invalid_filters()
 #[test]
 fn pagination_preserves_the_canonical_numeric_wire_contract()
 -> Result<(), Box<dyn std::error::Error>> {
-    for (value, expected) in [
-        ("1e2", 100),
-        ("0x10", 16),
-        ("+2", 2),
-        ("2.0", 2),
-        ("\u{feff}2\u{feff}", 2),
-        ("0002", 2),
-    ] {
+    for (value, expected) in [("1", 1), ("2", 2), ("100000", 100000)] {
         let input = vec![("page".to_owned(), value.to_owned())];
         assert_eq!(
             query::pagination(&query::parameters(&input, &["page"])?)?.0,
@@ -41,7 +34,25 @@ fn pagination_preserves_the_canonical_numeric_wire_contract()
         );
     }
     for value in [
-        "", "-1", "1.5", "Infinity", "nan", "+0x2", "100001", "0x", "abc",
+        "",
+        "0",
+        "01",
+        "+1",
+        "-1",
+        "1.0",
+        "1e0",
+        "0x1",
+        "0b1",
+        "0o1",
+        " 1",
+        "1 ",
+        "1\n",
+        "١",
+        "NaN",
+        "Infinity",
+        "100001",
+        "9007199254740993",
+        "\u{feff}2\u{feff}",
     ] {
         let input = vec![("page".to_owned(), value.to_owned())];
         assert!(

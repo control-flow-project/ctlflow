@@ -3,9 +3,9 @@
 ## Prerequisites
 
 Use the repository's Node/npm engine requirements, lockfile, `global.json` and
-`Directory.Packages.props`. The integrated Linux gate requires rootless Docker,
+`Directory.Packages.props` and `rust-toolchain.toml`. The integrated Linux gate requires rootless Docker,
 Chrome, Git, OpenSSH, stock Codex and the native compilation dependencies for
-.NET NativeAOT. The runner prepares checksum-pinned Conduit, Element and Pi assets.
+.NET NativeAOT and Rust. The runner prepares checksum-pinned Conduit, Element and Pi assets.
 
 `.npmrc` disables implicit install scripts and applies a seven-day release-age
 policy. Only its explicit named exclusions apply. Do not disable that policy to
@@ -15,13 +15,13 @@ selected platform lacks one.
 
 ```sh
 systemd-run --user --scope --quiet \
-  --property=MemoryMax=34359738368 --property=MemorySwapMax=0 \
-  --property=TasksMax=8192 /bin/bash -c \
+  --property=MemoryMax=17179869184 --property=MemorySwapMax=0 \
+  --property=TasksMax=2048 /bin/bash -c \
   'npm ci --ignore-scripts && npm run verify:parity -- /absolute/new-evidence-directory'
 ```
 
-This example limits the aggregate process group to 32 GiB, zero swap and 8192
-tasks. Choose finite values the host can support. The runner verifies cgroup v2
+This example limits the aggregate process group to 16 GiB, zero swap and 2048
+tasks, as required by Rust verification. The runner verifies cgroup v2
 limits; a JavaScript heap limit is not a substitute.
 
 Docker build and runtime children do not inherit the caller's cgroup. The root
@@ -38,6 +38,10 @@ not modify a production daemon or install a persistent service.
 | `npm test` | Build once, then all Node-owned tests and workspace checks |
 | `npm run verify:architecture` | Ownership, imports, packages, installation and current documentation links |
 | `npm run verify:csharp` | Managed and NativeAOT internal/native tests |
+| `npm run test:rust` | Rust internal/native tests, generators and interchange proofs |
+| `npm run publish:csharp -- --mode managed --output /absolute/new-distribution` | Self-contained managed products and shared assets |
+| `npm run publish:csharp -- --mode nativeaot --output /absolute/new-distribution` | NativeAOT products and shared assets |
+| `npm run publish:rust -- --output /absolute/new-distribution` | Native products, shared assets, pinned data and notices |
 | `npm run verify:contracts -- /absolute/matrix.json` | Shared installed-product scenarios for every configured target |
 | `npm run verify:container -- /absolute/matrix.json` | Actual operator, image, browser and persistent-container scenarios |
 | `npm run verify:parity -- /absolute/new-evidence-directory` | Serialized integrated gate, including migration containers |
@@ -64,8 +68,8 @@ their executables without changing assertions.
 ## Test ownership
 
 External behavior belongs to each product's `tests/contracts/`. One executable
-matrix selects Node, C# managed, C# NativeAOT and any explicitly provided Rust
-distribution. Assertions do not branch by implementation.
+matrix selects Node, C# managed, C# NativeAOT and Rust distributions explicitly.
+The complete integrated gate requires all four. Assertions do not branch by implementation.
 
 Language-local tests cover internal algorithms, protocol state, storage and
 compiler behavior. Shared scenarios exercise actual HTTP/Unix sockets, SQLite,
@@ -84,8 +88,8 @@ the canonical output schemas and refuses untested operation declarations.
 
 ## Database and generated code
 
-Knex creates all fixture schemas. Node queries through Tinqer; C# queries through
-EF. Neither runtime migrates at startup. Update database contracts, native models,
+Knex creates all fixture schemas. Node queries through Tinqer, C# through EF and
+Rust through Diesel. No runtime migrates at startup. Update database contracts, native models,
 query generation and consumers together when changing storage.
 
 ```sh
@@ -104,6 +108,15 @@ Only `@ctlflow/fleet` and `@ctlflow/fleetd` may be public npm packages.
 All three product versions agree; public dependencies use exact pins.
 Installation gates pack and install the actual archives outside the workspace,
 check their file allowlists and verify private-module bundling.
+
+Separate target guides document build-time and installed prerequisites, exact
+entrypoints, sibling assets and upgrade procedures. Native distributions ship
+the selected guide as their self-contained README; npm archives ship their
+product documentation. Documentation checks validate current repository links
+and reject promotional claims. Standalone-guide checks reject checkout-relative
+links before packaging.
+
+- [Installation and packaging for all four targets](distributions/README.md)
 
 A successful local pack is not registry publication. A running fixture is not a
 deployment. Production activation requires separate authorization, a verified

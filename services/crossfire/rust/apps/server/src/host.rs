@@ -1,6 +1,6 @@
 use crate::{
-    application, assets::Assets, bootstrap, configuration, content, registration::Registration,
-    security::RateLimit, state::State, worker,
+    application, assets::Assets, bootstrap, configuration, content,
+    http::public_request_budget::RequestBudget, registration::Registration, state::State, worker,
 };
 use crossfire_adapter_filesystem::{
     PrivateDirectory, lock::StateLock, logging, publication, release,
@@ -141,6 +141,7 @@ pub async fn run(
         )?,
         public_reads: Arc::new(Semaphore::new(32)),
         diagnostics,
+        rate: RequestBudget::new(&configuration.trusted_proxy_addresses),
         configuration,
         repository,
         matrix,
@@ -149,7 +150,6 @@ pub async fn run(
         assets,
         digest: Digest::new()?,
         started_at: identity::now()?,
-        rate: RateLimit::default(),
         registration: Registration::default(),
         changed: Notify::new(),
         stop: stop.clone(),

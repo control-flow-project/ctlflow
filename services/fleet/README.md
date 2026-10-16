@@ -11,8 +11,12 @@ native agents or write controller state directly.
 - [Remote controllers](docs/remote.md)
 - [Software updates and diagnosis](docs/operations.md)
 - [Pi runtime](docs/pi.md)
+- [Node package installation](https://github.com/control-flow-project/crossfire/blob/main/docs/distributions/node.md)
+- [C# managed installation](https://github.com/control-flow-project/crossfire/blob/main/docs/distributions/csharp-managed.md)
+- [C# NativeAOT installation](https://github.com/control-flow-project/crossfire/blob/main/docs/distributions/csharp-nativeaot.md)
+- [Rust installation](https://github.com/control-flow-project/crossfire/blob/main/docs/distributions/rust.md)
 
-Node source lives under `node/`; C# source under `csharp/`.
+Node source lives under `node/`, C# under `csharp/` and Rust under `rust/`.
 External behavior is tested under `tests/contracts/`.
 `@ctlflow/fleet` may be publicly distributed; first-party licensing remains
 proprietary. Internal dependencies are bundled, not published separately.

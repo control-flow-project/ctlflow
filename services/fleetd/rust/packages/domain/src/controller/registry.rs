@@ -149,7 +149,12 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
         Ok(current)
     }
     pub fn rename(&self, fleet: &str, revision: i64, label: &str) -> Result<FleetState> {
-        if label.is_empty() || label.chars().count() > 100 || label.chars().any(char::is_control) {
+        if label.is_empty()
+            || label.encode_utf16().count() > 100
+            || label
+                .chars()
+                .any(|character| character <= '\u{1f}' || character == '\u{7f}')
+        {
             return Err(Failure::new(ErrorCode::Invalid, "Invalid fleet label"));
         }
         let mut state = self.lock()?;

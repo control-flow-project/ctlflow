@@ -119,8 +119,9 @@ readers, SQL migration owners or permission to reset a database.
   terminates the owned native group if fleetd exits, including SIGKILL.
   No terminal scraping, history rewriting, global service or unsafe first-party
   Rust is introduced.
-- Native distributions select the shared pinned IANA timezone data explicitly;
-  there is no silent host-timezone fallback. Browser assets, Element, Conduit and
+- Runtime container images select the shared pinned IANA timezone data explicitly.
+  Rust's standalone server also retains that data in its distribution; standalone
+  .NET products use their installed system timezone support. Browser assets, Element, Conduit and
   onboarding releases are shared build inputs, not separately maintained copies.
 - Managed and NativeAOT outputs use one C# implementation. Rust uses one
   ahead-of-time native implementation. None falls back to another backend.
@@ -129,9 +130,16 @@ Credential refresh copies only the selected model/provider configuration and
 login, never unrelated MCP servers, profiles or host permission overrides.
 Every native activation refreshes that login; removing host login removes the
 stale native copy. Corrupt/public/hard-linked/symlinked private state fails closed.
-Native HTTP/WebSocket transports explicitly avoid proxy-mediated private traffic.
+Rust HTTP/WebSocket transports explicitly avoid proxy-mediated private traffic.
+The Node/C# findings are tracked separately; structural alignment does not imply
+that every implementation has passed the same current behavioral checks.
 
 ## Architecture and verification gates
+
+The [file audit](native-file-audit.md) and [per-file map](native-file-map.tsv)
+cover every Node/C# file, including manifests, internal tests, operator tools and
+framework-specific build inputs. The reproducible inventory checks explicit
+semantic owners without claiming that matching paths prove behavior.
 
 `scripts/verify-implementation-layout.mjs` checks every product/application and
 19 semantic package pairs, rejects superseded service-level source owners and

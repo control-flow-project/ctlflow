@@ -39,21 +39,7 @@ fn fields(input: &Value, fields: &[&str]) -> Result<()> {
     check::object(input, fields, &[]).map(|_| ())
 }
 fn page(items: Vec<Value>, query: &BTreeMap<&str, &str>, id: String) -> Result<Reply> {
-    let number = |key: &str, default: i64, max: i64| -> Result<i64> {
-        let Some(value) = query.get(key) else {
-            return Ok(default);
-        };
-        if value.starts_with('0') || !value.bytes().all(|byte| byte.is_ascii_digit()) {
-            return Err(invalid("Use canonical bounded pagination integers"));
-        }
-        value
-            .parse::<i64>()
-            .ok()
-            .filter(|value| (1..=max).contains(value))
-            .ok_or_else(|| invalid("Use canonical bounded pagination integers"))
-    };
-    let page = number("page", 1, 100000)?;
-    let size = number("pageSize", 20, 100)?;
+    let (page, size) = query::pagination(query)?;
     let total = items.len() as i64;
     Ok(Reply {
         data: Value::Array(
@@ -68,7 +54,7 @@ fn page(items: Vec<Value>, query: &BTreeMap<&str, &str>, id: String) -> Result<R
             page: Some(page),
             page_size: Some(size),
             total_items: Some(total),
-            total_pages: Some((total + size - 1) / size),
+            total_pages: Some(((total + size - 1) / size).max(1)),
         },
     })
 }

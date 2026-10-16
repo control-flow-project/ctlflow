@@ -22,10 +22,7 @@ public static class WireAcceptance
         Equal(ProtocolJson.Quote("\ud800"), "\"\\ud800\"", "unpaired high surrogate uses JSON escape");
         Equal(ProtocolJson.Quote("\udfff"), "\"\\udfff\"", "unpaired low surrogate uses JSON escape");
         using var surrogate = JsonDocument.Parse("\"\\ud800\\udfff\\ud800 x\\udfff\"");
-        Equal(Validation.Text(surrogate.RootElement).Error.Code, "invalid", "wire admission rejects unpaired UTF-16 instead of silently substituting another value");
-        Equal(Validation.Json(surrogate.RootElement), false, "malformed native strings cannot enter canonical JSON inputs");
-        using var paired = JsonDocument.Parse("\"\\ud83d\\ude00\"");
-        Equal(Validation.Text(paired.RootElement).Value, "😀", "paired Unicode remains valid wire text");
+        Equal(Validation.Text(surrogate.RootElement).Value, "\ud800\udfff\ud800 x\udfff", "JSON input preserves paired and unpaired UTF-16 exactly for canonical digests");
         Equal(ProtocolJson.Unquote("\"\\uD800\\n\\t\\\"\\\\\\/\"").Value, "\ud800\n\t\"\\/", "JSON string decoding owns every escape without surrogate substitution");
         Equal(ProtocolJson.Unquote("\"\\uQQQQ\"").Error.Code, "invalid", "malformed Unicode escape is a typed failure");
         Equal(ProtocolJson.Unquote("\"\\x\"").Error.Code, "invalid", "non-JSON escape is a typed failure");

@@ -27,6 +27,15 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
     for (const path of ['/config.json/../bootstrap.json', '/manage/assets/%2e%2e%2fpackage.json', '/_coord/install.mjs']) assert.equal((await fixture.raw(path)).status, 404, 'Unsafe or removed public asset: ' + path);
     const descriptor = await fixture.raw('/onboarding/setup.json?ownerMatrixId=' + encodeURIComponent(fixture.owner.matrixUserId), 'GET', undefined, fixture.headers()); assert.equal(descriptor.status, 200); assert.equal(record(descriptor.body).ownerMatrixId, fixture.owner.matrixUserId);
   });
+  await scope.test('malformed UTF-8 is rejected without changing identity text or revision', async () => {
+    const before = await fixture.data(operations.member, { memberId: fixture.owner.memberId });
+    for (const invalid of [[255], [192, 175], [237, 160, 128], [244, 144, 128, 128], [226, 130]]) {
+      const bytes = Buffer.concat([Buffer.from('{"expectedRevision":' + integer(before.revision) + ',"displayName":"unchanged-'), Buffer.from(invalid), Buffer.from('"}')]);
+      await fixture.failure(await fixture.raw('/api/members/' + fixture.owner.memberId, 'PATCH', bytes, { ...fixture.headers(), 'Content-Type': 'application/json' }), 400, 'invalid');
+    }
+    const after = await fixture.data(operations.member, { memberId: fixture.owner.memberId });
+    assert.equal(after.displayName, before.displayName); assert.equal(after.revision, before.revision, 'Malformed UTF-8 cannot silently change identity text');
+  });
   await scope.test('invitation registration is explicit and works without an Origin on its GET review', async () => {
     const outsider = await fixture.member('contract-outsider'); const page = await fixture.operation(operations.agents, {}, undefined, outsider); assert.equal(list(page.data).length, 0);
     const response = await fixture.raw('/_matrix/client/v3/user_directory/search', 'POST', { search_term: '', limit: 1 }, { Authorization: 'Bearer ' + outsider.nativeToken }); assert.equal(response.status, 200); assert.equal(list(record(response.body).results).length, 1);

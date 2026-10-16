@@ -100,11 +100,15 @@ conflicts require action. Failed cleanup blocks a replacement writer.
 The controller reports incidents to the owner's private Crossfire management DM.
 Lost contact is unknown execution state; a dead controller cannot report itself.
 
-A killed fleetd can leave a native Codex app-server alive. Its history writer lock
-refuses a competing writer. The audited native protocol cannot guarantee parent-
-death cleanup while retaining native remote TUI attachment.
-A full host restart, where the old process is gone, is a different case.
-No watchdog/process-name guess or copied history substitutes for that limitation.
+After Node/C# fleetd is killed, a native Codex app-server can remain alive.
+Its history writer lock refuses a competing writer; those adapters do not
+enforce controller lifetime after SIGKILL. Rust's packaged Linux process guard
+observes the exact parent pidfd and terminates its owned native group on exit.
+That mechanism does not contain arbitrary subprocesses that escape the group.
+A full host restart, where old processes are gone, is a different case.
+No implementation scans process names, adopts an orphan or copies its history
+to bypass ownership. These are explicit per-target failure boundaries, not a
+claim that parent-death control is architecturally impossible.
 
 ## Native terminal access
 

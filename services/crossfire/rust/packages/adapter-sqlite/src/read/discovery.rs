@@ -1,7 +1,6 @@
 use crate::{
     discovery::SummaryRow,
     error::failure,
-    expression::{instr, lower},
     store::Store,
     tables::{agent, agent_name, fleet, fleet_instance, member, principal},
 };
@@ -16,7 +15,7 @@ pub(super) fn page(
     filter: &DiscoveryFilter<'_>,
 ) -> Result<Page<PrincipalSummary>> {
     filter.pagination.validate()?;
-    let search = filter.search.to_lowercase();
+    let search = format!("%{}%", filter.search);
     let excluded = filter.exclude_id.unwrap_or("");
     let humans = principal::table
         .inner_join(member::table.on(member::principal_id.eq(principal::id)))
@@ -26,9 +25,9 @@ pub(super) fn page(
                 .and(principal::id.ne(excluded)),
         )
         .filter(
-            instr(lower(principal::matrix_user_id), &search)
-                .gt(0)
-                .or(instr(lower(member::display_name), &search).gt(0)),
+            principal::matrix_user_id
+                .like(&search)
+                .or(member::display_name.like(&search)),
         );
     let owner = diesel::alias!(principal as owner);
     let agents = principal::table
@@ -51,9 +50,9 @@ pub(super) fn page(
                 .and(fleet::archived_at.is_null()),
         )
         .filter(
-            instr(lower(principal::matrix_user_id), &search)
-                .gt(0)
-                .or(instr(lower(agent_name::name), &search).gt(0)),
+            principal::matrix_user_id
+                .like(&search)
+                .or(agent_name::name.like(&search)),
         );
     let humans_count = if filter.kind == Some(PrincipalKind::Agent) {
         0

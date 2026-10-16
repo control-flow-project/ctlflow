@@ -5,7 +5,7 @@ export function refine<Value>(parse: Parser<Value>, accepts: (value: Value) => b
   return input => { const parsed = parse(input); return !parsed.ok || accepts(parsed.value) ? parsed : failure('invalid', message); };
 }
 export function text(maximum = 255, minimum = 1): Parser<string> {
-  return input => typeof input === 'string' && input.length >= minimum && input.length <= maximum && input.isWellFormed() && !/[\u0000-\u001f\u007f]/u.test(input)
+  return input => typeof input === 'string' && input.length >= minimum && input.length <= maximum && !/[\u0000-\u001f\u007f]/u.test(input)
     ? success(input) : failure('invalid', 'Expected text of ' + minimum + '–' + maximum + ' characters');
 }
 export function integer(minimum = 0, maximum = Number.MAX_SAFE_INTEGER): Parser<number> {
@@ -46,15 +46,15 @@ export function object<const Fields extends Shape>(fields: Fields): Parser<Objec
 export const identifier: Parser<string> = input => typeof input === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u.test(input)
   ? success(input) : failure('invalid', 'Expected an opaque UUID');
 export const name: Parser<string> = input => typeof input === 'string' && /^[a-z][a-z0-9-]{0,39}$/u.test(input) ? success(input) : failure('invalid', 'Expected a lowercase name of 1–40 characters');
-export const matrixUserId: Parser<string> = input => typeof input === 'string' && input.length <= 255 && input.isWellFormed() && /^@[^:\s]+:[^\s]+$/u.test(input) ? success(input) : failure('invalid', 'Expected a Matrix user ID');
-export const roomId: Parser<string> = input => typeof input === 'string' && input.length <= 255 && input.isWellFormed() && /^!\S+$/u.test(input) ? success(input) : failure('invalid', 'Expected an immutable Matrix room ID');
-export const eventId: Parser<string> = input => typeof input === 'string' && input.length <= 255 && input.isWellFormed() && /^\$\S+$/u.test(input) ? success(input) : failure('invalid', 'Expected a Matrix event ID');
+export const matrixUserId: Parser<string> = input => typeof input === 'string' && input.length <= 255 && /^@[^:\s]+:[^\s]+$/u.test(input) ? success(input) : failure('invalid', 'Expected a Matrix user ID');
+export const roomId: Parser<string> = input => typeof input === 'string' && input.length <= 255 && /^!\S+$/u.test(input) ? success(input) : failure('invalid', 'Expected an immutable Matrix room ID');
+export const eventId: Parser<string> = input => typeof input === 'string' && input.length <= 255 && /^\$\S+$/u.test(input) ? success(input) : failure('invalid', 'Expected a Matrix event ID');
 export const secret: Parser<string> = input => typeof input === 'string' && /^[A-Za-z0-9_-]{43}$/u.test(input) ? success(input) : failure('invalid', 'Expected a private 32-byte claim');
 export const empty = object({});
 export const status = choice('active', 'suspended', 'revoked');
 export const wakeMode = choice('selected', 'humans', 'everyone');
 export function plainText(maximumBytes: number): Parser<string> {
-  return input => typeof input === 'string' && input.isWellFormed() && new TextEncoder().encode(input).length <= maximumBytes && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(input)
+  return input => typeof input === 'string' && new TextEncoder().encode(input).length <= maximumBytes && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(input)
     ? success(input) : failure('invalid', 'Expected plain text up to ' + maximumBytes + ' UTF-8 bytes');
 }
 export const multiline = plainText(8192);

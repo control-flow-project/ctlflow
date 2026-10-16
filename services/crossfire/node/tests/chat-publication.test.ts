@@ -40,22 +40,6 @@ function fixture(mode: 'shared' | 'per-room' = 'per-room', maximum = 65536) {
     fail: () => { fail = true; }, messages: () => messages };
 }
 
-test('steering remains prepared until the preceding native input is settled', async () => {
-  const proof = fixture('shared'), allowed = new Set(Object.keys(proof.batch.cursors));
-  let fail = true, recoveries = 0;
-  const runtime: RuntimeConnection = { ...proof.options.runtime,
-    settle: async () => { if (fail) { fail = false; throw new Error('Preceding receipt is not yet settled'); } return false; },
-    recover: async () => { recoveries++; return false; } };
-  const open = () => chatPublication({ ...proof.options, runtime, priority: 'steering' });
-  let publication = open(); publication.prepare(proof.batch, proof.batch.events, proof.identities);
-  await assert.rejects(publication.publish(allowed, proof.signal), /Preceding receipt/);
-  assert.equal(publication.recovering(), false); assert.equal(proof.inputs.length, 0);
-  publication = open(); assert.equal(await publication.recover(allowed, proof.signal), undefined);
-  assert.equal(recoveries, 0, 'Never recover steering against its predecessor’s native journal');
-  assert(await publication.publish(allowed, proof.signal)); assert.equal(proof.inputs.length, 1);
-  publication.acknowledge();
-});
-
 test('partial room publication retains full-batch cursors and recovers exact receipts without replay', async () => {
   const proof = fixture(), allowed = new Set(Object.keys(proof.batch.cursors));
   let publisher = proof.create(); publisher.prepare(proof.batch, proof.batch.events, proof.identities);

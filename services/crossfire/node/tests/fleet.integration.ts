@@ -39,7 +39,7 @@ type Binding = { fleetId: string; controllerCredential: string; identities: { in
 
 test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume without model housekeeping', { timeout: 180000 }, async scope => {
   const fixture = await nativeServer(scope, builtRelease().release), { services, admin, origin, worker } = fixture;
-  const directory = mkdtempSync(join(tmpdir(), 'fc-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
+  const directory = mkdtempSync(join(tmpdir(), 'native-fleet-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
   const cliPath = fileURLToPath(import.meta.resolve('@ctlflow/fleet/executable'));
   const home = join(directory, 'home'); mkdirSync(home, { mode: 0o700 });
   const env = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'config') };

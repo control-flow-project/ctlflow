@@ -38,7 +38,7 @@ async function until(predicate: () => boolean): Promise<void> {
   while (!predicate()) { assert(Date.now() < deadline, 'Controller observation deadline exceeded'); await yieldLoop(); }
 }
 function fixture(execution?: Partial<Execution>) {
-  const directory = mkdtempSync(join(tmpdir(), 'fc-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
+  const directory = mkdtempSync(join(tmpdir(), 'fleetd-test-')), root = join(directory, 'controller'), fleet = join(directory, 'fleet');
   mkdirSync(join(fleet, 'agents', 'analyst'), { recursive: true, mode: 0o700 });
   const definition = join(fleet, 'agents', 'analyst');
   writeFileSync(join(definition, 'agent.toml'), 'name = "Analyst"\nruntime = "codex"\n[runtime_options]\nsandbox_mode = "read-only"\napproval_policy = "never"\n', { mode: 0o600 });

@@ -1,5 +1,5 @@
 use crossfire_adapter_process::{NativeCommand, NativeProcess, Output, capture};
-use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
+use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use std::{collections::BTreeMap, path::Path, time::Duration};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_util::sync::CancellationToken;
@@ -114,7 +114,9 @@ pub fn migration(directory: &str, image: &str, resources: &[String]) -> Vec<Stri
     let mut args = vec![
         "run".into(),
         "--name".into(),
-        format!("crossfire-migration-{}", &identity::hash(directory)[..16]),
+        crate::container_lifecycle::names(directory)[1].clone(),
+        "--label".into(),
+        format!("org.crossfire.directory={directory}"),
         "--mount".into(),
         mount(directory),
     ];
@@ -172,77 +174,4 @@ pub fn server(
         .map(Into::into),
     );
     args
-}
-pub async fn owned(arguments: &[String], workspace: &Path, stop: CancellationToken) -> Result<()> {
-    if arguments.first().map(String::as_str) != Some("run")
-        || arguments
-            .iter()
-            .any(|arg| arg == "--rm" || arg.starts_with("--rm="))
-    {
-        return Err(failed(
-            "Use explicit owned container lifecycle without automatic removal",
-        ));
-    }
-    if stop.is_cancelled() {
-        return Err(failed("Container startup cancelled"));
-    }
-    let mut create = vec!["create".into()];
-    create.extend_from_slice(&arguments[1..]);
-    let created = captured(&create, workspace, CancellationToken::new()).await?;
-    if !created.status.success() {
-        return Err(failed(&format!(
-            "Cannot create owned container: {}",
-            created.errors
-        )));
-    }
-    let id = created.output.trim();
-    if id.len() != 64
-        || !id
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        return Err(failed("Docker did not return an exact container identity"));
-    }
-    let attach = CancellationToken::new();
-    let started = ["start".into(), "--attach".into(), id.into()];
-    let running = run(&started, workspace, attach.clone());
-    tokio::pin!(running);
-    let cancelled = stop.cancelled();
-    tokio::pin!(cancelled);
-    let result = tokio::select! {biased;
-        result=&mut running=>result,
-        _=&mut cancelled=>{
-            let stopped=captured(&["stop".into(),"--timeout".into(),"15".into(),id.into()],workspace,CancellationToken::new()).await;
-            attach.cancel(); let ended=running.await;
-            stopped.and_then(|value| if value.status.success(){Ok(())}else{Err(failed("Owned container stop failed"))}).and(ended.or_else(|error|if stop.is_cancelled(){Ok(())}else{Err(error)}))
-        }
-    };
-    attach.cancel();
-    let removed = captured(
-        &["rm".into(), "--force".into(), id.into()],
-        workspace,
-        CancellationToken::new(),
-    )
-    .await?;
-    if !removed.status.success() {
-        let remaining = captured(
-            &[
-                "container".into(),
-                "ls".into(),
-                "--all".into(),
-                "--no-trunc".into(),
-                "--filter".into(),
-                format!("id={id}"),
-                "--format".into(),
-                "{{.ID}}".into(),
-            ],
-            workspace,
-            CancellationToken::new(),
-        )
-        .await?;
-        if !remaining.status.success() || !remaining.output.trim().is_empty() {
-            return Err(failed("Exact owned container cleanup is not confirmed"));
-        }
-    }
-    result
 }

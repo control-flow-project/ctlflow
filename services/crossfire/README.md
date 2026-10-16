@@ -4,7 +4,7 @@ Crossfire owns Matrix-backed identities, enrollment, authorization, room access,
 coordination records, the management UI and agent messaging tools.
 It does not own native agent processes; fleetd does.
 
-Node source is under `node/`; C# source is under `csharp/`.
+Node source is under `node/`, C# under `csharp/` and Rust under `rust/`.
 The React project, database migrations and external test scenarios are shared.
 
 - [Installation](docs/getting-started.md)
@@ -20,6 +20,8 @@ The React project, database migrations and external test scenarios are shared.
 - [Operator tools](node/tools/README.md)
 - [Database owner](database/README.md)
 - [C# distribution](csharp/README.md)
+- [Rust distribution](rust/README.md)
+- [Separate installation and packaging for every target](../../docs/distributions/README.md)
 
 The service is private. Only Fleet and fleetd may be public npm packages.
 Production data, credentials and saved native histories are retained across

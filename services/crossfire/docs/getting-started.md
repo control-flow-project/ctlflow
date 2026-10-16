@@ -2,19 +2,23 @@
 
 ## Requirements
 
-Use Linux, Node.js 26+, npm 11.17+, Git and an existing rootless Docker engine.
-C# additionally needs the repository-pinned .NET SDK and selected build tools.
+Select Node, C# managed, C# NativeAOT or Rust before building. Each guide lists
+its build dependencies, installed dependencies and packaging commands. All
+server operators require an existing rootless Docker engine.
 Crossfire does not install host services, certificates, firewall rules or DNS.
 
 Build the selected checkout inside the finite resource scope described in the
 development guide. Do not use an active test output tree for deployment.
 
 - [Development prerequisites](../../../docs/development.md)
-- [C# operator](../csharp/README.md)
+- [Node installation and packaging](../../../docs/distributions/node.md)
+- [C# managed installation and packaging](../../../docs/distributions/csharp-managed.md)
+- [C# NativeAOT installation and packaging](../../../docs/distributions/csharp-nativeaot.md)
+- [Rust installation and packaging](../../../docs/distributions/rust.md)
 
 ## Initialize a local instance
 
-From `services/crossfire`:
+For the Node source installation, from `services/crossfire`:
 
 ```sh
 node crossfire init --directory /absolute/private/crossfire-state \
@@ -24,6 +28,11 @@ node crossfire init --directory /absolute/private/crossfire-state \
 ./start.sh --directory /absolute/private/crossfire-state \
   --port 8098 --content-port 8099
 ```
+
+The other guides use their installed native operator with an explicit source
+checkout. C# additionally selects its runtime image with `--runtime managed`
+or `--runtime nativeaot`. Do not mix an installation's default mode with the
+intended container mode.
 
 Initialization refuses a nonempty directory. The initial password is the
 `administratorPassword` value in private `bootstrap.json`.

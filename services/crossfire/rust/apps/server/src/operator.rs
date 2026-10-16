@@ -1,5 +1,5 @@
-use crate::{configuration, container_commands as docker};
-use crossfire_adapter_filesystem::PrivateDirectory;
+use crate::{configuration, container_commands as docker, container_lifecycle};
+use crossfire_adapter_filesystem::{PrivateDirectory, lock::StateLock};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -225,6 +225,7 @@ pub async fn run(values: &[String], stop: CancellationToken) -> Result<()> {
     }
     PrivateDirectory::open(&directory, false)?;
     let config = configuration::load(&directory)?;
+    let _ownership = StateLock::acquire(&directory.join("operator"))?;
     let source = absolute(
         options
             .get("source")
@@ -290,39 +291,15 @@ pub async fn run(values: &[String], stop: CancellationToken) -> Result<()> {
         ]);
         docker::run(&args, &source, stop.clone()).await?;
     }
-    let name = format!("crossfire-{}", &identity::hash(text(&directory)?)[..16]);
-    let existing = docker::captured(
-        &[
-            "container".into(),
-            "inspect".into(),
-            "--format".into(),
-            "{{index .Config.Labels \"org.crossfire.directory\"}}".into(),
-            name.clone(),
-        ],
-        &source,
-        stop.clone(),
-    )
-    .await?;
-    if existing.status.success() {
-        if existing.output.trim() != text(&directory)? {
-            return Err(invalid(
-                "Existing runtime container has different ownership; nothing was stopped",
-            ));
-        }
-        docker::run(
-            &["stop".into(), "--timeout".into(), "15".into(), name.clone()],
-            &source,
-            stop.clone(),
-        )
-        .await?;
-    }
+    let [name, _migration] = container_lifecycle::names(text(&directory)?);
+    container_lifecycle::reconcile(text(&directory)?, &source, stop.clone()).await?;
     if stop.is_cancelled() {
         return Ok(());
     }
     if let Some(backup) = crossfire_adapter_sqlite::upgrade::backup_before_migration(&directory)? {
         println!("Verified pre-migration backup: {}", backup.display());
     }
-    docker::owned(
+    container_lifecycle::owned(
         &docker::migration(text(&directory)?, &migrations, &resources),
         &source,
         stop.clone(),
@@ -335,7 +312,7 @@ pub async fn run(values: &[String], stop: CancellationToken) -> Result<()> {
         "Public: {}\nManagement: {}manage/\nContent: {}",
         config.public_origin, config.public_origin, config.content_origin
     );
-    docker::owned(
+    container_lifecycle::owned(
         &docker::server(
             text(&directory)?,
             &image,

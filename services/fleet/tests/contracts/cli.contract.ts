@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
@@ -14,6 +14,13 @@ export async function cliContracts(scope: TestContext, platform: ContractPlatfor
   async function cli(...args: string[]) { const process = contractProcess(scope, selected.cli, args, directory, environment); let expired = false; const timer = setTimeout(() => { expired = true; void process.close(); }, 30000); try { const code = await process.ended; assert(!expired, 'CLI must finish and detach its controller standard streams within its deadline'); return { code, output: process.output(), error: process.errors() }; } finally { clearTimeout(timer); await process.close(); } }
   async function json(...args: string[]) { const result = await cli(...args); assert.equal(result.code, 0, result.error); return JSON.parse(result.output) as unknown; }
   cleanup(scope, async () => { await cli('daemon', 'stop', '--root', root); });
+  await scope.test('invalid start syntax cannot create a controller or native session', async () => {
+    for (const words of [['start'], ['start', 'one', 'extra'], ['agent', 'start', 'one'], ['agent', 'start', 'one', 'two', 'extra']]) {
+      assert.notEqual((await cli(...words, '--root', root)).code, 0);
+      assert.equal(existsSync(root), false, 'Validate start syntax before controller activation');
+    }
+    assert.equal(provider.requests.length, 0);
+  });
   await scope.test('CLI starts one named controller and persists the default connection', async () => {
     const first = record(await json('daemon', 'start', '--root', root, '--name', 'cli-contract')); const second = record(await json('daemon', 'start', '--root', root, '--name', 'cli-contract')); assert.equal(first.startedAt, second.startedAt); assert.equal(record(first.controller).name, 'cli-contract'); assert.equal(statSync(join(root, 'fleetd.sock')).mode & 0o777, 0o600); assert.notEqual((await cli('daemon', 'start', '--root', root, '--name', 'different')).code, 0);
   });

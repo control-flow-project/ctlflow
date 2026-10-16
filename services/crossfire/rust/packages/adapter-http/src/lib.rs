@@ -37,6 +37,10 @@ pub struct NativeResponse {
     pub status: u16,
     pub body: Value,
 }
+enum Payload<'a> {
+    Json(Option<&'a Value>),
+    Binary(bytes::Bytes),
+}
 
 impl NativeHttp {
     pub fn new(endpoint: &str, cancellation: CancellationToken) -> Result<Self> {
@@ -119,6 +123,30 @@ impl NativeHttp {
         body: Option<&Value>,
         limits: JsonLimits,
     ) -> Result<NativeResponse> {
+        self.execute(token, method, path, Payload::Json(body), limits)
+            .await
+    }
+
+    pub async fn binary(
+        &self,
+        token: Option<&Secret>,
+        method: Method,
+        path: &str,
+        body: bytes::Bytes,
+        limits: JsonLimits,
+    ) -> Result<NativeResponse> {
+        self.execute(token, method, path, Payload::Binary(body), limits)
+            .await
+    }
+
+    async fn execute(
+        &self,
+        token: Option<&Secret>,
+        method: Method,
+        path: &str,
+        body: Payload<'_>,
+        limits: JsonLimits,
+    ) -> Result<NativeResponse> {
         if let Some(socket) = &self.socket {
             socket.validate()?;
         }
@@ -175,25 +203,41 @@ impl NativeHttp {
                 "HTTP request must remain on its configured origin",
             ));
         }
+        let content_type = match &body {
+            Payload::Json(_) => "application/json",
+            Payload::Binary(_) => "application/octet-stream",
+        };
         let mut request = self
             .client
             .request(method, destination)
-            .header("content-type", "application/json")
+            .header("content-type", content_type)
             .timeout(timeout);
         if let Some(token) = token {
             request = request.bearer_auth(token.expose());
         }
-        if let Some(body) = body {
-            validate_json(body)
-                .map_err(|_| Failure::new(ErrorCode::Invalid, "Invalid HTTP JSON request"))?;
-            let mut encoded = crossfire_kernel::bytes::Buffer::new(limits.request_bytes);
-            serde_json::to_writer(&mut encoded, body).map_err(|_| {
-                Failure::new(
-                    ErrorCode::BodyTooLarge,
-                    "HTTP JSON request exceeds its operation bound",
-                )
-            })?;
-            request = request.body(encoded.into_vec());
+        match body {
+            Payload::Json(Some(body)) => {
+                validate_json(body)
+                    .map_err(|_| Failure::new(ErrorCode::Invalid, "Invalid HTTP JSON request"))?;
+                let mut encoded = crossfire_kernel::bytes::Buffer::new(limits.request_bytes);
+                serde_json::to_writer(&mut encoded, body).map_err(|_| {
+                    Failure::new(
+                        ErrorCode::BodyTooLarge,
+                        "HTTP JSON request exceeds its operation bound",
+                    )
+                })?;
+                request = request.body(encoded.into_vec());
+            }
+            Payload::Json(None) => {}
+            Payload::Binary(body) => {
+                if body.len() > limits.request_bytes {
+                    return Err(Failure::new(
+                        ErrorCode::BodyTooLarge,
+                        "HTTP binary request exceeds its operation bound",
+                    ));
+                }
+                request = request.body(body);
+            }
         }
         let opened = tokio::select! {
             biased;

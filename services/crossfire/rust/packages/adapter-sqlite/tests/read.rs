@@ -11,6 +11,61 @@ fn pagination() -> Pagination {
     Pagination { page: 1, size: 20 }
 }
 #[test]
+fn agent_directory_search_and_inactive_filters_match_the_reference()
+-> Result<(), Box<dyn std::error::Error>> {
+    let mut scenario = Scenario::create()?;
+    let filter = AgentFilter {
+        pagination: pagination(),
+        owner_id: None,
+        search: "AGENT",
+        statuses: &[Status::Active],
+        listener: None,
+        agent_ids: None,
+    };
+    let result = read::agent::list(&mut scenario.store, &scenario.owner, &filter, NOW)?;
+    assert_eq!(result.total_items, 1);
+    assert_eq!(result.total_pages, 1);
+    let unmatched = read::agent::list(
+        &mut scenario.store,
+        &scenario.owner,
+        &AgentFilter {
+            search: "unmatched-directory-search",
+            ..filter
+        },
+        NOW,
+    )?;
+    assert_eq!(unmatched.total_items, 0);
+    assert_eq!(unmatched.total_pages, 1);
+    agent::change(
+        &mut scenario.store,
+        &scenario.owner,
+        &scenario.agent.principal_id,
+        0,
+        Some(Status::Suspended),
+        "suspend-filter",
+        NOW + 1,
+    )?;
+    let filter = AgentFilter {
+        search: "",
+        statuses: &[Status::Suspended],
+        listener: Some(ActivityState::Online),
+        ..filter
+    };
+    assert_eq!(
+        read::agent::list(&mut scenario.store, &scenario.owner, &filter, NOW + 1)?.total_items,
+        0
+    );
+    let filter = AgentFilter {
+        listener: Some(ActivityState::Offline),
+        ..filter
+    };
+    assert_eq!(
+        read::agent::list(&mut scenario.store, &scenario.owner, &filter, NOW + 1)?.total_items,
+        1
+    );
+    Ok(())
+}
+#[test]
 fn discovery_is_paginated_filtered_and_resolves_unknown_identities_without_adopting_them()
 -> Result<(), Box<dyn std::error::Error>> {
     let mut scenario = Scenario::create()?;
@@ -50,12 +105,12 @@ fn discovery_is_paginated_filtered_and_resolves_unknown_identities_without_adopt
         ..query
     })?;
     assert_eq!(filtered.total_items, 1);
-    let literal = scenario.store.discover(&DiscoveryFilter {
+    let pattern = scenario.store.discover(&DiscoveryFilter {
         pagination: pagination(),
         search: "%_",
         ..query
     })?;
-    assert_eq!(literal.total_items, 0);
+    assert_eq!(pattern.total_items, 3);
     let values = read::discovery::resolve(
         &mut scenario.store,
         &guest,

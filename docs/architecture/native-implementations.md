@@ -112,7 +112,7 @@ owner, with its upstream notices retained; they are not runtime query fallbacks.
 
 ## Evidence
 
-- [Rust integration and four-target review](rust-review.md)
+- [Rust implementation review and verification boundaries](rust-review.md)
 
 - [Current correction record and issue IDs](../verification/20261015-outside-review-fixes.md)
 - [Shared contract execution](../verification/shared-contracts.md)

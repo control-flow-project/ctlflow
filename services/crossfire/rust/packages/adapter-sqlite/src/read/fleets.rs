@@ -1,6 +1,5 @@
 use crate::{
     error::failure,
-    expression::{instr, lower},
     fleet::{ConnectionRow, FleetRow},
     store::Store,
     tables::{fleet, fleet_connection, fleet_controller_metadata, fleet_instance},
@@ -67,12 +66,12 @@ pub(super) fn page(
     pagination: Pagination,
 ) -> Result<Page<Fleet>> {
     pagination.validate()?;
-    let search = search.to_lowercase();
+    let search = format!("%{search}%");
     let base = fleet::table.filter(fleet::archived_at.is_null()).filter(
-        instr(lower(fleet::label), &search)
-            .gt(0)
-            .or(instr(fleet::fleet_key, &search).gt(0))
-            .or(instr(lower(fleet::controller_name), &search).gt(0)),
+        fleet::label
+            .like(&search)
+            .or(fleet::fleet_key.like(&search))
+            .or(fleet::controller_name.like(&search)),
     );
     let mut count = base.into_boxed();
     let mut records = base.into_boxed();

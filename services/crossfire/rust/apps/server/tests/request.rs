@@ -109,7 +109,7 @@ fn routes_accept_only_current_declared_resources_and_unambiguous_queries()
         );
     }
     let query = Query::parse(
-        Some("page=2&pageSize=0x20&search=x%2By"),
+        Some("page=2&pageSize=32&search=x%2By"),
         &["page", "pageSize", "search"],
     )?;
     assert_eq!(query.page()?.page, 2);
@@ -118,5 +118,10 @@ fn routes_accept_only_current_declared_resources_and_unambiguous_queries()
     assert!(Query::parse(Some("page=1&page=2"), &["page"]).is_err());
     assert!(Query::parse(Some("alias=true"), &[]).is_err());
     assert!(Query::parse(Some("page=NaN"), &["page"])?.page().is_err());
+    assert!(
+        Query::parse(Some("pageSize=0x20"), &["pageSize"])?
+            .page()
+            .is_err()
+    );
     Ok(())
 }

@@ -35,7 +35,7 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
   async function close() {
     const owned = running; running = undefined; if (!owned) return;
     let failure: unknown;
-    try { await owned.close(120000); assert.equal(await owned.ended, 0, owned.errors() + '\n' + owned.output()); }
+    try { await owned.close(); assert.equal(await owned.ended, 0, owned.errors() + '\n' + owned.output()); }
     catch (error) { failure = error; }
     try {
       if (spawnSync('docker', ['inspect', containerName], { stdio: 'ignore' }).status === 0) {

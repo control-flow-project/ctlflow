@@ -1,8 +1,8 @@
 # SQL database ownership
 
 Knex creates and migrates every owned SQL database, independent of application
-language. Node uses Tinqer and C# uses EF for application queries.
-Neither application creates tables, seeds reference data or migrates on open.
+language. Node uses Tinqer, C# uses EF and Rust uses Diesel for application queries.
+No application creates tables, seeds reference data or migrates on open.
 
 ## Layout
 
@@ -49,7 +49,7 @@ Roles and permissions are versioned reference data, not development demo seeds.
 
 The applied migration filenames are part of runtime admission.
 Append a forward migration for a new release; do not edit released migration
-bytes. Update the current contract, generated EF model and affected queries/tests
+bytes. Update the current contract, generated EF/Diesel metadata and affected queries/tests
 together. No EF migration history or second DDL owner exists.
 
 ## Commands
@@ -62,8 +62,8 @@ CROSSFIRE_DATA_DIR=/absolute/private/runtime \
 ```
 
 The migration-make script creates the next ESM migration.
-Runtime deployment uses the same one-shot migration image for Node and both C#
-outputs. It needs no provider/model work or Matrix credentials.
+Runtime deployment uses the same one-shot migration image for Node, both C#
+outputs and Rust. It needs no provider/model work or Matrix credentials.
 
 Supported deployed versions 13–16 convert transactionally to 17.
 A current schema without Knex history is adopted without changing application

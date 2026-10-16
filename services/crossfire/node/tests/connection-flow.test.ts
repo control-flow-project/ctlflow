@@ -27,7 +27,7 @@ test('public fleet setup starts a separate native history, reuses identity and p
   const directory = mkdtempSync(join(process.cwd(), '.temp/universal-setup-'));
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const home = join(directory, 'home'), project = join(directory, 'project');
-  const root = mkdtempSync(join(tmpdir(), 'fc-'));
+  const root = mkdtempSync(join(tmpdir(), 'crossfire-controller-'));
   cleanup(scope, () => rmSync(root, { recursive: true, force: true }));
   mkdirSync(home, { mode: 0o700 }); mkdirSync(project, { mode: 0o700 });
   execFileSync('git', ['init', '--quiet', project]);

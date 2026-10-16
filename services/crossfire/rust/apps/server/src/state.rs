@@ -1,4 +1,4 @@
-use crate::{configuration::Configuration, security::RateLimit};
+use crate::{configuration::Configuration, http::public_request_budget::RequestBudget};
 use crossfire_adapter_filesystem::{publication, release::Release};
 use crossfire_adapter_matrix::account::Authority;
 use crossfire_adapter_sqlite::store::SharedStore;
@@ -19,7 +19,7 @@ pub struct State {
     pub publications: publication::Store,
     pub public_reads: std::sync::Arc<tokio::sync::Semaphore>,
     pub started_at: i64,
-    pub rate: RateLimit,
+    pub rate: RequestBudget,
     pub registration: crate::registration::Registration,
     pub changed: Notify,
     pub stop: CancellationToken,

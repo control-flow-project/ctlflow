@@ -16,7 +16,8 @@ Sleeping can be ready without a running native engine.
    active/stopped instances.
 2. Verify a private backup of controller/fleet/native state, credentials and
    receipt journals.
-3. Install the approved exact public release in private storage.
+3. Install the approved exact npm package or selected native distribution in
+   private storage; retain the native products' sibling layout.
 4. Use the newly installed CLI to update the selected fleet or instances.
 5. Restart fleetd with the same root using that installed executable.
 6. Verify each target's release, configured/effective settings, exact histories,
@@ -50,9 +51,10 @@ Pending decisions and unconfirmed delivery remain recovery state, not logs.
 | Server unavailable | Delivery gate closes; retained unread state resumes after authenticated reconnection |
 | Old terminal pointer | Obtain a new attachment descriptor for the current generation |
 
-A killed controller may leave a native process or detached tool alive.
-Neither process-name scanning nor history copying is an approved recovery method.
-No system here guarantees arbitrary subprocess cleanup after SIGKILL.
+A killed Node/C# controller may leave a native process alive. Rust's Linux guard
+terminates its owned native group on parent death; it does not contain tools
+that escape that group. Process-name scanning and history copying are not
+recovery methods. No target guarantees arbitrary subprocess cleanup after SIGKILL.
 
 - [Controller failure boundaries](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/operations.md)
 - [Session controls](sessions.md)

@@ -68,6 +68,11 @@ Dirty forms retain their draft during refresh. Concurrent revision change blocks
 saving until edits are discarded and current values loaded.
 Filters, list pages and complex views use durable URLs.
 
+Server-backed directory, fleet, wake-rule and report searches use SQLite LIKE
+substring patterns: ASCII case is insensitive, other scalars retain case, `%`
+matches any sequence and `_` matches one character. Search does not expand
+the viewer's authorized scope.
+
 Destructive confirmation uses the shared themed dialog.
 Cancel initially owns focus; Escape restores the trigger without a mutation.
 The background is inert. Pending submission cannot be dismissed or duplicated;

@@ -15,6 +15,7 @@ pub struct Client {
     http: NativeHttp,
     credential: Option<Secret>,
     timeout: Duration,
+    response_bytes: usize,
 }
 pub struct Reply {
     pub data: Value,
@@ -29,27 +30,49 @@ impl Client {
             NativeHttp::new(origin, stop)?,
             credential,
             Duration::from_secs(30),
+            32 * 1024 * 1024,
         )
     }
     pub fn from_http(
         http: NativeHttp,
         credential: Option<Secret>,
         timeout: Duration,
+        response_bytes: usize,
     ) -> Result<Self> {
-        if timeout < Duration::from_millis(100) || timeout > Duration::from_secs(120) {
+        if timeout < Duration::from_millis(100)
+            || timeout > Duration::from_secs(120)
+            || !(1..=32 * 1024 * 1024).contains(&response_bytes)
+        {
             return Err(invalid("Invalid operation transport deadline"));
         }
         Ok(Self {
             http,
             credential,
             timeout,
+            response_bytes,
         })
     }
     pub async fn call<Id: Key>(&self, call: &Call<Id>, stop: CancellationToken) -> Result<Reply> {
+        self.execute(call, None, stop).await
+    }
+    pub async fn upload<Id: Key>(
+        &self,
+        call: &Call<Id>,
+        bytes: bytes::Bytes,
+        stop: CancellationToken,
+    ) -> Result<Reply> {
+        self.execute(call, Some(bytes), stop).await
+    }
+    async fn execute<Id: Key>(
+        &self,
+        call: &Call<Id>,
+        binary: Option<bytes::Bytes>,
+        stop: CancellationToken,
+    ) -> Result<Reply> {
         let declared = call.definition()?;
-        if declared.binary {
+        if declared.binary != binary.is_some() || binary.is_some() && call.body.is_some() {
             return Err(invalid(
-                "Binary operations require their declared stream input",
+                "Use the operation's declared JSON or binary request kind",
             ));
         }
         let path = target(call)?;
@@ -75,9 +98,20 @@ impl Client {
         } else {
             self.credential.as_ref()
         };
+        let request = async {
+            let limits = JsonLimits {
+                request_bytes: declared.request_bytes,
+                response_bytes: self.response_bytes,
+                timeout: self.timeout,
+            };
+            match binary {
+                Some(bytes) => self.http.binary(token, method, &path, bytes, limits).await,
+                None => self.http.json(token, method, &path, body, limits).await,
+            }
+        };
         let response = tokio::select! { biased;
             _ = stop.cancelled() => return Err(Failure::new(ErrorCode::Unavailable, "Coordination request was cancelled")),
-            result = self.http.json(token, method, &path, body, JsonLimits { request_bytes: declared.request_bytes, response_bytes: 32*1024*1024, timeout: self.timeout }) => result.map_err(|mut error| { if error.code == ErrorCode::Native { error.code = ErrorCode::Unavailable; } error })?,
+            result = request => result.map_err(|mut error| { if error.code == ErrorCode::Native { error.code = ErrorCode::Unavailable; } error })?,
         };
         decode(
             response.status,
@@ -124,7 +158,7 @@ fn metadata(value: &Value, collection: bool) -> Result<Metadata> {
         if let Some(value) = data.get(name) {
             check::integer(
                 value,
-                if ["page", "pageSize"].contains(&name) {
+                if ["page", "pageSize", "totalPages"].contains(&name) {
                     1
                 } else {
                     0

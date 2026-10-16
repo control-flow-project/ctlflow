@@ -135,7 +135,7 @@ impl MessageRepository for Store {
             page,
             page_size: size,
             total_items: total,
-            total_pages: (total + size - 1) / size,
+            total_pages: ((total + size - 1) / size).max(1),
         })
     }
     fn fleet_message_deliveries(&mut self, ids: &[String]) -> Result<Vec<Delivery>> {

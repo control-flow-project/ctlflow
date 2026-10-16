@@ -4,6 +4,7 @@ pub mod bootstrap;
 pub mod configuration;
 pub mod container;
 pub mod container_commands;
+pub mod container_lifecycle;
 pub mod content;
 pub mod host;
 pub mod http;

@@ -61,14 +61,22 @@ async fn apply(
         security::same_origin(input.headers(), &state.configuration.public_origin, false)?;
     }
     if registered {
-        if input.method() == Method::POST {
-            let Peer::Tcp(peer) = peer else {
-                return Err(Failure::new(
-                    ErrorCode::Forbidden,
-                    "Signup requires a network peer",
-                ));
-            };
-            state.rate.admit(peer.ip(), identity::now()?)?;
+        if input.method() == Method::POST
+            && let Err(error) = state.rate.admit(peer, input.headers(), identity::now()?)
+        {
+            let limited = error.code == ErrorCode::RateLimit;
+            let mut response = registration::native(
+                if limited { 429 } else { 403 },
+                json!({"errcode":if limited { "M_LIMIT_EXCEEDED" } else { "M_FORBIDDEN" }, "error":error.message}),
+            )?;
+            if limited {
+                response.headers_mut().insert(
+                    header::RETRY_AFTER,
+                    hyper::header::HeaderValue::from_static("60"),
+                );
+            }
+            api::secure(&mut response, request_id)?;
+            return Ok(response);
         }
         return registration::handle(&state, input, request_id).await;
     }

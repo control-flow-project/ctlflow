@@ -97,7 +97,7 @@ pub(super) fn page(
     let items = items
         .order((
             enrollment_request::created_at.desc(),
-            enrollment_request::id.desc(),
+            enrollment_request::id.asc(),
         ))
         .limit(size)
         .offset((page - 1) * size)
@@ -112,7 +112,7 @@ pub(super) fn page(
         page,
         page_size: size,
         total_items: total,
-        total_pages: (total + size - 1) / size,
+        total_pages: ((total + size - 1) / size).max(1),
     })
 }
 pub(super) fn items(store: &mut Store, id: &str) -> Result<Vec<Item>> {

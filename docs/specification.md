@@ -122,6 +122,15 @@ Jeswin P Kumar, jeswinpk@agilehead.com. Workspace metadata/distributed licenses
 must agree; public npm availability grants no open-source rights.
 Third-party notices remain unchanged.
 
+Each selectable target has separate factual installation/packaging instructions:
+Node, C# managed, C# NativeAOT and Rust. Instructions distinguish build-time and
+installed dependencies, local packaging, publication and activation. Native
+distributions ship their selected guide as a standalone README; npm products
+ship their product guides. Installed documentation cannot rely on paths outside
+its distribution. Current documentation contains no promotional claims.
+
+- [Target installation and packaging](distributions/README.md)
+
 The immutable intentional-tool release contains README.md, SKILL.md,
 crossfire-client.mjs and matrix-spec-LICENSE.txt. One private build export
 produces the server/fleetd bytes. Activation verifies the complete local release.
@@ -144,8 +153,10 @@ Matrix retains /_matrix. Static reports use a separate origin/listener.
 - Fields are camelCase. Application IDs are UUIDs; native Matrix/session IDs
   remain opaque and are validated by their owning adapters.
 - Wire strings and object keys must be well-formed Unicode. Unpaired UTF-16
-  surrogates fail rather than being silently replaced; valid scalar pairs and
-  canonical escaped controls retain their exact values.
+  surrogates and malformed UTF-8 bytes fail rather than being silently replaced;
+  valid scalar pairs, literal replacement characters and canonical escaped
+  controls retain their exact values. Private JSON/native evidence follows the
+  same decoding rule; corruption is not permission to rewrite an existing file.
 - Unknown fields, duplicate query parameters, invalid discriminants, unsupported
   methods and bounded-resource violations fail.
 - Status distinguishes invalid input, authentication, authority, absence,
@@ -702,6 +713,12 @@ Management never embeds/executes report content.
 
 ## 16. Statistics and retention
 
+Telemetry message-type labels use at most 100 UTF-16 units without splitting
+scalar pairs; empty/control labels are summarized as `unknown`. Invalid usage
+or an overflowing counter sample is dropped without partially changing counters
+or poisoning listener heartbeats. Runtime/session labels use the shared bounded
+text contract, not a separate runtime activation whitelist.
+
 Listeners collect bounded approximate traffic counters, not analytics bodies:
 observed/delivered messages, UTF-8 bytes, declared attachment bytes, largest size
 and sender/room/type flows. Multi-recipient messages count per recipient.
@@ -768,6 +785,13 @@ Indexes serve concrete queries/FKs. Scope/filter/count/order/page precedes
 hydration; batch labels/settings. Owner shapes do not use administrator-OR-owner
 predicates that prevent seeks. Query-plan/count tests verify actual behavior.
 Substring search is not constant-time; offsets may scan skipped matches.
+
+Directory, fleet, wake-rule and publication searches use bound SQLite LIKE
+substring patterns across all implementations. ASCII case is insensitive;
+non-ASCII scalars retain exact case. `%` matches a sequence and `_` matches one
+character. No host-language Unicode lowercasing adds a second normalization
+rule. Scope, count, order and page use the identical predicate; search never
+changes authority or interpolates SQL text.
 
 There is no application database-size ceiling. Native SQLITE_FULL rolls back
 the affected operation as storage-unavailable; it never authorizes data deletion

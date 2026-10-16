@@ -111,9 +111,8 @@ impl<C: Coordination, T: Clock + Send + Sync> Reporter<C, T> {
                         .content
                         .get("info")
                         .and_then(|info| info.get("size"))
-                        .and_then(Value::as_i64)
+                        .and_then(|value| check::integer(value, 0, check::SAFE_INTEGER).ok())
                         .unwrap_or(0)
-                        .max(0)
                 },
                 |file| file.attachment_bytes,
             );

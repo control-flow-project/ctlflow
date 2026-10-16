@@ -21,6 +21,7 @@
     "build": "node scripts/workspaces.mjs build",
     "test": "node scripts/workspaces.mjs test",
     "test:rust": "node scripts/verify-rust.mjs",
+    "verify:rust": "node scripts/verify-rust-release.mjs",
     "test:browser": "node scripts/test.mjs crossfire browser",
     "verify:structure": "node scripts/verify-structure.mjs",
     "verify:architecture": "npm run verify:structure && npm run verify:architecture --workspace=@ctlflow/crossfire",

@@ -123,6 +123,11 @@ Do not stop at intermediate milestones when completion is authorized. Never
 weaken tests/gates or claim fixture-only evidence as real-provider certification.
 Root commands coordinate typecheck, build, tests and architecture verification.
 
+Documentation uses factual language, not promotional claims. Describe exact
+behavior, prerequisites, measured verification and limitations. Keep separate
+installation/packaging instructions for Node, C# managed, C# NativeAOT and Rust;
+installed guides must not depend on checkout-relative documentation links.
+
 ## Test execution
 Runtime verification includes Codex and Pi. Claude remains unimplemented and has
 no product test suite or retained legacy adapter. Prepare pinned native assets

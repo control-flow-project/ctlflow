@@ -4,7 +4,7 @@ use crossfire_contracts::validation as check;
 use crossfire_domain::publication::values::Budget;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, secret::Secret};
 use serde_json::Value;
-use std::path::Path;
+use std::{net::IpAddr, path::Path};
 use url::Url;
 
 pub struct Configuration {
@@ -18,6 +18,7 @@ pub struct Configuration {
     pub registration_secret: Secret,
     pub publication_budget: Budget,
     pub logging_retention_days: i64,
+    pub trusted_proxy_addresses: Vec<IpAddr>,
 }
 impl Configuration {
     pub fn service_matrix_id(&self) -> String {
@@ -37,7 +38,11 @@ pub fn parse(value: &Value) -> Result<Configuration> {
             "jwtSecret",
             "registrationSecret",
         ],
-        &["publicationBudget", "loggingRetentionDays"],
+        &[
+            "publicationBudget",
+            "loggingRetentionDays",
+            "trustedProxyAddresses",
+        ],
     )?;
     let instance = check::name(&value["instance"])?;
     let server_name = check::text(&value["serverName"], 1, 200)?;
@@ -99,6 +104,11 @@ pub fn parse(value: &Value) -> Result<Configuration> {
             .map(|value| check::integer(value, 1, check::SAFE_INTEGER / 86_400_000))
             .transpose()?
             .unwrap_or(7),
+        trusted_proxy_addresses: value
+            .get("trustedProxyAddresses")
+            .map(crate::http::public_request_budget::proxies)
+            .transpose()?
+            .unwrap_or_default(),
     })
 }
 fn budget(value: &Value) -> Result<Budget> {

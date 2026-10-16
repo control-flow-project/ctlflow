@@ -56,7 +56,7 @@ Rejected/expired requests cannot yield credentials.
 
 ## Software
 
-The installed fleetd package owns a pinned local tool release:
+The installed fleetd package or native distribution owns a pinned local tool release:
 README, skill, client and Matrix license. Artifact size and SHA-256 establish
 byte integrity, not independent publisher trust.
 
@@ -67,7 +67,8 @@ release. Sleeping engines are not woken for that notice.
 
 After explicit consent:
 
-1. Install the exact new public Fleet/fleetd release in private storage.
+1. Install the exact new Fleet/fleetd npm release or native distribution in
+   private storage; keep native product directories together.
 2. Use its new CLI to update the selected fleet/instances.
 3. Restart fleetd from the installed executable with the same root.
 4. Verify releases, effective settings, saved histories, unread positions and

@@ -165,8 +165,10 @@ Preview/apply checks exact input, revisions and current native authority.
 
 ## Secrets and activation
 
-Do not put tokens, passwords, endpoints, session IDs or shell commands in tracked
-roster/role files. Private directories use 0700 and state files 0600.
+Tracked roster/role files contain the intended public Crossfire server/owner
+and validated native options. Do not put tokens, passwords, private provider
+endpoints, native session IDs or credentials in them. Private directories use
+0700 and state files 0600.
 The adapter refreshes current host provider login at actual native activation.
 It does not copy the setup assistant's history, trust settings or bypass policy.
 

@@ -4,7 +4,6 @@ use super::{
 };
 use crate::{
     error::failure,
-    expression::{instr, lower},
     store::Store,
     tables::{wake_delivery, wake_rule, wake_rule_agent},
 };
@@ -59,9 +58,9 @@ impl RuleRepository for Store {
                 "Use page >= 1 and pageSize 1-100",
             ));
         }
-        let search = search.to_lowercase();
+        let search = format!("%{search}%");
         let mut count = wake_rule::table
-            .filter(instr(lower(wake_rule::name), &search).gt(0))
+            .filter(wake_rule::name.like(&search))
             .into_boxed();
         if let Some(owner) = owner_id {
             count = count.filter(wake_rule::owner_id.eq(owner));
@@ -71,13 +70,13 @@ impl RuleRepository for Store {
             .get_result(self.database.connection())
             .map_err(failure)?;
         let mut query = wake_rule::table
-            .filter(instr(lower(wake_rule::name), &search).gt(0))
+            .filter(wake_rule::name.like(&search))
             .into_boxed();
         if let Some(owner) = owner_id {
             query = query.filter(wake_rule::owner_id.eq(owner));
         }
         let items = query
-            .order((wake_rule::name.asc(), wake_rule::id.asc()))
+            .order((wake_rule::created_at.desc(), wake_rule::id.asc()))
             .offset((page - 1) * size)
             .limit(size)
             .select(RuleRow::as_select())
@@ -91,7 +90,7 @@ impl RuleRepository for Store {
             page,
             page_size: size,
             total_items,
-            total_pages: (total_items + size - 1) / size,
+            total_pages: ((total_items + size - 1) / size).max(1),
         })
     }
     fn wake_assignments(&mut self, ids: &[String]) -> Result<Vec<Assignment>> {

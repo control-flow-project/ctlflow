@@ -86,7 +86,7 @@ pub async fn fleets(client: &Client, stop: CancellationToken) -> Result<Vec<Valu
         let value = client.call(&call, stop.clone()).await?;
         let items = check::list(&value["items"], 0, 100)?;
         all.extend_from_slice(items);
-        if i64::from(page) >= check::integer(&value["meta"]["totalPages"], 0, 100000)? {
+        if i64::from(page) >= check::integer(&value["meta"]["totalPages"], 1, 100000)? {
             return Ok(all);
         }
     }

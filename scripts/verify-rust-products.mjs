@@ -8,11 +8,14 @@ import { command as runCommand } from './build.mjs';
 import { contractStack } from '../services/crossfire/dist/tests/contracts/fixture.js';
 import { daemonContracts } from '../services/fleetd/dist/tests/contracts/daemon.contract.js';
 import { cliContracts } from '../services/fleet/dist/tests/contracts/cli.contract.js';
+import { serverContracts } from '../services/crossfire/dist/tests/contracts/server.contract.js';
+import { browserContracts } from '../services/crossfire/dist/tests/contracts/browser.contract.js';
+import { ingressContracts } from '../services/crossfire/dist/tests/contracts/ingress.contract.js';
 
 verifyTestResources();
 const [distribution] = process.argv.slice(2);
 assert(process.argv.length === 3 && isAbsolute(distribution), 'Use one exact prepared Rust distribution; no runtime selection or skip flags');
-const root = fileURLToPath(new URL('../', import.meta.url)), temporary = join(root, '.temp');
+const root = fileURLToPath(new URL('../', import.meta.url)), temporary = join(root, 't');
 mkdirSync(temporary, {recursive: true, mode: 0o700});
 process.env.TMPDIR = temporary; process.env.TMP = temporary; process.env.TEMP = temporary;
 const command = product => ({binary:join(distribution, product === 'server' ? 'crossfire/crossfire' : product === 'daemon' ? 'fleetd/fleetd' : 'fleet/fleet'),arguments:[]});
@@ -23,7 +26,10 @@ await runCommand(process.execPath, ['dist/scripts/architecture-proof/conduit-ass
 await runCommand(process.execPath, ['dist/scripts/architecture-proof/pi-assets.js'], process.cwd());
 test('Rust actual product contracts: shared assertion bank', {timeout:780000}, async scope => {
   const fixture = await contractStack(scope,target,[target]);
+  await scope.test('HTTP, Matrix, security and persisted data', child => serverContracts(child,fixture));
   for (const runtime of ['codex','pi']) await scope.test('Actual '+runtime+' fleetd contract', child => daemonContracts(child,fixture,target,runtime));
   await scope.test('Actual CLI and SSH contract', child => cliContracts(child,fixture,target));
+  await scope.test('Shared React browser', child => browserContracts(child,fixture));
+  await scope.test('Trusted ingress', child => ingressContracts(child,fixture));
   await fixture.close();
 });

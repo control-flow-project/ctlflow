@@ -9,46 +9,18 @@ public static partial class Validation
 {
     public const long MaxWireInteger = 9007199254740991;
 
-    private static string? String(JsonElement input)
-    {
-        if (input.ValueKind != JsonValueKind.String) return null;
-        try
-        {
-            var parsed = ProtocolJson.Unquote(input.GetRawText());
-            return parsed.IsSuccess && WellFormed(parsed.Value) ? parsed.Value : null;
-        }
-        catch (InvalidOperationException) { return null; }
-    }
-
-    public static bool WellFormed(string value)
-    {
-        for (var index = 0; index < value.Length; index++)
-        {
-            if (!char.IsSurrogate(value[index])) continue;
-            if (!char.IsHighSurrogate(value[index]) || index + 1 == value.Length || !char.IsLowSurrogate(value[index + 1])) return false;
-            index++;
-        }
-        return true;
-    }
-
-    public static string TruncateUtf16(string value, int maximum)
-    {
-        if (maximum < 0 || !WellFormed(value)) throw new ArgumentException("Use well-formed Unicode and a nonnegative text bound");
-        if (value.Length <= maximum) return value;
-        var boundary = maximum > 0 && char.IsHighSurrogate(value[maximum - 1]) && char.IsLowSurrogate(value[maximum]) ? maximum - 1 : maximum;
-        return value[..boundary];
-    }
-
     public static Result<string> Text(JsonElement input, int maximum = 255, int minimum = 1)
     {
-        var value = String(input);
+        var parsed = input.ValueKind == JsonValueKind.String ? ProtocolJson.Unquote(input.GetRawText()) : Results.Fail<string>("invalid", "Expected text");
+        var value = parsed.IsSuccess ? parsed.Value : null;
         return value is not null && value.Length >= minimum && value.Length <= maximum && !Controls().IsMatch(value)
             ? Result<string>.Success(value) : Results.Fail<string>("invalid", $"Expected text of {minimum}–{maximum} characters");
     }
 
     public static Result<string> PlainText(JsonElement input, int maximumBytes)
     {
-        var value = String(input);
+        var parsed = input.ValueKind == JsonValueKind.String ? ProtocolJson.Unquote(input.GetRawText()) : Results.Fail<string>("invalid", "Expected plain text");
+        var value = parsed.IsSuccess ? parsed.Value : null;
         return value is not null && Encoding.UTF8.GetByteCount(value) <= maximumBytes && !PlainControls().IsMatch(value)
             ? Result<string>.Success(value) : Results.Fail<string>("invalid", $"Expected plain text up to {maximumBytes} UTF-8 bytes");
     }
@@ -73,8 +45,11 @@ public static partial class Validation
         => input.ValueKind == JsonValueKind.Null ? Result<bool?>.Success(null) : Boolean(input).Map<bool?>(value => value);
 
     public static Result<string> Choice(JsonElement input, params string[] choices)
-        => String(input) is { } value && choices.Contains(value, StringComparer.Ordinal)
-            ? Result<string>.Success(value) : Results.Fail<string>("invalid", "Choose one of: " + string.Join(", ", choices));
+    {
+        var parsed = input.ValueKind == JsonValueKind.String ? ProtocolJson.Unquote(input.GetRawText()) : Results.Fail<string>("invalid", "Expected a choice");
+        return parsed.IsSuccess && choices.Contains(parsed.Value, StringComparer.Ordinal)
+            ? parsed : Results.Fail<string>("invalid", "Choose one of: " + string.Join(", ", choices));
+    }
 
     public static Result<JsonElement> Fields(JsonElement input, IReadOnlyList<string> required, IReadOnlyList<string>? optional = null)
     {
@@ -101,25 +76,18 @@ public static partial class Validation
 
     public static bool Identifier(string value) => IdentitySyntax.Identifier(value);
     public static bool Name(string value) => IdentitySyntax.Name(value);
-    public static bool UserId(string value) => WellFormed(value) && IdentitySyntax.MatrixUser(value);
-    public static bool RoomId(string value) => value.Length <= 255 && WellFormed(value) && RoomPattern().IsMatch(value);
-    public static bool EventId(string value) => value.Length <= 255 && WellFormed(value) && EventPattern().IsMatch(value);
+    public static bool UserId(string value) => IdentitySyntax.MatrixUser(value);
+    public static bool RoomId(string value) => value.Length <= 255 && RoomPattern().IsMatch(value);
+    public static bool EventId(string value) => value.Length <= 255 && EventPattern().IsMatch(value);
     public static bool Secret(string value) => SecretPattern().IsMatch(value);
 
     public static bool Json(JsonElement value, int depth = 0)
-    {
-        try { return JsonValue(value, depth); }
-        catch (InvalidOperationException) { return false; }
-    }
-
-    private static bool JsonValue(JsonElement value, int depth)
         => depth <= 64 && value.ValueKind switch
         {
-            JsonValueKind.String => String(value) is not null,
-            JsonValueKind.Null or JsonValueKind.True or JsonValueKind.False => true,
+            JsonValueKind.Null or JsonValueKind.String or JsonValueKind.True or JsonValueKind.False => true,
             JsonValueKind.Number => value.TryGetDouble(out var number) && double.IsFinite(number),
             JsonValueKind.Array => value.EnumerateArray().All(item => Json(item, depth + 1)),
-            JsonValueKind.Object => value.EnumerateObject().All(item => WellFormed(item.Name) && Json(item.Value, depth + 1)),
+            JsonValueKind.Object => value.EnumerateObject().All(item => Json(item.Value, depth + 1)),
             _ => false
         };
 

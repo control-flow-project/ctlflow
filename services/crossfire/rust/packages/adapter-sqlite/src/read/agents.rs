@@ -1,7 +1,6 @@
 use crate::{
     agent::{self as mapping, AgentRow},
     error::failure,
-    expression::{instr, lower},
     rows,
     store::Store,
     tables::{agent, agent_name, fleet, fleet_instance, member, principal, principal_application},
@@ -19,7 +18,7 @@ pub(super) fn page(
 ) -> Result<Page<AgentRecord>> {
     input.pagination.validate()?;
     let owner = diesel::alias!(principal as owner);
-    let search = input.search.to_lowercase();
+    let search = format!("%{}%", input.search);
     let statuses: Vec<_> = input
         .statuses
         .iter()
@@ -47,11 +46,9 @@ pub(super) fn page(
         )
         .filter(principal::status.eq_any(&statuses))
         .filter(
-            instr(lower(agent_name::name), &search).gt(0).or(instr(
-                lower(principal::matrix_user_id),
-                &search,
-            )
-            .gt(0)),
+            agent_name::name
+                .like(&search)
+                .or(principal::matrix_user_id.like(&search)),
         )
         .into_boxed();
     let mut records = base
@@ -62,11 +59,9 @@ pub(super) fn page(
         )
         .filter(principal::status.eq_any(&statuses))
         .filter(
-            instr(lower(agent_name::name), &search).gt(0).or(instr(
-                lower(principal::matrix_user_id),
-                &search,
-            )
-            .gt(0)),
+            agent_name::name
+                .like(&search)
+                .or(principal::matrix_user_id.like(&search)),
         )
         .into_boxed();
     if let Some(owner_id) = input.owner_id {
@@ -79,11 +74,31 @@ pub(super) fn page(
     }
     if let Some((ids, include)) = activity {
         if include {
-            count = count.filter(principal::id.eq_any(ids));
-            records = records.filter(principal::id.eq_any(ids));
+            count = count.filter(
+                principal::id
+                    .eq_any(ids)
+                    .and(principal::status.eq("active"))
+                    .and(owner.field(principal::status).eq("active")),
+            );
+            records = records.filter(
+                principal::id
+                    .eq_any(ids)
+                    .and(principal::status.eq("active"))
+                    .and(owner.field(principal::status).eq("active")),
+            );
         } else {
-            count = count.filter(principal::id.ne_all(ids));
-            records = records.filter(principal::id.ne_all(ids));
+            count = count.filter(
+                principal::id
+                    .ne_all(ids)
+                    .or(principal::status.ne("active"))
+                    .or(owner.field(principal::status).ne("active")),
+            );
+            records = records.filter(
+                principal::id
+                    .ne_all(ids)
+                    .or(principal::status.ne("active"))
+                    .or(owner.field(principal::status).ne("active")),
+            );
         }
     }
     let total = count
@@ -91,7 +106,7 @@ pub(super) fn page(
         .get_result::<i64>(store.database.connection())
         .map_err(failure)?;
     let values = records
-        .order((agent_name::name.asc(), principal::id.asc()))
+        .order((principal::created_at.asc(), principal::id.asc()))
         .offset(input.pagination.offset())
         .limit(input.pagination.size)
         .select((
