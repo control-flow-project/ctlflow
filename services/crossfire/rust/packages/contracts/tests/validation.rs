@@ -34,11 +34,11 @@ fn unicode_and_plain_text_use_exact_wire_units() {
     assert!(check::room_id(&json!("#alias:server.test")).is_err());
     assert!(serde_json::from_str::<serde_json::Value>(r#""\ud800""#).is_err());
     assert!(serde_json::from_str::<serde_json::Value>(r#"{"\udfff":true}"#).is_err());
-    assert_eq!(check::truncate_utf16("a🚀b", 2), "a");
-    assert_eq!(check::truncate_utf16("a🚀b", 3), "a🚀");
-    assert_eq!(check::truncate_utf16("🚀", 0), "");
-    assert_eq!(check::truncate_utf16("🚀", 1), "");
-    assert_eq!(check::truncate_utf16("🚀", 2), "🚀");
+    assert_eq!(crossfire_kernel::text::truncate_utf16("a🚀b", 2), "a");
+    assert_eq!(crossfire_kernel::text::truncate_utf16("a🚀b", 3), "a🚀");
+    assert_eq!(crossfire_kernel::text::truncate_utf16("🚀", 0), "");
+    assert_eq!(crossfire_kernel::text::truncate_utf16("🚀", 1), "");
+    assert_eq!(crossfire_kernel::text::truncate_utf16("🚀", 2), "🚀");
 }
 
 #[test]

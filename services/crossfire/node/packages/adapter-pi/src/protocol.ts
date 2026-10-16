@@ -1,5 +1,4 @@
 import { spawn, execFile } from 'node:child_process';
-import { StringDecoder } from 'node:string_decoder';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { writePrivateBytes } from '@ctlflow/crossfire-adapter-filesystem/index';
@@ -34,7 +33,7 @@ export async function startPi(input: { binary: string; workspace: string; stateD
   const failed = new AbortController(), lifetime = AbortSignal.any([stop, failed.signal]);
   const requests = new Map<string, { command: string; resolve: (value: unknown) => void; reject: (error: unknown) => void }>();
   const controls = new Map<string, { resolve: (value: unknown) => void; reject: (error: unknown) => void }>();
-  const decoder = new StringDecoder('utf8');
+  const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
   let buffered = '', closing: Promise<void> | undefined;
   let finish!: () => void;
   const ended = new Promise<void>(resolve => { finish = resolve; });
@@ -62,7 +61,7 @@ export async function startPi(input: { binary: string; workspace: string; stateD
   child.stdin.on('error', () => failed.abort(new Error('Owned Pi input pipe closed')));
   child.stdout.on('data', (bytes: Buffer) => {
     try {
-      buffered += decoder.write(bytes);
+      buffered += decoder.decode(bytes, { stream: true });
       if (Buffer.byteLength(buffered) > 32 * 1024 * 1024) throw failureError({ code: 'limit', message: 'Native Pi protocol frame exceeds its finite byte budget' });
       for (let end = buffered.indexOf('\n'); end >= 0; end = buffered.indexOf('\n')) {
         const line = buffered.slice(0, end); buffered = buffered.slice(end + 1);

@@ -8,6 +8,7 @@ namespace Crossfire.Server.Http;
 
 public static class Transport
 {
+    private static readonly UTF8Encoding Utf8 = new(false, true);
     public const string CookieName = "__Host-crossfire";
 
     public static string Cookie(HttpRequest request)
@@ -26,10 +27,11 @@ public static class Transport
         if (!body.IsSuccess) return Result<JsonElement>.Fail(body.Error);
         try
         {
-            using var document = JsonDocument.Parse(Encoding.UTF8.GetString(body.Value));
+            using var document = JsonDocument.Parse(Utf8.GetString(body.Value));
+            if (!Validation.Json(document.RootElement)) return Results.Fail<JsonElement>("invalid", "Invalid JSON text or structure");
             return Result<JsonElement>.Success(document.RootElement.Clone());
         }
-        catch (JsonException) { return Results.Fail<JsonElement>("invalid", "Invalid JSON"); }
+        catch (Exception error) when (error is JsonException or DecoderFallbackException) { return Results.Fail<JsonElement>("invalid", "Invalid UTF-8 JSON"); }
     }
 
     public static async ValueTask<Result<byte[]>> ReadBytes(HttpRequest request, int maximum, CancellationToken cancellation)

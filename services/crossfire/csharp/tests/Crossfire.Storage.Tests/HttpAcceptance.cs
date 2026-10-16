@@ -15,21 +15,40 @@ namespace Crossfire.Storage.Tests;
 
 public static class HttpAcceptance
 {
+    private sealed class UntrustedProxy(Uri origin) : System.Net.IWebProxy
+    {
+        public System.Net.ICredentials? Credentials { get; set; }
+        public Uri GetProxy(Uri destination) => origin;
+        public bool IsBypassed(Uri host) => false;
+    }
     public static async Task Verify()
     {
         var builder = WebApplication.CreateSlimBuilder(); builder.Logging.ClearProviders(); builder.WebHost.UseUrls("http://127.0.0.1:0");
         await using var server = builder.Build();
-        var registrationCalls = 0; var requests = 0;
+        var registrationCalls = 0; var requests = 0; var invalidPages = false; var largeReply = false;
         server.Run(async context =>
         {
             Interlocked.Increment(ref requests); context.Response.ContentType = "application/json";
             var path = context.Request.Path.Value;
+            if (path == "/api/agents")
+            {
+                await context.Response.WriteAsync("{\"data\":[],\"meta\":{\"requestId\":\"11111111-1111-4111-8111-111111111111\",\"page\":1,\"pageSize\":20,\"totalItems\":0,\"totalPages\":" + (invalidPages ? "0" : "1") + "}}"); return;
+            }
+            if (path == "/api/publications/11111111-1111-4111-8111-111111111111/files/22222222-2222-4222-8222-222222222222")
+            {
+                Equal(context.Request.ContentType, "application/octet-stream", "declared binary upload uses its native content type");
+                using var bytes = new MemoryStream(); await context.Request.Body.CopyToAsync(bytes);
+                Equal(bytes.ToArray().SequenceEqual(new byte[] { 0, 128, 255 }), true, "binary transport preserves non-UTF-8 bytes");
+                Equal(context.Request.Headers.Authorization.ToString(), "Bearer exact-agent-token", "binary operation retains exact credentials");
+                await context.Response.WriteAsync("{\"data\":{\"uploaded\":true},\"meta\":{\"requestId\":\"11111111-1111-4111-8111-111111111111\"}}"); return;
+            }
             if (path is "/api/releases/current" or "/api/agents/11111111-1111-4111-8111-111111111111" or "/api/agents/11111111-1111-4111-8111-111111111111/owner-conversation")
             {
                 Equal(context.Request.Headers.Authorization.ToString(), path == "/api/releases/current" ? "" : "Bearer exact-agent-token", "operation authentication follows its declared public or agent boundary");
                 if (context.Request.Method == "POST") { using var input = await JsonDocument.ParseAsync(context.Request.Body); Equal(input.RootElement.GetRawText(), "{}", "bodyless operation arguments still serialize the canonical empty JSON object"); }
                 else Equal(context.Request.ContentLength ?? 0, 0L, "GET operations do not transmit JSON bodies");
-                await context.Response.WriteAsync("{\"data\":{},\"meta\":{\"requestId\":\"11111111-1111-4111-8111-111111111111\"}}"); return;
+                var data = largeReply ? "{\"text\":\"" + new string('x', 16777216) + "\"}" : "{}";
+                await context.Response.WriteAsync("{\"data\":" + data + ",\"meta\":{\"requestId\":\"11111111-1111-4111-8111-111111111111\"}}"); return;
             }
             if (path == "/redirect") { context.Response.StatusCode = 302; context.Response.Headers.Location = "/unexpected"; await context.Response.WriteAsync("{}"); return; }
             if (path == "/too-large") { await context.Response.WriteAsync("{\"body\":\"" + new string('a', 2048) + "\"}"); return; }
@@ -62,14 +81,32 @@ public static class HttpAcceptance
             }
             context.Response.StatusCode = 404; await context.Response.WriteAsync("{\"errcode\":\"M_NOT_FOUND\"}");
         });
-        await server.StartAsync();
+        var proxyBuilder = WebApplication.CreateSlimBuilder(); proxyBuilder.Logging.ClearProviders(); proxyBuilder.WebHost.UseUrls("http://127.0.0.1:0");
+        await using var proxy = proxyBuilder.Build(); var forwarded = 0;
+        proxy.Run(context => { Interlocked.Increment(ref forwarded); context.Response.StatusCode = 502; return Task.CompletedTask; });
+        await proxy.StartAsync(); await server.StartAsync(); var previousProxy = HttpClient.DefaultProxy;
         try
         {
-            var origin = server.Urls.Single(); using var client = NativeHttp.Client(); var before = requests;
+            HttpClient.DefaultProxy = new UntrustedProxy(new Uri(proxy.Urls.Single()));
+            var origin = server.Urls.Single();
+            using (var probe = new HttpClient { Timeout = TimeSpan.FromSeconds(5) })
+            { using var refusal = await probe.GetAsync(origin + "/proxy-probe"); Equal((int)refusal.StatusCode, 502, "hostile proxy fixture actually intercepts a default client"); }
+            Equal(forwarded, 1, "the owned rejecting proxy receives only the credential-free control probe"); Interlocked.Exchange(ref forwarded, 0);
+            using var client = NativeHttp.Client(); var before = requests;
             var operations = new OperationClient(client, origin, () => "exact-agent-token", RestOperations.All);
             Equal((await operations.Call(new("release", new Dictionary<string, string>()), CancellationToken.None)).IsSuccess, true, "public operation omits an available bearer credential");
             Equal((await operations.Call(new("agent", new Dictionary<string, string> { ["agentId"] = "11111111-1111-4111-8111-111111111111" }), CancellationToken.None)).IsSuccess, true, "authenticated operation retains its exact credential");
             Equal((await operations.Call(new("ownerConversation", new Dictionary<string, string> { ["agentId"] = "11111111-1111-4111-8111-111111111111" }), CancellationToken.None)).IsSuccess, true, "empty operation input remains valid at the real HTTP boundary");
+            Equal((await operations.Call(new("agents", new Dictionary<string, string>()), CancellationToken.None)).IsSuccess, true, "collection with zero items has one logical page");
+            invalidPages = true;
+            Equal((await operations.Call(new("agents", new Dictionary<string, string>()), CancellationToken.None)).Error.Code, "invalid", "client rejects superseded zero-page metadata");
+            var upload = new Dictionary<string, string> { ["publicationId"] = "11111111-1111-4111-8111-111111111111", ["fileId"] = "22222222-2222-4222-8222-222222222222" };
+            Equal((await operations.Upload("uploadPublicationFile", upload, new byte[] { 0, 128, 255 }, CancellationToken.None)).IsSuccess, true, "native binary operation has the same declared request path");
+            largeReply = true;
+            Equal((await operations.Call(new("release", new Dictionary<string, string>()), CancellationToken.None)).IsSuccess, true, "public operation client retains the canonical 32 MiB response allowance");
+            var privateClient = new OperationClient(client, origin, () => null, RestOperations.All, 30000, 16777216);
+            Equal((await privateClient.Call(new("release", new Dictionary<string, string>()), CancellationToken.None)).Error.Code, "body_too_large", "explicit private transport keeps its 16 MiB bound");
+            largeReply = false;
             before = requests;
             Equal((await NativeHttp.Json(client, new(origin), "GET", "//bad-origin/path")).Error.Code, "invalid", "origin escape rejected");
             Equal(requests, before, "no request on rejected origin");
@@ -92,7 +129,8 @@ public static class HttpAcceptance
             Equal(MatrixJson.Segment("!room:'()*"), "!room%3A'()*", "canonical Matrix path encoding");
             using var apiError = JsonDocument.Parse(JsonSerializer.Serialize(new ApiFailure(new("invalid", "Invalid request"), new(Identity.Identifier())), ApiJson.Default.ApiFailure));
             Equal(apiError.RootElement.GetProperty("error").TryGetProperty("fieldErrors", out _), false, "optional API error field omission");
+            Equal(forwarded, 0, "private native credentials and operations never traverse the ambient proxy");
         }
-        finally { await server.StopAsync(); }
+        finally { HttpClient.DefaultProxy = previousProxy; await server.StopAsync(); await proxy.StopAsync(); }
     }
 }

@@ -35,11 +35,13 @@ test('controller failure reporting survives outage and restart with the original
     fleetId, controllerCredential: 'controller-only', request: null, identities: [] };
   const stop = new AbortController();
   let reporter = failureReporter(directory, binding, stop.signal);
-  assert(reporter.record(agentId, 'original-session', new Error('Native engine exited')).ok);
+  const detail = '🚀'.repeat(2000);
+  assert(reporter.record(agentId, 'original-session', new Error(detail)).ok);
   await until(() => reports.length === 1 && reporter.error() !== null);
   await reporter.close();
   const file = join(directory, '.fleet/failures.json'), pending = readJson<unknown[]>(file);
   assert.deepEqual(pending, reports);
+  assert.equal((pending[0] as { message: string }).message, '🚀'.repeat(1000));
   available = true; reporter = failureReporter(directory, binding, stop.signal);
   cleanup(scope, async () => { stop.abort(); await reporter.close(); });
   await until(() => reports.length === 2 && readJson<unknown[]>(file).length === 0);

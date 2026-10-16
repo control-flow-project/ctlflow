@@ -63,17 +63,17 @@ impl<C: Coordination + 'static, E: Executor + 'static> Fleet<C, E> {
             },
         };
         let error = outcome.error.map(|error| {
-            error
+            let filtered = error
                 .chars()
                 .map(|character| {
-                    if character.is_control() {
+                    if character <= '\u{1f}' || character == '\u{7f}' {
                         ' '
                     } else {
                         character
                     }
                 })
-                .take(4096)
-                .collect::<String>()
+                .collect::<String>();
+            crossfire_kernel::text::truncate_utf16(&filtered, 4096).to_owned()
         });
         let mut call = self.call(OperationId::ReceiptFleetRuntime);
         call.parameters

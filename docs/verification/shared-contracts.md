@@ -34,6 +34,23 @@ It runs architecture, Node tests, C# tests, Rust tests, both C# distributions,
 Rust publication, matrix generation, installed-product tests, container tests
 and migration-container tests. Failure stops subsequent phases. Configured targets cannot be skipped.
 
+Within the installed and container banks, targets run in independent test
+processes concurrently up to the available CPU count in the verified aggregate
+resource group. One shared matrix runner owns process groups, deadlines,
+cancellation and complete per-target evidence. Synchronous native commands in
+one target cannot block another target's browser or fixture heartbeat. Container
+packages build once before those target fixtures start. Each target owns its
+directory, ports, browser contexts and exact container identities; scenarios
+within one fixture remain sequential. Concurrency does not change assertions,
+product deadlines or the finite target/overall test timeouts.
+
+The operator/package matrix is distributed across those workers: each selected
+operator runs every backend package once. Four target workers therefore verify
+all 16 ordered operator/backend pairs, not 64 duplicate executions. Each worker
+asserts its operator identity and records the backend identities after successful
+image, readiness and API checks. No unique pair or behavioral assertion is
+omitted; each worker still runs the complete other container/recovery scenarios.
+
 ## Coverage
 
 | Area | Assertions |

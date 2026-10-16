@@ -2,6 +2,28 @@ use crossfire_server::container_lifecycle;
 use std::{os::unix::fs::PermissionsExt, path::Path, process::Command};
 use tokio_util::sync::CancellationToken;
 
+#[test]
+fn docker_lifecycle_mutations_and_metadata_probes_use_their_canonical_finite_budgets() {
+    use crossfire_server::container_commands::capture_timeout;
+    for command in ["create", "stop", "rm"] {
+        assert_eq!(
+            capture_timeout(&[command.into(), "fixture".into()]).as_secs(),
+            120
+        );
+    }
+    for command in [
+        vec!["info"],
+        vec!["image", "inspect"],
+        vec!["container", "ls"],
+        vec!["container", "inspect"],
+    ] {
+        assert_eq!(
+            capture_timeout(&command.into_iter().map(str::to_owned).collect::<Vec<_>>()).as_secs(),
+            30
+        );
+    }
+}
+
 #[tokio::test]
 async fn removal_observes_exact_absence_without_competing_with_an_existing_removal()
 -> Result<(), Box<dyn std::error::Error>> {
@@ -39,6 +61,21 @@ async fn removal_observes_exact_absence_without_competing_with_an_existing_remov
             }).await?;
             return cancelled;
         }
+        if mode == "double-failure" {
+            let result = container_lifecycle::owned(
+                &["run".into(), "--name".into(), "fixture".into()],
+                root,
+                stop,
+            )
+            .await;
+            assert!(result.is_err_and(|error| {
+                error.message.contains("permission denied")
+                    && error
+                        .message
+                        .contains("original operation failed: Docker command failed")
+            }));
+            return Ok(());
+        }
         let result = container_lifecycle::remove(&identity, root, stop).await;
         if mode == "denied" {
             assert!(result.is_err_and(|error| error.message.contains("permission denied")));
@@ -57,9 +94,11 @@ async fn removal_observes_exact_absence_without_competing_with_an_existing_remov
 phase=$(/bin/cat "$CROSSFIRE_REMOVAL_FIXTURE/state")
 printf '%s\n' "$*" >> "$CROSSFIRE_REMOVAL_FIXTURE/calls"
 case "$1 $2" in
+  'create --name') printf '%s\n' aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; exit 0 ;;
+  'start --attach') echo 'primary operation failed' >&2; exit 17 ;;
   'stop --timeout') phase=exited ;;
   'rm aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
-    if [ "$FIXTURE_MODE" = denied ]; then echo 'permission denied' >&2; exit 1; fi
+    if [ "$FIXTURE_MODE" = denied ] || [ "$FIXTURE_MODE" = double-failure ]; then echo 'permission denied' >&2; exit 1; fi
     phase=removing
     printf '%s' "$phase" > "$CROSSFIRE_REMOVAL_FIXTURE/state"
     if [ "$FIXTURE_MODE" = in-progress ]; then exit 1; fi ;;
@@ -108,6 +147,7 @@ printf '%s' "$phase" > "$CROSSFIRE_REMOVAL_FIXTURE/state"
         ("running", "denied"),
         ("invalid", "invalid-state"),
         ("running", "cancelled"),
+        ("running", "double-failure"),
     ] {
         std::fs::write(root.join("state"), phase)?;
         std::fs::write(root.join("observations"), "0")?;

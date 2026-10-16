@@ -431,6 +431,7 @@ services/crossfire/csharp/tests/Crossfire.Runtime.Tests/Program.cs	services/cros
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ProtocolAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ProtocolFixture.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/SignalAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/StatisticsAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/AgentAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/AuthenticationAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/CalendarAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
@@ -925,6 +926,7 @@ services/crossfire/node/packages/kernel/src/fleet-map.ts	services/crossfire/rust
 services/crossfire/node/packages/kernel/src/lifecycle.ts	services/crossfire/rust/packages/kernel	native library
 services/crossfire/node/packages/kernel/src/logging.ts	services/crossfire/rust/packages/kernel	native library
 services/crossfire/node/packages/kernel/src/result.ts	services/crossfire/rust/packages/kernel	native library
+services/crossfire/node/packages/kernel/src/text.ts	services/crossfire/rust/packages/kernel	native library
 services/crossfire/node/packages/operator-support/LICENSE	services/crossfire/node/packages/operator-support	shared optional operator library; no native backend fallback
 services/crossfire/node/packages/operator-support/package.json	services/crossfire/node/packages/operator-support	shared optional operator library; no native backend fallback
 services/crossfire/node/packages/operator-support/src/collections.ts	services/crossfire/node/packages/operator-support	shared optional operator library; no native backend fallback
@@ -945,6 +947,7 @@ services/crossfire/node/packages/test-support/src/native-provider.ts	services/cr
 services/crossfire/node/packages/test-support/src/pi-provider.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
 services/crossfire/node/packages/test-support/src/pi.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
 services/crossfire/node/packages/test-support/src/result.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/tls.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
 services/crossfire/node/scripts/architecture-proof/access.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/architecture-proof/codex-fixture.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/architecture-proof/codex-rpc.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
@@ -980,6 +983,7 @@ services/crossfire/node/scripts/native-tests/codex.test.ts	scripts/verify-rust.m
 services/crossfire/node/scripts/native-tests/permissions.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/package-containers.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/receive.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/test-clock.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/test-support/clock.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/test-support/codex-runtime.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/test-support/listener.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
@@ -1028,6 +1032,7 @@ services/crossfire/node/tests/data.test.ts	services/crossfire/tests/contracts	ta
 services/crossfire/node/tests/delivery-journal.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/editable-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/editable.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/element-assets.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/element-configuration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/element-thinking.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/enrollment-capacity.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
@@ -1147,7 +1152,6 @@ services/crossfire/node/tests/support/schema14.ts	services/crossfire/tests/contr
 services/crossfire/node/tests/support/schema15.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/support/schema16.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/support/storage.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
-services/crossfire/node/tests/support/tls.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/terminal-pointer.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/time-zone-assets.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/transport.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank

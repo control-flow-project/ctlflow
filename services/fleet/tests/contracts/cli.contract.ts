@@ -15,7 +15,10 @@ export async function cliContracts(scope: TestContext, platform: ContractPlatfor
   async function json(...args: string[]) { const result = await cli(...args); assert.equal(result.code, 0, result.error); return JSON.parse(result.output) as unknown; }
   cleanup(scope, async () => { await cli('daemon', 'stop', '--root', root); });
   await scope.test('invalid start syntax cannot create a controller or native session', async () => {
-    for (const words of [['start'], ['start', 'one', 'extra'], ['agent', 'start', 'one'], ['agent', 'start', 'one', 'two', 'extra']]) {
+    for (const words of [['start'], ['start', 'one', 'extra'], ['agent', 'start', 'one'], ['agent', 'start', 'one', 'two', 'extra'],
+      ['start', 'INVALID'], ['start', 'one', '--operation-id', 'not-a-uuid'], ['agent', 'start', 'one', 'INVALID'],
+      ['agent', 'start', 'one', 'two', '--operation-id=not-a-uuid'], ['start', 'one', '--fresh-history', '--fresh-history'],
+      ['daemon', 'start', '--name', 'invalid\nname'], ['start', 'one', '--root', root]]) {
       assert.notEqual((await cli(...words, '--root', root)).code, 0);
       assert.equal(existsSync(root), false, 'Validate start syntax before controller activation');
     }

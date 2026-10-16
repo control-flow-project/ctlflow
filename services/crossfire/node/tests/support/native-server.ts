@@ -9,7 +9,7 @@ import { createHttpServer } from '../../apps/server/src/http/create-server.js';
 import { createWorker } from '../../apps/server/src/worker.js';
 import { publicRouter } from '../../apps/server/src/router.js';
 import type { ElementPresentation } from '../../apps/server/src/element-configuration.js';
-import { secureRouter } from './tls.js';
+import { secureRouter } from '@ctlflow/crossfire-test-support/tls';
 export async function nativeServer(scope: TestContext, release: Release, presentation: ElementPresentation = {}, element?: string) {
   const fixture = await nativeApplication(scope), worker = createWorker(fixture.services, fixture.application.diagnostics);
   const server = createHttpServer(fixture.application, worker, release, presentation);

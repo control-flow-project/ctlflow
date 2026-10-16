@@ -1,19 +1,16 @@
 import { spawn } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { repository } from './build.mjs';
 import { verifyTestResources } from './test-resources.mjs';
 import { testEvidence } from './test-evidence.mjs';
+import { verificationFixtures } from './verification-fixtures.mjs';
 
 const [requested] = process.argv.slice(2);
 if (process.argv.length !== 3 || !isAbsolute(requested)) throw new Error('Supply one absolute new Rust verification evidence directory');
 const output = resolve(requested);
 if (existsSync(output) || !existsSync(dirname(output))) throw new Error('Use a new evidence directory with an existing parent');
-const resources = verifyTestResources(), events = [], fixtures = join(repository, 't');
-mkdirSync(fixtures, { recursive: true, mode: 0o700 });
-const information = lstatSync(fixtures);
-if (!information.isDirectory() || information.isSymbolicLink() || information.uid !== process.getuid() || (information.mode & 0o077) !== 0) throw new Error('Rust verification requires a private owned fixture directory');
-process.env.TMPDIR = fixtures; process.env.TMP = fixtures; process.env.TEMP = fixtures;
+const resources = verifyTestResources(), events = [], fixtures = verificationFixtures();
 mkdirSync(output, { mode: 0o700 });
 const temporary = mkdtempSync(join(output, 'distribution-')), distribution = join(temporary, 'rust');
 let completed = false;
@@ -38,6 +35,6 @@ try {
   completed = true;
   console.log(JSON.stringify({ status: 'passed', implementation: 'rust', resources, evidence: output }));
 } finally {
-  if (completed) rmSync(temporary, { recursive: true, force: true });
-  else console.error('Unsuccessful scoped gate artifacts retained for diagnosis: ' + temporary);
+  if (completed) { rmSync(temporary, { recursive: true, force: true }); fixtures.close(); }
+  else console.error('Unsuccessful scoped gate artifacts retained for diagnosis: ' + temporary + '; fixtures: ' + fixtures.directory);
 }

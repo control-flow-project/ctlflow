@@ -7,12 +7,15 @@ namespace Crossfire.Kernel;
 
 public static class WireJson
 {
+    private static readonly UTF8Encoding Utf8 = new(false, true);
+    public static JsonDocument Document(ReadOnlyMemory<byte> bytes)
+    { try { Utf8.GetCharCount(bytes.Span); } catch (DecoderFallbackException error) { throw new JsonException("Invalid UTF-8 JSON", error); } return JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 65 }); }
     public static JsonElement Build(Action<ProtocolWriter> write)
     { var bytes = new ArrayBufferWriter<byte>(); using (var writer = new Utf8JsonWriter(bytes)) write(new ProtocolWriter(writer)); using var document = JsonDocument.Parse(bytes.WrittenMemory); return document.RootElement.Clone(); }
     public static JsonElement Object(Action<ProtocolWriter> write) => Build(writer => { writer.WriteStartObject(); write(writer); writer.WriteEndObject(); });
     public static JsonElement Array(Action<ProtocolWriter> write) => Build(writer => { writer.WriteStartArray(); write(writer); writer.WriteEndArray(); });
     public static JsonElement Parse(ReadOnlyMemory<byte> bytes)
-    { using var document = JsonDocument.Parse(bytes, new JsonDocumentOptions { MaxDepth = 65 }); return document.RootElement.Clone(); }
+    { using var document = Document(bytes); return document.RootElement.Clone(); }
     public static string? Text(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var field) && field.ValueKind == JsonValueKind.String ? ProtocolJson.Unquote(field.GetRawText()).Value : null;
     public static string Compact(JsonElement value) { var result = new StringBuilder(); Append(result, value, 0, 0); return result.ToString(); }
     public static string Pretty(JsonElement value) { var result = new StringBuilder(); Append(result, value, 2, 0); return result.Append('\n').ToString(); }

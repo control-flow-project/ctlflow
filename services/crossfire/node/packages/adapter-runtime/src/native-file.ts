@@ -1,3 +1,5 @@
+import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
+import { json } from '@ctlflow/crossfire-contracts/matrix';
 import { openSync, closeSync, fstatSync, constants, readSync, realpathSync, type Stats } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -28,11 +30,17 @@ function readBytes(descriptor: number, size: number, position: number): Buffer {
   return bytes;
 }
 
+function parseJson(bytes: Uint8Array): unknown {
+  const value: unknown = JSON.parse(decodeUtf8(bytes));
+  if (!json(value)) throw new Error('Native evidence contains invalid Unicode JSON');
+  return value;
+}
+
 export function nativeJson(path: string, maximum: number): unknown {
   return ownedFile(path, maximum, (descriptor, info) => {
     const bytes = readBytes(descriptor, info.size, 0);
     if (fstatSync(descriptor).size !== info.size) throw new Error('Native metadata changed during its bounded read');
-    return JSON.parse(bytes.toString('utf8')) as unknown;
+    return parseJson(bytes);
   });
 }
 
@@ -57,7 +65,7 @@ export function historyHeader(path: string): unknown | undefined {
     return ownedFile(path, Number.MAX_SAFE_INTEGER, (descriptor, info) => {
       for (let size = Math.min(info.size, 4096); size; size = Math.min(size * 2, info.size, MAX_INTERVAL)) {
         const bytes = readBytes(descriptor, size, 0), end = bytes.indexOf(10);
-        if (end >= 0) return JSON.parse(bytes.subarray(0, end).toString('utf8')) as unknown;
+        if (end >= 0) return parseJson(bytes.subarray(0, end));
         if (size === info.size) return undefined;
         if (size === MAX_INTERVAL) throw new Error('Native history header exceeds its verification bound');
       }
@@ -99,7 +107,7 @@ export function historySince(path: string, boundary: HistoryBoundary | null, ins
           if (end < 0) break;
           if (length) {
             const line = fragments.length === 1 ? fragments[0]! : Buffer.concat(fragments, length);
-            inspect(JSON.parse(line.toString('utf8')) as unknown); result.records++;
+            inspect(parseJson(line)); result.records++;
           }
           fragments = []; length = 0; start = end + 1;
         }

@@ -24,6 +24,20 @@ fn conflict() -> Failure {
     )
 }
 impl Gate {
+    pub fn with_query_state(
+        &self,
+        exclusive: bool,
+        operation: impl FnOnce() -> Result<bool>,
+    ) -> Result<Option<bool>> {
+        let state = self.0.lock().map_err(|_| conflict())?;
+        if state.query.is_some() || exclusive && state.publication {
+            return Ok(None);
+        }
+        let outcome = operation();
+        drop(state);
+        outcome.map(Some)
+    }
+
     pub fn query(&self, stop: CancellationToken, exclusive: bool) -> Result<Query> {
         self.begin_query(stop, exclusive, false)
     }
@@ -115,5 +129,33 @@ impl Drop for Publication {
         if let Ok(mut state) = self.gate.0.lock() {
             state.publication = false;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::TryLockError;
+
+    #[test]
+    fn query_maintenance_is_atomic_without_creating_a_visible_query_lease() -> Result<()> {
+        let gate = Gate::default();
+        assert_eq!(
+            gate.with_query_state(false, || {
+                assert!(matches!(gate.0.try_lock(), Err(TryLockError::WouldBlock)));
+                Ok(false)
+            })?,
+            Some(false)
+        );
+        let query = gate.query(CancellationToken::new(), false)?;
+        assert_eq!(gate.with_query_state(false, || Err(conflict()))?, None);
+        drop(query);
+        let publication = gate.publication()?;
+        assert_eq!(gate.with_query_state(true, || Err(conflict()))?, None);
+        assert_eq!(gate.with_query_state(false, || Ok(false))?, Some(false));
+        drop(publication);
+        let query = gate.query(CancellationToken::new(), false)?;
+        query.check()?;
+        Ok(())
     }
 }

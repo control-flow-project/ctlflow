@@ -33,6 +33,11 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
       const bytes = Buffer.concat([Buffer.from('{"expectedRevision":' + integer(before.revision) + ',"displayName":"unchanged-'), Buffer.from(invalid), Buffer.from('"}')]);
       await fixture.failure(await fixture.raw('/api/members/' + fixture.owner.memberId, 'PATCH', bytes, { ...fixture.headers(), 'Content-Type': 'application/json' }), 400, 'invalid');
     }
+    for (const invalid of ['\ud800', '\udfff', 'before\ud800after', '\ud800🚀']) {
+      await fixture.failure(await fixture.raw('/api/members/' + fixture.owner.memberId, 'PATCH', { expectedRevision: integer(before.revision), displayName: invalid }, fixture.headers()), 400, 'invalid');
+      const bytes = Buffer.from('{"expectedRevision":' + integer(before.revision) + ',"displayName":"unchanged","\\ud800":true}');
+      await fixture.failure(await fixture.raw('/api/members/' + fixture.owner.memberId, 'PATCH', bytes, { ...fixture.headers(), 'Content-Type': 'application/json' }), 400, 'invalid');
+    }
     const after = await fixture.data(operations.member, { memberId: fixture.owner.memberId });
     assert.equal(after.displayName, before.displayName); assert.equal(after.revision, before.revision, 'Malformed UTF-8 cannot silently change identity text');
   });

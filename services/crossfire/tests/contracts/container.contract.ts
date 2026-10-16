@@ -8,7 +8,7 @@ import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { ARTIFACTS } from '@ctlflow/crossfire-contracts/release';
 import { messageContent } from '@ctlflow/crossfire-adapter-matrix/message';
 import { onboardingUrl, setupDescriptorUrl, setupDescriptorSchema } from '@ctlflow/crossfire-contracts/onboarding';
-import { browserOptions } from './tls.js';
+import { browserOptions } from '@ctlflow/crossfire-test-support/tls';
 import type { ContainerStack } from './container-fixture.js';
 
 export async function containerContracts(scope: TestContext, fixture: ContainerStack): Promise<void> {

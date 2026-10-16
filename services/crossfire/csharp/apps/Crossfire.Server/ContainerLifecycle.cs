@@ -14,20 +14,15 @@ public static class ContainerLifecycle
         try
         {
             cancellation.ThrowIfCancellationRequested(); running = ContainerCommands.Run(["start", "--attach", identity], workspace, attach.Token); var cancelled = Task.Delay(Timeout.InfiniteTimeSpan, cancellation);
-            if (await Task.WhenAny(running, cancelled) == cancelled)
-            {
-                using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-                try { await ContainerCommands.Run(["stop", "--timeout", "15", identity], workspace, stop.Token); }
-                finally { await attach.CancelAsync(); }
-            }
-            await running;
+            if (await Task.WhenAny(running, cancelled) == running) await running;
         }
         catch (Exception error) { failure = error; }
         finally
         {
-            await attach.CancelAsync(); if (running is not null) try { await running; } catch (Exception error) { failure ??= error; }
-            try { await Remove(identity, workspace, CancellationToken.None); }
-            catch (Exception error) { failure = new IOException("Owned runtime container cleanup is not confirmed", failure ?? error); }
+            Exception? cleanupFailure = null;
+            try { await Remove(identity, workspace, CancellationToken.None); } catch (Exception error) { cleanupFailure = error; }
+            await attach.CancelAsync(); if (running is not null) try { await running; } catch (Exception error) { if (!cancellation.IsCancellationRequested) failure ??= error; }
+            if (cleanupFailure is { } cleanup) failure = failure is null ? new IOException("Owned container cleanup is not confirmed: " + cleanup.Message, cleanup) : new IOException("Owned container cleanup is not confirmed: " + cleanup.Message + "; original operation failed: " + failure.Message, new AggregateException(failure, cleanup));
         }
         if (failure is not null && !(cancellation.IsCancellationRequested && failure is OperationCanceledException)) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
     }

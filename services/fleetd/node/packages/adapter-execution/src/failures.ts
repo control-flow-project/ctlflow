@@ -1,3 +1,4 @@
+import { truncateUtf8 } from '@ctlflow/crossfire-kernel/text';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -40,7 +41,7 @@ export function failureReporter(directory: string, binding: Binding, signal: Abo
     record(agentId: string, sessionId: string | null, error: unknown) {
       if (episodes.has(agentId)) return success(undefined);
       const report = failureReport({ episodeId: randomUUID(), agentId, sessionId,
-        message: (error instanceof Error ? error.message : 'Runtime or listener ended unexpectedly').slice(0, 4000) });
+        message: truncateUtf8(error instanceof Error ? error.message : 'Runtime or listener ended unexpectedly', 4000) });
       if (!report.ok) return report;
       if (reports.length >= 4096) { errorMessage = 'Resolve queued failure reports before starting further native work'; return failure('limit', errorMessage); }
       reports.push(report.value);

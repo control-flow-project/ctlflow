@@ -1,3 +1,4 @@
+import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
 import { readFileSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import catalog from './operations.json' with { type: 'json' };
@@ -178,7 +179,7 @@ export async function executeOperation(client: Matrix, settings: Settings, accou
   if (output) {
     return saveStream(response, output, operation.response === 'binary' ? settings.max_upload_bytes : MAX_JSON_BYTES);
   }
-  const result: unknown = JSON.parse((await collect(response, MAX_JSON_BYTES)).toString('utf8'));
+  const result: unknown = JSON.parse(decodeUtf8(await collect(response, MAX_JSON_BYTES)));
   if (!json(result)) throw new Error('Invalid bounded native JSON response');
   return result;
 }

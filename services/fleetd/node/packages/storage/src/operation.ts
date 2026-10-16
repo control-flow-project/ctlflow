@@ -1,3 +1,4 @@
+import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
 import { lstatSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
@@ -34,7 +35,7 @@ export function operationStorage(root: string): Pick<Registry, 'pendingOperation
   const previous = join(root, 'operations.json');
   if (lstatSync(previous, { throwIfNoEntry: false })) {
     const bytes = readPrivateBytes(previous, 1024 * 1024);
-    const parsed = check.list(operationView, 700)(JSON.parse(bytes.toString('utf8')));
+    const parsed = check.list(operationView, 700)(JSON.parse(decodeUtf8(bytes)));
     if (!parsed.ok) throw new Error(parsed.error.message);
     if (new Set(parsed.value.map(value => value.operationId)).size !== parsed.value.length) throw new Error('Duplicate operation in deployed history');
     for (const value of parsed.value) {

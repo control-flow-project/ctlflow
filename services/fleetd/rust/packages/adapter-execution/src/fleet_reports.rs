@@ -133,7 +133,7 @@ impl<S: LocalState + 'static, C: Coordination + 'static> Reports<S, C> {
             ));
         }
         let mut values = state.failures.clone();
-        values.push(json!({"episodeId":identity::id(),"agentId":agent,"sessionId":session,"message":check::truncate_utf16(&error.message,4000)}));
+        values.push(json!({"episodeId":identity::id(),"agentId":agent,"sessionId":session,"message":crossfire_kernel::text::truncate_utf8(&error.message,4000)}));
         local_state::write(self.storage.as_ref(), &self.file, &values, 33554432)?;
         state.failures = values;
         state.episodes.insert(agent.to_owned());

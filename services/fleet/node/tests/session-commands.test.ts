@@ -13,11 +13,12 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { operations } from '@ctlflow/fleetd-contracts/api';
 
 test('CLI fleet-wide and per-agent start resume by default; only --fresh-history selects reset', async scope => {
-  const directory = mkdtempSync(join(tmpdir(), 'fleet-session-cli-')), root = join(directory, 'controller'), home = join(directory, 'home');
+  const directory = mkdtempSync(join(tmpdir(), 'fc-')), root = join(directory, 'controller'), home = join(directory, 'home');
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(root, { mode: 0o700 }); mkdirSync(home, { mode: 0o700 });
   const fleetId = randomUUID(), inputs: { operationId: string; action: string; target: { kind: string; instanceKey?: string } }[] = [];
-  let loseResponse = false, rejectOperation = false;
+  let loseResponse = false, rejectOperation = false, paginated = false;
+  const pages: number[] = [];
   const fleet = { fleetId, fleetKey: 'test', directory: '/private/fixture', label: 'Test', revision: 0, controller: { name: 'test' }, phase: 'stopped',
     connection: { connected: true, deliveryEnabled: false, revision: 0, error: null }, resumeInstanceKeys: null, error: null as string | null,
     instances: [{ instance: { key: 'one', name: 'one', definition: 'analyst', workarea: 'agents/analyst/workarea/one' }, phase: 'stopped',
@@ -26,7 +27,14 @@ test('CLI fleet-wide and per-agent start resume by default; only --fresh-history
   const server = createServer(async (request, response) => {
     let data: unknown, meta: object = { requestId: randomUUID() }, status = 200;
     if (request.url === '/api/status') data = { controller: { name: 'test' }, startedAt: 1, stopping: false, loggingRetentionDays: 7, loggingError: null };
-    else if (request.method === 'GET') { data = [fleet]; meta = { ...meta, page: 1, pageSize: 100, totalItems: 1, totalPages: 1 }; }
+    else if (request.method === 'GET') {
+      const page = Number(new URL(request.url ?? '/', 'http://localhost').searchParams.get('page') ?? '1');
+      if (paginated) {
+        pages.push(page);
+        data = page === 1 ? Array.from({ length: 100 }, (_, index) => ({ ...fleet, fleetId: randomUUID(), fleetKey: 'other-' + index })) : [fleet];
+        meta = { ...meta, page, pageSize: 100, totalItems: 101, totalPages: 2 };
+      } else { data = [fleet]; meta = { ...meta, page: 1, pageSize: 100, totalItems: 1, totalPages: 1 }; }
+    }
     else {
       const bytes: Buffer[] = []; for await (const chunk of request) bytes.push(Buffer.from(chunk));
       const parsed = operations.operate.input(JSON.parse(Buffer.concat(bytes).toString())); assert(parsed.ok);
@@ -76,4 +84,8 @@ test('CLI fleet-wide and per-agent start resume by default; only --fresh-history
     error instanceof Error && 'stdout' in error && typeof error.stdout === 'string' && error.stdout.includes(retryId),
   'An uncertain submission must expose its stable identity before the remote response');
   assert.equal(inputs.length, 11);
+  paginated = true;
+  assert.equal((JSON.parse((await cli('list')).stdout) as unknown[]).length, 101);
+  assert.equal((JSON.parse((await cli('show', 'test')).stdout) as { fleetId: string }).fleetId, fleetId);
+  assert.deepEqual(pages, [1, 2, 1, 2], 'Listing and name lookup collect all bounded controller pages');
 });

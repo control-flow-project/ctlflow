@@ -134,13 +134,13 @@ impl<S: LocalState, M: Matrix, C: Coordination, A: Artifacts, T: Clock + Send + 
         Ok(())
     }
     pub fn is_pending(&self) -> Result<bool> {
-        let _lease = match self.gate.query(CancellationToken::new(), false) {
-            Ok(lease) => lease,
-            Err(error) if error.code == ErrorCode::Conflict => return Ok(true),
-            Err(error) => return Err(error),
-        };
-        self.expire()?;
-        Ok(self.pending()?.is_some())
+        Ok(self
+            .gate
+            .with_query_state(false, || {
+                self.expire()?;
+                Ok(self.pending()?.is_some())
+            })?
+            .unwrap_or(true))
     }
     pub fn content_files(&self) -> Result<BTreeSet<String>> {
         Ok(self
@@ -360,18 +360,18 @@ impl<S: LocalState, M: Matrix, C: Coordination, A: Artifacts, T: Clock + Send + 
         }
     }
     pub fn discard_prepared(&self) -> Result<bool> {
-        let _lease = match self.gate.acknowledgment(CancellationToken::new()) {
-            Ok(lease) => lease,
-            Err(error) if error.code == ErrorCode::Conflict => return Ok(false),
-            Err(error) => return Err(error),
-        };
-        if let Some(pending) = self.pending()? {
-            if pending.stage == Stage::Acknowledging {
-                return Ok(false);
-            }
-            self.artifacts.release(&[pending.message_id])?;
-            self.storage.remove(&format!("{}.query", self.file))?;
-        }
-        Ok(true)
+        Ok(self
+            .gate
+            .with_query_state(true, || {
+                if let Some(pending) = self.pending()? {
+                    if pending.stage == Stage::Acknowledging {
+                        return Ok(false);
+                    }
+                    self.artifacts.release(&[pending.message_id])?;
+                    self.storage.remove(&format!("{}.query", self.file))?;
+                }
+                Ok(true)
+            })?
+            .unwrap_or(false))
     }
 }

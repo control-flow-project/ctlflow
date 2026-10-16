@@ -13,7 +13,7 @@ import { checkPaperLayout } from '../tools/browser/layout.js';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
-import { browserOptions } from './support/tls.js';
+import { browserOptions } from '@ctlflow/crossfire-test-support/tls';
 import { browserPublisher } from './support/browser-controller.js';
 
 async function stage(client: Client, title: string, assets = false) {

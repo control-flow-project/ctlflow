@@ -29,7 +29,7 @@ import { createListenerHost } from '@ctlflow/crossfire-adapter-crossfire/listene
 import { fakeCodex, until } from '../scripts/test-support/listener.js';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
-import { browserOptions } from './support/tls.js';
+import { browserOptions } from '@ctlflow/crossfire-test-support/tls';
 import { browserController } from './support/browser-controller.js';
 import { decideConfirmation } from './support/confirmation.js';
 

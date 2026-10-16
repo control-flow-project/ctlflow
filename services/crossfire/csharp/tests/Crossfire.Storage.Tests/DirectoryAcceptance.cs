@@ -20,6 +20,8 @@ public static class DirectoryAcceptance
         Equal(record.Value.AllowedActions.Contains("configure"), true, "owner receives configure capability");
         var all = new AgentDirectoryFilter(1, 100, owner.PrincipalId, ["active", "suspended", "revoked"], "", "all", [id]);
         Equal(AgentReads.List(reads, owner, all).Value.Items.Single().Record.Principal.Id, id, "page SQL admits only explicitly selected fleet bindings");
+        Equal(AgentReads.List(reads, owner, all with { Search = "TEST_" + id[..8] }).Value.Items.Single().Record.Principal.Id, id, "agent search uses SQLite ASCII case folding and pattern wildcards");
+        Equal(AgentReads.List(reads, owner, all with { Search = "unmatched-directory-search" }).Value.TotalPages, 1L, "empty search results retain one logical page");
         Equal(AgentReads.List(reads, owner, all with { AgentIds = [] }).Value.TotalItems, 0L, "empty selected roster cannot become an unfiltered query");
         Equal(AgentReads.List(reads, owner, all with { Listener = "online" }).Value.TotalItems, 1L, "online filter uses actual admitted controller lease");
         Equal(AgentReads.List(reads, owner, all with { Listener = "offline" }).Value.TotalItems, 0L, "online native binding is not counted offline");

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Crossfire.Contracts;
+using Crossfire.Kernel;
 
 namespace Crossfire.AdapterFilesystem;
 
@@ -13,7 +14,7 @@ public static class Releases
 
     public static Release Load(string directory)
     {
-        using var document = JsonDocument.Parse(PrivateFiles.ReadPublished(Path.Combine(directory, "manifest.json"), 16384));
+        using var document = WireJson.Document(PrivateFiles.ReadPublished(Path.Combine(directory, "manifest.json"), 16384));
         var manifest = document.RootElement;
         Require(Validation.Fields(manifest, ["release", "version", "artifacts"]).IsSuccess);
         var versionValue = Validation.Text(manifest.GetProperty("version"), 40); var identityValue = Validation.Text(manifest.GetProperty("release"), 65);

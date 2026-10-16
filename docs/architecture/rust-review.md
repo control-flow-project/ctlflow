@@ -1,106 +1,86 @@
 # Rust integration review
 
-Review date: 16 October 2026. Coordinated version: 0.1.20.
-Main `7378d12` was merged into `feat/rust-native-20261014` at `9e90bdf` before
-this review. Work is confined to the isolated Rust worktree; it does not deploy,
-publish packages, reset data or change peer worktrees.
+Review dates: 16–17 October 2026. Coordinated version: 0.1.20.
+Main `7378d12` is integrated into `feat/rust-native-20261014`.
 
-The owner subsequently restricted product-code edits to Rust. Node/C# product
-files, tests, assets, the C# solution and publisher match main exactly. Their
-findings are handed to the main session, not silently repaired by this fork.
+The parent session owns this branch and the final quality gate. The earlier
+Rust-only restriction no longer applies: confirmed defects are corrected in
+their Node, C# or shared owner in this PR. Other repositories, production data,
+native user histories, publication and deployment are outside this review.
 
 ## Ownership
 
-Three implementations own the same Crossfire, fleetd and Fleet products.
-Nineteen semantic package pairs match by responsibility. Shared React, external
-assertions, REST declarations, agent-tool assets and Knex migrations each have
-one owner. Rust uses native HTTP, Matrix HTTP and Diesel queries; it does not
-delegate backend requests to Node/C#.
+Node, C# and Rust implement Crossfire, fleetd and Fleet. Nineteen semantic package
+pairs match by responsibility. React, REST declarations, external assertions,
+agent-tool assets and Knex migrations each retain one shared owner. Native
+executables do not delegate backend requests to another implementation.
 
-The file review inventories all 801 Node and 525 C# owned files, including manifests,
-tests, build inputs, generated metadata and operator tools, and maps them to 591
-Rust files or explicitly shared owners. Matching paths alone do not prove
-behavior. Producer/consumer inspection and executable regressions check the
-affected decisions.
+Rust uses native HTTP, Matrix HTTP and Diesel queries. C# uses its .NET HTTP
+adapters and EF mappings; Node uses its declared adapters and Tinqer queries.
+Knex alone creates or migrates the common SQLite schema. Runtime adapters reject
+missing or unsupported schemas instead of creating a parallel data model.
 
-- [File audit and corrections](native-file-audit.md)
+The inventory covers 804 Node files, 526 C# files and 592 Rust files. It includes
+source, tests, manifests, generated metadata and build inputs. A file association
+is an ownership check, not proof of equivalent behavior.
+
+- [Per-file review and owning corrections](native-file-audit.md)
 - [Per-file ownership map](native-file-map.tsv)
-- [Shared structure and native differences](native-layout.md)
+- [Structure and native differences](native-layout.md)
 
-## Corrections after the main merge
+## Parent review corrections
 
-| Owner | Change |
+| ID | Owner and correction |
 | --- | --- |
-| Contracts and collections | Canonical decimal pagination, one-page empty collections, strict client metadata, deterministic ordering and one SQLite LIKE search rule |
-| Server HTTP | Literal trusted ingress, bounded per-client/aggregate admissions, malformed UTF-8 refusal and unchanged-state regressions |
-| Container operator | Lifetime SQLite ownership, inspect both exact identities before cleanup, shared backup/Knex/start ordering |
-| Container packages | Same bounded manifest/archive and exact-image/release checks; only --package activates a backend, with no source compilation or language fallback |
-| Native readiness/removal | Image-owned HTTP/Matrix probes and bounded exact-ID deletion; an existing removal is observed without competing stop/delete commands |
-| Operator arguments | Repeated options and noncanonical ports fail before state-lock creation or Docker; defaults obey the same port bounds |
-| Native transport | Exact binary request bytes, public/private bounds, cancellation and explicit private proxy bypass |
-| Listener statistics | Scalar-safe labels, shared runtime/session validation and atomic overflow refusal without poisoning heartbeats |
-| Native assets | Rust's Pi asset is generated from the unchanged shared extension source, not a separate runtime implementation |
-| Calendar verification | Rust derives its catalogue from the shared checksum-pinned IANA archive and reuses the canonical compiler, independent of host timezone updates |
-| Fleet CLI | Full directory pagination and invalid-command rejection before controller activation |
-| Verification wiring | Rust invokes the common assertions without editing Node/C# product implementations or removing existing assertions |
-| Documentation/distribution | Separate target guides, Rust's standalone bundled README, explicit prerequisites and factual failure boundaries |
+| RQ-001 | Canonical container source identity includes the root Cargo manifest, lock and toolchain; removes the superseded Rust-specific corrective guard |
+| RQ-002 | Strict UTF-8 and Unicode admission, including fragmented Docker output; kernel-owned whole-scalar UTF-16/UTF-8 bounds; consistent native failure journals, observations and steering excerpts |
+| RQ-003 | Declared public/private HTTP limits, exact binary bytes, explicit private no-proxy transport and minimum-one-page collection metadata |
+| RQ-004 | Bound SQLite LIKE queries without host Unicode casing; shared filter/count/order/page rules |
+| RQ-005 | Atomic telemetry admission and wire-unit-safe labels; invalid summaries cannot partially mutate counters |
+| RQ-006 | Full fleet-directory pagination and command validation before any controller activation; consistent label admission and bounded SSH socket paths |
+| RQ-007 | Resolve preceding native input before recording a new steering publication; failure/reopen tests preserve the original pending input |
+| RQ-008 | One finite removal deadline, immutable container identities and both primary/cleanup failures retained; fixtures dispose exact owned resources |
+| RQ-009 | Narrow rustls 0.23.45 to 0.23.46 security update; no audit suppression, TLS relaxation or unrelated dependency changes |
+| RQ-010 | Atomic synchronous history maintenance without claiming a query slot; ordinary browsing cannot collide with a status check |
+| RQ-011 | One shared installed/container matrix runner isolates target processes within the same finite resource slice; blocking native commands cannot starve another target's browser or heartbeat |
+| RQ-012 | Build a label-only derivative instead of snapshotting an unused container; use the existing five-minute artifact-preparation budget, retain 30-second metadata probes and all archive import/readiness assertions |
+| RQ-013 | Distribute the complete operator/backend Cartesian product across its owning target workers; verify all 16 unique pairs once instead of repeating them 64 times under the same one-hour target budget |
+| RQ-014 | Own Docker capture deadlines in the command adapter; remove caller-specific overrides and retain operation names on failures |
+| RQ-015 | Native acceptance waits for each independent WebSocket notification before asserting exact-once delivery; sender-lookup acceptance controls business time separately from I/O and observes explicit polling barriers rather than racing maintenance |
+| RQ-016 | Stop is a lifecycle mutation, not a metadata read; cancellation and normal exit use one stop/removal owner with one overall 120-second deadline, retaining the 15-second graceful stop and complete launcher teardown |
 
-No obsolete handlers, alternate state readers, runtime migrations or silent
-model/backend substitutions are retained. Necessary forward data conversion
-remains separate from runtime admission.
+The shared TLS fixture uses a distinct authority and CA:FALSE server certificate.
+It has one service-owned test-support export. Native certificate, chain and
+hostname validation stays enabled. The two verification coordinators share one
+short, private, identity-checked fixture-root allocator; waiting for real native
+I/O does not advance the listener test's controlled maintenance clock.
 
-## Verification
+The complete verification record, including failed attempts and final gate
+outcomes, is maintained separately. Earlier scoped passes are historical
+evidence, not final four-target certification.
 
-Current Rust-only evidence passes architecture, type checking, formatting,
-warnings-denied Clippy, 265 tests in 136 compiled targets, 2,072 Node/Rust calendar
-comparisons, bidirectional SQLite/journal/lock proofs, actual Conduit authority
-and Linux x64 release packaging. Actual Codex and Pi adapter tests use inert
-providers. All 58 installed-product assertions now pass, including real daemon
-delivery, steering, restart, CLI/SSH and browser scenarios. The common fixture
-now uses a CA:FALSE server certificate signed by a distinct test authority;
-strict native certificate, hostname and chain validation remains enabled.
+The parent full gate passes on all four targets, including actual container
+recovery and shared Knex migrations. The linked parent record defines the tested
+platform, native-runtime scope, resource bounds and remaining dependency limits.
 
-The subsequent isolated parser change passes warnings-denied Clippy, six native
-checks, the five shared CLI checks against the compiled release, and type
-checking. Thirty-two root tooling regressions and checks of 65 current Markdown
-guides pass. The complete gate and final targeted results are recorded in the
-dated integration report; earlier failed runs are not substituted for it.
-
-All 32 actual-container assertions pass. Actual Knex migrations pass schemas
-0/13/17 and reject future 18 on an unchanged isolated retry. The first full
-run remains failed: Docker exceeded the Node-owned exact-container cleanup
-deadline after correctly rejecting schema 18. Its cleanup failure and retained
-primary cause are handed to the owning session, not hidden by the retry.
-
-The final main merge adds SYM-001/002/003. It changes no Rust runtime source or
-shared operator assertions relative to the verified Rust checkpoint. The merged
-build, validation and shared operator wiring receive focused verification.
-
-The scoped command is `npm run verify:rust -- /absolute/new-evidence-directory`
-inside a finite 16 GiB, zero-swap, 2,048-task scope. It retains the failed outcome
-and exits nonzero; an unsuccessful gate is not certification. This Rust-only
-scope does not rerun or certify all four target combinations. The main session
-owns remaining Node/C# findings and the final four-target `verify:parity` run.
-
-- [Current integration evidence and remaining owner findings](../../.analysis/20261016-rust-main-integration/verification.md)
-
-- [Main-session findings and preserved proposals](../../.analysis/20261016-node-csharp-findings/README.md)
-
-- [Executable scenario coverage](../verification/shared-contracts.md)
-- [Earlier 15 October evidence; not current-source certification](../verification/20261015-rust-integration.md)
+- [Parent quality gate and findings](../verification/20261016-rust-quality-gate.md)
+- [Executable shared scenario coverage](../verification/shared-contracts.md)
+- [Earlier Rust-only integration evidence](../../.analysis/20261016-rust-main-integration/verification.md)
+- [Earlier 15 October evidence](../verification/20261015-rust-integration.md)
 
 ## Limits
 
-The current distributions target Linux x64. Tests use actual Codex/Pi engines
-with inert providers and actual pinned Conduit. They do not establish paid-model
-quality, every subprocess failure, sustained-load capacity or other platforms.
-The .NET 11/EF pins remain previews with visible NativeAOT diagnostics.
+The current native distributions target Linux x64. Tests use actual pinned
+Codex/Pi engines with inert providers and actual pinned Conduit. They do not
+establish paid-model quality, sustained-load capacity, every power-loss boundary
+or unselected platforms. The .NET 11/EF pins are previews; NativeAOT dependency
+diagnostics remain visible.
 
 Rust's packaged Linux guard observes the exact controller lifetime and terminates
-its owned native group. Node/C# can retain a native writer after SIGKILL and
-refuse a competing writer through the native lock. Tools that escape their group
-are outside the guard's protection. Documentation distinguishes these concrete
-target behaviors instead of claiming parent-death handling is impossible.
+its owned process group. Node/C# can retain a native writer after SIGKILL and
+refuse a competing writer through the native lock. A subprocess that deliberately
+escapes its group is outside the guard's protection. These are documented native
+target differences, not competing backends or a universal crash guarantee.
 
-Local package creation and passing fixtures are not publication or deployment.
-The authorized deliverable is one pushed non-main branch for manual PR creation.
+The deliverable is one non-main branch prepared for manual PR creation.
+Local builds and passing fixtures are not publication or deployment.

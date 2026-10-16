@@ -1,3 +1,4 @@
+import { truncateUtf16 } from '@ctlflow/crossfire-kernel/text';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
@@ -49,7 +50,7 @@ export async function createListenerHost() {
         response.end(JSON.stringify({ ...status, test: await binding.diagnose() }));
       } else response.end(JSON.stringify(status));
     } catch (error) {
-      const message = error instanceof Error ? error.message.slice(0, 1024) : 'Listener control failed';
+      const message = error instanceof Error ? truncateUtf16(error.message, 1024) : 'Listener control failed';
       response.writeHead(400).end(JSON.stringify(queryAction ? failure('unavailable', message) : { error: message }));
     } finally { inFlight--; }
   });

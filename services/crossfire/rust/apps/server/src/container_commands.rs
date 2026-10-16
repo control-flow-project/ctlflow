@@ -34,6 +34,18 @@ pub fn resources(parent: Option<&str>) -> Result<Vec<String>> {
         )),
     }
 }
+pub fn capture_timeout(args: &[String]) -> Duration {
+    Duration::from_secs(
+        if matches!(
+            args.first().map(String::as_str),
+            Some("create" | "stop" | "rm")
+        ) {
+            120
+        } else {
+            30
+        },
+    )
+}
 pub async fn captured(
     args: &[String],
     workspace: &Path,
@@ -42,10 +54,20 @@ pub async fn captured(
     capture(
         &command(args, workspace),
         65536,
-        Duration::from_secs(30),
+        capture_timeout(args),
         stop,
     )
     .await
+    .map_err(|error| {
+        Failure::new(
+            error.code,
+            format!(
+                "Docker {} failed: {}",
+                args.first().map(String::as_str).unwrap_or("command"),
+                error.message
+            ),
+        )
+    })
 }
 pub async fn image(tag: &str, workspace: &Path, stop: CancellationToken) -> Result<bool> {
     Ok(captured(

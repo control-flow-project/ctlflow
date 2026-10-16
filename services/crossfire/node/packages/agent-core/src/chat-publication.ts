@@ -103,8 +103,8 @@ export function chatPublication(options: { storage: LocalState; file: string; se
         if (remaining.length !== events.length) {
           replace(index, step, remaining); index--; continue;
         }
-        step.session = target.sessionId; step.status = 'publishing'; save();
         if (options.priority) await target.settle(signal);
+        step.session = target.sessionId; step.status = 'publishing'; save();
         await target.deliver(step.text, step.id, signal, options.priority);
         step.status = 'delivered'; save(); options.count(events.filter(event => event.type === 'm.room.message').length);
         options.traffic(events);

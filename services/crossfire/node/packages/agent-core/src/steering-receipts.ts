@@ -1,3 +1,4 @@
+import { truncateUtf16 } from '@ctlflow/crossfire-kernel/text';
 import type { ReceivedEvent } from './receive.js';
 
 export type SteeringStage = 'received' | 'interrupted' | 'already-idle' | 'accepted' | 'superseded' | 'failed';
@@ -14,7 +15,7 @@ export function steeringReceipts(now: () => number, notice: (id: string, text: s
     const text = label + '\n' + JSON.stringify({ eventId: event.event_id, source: event.origin, roomId: event.room_id,
       sender: event.sender, sentAt: event.timestamp, receivedAt: first === null ? null : new Date(first).toISOString(), stageAt: new Date(at).toISOString(),
       sinceReceiptMs: first === null ? null : Math.max(0, at - first), sinceSentMs: sent === null ? null : Math.max(0, at - sent),
-      ...(stage === 'received' ? { message: String(event.content.body).slice(0, 3000) } : {}), ...(detail ? { detail: detail.slice(0, 3000) } : {}) });
+      ...(stage === 'received' ? { message: truncateUtf16(String(event.content.body), 3000) } : {}), ...(detail ? { detail: truncateUtf16(detail, 3000) } : {}) });
     notice(JSON.stringify(['steering', key, stage]), text);
     if (stage === 'accepted' || stage === 'superseded') received.delete(key);
   };

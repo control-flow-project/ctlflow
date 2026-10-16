@@ -11,6 +11,7 @@ import { deliveryEvents, resolveSenders } from '@ctlflow/crossfire-agent-core/se
 import { success } from '@ctlflow/crossfire-kernel/result';
 import type { PrincipalIdentity } from '@ctlflow/crossfire-contracts/schema/response';
 import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, SELF, temporary, until } from './test-support/listener.js';
+import { withClock } from './test-support/clock.js';
 
 test('delivery batches carry one verified entry per emitted sender, with exact byte accounting and no self-chat metadata', async scope => {
   const fixture = await matrixFixture(scope, temporary(scope));
@@ -82,22 +83,26 @@ test('sender resolution retains its exact request while the independent receiver
   assert.deepEqual(data.senders, { [OBSERVER]: { kind: 'human', display_name: null, relationship: 'owner' } });
 });
 
-test('idle and blocked traffic perform no sender lookups; authorized delivery includes buffered verified ownership', async scope => {
-  const native = await fakeCodex(scope), fixture = await matrixFixture(scope, native.directory), stop = new AbortController();
+test('idle and blocked traffic perform no sender lookups; authorized delivery includes buffered verified ownership', withClock(async (scope, clock) => {
+  const native = await fakeCodex(scope), fixture = await matrixFixture(scope, native.directory, clock), stop = new AbortController();
   fixture.waking.policy = 'selected'; fixture.waking.senders = [OBSERVER];
   const receiving = listen({ ...fixture, reconcileMs: 1000, limit: 20, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
   cleanup(scope, async () => { stop.abort(); await receiving; });
-  await until(() => fixture.waiting() === 1);
+  await clock.observe(() => fixture.waiting() === 1);
+  const syncs = fixture.requests.filter(request => request.path.endsWith('/sync')).length;
   fixture.add(ROOM, message('$peer', '@agent-holmes:test.localhost', 'Buffered peer context'));
-  await until(() => fixture.requests.filter(request => request.path.endsWith('/sync')).length >= 3);
+  await clock.observe(() => fixture.requests.filter(request => request.path.endsWith('/sync')).length >= syncs + 1 && fixture.waiting() === 1);
+  await clock.advance(100);
+  await clock.observe(() => fixture.requests.filter(request => request.path.endsWith('/sync')).length >= syncs + 2 && fixture.waiting() === 1);
   assert.equal(fixture.requests.filter(request => request.path === '/api/principal-resolutions').length, 0);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
   fixture.add(ROOM, message('$owner', OBSERVER, 'One authorized task'));
-  await until(() => native.requests().some(request => request.method === 'turn/start'));
+  await clock.observe(() => native.requests().some(request => request.method === 'turn/start'));
   const input = native.requests().find(request => request.method === 'turn/start')!.params!.input as { text: string }[];
   const data = JSON.parse(input[0]!.text.split('\n').slice(1).join('\n'));
   assert.deepEqual(data.senders, { '@agent-holmes:test.localhost': { kind: 'agent', owner: OBSERVER, display_name: null, owner_display_name: null, relationship: 'owners-agent' },
     [OBSERVER]: { kind: 'human', display_name: null, relationship: 'owner' } });
   assert.deepEqual(data.events.map((event: { event_id: string }) => event.event_id), ['$peer', '$owner']);
-  assert.equal(fixture.requests.filter(request => request.path === '/api/principal-resolutions').length, 1);
-});
+  const resolutions = fixture.requests.filter(request => request.path === '/api/principal-resolutions');
+  assert.equal(resolutions.length, 1, JSON.stringify(resolutions.map(request => request.body)));
+}));

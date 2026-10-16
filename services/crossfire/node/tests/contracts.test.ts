@@ -7,6 +7,9 @@ import { agents as agentFilters } from "@ctlflow/crossfire-contracts/schema/quer
 import { page } from "@ctlflow/crossfire-contracts/schema/query";
 import { memberChange } from '@ctlflow/crossfire-contracts/schema/request';
 import { owner } from '@ctlflow/crossfire-contracts/schema/response';
+import * as validation from '@ctlflow/crossfire-contracts/schema/validation';
+import { json } from '@ctlflow/crossfire-contracts/matrix';
+import { truncateUtf16, truncateUtf8 } from '@ctlflow/crossfire-kernel/text';
 
 
 test("native room identities remain opaque, including version 12 IDs", () => {
@@ -15,6 +18,38 @@ test("native room identities remain opaque, including version 12 IDs", () => {
   assert.equal(roomId("!native:example.org"), true);
   for (const invalid of ["", "!", "room", "!room id", "!room\n"]) assert.equal(roomId(invalid), false);
   assert.equal(deliveryGrant({ roomId: room, accessMode: "read", powerLevel: null, muted: false }).ok, true);
+});
+
+test('portable text rejects unpaired surrogates without replacement and truncates whole characters', () => {
+  for (const value of ['\ud800', '\udfff', 'before\ud800after', '\ud800🚀']) {
+    assert.equal(validation.text()(value).ok, false);
+    assert.equal(validation.plainText(8192)(value).ok, false);
+    assert.equal(validation.matrixUserId('@' + value + ':example.test').ok, false);
+    assert.equal(validation.roomId('!' + value).ok, false);
+    assert.equal(validation.eventId('$' + value).ok, false);
+    assert.equal(json(value), false);
+    assert.equal(json({ [value]: true }), false);
+    assert.throws(() => truncateUtf16(value, 1));
+    assert.throws(() => truncateUtf8(value, 1));
+  }
+  for (const value of ['東京', '🚀', 'a🚀b', 'é\u0301']) {
+    assert(validation.text()(value).ok);
+    assert(validation.plainText(8192)(value).ok);
+    assert(json(value));
+  }
+  assert.equal(truncateUtf16('a🚀b', 2), 'a');
+  assert.equal(truncateUtf16('a🚀b', 3), 'a🚀');
+  assert.equal(truncateUtf16('🚀', 0), '');
+  assert.equal(truncateUtf16('🚀', 1), '');
+  assert.equal(truncateUtf16('🚀', 2), '🚀');
+  for (const [value, maximum, expected] of [['a🚀b', 4, 'a'], ['a🚀b', 5, 'a🚀'], ['éé', 3, 'é'], ['東京', 5, '東'], ['🚀', 0, ''], ['🚀', 4, '🚀']] as const) {
+    assert.equal(truncateUtf8(value, maximum), expected);
+    assert(Buffer.byteLength(truncateUtf8(value, maximum)) <= maximum);
+  }
+  for (const maximum of [-1, 0.5, Infinity, NaN]) {
+    assert.throws(() => truncateUtf16('valid', maximum));
+    assert.throws(() => truncateUtf8('valid', maximum));
+  }
 });
 
 test('room authority and observations distinguish immutable creators from finite power levels', () => {

@@ -116,9 +116,9 @@ pub(crate) fn facts(events: &[StateEvent], user: &str, room: &str) -> Result<Roo
         .and_then(Value::as_str);
     Ok(RoomFacts {
         room_id: room.to_owned(),
-        name: validation::truncate_utf16(name, 255).to_owned(),
-        topic: validation::truncate_utf16(topic, 4096).to_owned(),
-        alias: alias.map(|alias| validation::truncate_utf16(alias, 255).to_owned()),
+        name: crossfire_kernel::text::truncate_utf16(name, 255).to_owned(),
+        topic: crossfire_kernel::text::truncate_utf16(topic, 4096).to_owned(),
+        alias: alias.map(|alias| crossfire_kernel::text::truncate_utf16(alias, 255).to_owned()),
         matrix_user_id: user.to_owned(),
         power: if creator {
             RoomPower::Creator

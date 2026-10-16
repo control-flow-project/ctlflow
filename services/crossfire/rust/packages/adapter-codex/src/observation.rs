@@ -1,7 +1,7 @@
 use crate::{protocol::Event, usage};
 use crossfire_agent_core::runtime::{Hooks, ObservationEvent};
-use crossfire_contracts::validation::truncate_utf16;
 use crossfire_domain::runtime::values::{Runtime, Setting, State};
+use crossfire_kernel::text::truncate_utf8;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
@@ -186,7 +186,7 @@ impl<H: Hooks> Observer<H> {
             &tracking,
             session,
             value,
-            message.map(|value| truncate_utf16(value, 4000).to_owned()),
+            message.map(|value| truncate_utf8(value, 4000).to_owned()),
         )?;
         drop(tracking);
         self.hooks.observe(event);
@@ -330,7 +330,7 @@ impl<H: Hooks> Observer<H> {
                 let error = match field(turn, "error")? {
                     Value::Null => None,
                     value => {
-                        Some(truncate_utf16(string(object(value)?, "message")?, 4000).to_owned())
+                        Some(truncate_utf8(string(object(value)?, "message")?, 4000).to_owned())
                     }
                 };
                 state.streamed.clear();

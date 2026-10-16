@@ -17,7 +17,7 @@ test("one bounded reconciliation receiver recovers missed notifications and impo
   const stop = new AbortController();
   const result = listen({ ...matrix, reconcileMs: 1000, limit: 2, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
   cleanup(scope, async () => { stop.abort(); await clock.complete(result); });
-  await clock.until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
+  await clock.observe(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
   const before = readJson(matrix.cursorFile);
   matrix.syncUpdates.enabled = false;
   matrix.add(ROOM, message("$missed"), { ...message("$rename", OBSERVER), type: "m.room.name", state_key: "", content: { name: "Coffee Day" } },

@@ -131,9 +131,10 @@ Credential refresh copies only the selected model/provider configuration and
 login, never unrelated MCP servers, profiles or host permission overrides.
 Every native activation refreshes that login; removing host login removes the
 stale native copy. Corrupt/public/hard-linked/symlinked private state fails closed.
-Rust HTTP/WebSocket transports explicitly avoid proxy-mediated private traffic.
-The Node/C# findings are tracked separately; structural alignment does not imply
-that every implementation has passed the same current behavioral checks.
+Private HTTP/WebSocket transports explicitly avoid ambient proxies in every
+implementation. The parent review corrects confirmed defects in their owning
+Node, C# or Rust modules. Structural alignment is checked separately from the
+four-target behavioral and packaging gates; neither substitutes for the other.
 
 ## Architecture and verification gates
 

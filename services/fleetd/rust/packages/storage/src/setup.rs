@@ -230,7 +230,7 @@ impl Setup {
             let name = generated_name(project, digest);
             let roster = json!({"fleet":name,"coordination":{"adapter":"crossfire","server":input.descriptor.server,"owner":input.descriptor.owner},"instances":[{"key":name,"name":name,"definition":"project","workarea":format!("agents/project/workarea/{name}"),"workspace":input.workspace}]});
             staging.write_new("runtime.toml", configuration::format(&roster)?.as_bytes())?;
-            let definition = json!({"name":project.chars().take(100).collect::<String>(),"runtime":"codex","runtime_options":{"sandbox_mode":"danger-full-access","approval_policy":"on-request","dangerously_bypass_approvals_and_sandbox":false}});
+            let definition = json!({"name":crossfire_kernel::text::truncate_utf16(project, 100),"runtime":"codex","runtime_options":{"sandbox_mode":"danger-full-access","approval_policy":"on-request","dangerously_bypass_approvals_and_sandbox":false}});
             role.write_new("agent.toml", configuration::format(&definition)?.as_bytes())?;
             role.write_new("AGENTS.md", b"Work in the configured project workspace. Follow its instructions and the authorized human requests. This is a separate fleet-managed agent; the coding session performing setup is not your conversation.\n")?;
             projects.publish_directory(&staging_name, digest)

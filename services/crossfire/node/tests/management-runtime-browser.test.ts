@@ -9,7 +9,7 @@ import { createClient } from '@ctlflow/crossfire-client/client';
 import { failure } from '@ctlflow/crossfire-kernel/result';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
-import { browserOptions } from './support/tls.js';
+import { browserOptions } from '@ctlflow/crossfire-test-support/tls';
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { nativeServer } from './support/native-server.js';
 import { mapFleet } from './support/map-fleet.js';

@@ -13,7 +13,7 @@ export default function piExtension(pi              )       {
     pending = null;
   });
   pi.registerCommand('crossfire-control', { description: 'Private fleet adapter control; not a conversation command', async handler(arguments_, context) {
-    const request          = JSON.parse(Buffer.from(arguments_, 'base64url').toString('utf8'));
+    const request          = JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(Buffer.from(arguments_, 'base64url')));
     if (!request || typeof request !== 'object' || Array.isArray(request) || !('id' in request) || typeof request.id !== 'string'
       || !('operation' in request) || typeof request.operation !== 'string') throw new Error('Invalid private control');
     const value = request                           ;

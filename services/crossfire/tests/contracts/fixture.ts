@@ -13,7 +13,7 @@ import { decodeResponse, decodeFailure } from '@ctlflow/crossfire-contracts/rest
 import type { Parser } from '@ctlflow/crossfire-contracts/schema/validation';
 import { conduitFixture } from '../../node/scripts/architecture-proof/conduit-fixture.js';
 import { builtRelease } from '../../node/scripts/test-support/release.js';
-import { secureProxy } from './tls.js';
+import { secureProxy } from '@ctlflow/crossfire-test-support/tls';
 
 type ContractOperation = { method: string; path: string; status: number; collection: boolean; output: Parser<unknown> };
 export type ContractSession = { nativeToken: string; cookie: string; csrf: string; matrixUserId: string; memberId: string };

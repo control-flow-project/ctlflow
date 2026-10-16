@@ -19,7 +19,6 @@ public static class Commands
         if (input.Has("root") && input.Has("remote")) throw new CommandFailure("Select a local root or a remote, not both"); var remote = input.Option("remote") is { } selected ? settings.Remotes.FirstOrDefault(value => value.Name == selected) ?? throw new CommandFailure("Remote connection not found") : null;
         var root = remote?.Root ?? (input.Option("root") is { } local ? Path.GetFullPath(local) : settings.LocalRoot) ?? throw new CommandFailure("Select --root DIRECTORY or --remote NAME");
         if (words[0] == "daemon" && words.ElementAtOrDefault(1) == "start") { if (remote is not null || words.Count != 2) throw new CommandFailure("Start the controller locally on its computer"); var status = await DaemonLauncher.Launch(root, input.Option("name"), clock, cancellation); Connections.Save(settings with { LocalRoot = root }); Output(status); return; }
-        if (words[0] == "start" && words.Count != 2 || words[0] == "agent" && words.ElementAtOrDefault(1) == "start" && words.Count != 4) throw new CommandFailure(Usage);
         if (remote is null && (words[0] == "start" || words[0] == "agent" && words.ElementAtOrDefault(1) == "start")) await DaemonLauncher.Launch(root, null, clock, cancellation);
         await using var tunnel = remote is null ? null : Value(await SshTunnel.Open(remote.Ssh, root, clock, cancellation)); using var client = new Client(tunnel?.Socket ?? Path.Combine(root, "fleetd.sock"));
         if (words[0] == "daemon")

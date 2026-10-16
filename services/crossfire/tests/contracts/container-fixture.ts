@@ -8,7 +8,7 @@ import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { contractProcess, freePorts, observe, record, text, type ContractProcess, type ContractTarget } from '@ctlflow/crossfire-test-support/contract-process';
 import { contractHttp } from '@ctlflow/crossfire-test-support/contract-http';
-import { secureProxy } from './tls.js';
+import { secureProxy } from '@ctlflow/crossfire-test-support/tls';
 import { builtRelease } from '../../node/scripts/test-support/release.js';
 import { contractClient } from './fixture.js';
 
@@ -47,7 +47,7 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
   }
   cleanup(scope, close);
   function launch(target: ContractTarget, packageDirectory = join(packages, target.name)) {
-    return contractProcess(scope, target.server, ['start', '--directory', state, '--package', packageDirectory, '--port', String(port), '--content-port', String(contentPort), '--cgroup-parent', parent!], directory, process.env, 180000);
+    return contractProcess(scope, target.server, ['start', '--directory', state, '--package', packageDirectory, '--port', String(port), '--content-port', String(contentPort), '--cgroup-parent', parent!], directory, process.env, 300000);
   }
   async function start(target: ContractTarget, packageDirectory = join(packages, target.name)) {
     selected = target; running = launch(target, packageDirectory);

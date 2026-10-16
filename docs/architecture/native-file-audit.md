@@ -1,74 +1,71 @@
 # Native implementation file audit
 
-Baseline: main `7378d12`, integrated on the isolated Rust branch at `9e90bdf`.
-This review extends the earlier package-level assessment with per-file coverage.
-Current verification is recorded separately from historical results.
+Baseline: main `7378d12`, integrated on the isolated Rust feature branch.
+The parent review includes confirmed fixes in every affected Crossfire owner.
+No other repository or deployed data is changed.
 
-## File coverage
+## Coverage
 
-The accompanying [per-file map](native-file-map.tsv) lists every Node/C# file,
-its semantic Rust/shared owner and disposition. Running
-`node scripts/native-file-inventory.mjs` reads each complete file and emits its content
-identity, declarations, size and association. Structure verification rejects
-unclassified packages and missing counterparts. This is an inventory, not a
-claim that static association proves functional equivalence.
+The [per-file map](native-file-map.tsv) lists every Node/C# file, its semantic
+Rust/shared owner and disposition. `node scripts/native-file-inventory.mjs`
+reads each complete file and emits its identity, declarations, size and owner.
+Structure verification rejects unclassified packages, missing counterparts and
+stale maps. Association alone does not prove functional equivalence.
 
-| Product | Node files | C# files | Scope |
+| Product | Node files | C# files | Coverage |
 | --- | ---: | ---: | --- |
-| Crossfire | 702 | 476 | Server, domain, contracts, adapters, query/mapping code, assets, tests, operators and build |
-| fleetd | 74 | 37 | Daemon, lifecycle, execution composition, persisted state, setup and tests |
+| Crossfire | 705 | 477 | Server, domain, contracts, adapters, queries, assets, tests, operators and build |
+| fleetd | 74 | 37 | Daemon, lifecycle, execution composition, state, setup and tests |
 | Fleet | 25 | 12 | CLI, daemon client, setup, SSH, packaging and tests |
-| Total | 801 | 525 | 1,326 files, with no source/test/manifest/guide exclusions |
+| Total | 804 | 526 | 1,330 files, with no source/test/manifest/guide exclusions |
 
-The source review follows producers through consumers rather than treating matching
-filenames as proof: configuration/validation; authorization/transactions;
-filter/count/order/page/hydration; input/receipt/restart; process/lock/cleanup;
-and declaration/generator/package/container. Public behavior is then exercised
-through one external assertion bank. This fork now edits Rust product code only;
-Node/C# differences are recorded for the main session rather than changed here.
+These owners map to 592 Rust files or explicit shared assets. Review follows
+configuration/validation, authorization/transactions, filter/count/order/page,
+input/receipt/restart, process/lock/cleanup and declaration/generator/package
+paths. Public behavior uses one external assertion bank.
 
-## Corrected differences
+## Owning corrections
 
-| Finding | Correct owning change | Verification |
+| Area | Current model | Verification |
 | --- | --- | --- |
-| Rust retained permissive numeric pagination and zero-page empty collections | Canonical decimal parser shared by REST/daemon; every empty-page producer and native-client validator agree | Boundary unit tests and shared public/private pagination |
-| Rust retained the old client-only limiter | Explicit trusted peers, mapped-IP normalization, exact forwarding header, independent per-client/global budgets, bounded expiry and native/REST error headers | Controlled-time unit tests and real TLS ingress contracts |
-| Rust operator had no cross-language lifetime lock or orphan reconciliation | Same SQLite operator lock; inspect both names before changing either; exact labels/IDs; confirmed stop/removal before backup/Knex/start | Native command checks and actual concurrent/crashed/container-orphan contracts |
-| Main replaced source-built activation with transferable packages | Rust verifies the bounded manifest/archive, imports missing exact images, validates platform/release labels and only then reconciles writers | Shared actual export/import, corrupt archive, mismatched label, image-owned health and operator/orphan assertions |
-| Native readiness and asynchronous deletion needed the same explicit owners | Header-only native health probes and bounded exact-ID state observation; an already-removing container is not stopped/deleted again | Real HTTP response/cancellation tests, subprocess transition tests and actual Docker removal |
-| SYM-001/002 define canonical operator arguments | Rust rejects repeated options and every noncanonical port before the instance lock or Docker; configured defaults receive the same bounds | Same shared operator assertions as the concurrent Node/C# fix, against the compiled Rust release; default-port unit regression |
-| SYM-003 forbids native aborts for operator input failures | Rust's existing entrypoint returns normal exit code 1 with a stderr diagnostic; merged C# now follows that rule | Identical strict signal/status assertions; no signal allowance or target-specific expected result |
-| Search compilers produced different predicates; directory order and active filters also differed | Rust uses bound SQLite LIKE, no host Unicode normalization, canonical creation-time/ID order and active identity fences | Rust repository checks and shared agent/discovery/fleet/wake/report assertions; other adapters remain the main session's responsibility |
-| Invitation/enrollment equal-time tie order differed | Reference ascending ID tie-breaker | Query owner review plus integration/repository gates |
-| Native HTTP client lacked declared binary upload | One bounded HTTP implementation for JSON and exact binary bytes; common operation/auth/error owner | Actual HTTP binary, invalid-kind, size, cancellation and metadata checks |
-| Native client defaults differed and ambient proxies could affect private traffic | Rust has explicit public/private bounds and no ambient proxy path | Real HTTP under a rejecting forced proxy plus native transport gates; C# changes deferred |
-| Rust catalogue generation depended on host timezone data | Derive the catalogue from the shared checksum-pinned archive and reuse the canonical compiler; no second pin or host-data compiler | Catalogue rejection tests, generated-table check and 2,072 calendar comparisons while host tzdata has a different version |
-| Some other implementations substitute malformed UTF-8 | Rust retains fatal decoding and refuses malformed HTTP JSON without changing state | Rust corrupt-file/boundary checks; Node/C# proposals preserved but not applied |
-| Fleet label Unicode bounds differed | One UTF-16 length/C0/DEL contract in daemon inputs/domain | Shared actual-daemon Unicode cases |
-| Rust could activate a controller for malformed start syntax | Validate before launch | Identical installed CLI negative case |
-| Rust telemetry labels were unbounded | Scalar-safe truncation, bounded summary labels and atomic count admission without a runtime activation whitelist | Rust collector tests exercise Unicode/empty/control labels, adapter-neutral usage and overflow preservation; Node/C# proposals deferred |
+| Pagination | Canonical decimal parameters, bounded collection metadata, one page for empty collections, full CLI directory traversal | Native boundary tests and shared public/private/installed CLI contracts |
+| Public HTTP | Explicit trusted ingress, mapped-IP normalization, independent per-client/global budgets, bounded expiry | Controlled-clock tests and real TLS ingress contracts |
+| Wire data | Fatal UTF-8 decoding, rejection of unpaired Unicode values/keys and whole-scalar bounds in the correct wire unit | Corrupt-file/native JSON tests, shared unchanged-state assertions and receipt/journal regressions |
+| Native HTTP | Explicit public/private bounds, exact binary uploads, cancellation and private no-proxy transport | Real rejecting-proxy positive control and request/metadata boundary tests |
+| Queries | Bound SQLite LIKE without host case folding; identical filters, creation/ID ordering and page counts | Repository tests and shared agent/discovery/fleet/wake/report scenarios |
+| State | Shared Knex-created schema, runtime validation, transactional rollback and same-file interoperability | Bidirectional SQLite, journal, lock and actual migration proofs |
+| Steering | Predecessor settlement precedes recording a new publication; input and exact history remain recoverable | Fault/reopen recovery and installed native runtime tests |
+| History inspection | Synchronous maintenance never claims an active query slot; real unread ownership remains exclusive | Deterministic mutex/lease regression and unchanged four-target room/global history contracts |
+| Telemetry | Atomic bounded summaries; safe labels; invalid input does not poison counters or heartbeats | Cross-language collector and overflow regressions |
+| Lifecycle | Fleetd alone owns execution; saved history, explicit operation identity and native writer locks | Actual Codex/Pi inert-provider, restart, terminal, steering and process-group proofs |
+| Operator | One SQLite lifetime lock, inspect both exact container identities, ordered backup/Knex/start | Concurrent/crashed/operator-orphan and installed container assertions |
+| Removal | One finite 120-second removal budget; observe in-progress deletion; retain primary and cleanup errors | Injected dual-failure tests and real Docker/Knex scenarios |
+| Packaging | Immutable source/image/release identity, bounded manifests/archives, no source-built activation fallback | Fingerprint mutation, export/import, corrupt archive and mismatched-label tests |
+| Calendar | Shared checksum-pinned IANA archive and canonical compiler, independent of host timezone data | Generated-table checks and cross-target calendar comparisons |
+| Dependency security | Narrow patched rustls lock entry; strict TLS remains enabled | RustSec audit without ignored advisories plus native HTTP/runtime tests |
+| Fixtures | One TLS owner and one short private verification-root allocator; controlled time separate from native I/O observation | Fixture ownership/socket-budget/cleanup and clock regressions |
 
-## Deliberate native structure
+## Native structure
 
-General ownership matches [the layout](native-layout.md). Native-specific process,
-HTTP, TOML and ORM primitives stay in their adapters. Rust tests sit beside their
+General ownership follows [the layout](native-layout.md). Native process, HTTP,
+TOML and ORM primitives stay in their adapters. Rust tests sit beside their
 crate; C# tests retain managed/AOT projects and Node uses isolated test files.
-The EF design-time compiler is not a missing Rust feature: Diesel metadata comes
-from the same Knex-created schema through its own generator. No artificial EF
-compiler copy, empty directory or target-specific migration/UI owner is added.
 
-The JavaScript agent tool, Pi extension, optional operator tooling and common
-contract fixtures remain single shared assets, not missing native ports. Native
-executables never invoke Node/C# as backend fallback. The Rust parent pidfd guard
-is an explicit process-adapter primitive; its scope is recorded in the runtime
-review, not extended into an unsupported arbitrary-subprocess guarantee.
+The EF design-time compiler is not a missing Rust feature: Diesel metadata is
+generated from the common Knex-created schema. No empty EF counterpart, second
+migration owner or target-specific UI is introduced.
 
-## Verification state
+JavaScript agent-tool assets, the Pi extension, optional operator tools and
+external contract fixtures have one shared owner. Native executables do not
+invoke another language backend as a fallback. The Linux parent pidfd guard is
+a process-adapter primitive, not arbitrary-subprocess containment.
 
-Current internal, packaging and installed native setup checks pass. The common
-external TLS fixture now owns a separate authority and valid server leaf;
-native certificate verification is unchanged. See [the Rust review](rust-review.md) for current results
-and [the main-session handover](../../.analysis/20261016-node-csharp-findings/README.md)
-for excluded fixes. Earlier cross-target results used source that has since been
-restored and are not final-source certification. No deployment or publication is
-implied.
+## Evidence
+
+Current-source verification and failed-attempt diagnoses are recorded in the
+parent quality-gate report. Historical Rust-only passes do not replace the
+complete four-target gate. No deployment, registry publication or paid-provider
+certification is implied.
+
+- [Parent quality gate](../verification/20261016-rust-quality-gate.md)
+- [Integration review and native limits](rust-review.md)

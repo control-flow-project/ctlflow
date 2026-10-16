@@ -8,16 +8,25 @@ function pinnedImage(): string {
   if (!image) throw new Error('Pinned Element image is missing');
   return image;
 }
-export function prepareElementAssets(): void {
+type DockerCommand = (arguments_: string[], timeout: number) => string;
+const command: DockerCommand = (arguments_, timeout) => execFileSync('docker', arguments_, { encoding: 'utf8', timeout });
+export function prepareElementAssets(run: DockerCommand = command): void {
   const image = pinnedImage(), root = join(process.cwd(), 'dist/test-assets');
   mkdirSync(root, { recursive: true });
-  const container = execFileSync('docker', ['create', image], { encoding: 'utf8', timeout: 60000 }).trim();
+  const container = run(['create', image], 60000).trim();
+  if (!/^[a-f0-9]{64}$/u.test(container)) throw new Error('Docker returned an invalid Element fixture identity');
   const destination = join(root, 'element');
+  let primary: { error: unknown } | undefined;
   try {
     mkdirSync(destination, { mode: 0o700 });
-    execFileSync('docker', ['cp', container + ':/app/.', destination], { timeout: 60000 });
+    run(['cp', container + ':/app/.', destination], 60000);
+  } catch (error) { primary = { error }; }
+  try { run(['rm', container], 120000); }
+  catch (error) {
+    if (primary) throw new AggregateError([primary.error, error], 'Element fixture extraction and cleanup failed');
+    throw error;
   }
-  finally { execFileSync('docker', ['rm', container], { timeout: 30000 }); }
+  if (primary) throw primary.error;
   writeFileSync(join(root, 'element-image'), image);
 }
 export function elementAssets(): string {

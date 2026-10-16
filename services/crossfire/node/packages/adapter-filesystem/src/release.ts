@@ -1,3 +1,4 @@
+import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
 import { createHash } from "node:crypto";
 import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { join } from "node:path";
@@ -32,7 +33,7 @@ function read(path: string, maximum: number): Buffer {
 
 export function loadRelease(directory: string) {
   const bytes = read(join(directory, "manifest.json"), 16 * 1024);
-  const result = manifest(JSON.parse(bytes.toString("utf8")) as unknown);
+  const result = manifest(JSON.parse(decodeUtf8(bytes)) as unknown);
   if (!result.ok) throw new Error(result.error.message);
   const metadata = result.value;
   const files = Object.fromEntries(ARTIFACTS.map(name => {

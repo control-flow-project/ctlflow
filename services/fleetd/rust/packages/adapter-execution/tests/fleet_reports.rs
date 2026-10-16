@@ -119,7 +119,11 @@ async fn failure_episodes_are_durable_bounded_and_retry_after_controller_restart
         "failures.json",
         CancellationToken::new(),
     )?;
-    reports.failure(AGENT, Some("saved"), &failed())?;
+    reports.failure(
+        AGENT,
+        Some("saved"),
+        &Failure::new(ErrorCode::Unavailable, "🚀".repeat(2000)),
+    )?;
     reports.failure(AGENT, Some("saved"), &failed())?;
     assert_eq!(
         *storage.changed.borrow(),
@@ -129,6 +133,8 @@ async fn failure_episodes_are_durable_bounded_and_retry_after_controller_restart
     let before = storage
         .read("failures.json", 33554432)?
         .ok_or("Saved failures")?;
+    let retained: Vec<Value> = serde_json::from_slice(&before)?;
+    assert_eq!(retained[0]["message"], "🚀".repeat(1000));
     reports.start().await?;
     tokio::time::timeout(Duration::from_secs(2), network.entered.notified()).await?;
     reports.close().await?;

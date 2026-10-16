@@ -8,12 +8,12 @@ public static class FleetReadQueries
 {
     public static Result<Page<FleetRecord>> Page(CrossfireDbContext context, int page, int size, string? ownerId, string term)
     {
-        var search = term.ToLowerInvariant(); var offset = checked((page - 1) * size);
+        var search = "%" + term + "%"; var offset = checked((page - 1) * size);
         var count = Stored.Read(() => context.Fleet.AsNoTracking().LongCount(row => row.ArchivedAt == null && (ownerId == null || row.OwnerId == ownerId)
-            && (row.Label.ToLower().Contains(search) || row.FleetKey.Contains(search) || row.ControllerName.ToLower().Contains(search))));
+            && (EF.Functions.Like(row.Label, search) || EF.Functions.Like(row.FleetKey, search) || EF.Functions.Like(row.ControllerName, search))));
         if (!count.IsSuccess) return Result<Page<FleetRecord>>.Fail(count.Error);
         return Stored.Read(() => context.Fleet.AsNoTracking().Where(row => row.ArchivedAt == null && (ownerId == null || row.OwnerId == ownerId)
-            && (row.Label.ToLower().Contains(search) || row.FleetKey.Contains(search) || row.ControllerName.ToLower().Contains(search))).OrderByDescending(row => row.CreatedAt).ThenBy(row => row.Id).Skip(offset).Take(size)
+            && (EF.Functions.Like(row.Label, search) || EF.Functions.Like(row.FleetKey, search) || EF.Functions.Like(row.ControllerName, search))).OrderByDescending(row => row.CreatedAt).ThenBy(row => row.Id).Skip(offset).Take(size)
             .Select(row => new FleetRecord(row.Id, row.OwnerId, row.FleetKey, row.Label, row.ControllerName, row.Revision, row.CreatedAt, row.UpdatedAt, row.DeliveryEnabled == 1, row.ArchivedAt)).ToArray())
             .Map(values => new Page<FleetRecord>(values, page, size, count.Value));
     }

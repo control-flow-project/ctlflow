@@ -1,3 +1,4 @@
+import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
 import { closeSync, constants, fsyncSync, lstatSync, openSync, realpathSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
@@ -14,7 +15,7 @@ export function refreshAuthentication(home: string): Result<void> {
     let bytes: Buffer | undefined;
     if (metadataExists(source)) {
       bytes = readPrivateBytes(source, 65536);
-      const value: unknown = JSON.parse(bytes.toString('utf8'));
+      const value: unknown = JSON.parse(decodeUtf8(bytes));
       if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Invalid native login');
     }
     if (metadataExists(destination)) {

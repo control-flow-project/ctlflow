@@ -111,6 +111,6 @@ public sealed partial class AccountAuthority
     {
         var content = RoomState.Content(state, type);
         var value = content is null ? null : RoomState.String(content.Value, key);
-        return value is null ? null : value[..Math.Min(value.Length, maximum)];
+        return value is null ? null : TextRules.TruncateUtf16(value, maximum);
     }
 }

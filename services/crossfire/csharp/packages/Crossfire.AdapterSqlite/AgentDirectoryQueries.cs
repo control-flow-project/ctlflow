@@ -15,14 +15,14 @@ public static class AgentDirectoryQueries
         var activity = (input.Listener == "online" ? online.Value : input.Listener == "disconnecting" ? reporting.Value.Except(online.Value, StringComparer.Ordinal) : reporting.Value).ToArray();
         var include = input.Listener is "online" or "disconnecting"; var exclude = input.Listener == "offline";
         var selected = input.AgentIds?.ToArray() ?? []; var hasSelection = input.AgentIds is not null;
-        var statuses = input.Statuses.ToArray(); var search = input.Search; var owner = input.OwnerId; var offset = checked((input.Page - 1) * input.PageSize); var size = input.PageSize;
+        var statuses = input.Statuses.ToArray(); var search = "%" + input.Search + "%"; var owner = input.OwnerId; var offset = checked((input.Page - 1) * input.PageSize); var size = input.PageSize;
         var count = Stored.Read(() => context.Agent.AsNoTracking().Join(context.Principal, agent => agent.PrincipalId, principal => principal.Id, (agent, principal) => new { agent, principal })
             .Join(context.AgentName, joined => joined.agent.PrincipalId, name => name.AgentId, (joined, name) => new { joined.agent, joined.principal, name })
             .Join(context.FleetInstance.Where(row => row.RetiredAt == null), joined => joined.agent.PrincipalId, instance => instance.AgentId, (joined, instance) => new { joined.agent, joined.principal, joined.name, instance })
             .Join(context.Fleet.Where(row => row.ArchivedAt == null), joined => joined.agent.OwnerId, fleet => fleet.OwnerId, (joined, fleet) => new { joined.agent, joined.principal, joined.name, joined.instance, fleet })
             .Where(joined => joined.instance.FleetKey == joined.fleet.FleetKey && (owner == null || joined.agent.OwnerId == owner) && statuses.Contains(joined.principal.Status)
                 && (!hasSelection || selected.Contains(joined.agent.PrincipalId)) && (!include || joined.principal.Status == "active" && activity.Contains(joined.agent.PrincipalId)) && (!exclude || joined.principal.Status != "active" || !activity.Contains(joined.agent.PrincipalId))
-                && (joined.principal.MatrixUserId.Contains(search) || joined.name.Name.Contains(search))).LongCount());
+                && (EF.Functions.Like(joined.principal.MatrixUserId, search) || EF.Functions.Like(joined.name.Name, search))).LongCount());
         if (!count.IsSuccess) return Result<Page<string>>.Fail(count.Error);
         return Stored.Read(() => context.Agent.AsNoTracking().Join(context.Principal, agent => agent.PrincipalId, principal => principal.Id, (agent, principal) => new { agent, principal })
             .Join(context.AgentName, joined => joined.agent.PrincipalId, name => name.AgentId, (joined, name) => new { joined.agent, joined.principal, name })
@@ -30,7 +30,7 @@ public static class AgentDirectoryQueries
             .Join(context.Fleet.Where(row => row.ArchivedAt == null), joined => joined.agent.OwnerId, fleet => fleet.OwnerId, (joined, fleet) => new { joined.agent, joined.principal, joined.name, joined.instance, fleet })
             .Where(joined => joined.instance.FleetKey == joined.fleet.FleetKey && (owner == null || joined.agent.OwnerId == owner) && statuses.Contains(joined.principal.Status)
                 && (!hasSelection || selected.Contains(joined.agent.PrincipalId)) && (!include || joined.principal.Status == "active" && activity.Contains(joined.agent.PrincipalId)) && (!exclude || joined.principal.Status != "active" || !activity.Contains(joined.agent.PrincipalId))
-                && (joined.principal.MatrixUserId.Contains(search) || joined.name.Name.Contains(search)))
+                && (EF.Functions.Like(joined.principal.MatrixUserId, search) || EF.Functions.Like(joined.name.Name, search)))
             .OrderBy(joined => joined.principal.CreatedAt).ThenBy(joined => joined.principal.Id).Skip(offset).Take(size).Select(joined => joined.agent.PrincipalId).ToArray())
             .Map(values => new Page<string>(values, input.Page, input.PageSize, count.Value));
     }

@@ -108,19 +108,19 @@ export function createCollectionRepository(database: Database.Database): Collect
     },
     fleets(input) {
       return stored(() => {
-        const params = { offset: (input.page - 1) * input.pageSize, limit: input.pageSize, ownerId: input.ownerId ?? '', search: (input.search ?? '').toLowerCase() };
+        const params = { offset: (input.page - 1) * input.pageSize, limit: input.pageSize, ownerId: input.ownerId ?? '', search: input.search ?? '' };
         if (input.ownerId !== undefined) {
           const total = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.archived_at === null && row.owner_id === params.ownerId
-            && (row.label.toLowerCase().includes(params.search) || row.fleet_key.includes(params.search) || row.controller_name.toLowerCase().includes(params.search))).count(), params);
+            && (row.label.includes(params.search) || row.fleet_key.includes(params.search) || row.controller_name.includes(params.search))).count(), params);
           const rows = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.archived_at === null && row.owner_id === params.ownerId
-            && (row.label.toLowerCase().includes(params.search) || row.fleet_key.includes(params.search) || row.controller_name.toLowerCase().includes(params.search)))
+            && (row.label.includes(params.search) || row.fleet_key.includes(params.search) || row.controller_name.includes(params.search)))
             .orderByDescending(row => row.created_at).thenBy(row => row.id).skip(params.offset).take(params.limit), params);
           return success(page(rows.map(mapFleet), total, input));
         }
-        const total = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.archived_at === null && (row.label.toLowerCase().includes(params.search)
-          || row.fleet_key.includes(params.search) || row.controller_name.toLowerCase().includes(params.search))).count(), params);
-        const rows = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.archived_at === null && (row.label.toLowerCase().includes(params.search)
-          || row.fleet_key.includes(params.search) || row.controller_name.toLowerCase().includes(params.search)))
+        const total = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.archived_at === null && (row.label.includes(params.search)
+          || row.fleet_key.includes(params.search) || row.controller_name.includes(params.search))).count(), params);
+        const rows = executeSelect(database, schema, (query, params) => query.from('fleet').where(row => row.archived_at === null && (row.label.includes(params.search)
+          || row.fleet_key.includes(params.search) || row.controller_name.includes(params.search)))
           .orderByDescending(row => row.created_at).thenBy(row => row.id).skip(params.offset).take(params.limit), params);
         return success(page(rows.map(mapFleet), total, input));
       });

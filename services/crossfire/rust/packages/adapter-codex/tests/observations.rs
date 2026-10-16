@@ -198,14 +198,10 @@ fn observations_expose_exact_activity_waiting_and_failure_with_strict_flags_and_
         assert!(settings.iter().any(|setting| setting.name == "model"
             && setting.configured.as_deref() == Some("chosen")
             && setting.effective.as_deref() == Some("chosen")));
-        assert_eq!(
-            error_message
-                .as_deref()
-                .ok_or("Failure text")?
-                .encode_utf16()
-                .count(),
-            4000
-        );
+        let message = error_message.as_deref().ok_or("Failure text")?;
+        assert_eq!(message, "😀".repeat(1000));
+        assert_eq!(message.len(), 4000);
+        assert!(crossfire_contracts::validation::plain_text(&json!(message), 4000).is_ok());
     }
     Ok(())
 }

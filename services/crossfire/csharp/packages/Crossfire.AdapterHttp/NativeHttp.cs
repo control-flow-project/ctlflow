@@ -21,7 +21,7 @@ public static class NativeHttp
     public static HttpClient Client()
         => new(new SocketsHttpHandler
         {
-            AllowAutoRedirect = false, UseCookies = false, AutomaticDecompression = DecompressionMethods.None,
+            AllowAutoRedirect = false, UseCookies = false, UseProxy = false, AutomaticDecompression = DecompressionMethods.None,
             PooledConnectionLifetime = TimeSpan.FromMinutes(10), ConnectTimeout = TimeSpan.FromSeconds(15)
         }) { Timeout = Timeout.InfiniteTimeSpan };
 
@@ -67,7 +67,7 @@ public static class NativeHttp
             await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token);
             var collected = await Collect(stream, maximumBytes, deadline.Token);
             if (!collected.IsSuccess) return Result<NativeJsonResponse>.Fail(collected.Error);
-            var document = JsonDocument.Parse(collected.Value, new JsonDocumentOptions { MaxDepth = 65 });
+            var document = WireJson.Document(collected.Value);
             if (!Validation.Json(document.RootElement))
             {
                 document.Dispose();

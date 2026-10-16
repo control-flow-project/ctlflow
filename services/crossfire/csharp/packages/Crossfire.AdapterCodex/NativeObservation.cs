@@ -24,7 +24,7 @@ public sealed class NativeObservation(RuntimeHooks hooks, Func<string> session, 
         if (configured.Questions is not null) result.Add(new("features.default_mode_request_user_input", configured.Questions.Value ? "true" : "false", null)); settings = result;
     }
     private static string? Scalar(JsonElement value) => value.ValueKind switch { JsonValueKind.String => value.GetString(), JsonValueKind.Null => null, JsonValueKind.Object => "[object Object]", _ => value.GetRawText() };
-    public void State(string state, string? error = null) => hooks.Observe?.Invoke(new NativeState("codex", session(), null, state, now(), settings, error));
+    public void State(string state, string? error = null) => hooks.Observe?.Invoke(new NativeState("codex", session(), null, state, now(), settings, error is null ? null : TextRules.TruncateUtf8(error, 4000)));
     private void Output(string id, string text, string? stream = null)
     {
         if (text.Length == 0) return;
@@ -51,7 +51,7 @@ public sealed class NativeObservation(RuntimeHooks hooks, Func<string> session, 
             case "turn/completed":
                 var turn = parameters.GetProperty("turn"); var completed = Text(turn, "status"); if (completed is not ("completed" or "failed" or "interrupted")) throw new InvalidDataException("Invalid native turn completion state");
                 var message = turn.GetProperty("error").ValueKind == JsonValueKind.Null ? null : Text(turn.GetProperty("error"), "message");
-                State(completed == "failed" ? "failed" : "idle", message is { Length: > 4000 } ? message[..4000] : message); Clear(); break;
+                State(completed == "failed" ? "failed" : "idle", message); Clear(); break;
             case "item/agentMessage/delta":
             case "item/commandExecution/outputDelta":
                 var id = Text(parameters, "itemId"); var delta = Text(parameters, "delta");

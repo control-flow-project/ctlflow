@@ -7,17 +7,6 @@ pub fn utf16_length(value: &str) -> usize {
     value.encode_utf16().count()
 }
 
-pub fn truncate_utf16(value: &str, maximum: usize) -> &str {
-    let mut length = 0;
-    for (offset, character) in value.char_indices() {
-        length += character.len_utf16();
-        if length > maximum {
-            return &value[..offset];
-        }
-    }
-    value
-}
-
 pub fn text(value: &Value, minimum: usize, maximum: usize) -> Result<&str> {
     value
         .as_str()

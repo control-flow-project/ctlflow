@@ -151,9 +151,19 @@ Images own readiness and entrypoints; site-specific branding uses build stages,
 not language-specific commands injected into another backend's runtime.
 Container removal is complete only after the exact immutable container identity
 is absent. An already-removing container is observed, not stopped/deleted again.
-All three operators bound that observation and preserve explicit cleanup failures;
-test-process guards allow the complete native stop/cleanup budget before killing
-their owned launcher. No presence/ownership assertion is waived for slow I/O.
+All three operators bound that observation and preserve explicit cleanup failures.
+Their command adapter owns the deadline policy: lifecycle mutations (create,
+stop and remove) use 120 seconds; metadata commands use 30 seconds. Removal has
+one overall 120-second deadline, including its stop and metadata observations;
+the container's graceful-stop allowance remains 15 seconds. Cancellation and
+normal exit both delegate to that single stop/removal owner, not a separate stop
+command with a competing deadline. Callers cannot substitute a conflicting
+capture deadline. A cancelled creation returns its exact identity before cleanup.
+Primary execution and cleanup failures both remain available when they occur
+together; command failures name the operation.
+Test-process guards allow the complete creation/removal budget plus process-stream
+teardown before killing their owned launcher. No presence/ownership assertion is
+waived for slow I/O; scenario, target and bank deadlines remain unchanged.
 The current verified package platform is Linux amd64. Other native host/CPU
 targets require their platform adapters and test evidence, not a changed RID alone.
 

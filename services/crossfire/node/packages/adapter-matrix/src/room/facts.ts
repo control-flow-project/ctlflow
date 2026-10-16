@@ -1,5 +1,6 @@
 import { roomId } from "@ctlflow/crossfire-contracts/validation";
 import { roomCreators, roomPowers } from '@ctlflow/crossfire-contracts/matrix-room';
+import { truncateUtf16 } from '@ctlflow/crossfire-kernel/text';
 import { failure, success, type Result } from "@ctlflow/crossfire-kernel/result";
 import { API } from '@ctlflow/crossfire-contracts/matrix';
 import { nativeOk, nativeState, type Native } from "../http.js";
@@ -29,7 +30,7 @@ export async function roomFacts(client: Native, owner: string, room: string): Pr
   if (!creators.ok) return creators;
   const content = (type: string, key: string) => stateEvents.value.find(event => event.type === type && event.state_key === '')?.content[key];
   const name = content('m.room.name', 'name'), topic = content('m.room.topic', 'topic'), alias = content('m.room.canonical_alias', 'alias');
-  return success({ room, name: typeof name === 'string' && name ? name.slice(0, 255) : 'Unnamed room',
-    topic: typeof topic === 'string' ? topic.slice(0, 4096) : '', alias: typeof alias === 'string' ? alias.slice(0, 255) : null,
+  return success({ room, name: typeof name === 'string' && name ? truncateUtf16(name, 255) : 'Unnamed room',
+    topic: typeof topic === 'string' ? truncateUtf16(topic, 4096) : '', alias: typeof alias === 'string' ? truncateUtf16(alias, 255) : null,
     ...levels.value, ownerCreator: creators.value.includes(owner), creators: creators.value, powers });
 }

@@ -200,7 +200,9 @@ impl<
                     .then_some(context.context),
                 state: phase,
                 observed_at: self.clock.now()?,
-                error_message: error.map(|error| error.message.clone()),
+                error_message: error.map(|error| {
+                    crossfire_kernel::text::truncate_utf8(&error.message, 4000).to_owned()
+                }),
             });
         }
         Ok(())

@@ -62,6 +62,32 @@ test('collection overflow is observable and native token hooks reject corrupt, f
   for (const query of ['hours=0', 'hours=24&hours=24', 'page=1e2', 'page=01', 'agentPage=2', 'pageSize=101']) assert(!statisticsQuery(new URLSearchParams(query)).ok);
 });
 
+test('summary labels stay bounded Unicode and usage stays adapter-neutral without invalid wire batches', () => {
+  const statistics = listenerStatistics('@self:test.localhost', () => 1000);
+  const labels = ['a'.repeat(99) + '😀suffix', '😀'.repeat(51), '', '\n'];
+  statistics.delivered(labels.map((label, index) => {
+    const event = message('$bounded-' + index, OBSERVER); event.content.msgtype = label; return eventView(event, ROOM);
+  }));
+  const usage = { ...sample('😀'.repeat(127) + 'a'), runtime: 'custom-adapter' };
+  statistics.usage(usage); statistics.usage({ ...usage, sessionId: '😀'.repeat(128) }); statistics.usage({ ...usage, runtime: 'invalid\n' });
+  const batch = statistics.batch(true)!;
+  assert(statisticsBatch(batch).ok); assert.equal(batch.dropped, 2); assert.equal(batch.usage.length, 1);
+  assert.equal(batch.usage[0]!.runtime, 'custom-adapter');
+  assert.deepEqual(batch.flows.map(flow => [flow.messageType, flow.delivered]), [['a'.repeat(99), 1], ['😀'.repeat(50), 1], ['unknown', 2]]);
+});
+
+test('counter overflow drops only that sample and preserves the last valid summary', () => {
+  const statistics = listenerStatistics('@self:test.localhost', () => 1000);
+  const events = [Number.MAX_SAFE_INTEGER, 1].map((size, index) => {
+    const event = message('$count-' + index, OBSERVER); event.content.info = { size }; return eventView(event, ROOM);
+  });
+  statistics.delivered(events);
+  const batch = statistics.batch(true)!;
+  assert(statisticsBatch(batch).ok); assert.equal(batch.dropped, 1);
+  assert.equal(batch.flows[0]!.observed, 1); assert.equal(batch.flows[0]!.delivered, 1);
+  assert.equal(batch.flows[0]!.attachmentBytes, Number.MAX_SAFE_INTEGER);
+});
+
 test('hourly normalized summaries are idempotent, paginated in SQL, token-baselined across restarts and cleaned by shared retention', async scope => {
   const fixture = await fixtureStore(scope), agent = await fixture.agent(fixture.admin.actor, 'stats'), other = await fixture.agent(fixture.admin.actor, 'other');
   const run = randomUUID(), session = randomUUID(), collected = listenerStatistics(agent.matrixUserId, fixture.now);

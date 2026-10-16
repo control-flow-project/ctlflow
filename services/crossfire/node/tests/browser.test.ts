@@ -46,7 +46,7 @@ import { checkEnrollmentInstructions, reviewLayouts } from './support/connect-br
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { elementAssets } from './support/element.js';
 import { checkOnboardingPolicy } from './support/onboarding-browser.js';
-import { browserOptions, secureRouter } from './support/tls.js';
+import { browserOptions, secureRouter } from '@ctlflow/crossfire-test-support/tls';
 
 test('paper table checks center complete content groups and reject displaced controls', async scope => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });

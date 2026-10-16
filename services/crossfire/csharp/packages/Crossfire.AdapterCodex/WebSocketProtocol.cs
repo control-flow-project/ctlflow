@@ -46,7 +46,7 @@ public sealed class WebSocketProtocol : CodexProtocol
         ClientWebSocket? socket = null; HttpClient? client = null; SocketsHttpHandler? handler = null;
         try
         {
-            handler = new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false, AutomaticDecompression = DecompressionMethods.None, ConnectTimeout = TimeSpan.FromMilliseconds(timeout) };
+            handler = new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false, UseProxy = false, AutomaticDecompression = DecompressionMethods.None, ConnectTimeout = TimeSpan.FromMilliseconds(timeout) };
             Uri destination;
             if (endpoint.StartsWith("unix://", StringComparison.Ordinal))
             {

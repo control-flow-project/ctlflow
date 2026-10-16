@@ -365,12 +365,7 @@ impl NativeHttp {
                 .body
                 .get("errcode")
                 .and_then(Value::as_str)
-                .map(|code| {
-                    format!(
-                        ": {}",
-                        crossfire_contracts::validation::truncate_utf16(code, 80)
-                    )
-                })
+                .map(|code| format!(": {}", crossfire_kernel::text::truncate_utf16(code, 80)))
                 .unwrap_or_default();
             return Err(Failure::new(
                 ErrorCode::Native,
@@ -398,7 +393,7 @@ fn transport_failure(error: reqwest::Error) -> Failure {
         ErrorCode::Native,
         format!(
             "HTTP transport failed: {}",
-            crossfire_contracts::validation::truncate_utf16(&details, 512)
+            crossfire_kernel::text::truncate_utf16(&details, 512)
         ),
     )
 }

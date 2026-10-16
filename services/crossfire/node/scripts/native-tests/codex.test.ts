@@ -93,6 +93,7 @@ test('owned native Codex receipts, interruption recovery, commands and Matrix in
   await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === '6');
   await until(() => native.requests.some(request => JSON.stringify(request).includes('Matrix burst 5')));
   for (let index = 0; index < 6; index++) {
+    await until(() => users().some(event => JSON.stringify(event).includes('$native-' + index)));
     assert(native.requests.some(request => JSON.stringify(request).includes('Matrix burst ' + index)));
     assert.equal(users().filter(event => JSON.stringify(event).includes('$native-' + index)).length, 1);
   }

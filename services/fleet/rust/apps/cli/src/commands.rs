@@ -87,13 +87,6 @@ pub async fn run(values: Vec<String>, stop: CancellationToken) -> Result<()> {
         connections::save(&settings)?;
         return output(&status);
     }
-    if words[0] == "start" && words.len() != 2
-        || words[0] == "agent"
-            && words.get(1).map(String::as_str) == Some("start")
-            && words.len() != 4
-    {
-        return Err(invalid(arguments::USAGE));
-    }
     if remote.is_none()
         && (words[0] == "start"
             || words[0] == "agent" && words.get(1).map(String::as_str) == Some("start"))

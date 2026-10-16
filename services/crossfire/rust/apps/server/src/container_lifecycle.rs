@@ -240,29 +240,33 @@ pub async fn owned(arguments: &[String], workspace: &Path, stop: CancellationTok
         return Err(failed("Docker did not return an exact container identity"));
     }
     let attach = CancellationToken::new();
-    let result = if stop.is_cancelled() {
+    let arguments = ["start".into(), "--attach".into(), identity.into()];
+    let running = docker::run(&arguments, workspace, attach.clone());
+    tokio::pin!(running);
+    let started = !stop.is_cancelled();
+    let mut ended = false;
+    let result = if !started {
         Ok(())
     } else {
-        let arguments = ["start".into(), "--attach".into(), identity.into()];
-        let running = docker::run(&arguments, workspace, attach.clone());
-        tokio::pin!(running);
         tokio::select! { biased;
-            result = &mut running => result,
-            _ = stop.cancelled() => {
-                let stopped = docker::captured(&["stop".into(), "--timeout".into(), "15".into(), identity.into()], workspace, CancellationToken::new()).await;
-                attach.cancel(); let _ended = running.await;
-                stopped.and_then(|value| if value.status.success() { Ok(()) } else { Err(failed("Owned container stop is not confirmed")) })
-            }
+            result = &mut running => { ended = true; result },
+            _ = stop.cancelled() => Ok(()),
         }
     };
+    let cleanup = remove(identity, workspace, CancellationToken::new()).await;
     attach.cancel();
-    remove(identity, workspace, CancellationToken::new())
-        .await
-        .map_err(|error| {
-            failed(&format!(
-                "Owned container cleanup is not confirmed: {}",
-                error.message
-            ))
-        })?;
+    if started && !ended {
+        let _attachment = running.await;
+    }
+    if let Err(cleanup) = cleanup {
+        let message = format!(
+            "Owned container cleanup is not confirmed: {}",
+            cleanup.message
+        );
+        return Err(failed(&match &result {
+            Ok(()) => message,
+            Err(original) => format!("{message}; original operation failed: {}", original.message),
+        }));
+    }
     result
 }

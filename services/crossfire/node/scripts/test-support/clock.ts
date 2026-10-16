@@ -48,6 +48,10 @@ export function testClock(scope: TestContext) {
     const deadline = performance.now() + timeoutMs;
     while (!predicate()) { assert(performance.now() < deadline, message); await advance(1); await poll(1); }
   }
+  async function observe(predicate: () => boolean, message = 'I/O condition did not become true', timeoutMs = 5000) {
+    const deadline = performance.now() + timeoutMs;
+    while (!predicate()) { assert(performance.now() < deadline, message); await poll(1); }
+  }
   async function complete<Value>(promise: Promise<Value>): Promise<Value> {
     let settled = false;
     const observed = promise.finally(() => { settled = true; }); void observed.catch(() => {});
@@ -55,7 +59,7 @@ export function testClock(scope: TestContext) {
   }
   const close = () => { timers.clear(); subscribers.clear(); };
   cleanup(scope, close);
-  return { ...clock, advance, until, complete, wallNow: () => epoch + elapsed,
+  return { ...clock, advance, until, observe, complete, wallNow: () => epoch + elapsed,
     close,
     subscribe: (subscriber: (milliseconds: number) => Promise<void>) => { subscribers.add(subscriber); return () => subscribers.delete(subscriber); } };
 }

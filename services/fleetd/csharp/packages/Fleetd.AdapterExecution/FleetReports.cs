@@ -41,7 +41,7 @@ public sealed class FleetReports : IAsyncDisposable
     {
         lock (gate)
         {
-            if (episodes.Contains(agent)) return Results.Done(); if (failures.Count >= 4096) return Results.Fail<Unit>("limit", "Resolve queued failure reports before starting further native work"); var message = error.Message[..Math.Min(4000, error.Message.Length)];
+            if (episodes.Contains(agent)) return Results.Done(); if (failures.Count >= 4096) return Results.Fail<Unit>("limit", "Resolve queued failure reports before starting further native work"); var message = TextRules.TruncateUtf8(error.Message, 4000);
             failures.Add(WireJson.Object(writer => { writer.WriteString("episodeId", Identity.Identifier()); writer.WriteString("agentId", agent); writer.WriteString("sessionId", session); writer.WriteString("message", message); })); episodes.Add(agent); dirty = true; Save(); return Results.Done();
         }
     });

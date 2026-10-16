@@ -1,19 +1,16 @@
 import { spawn } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { repository } from './build.mjs';
 import { verifyTestResources } from './test-resources.mjs';
 import { testEvidence } from './test-evidence.mjs';
+import { verificationFixtures } from './verification-fixtures.mjs';
 
 if (process.argv.length !== 3 || !isAbsolute(process.argv[2])) throw new Error('Use verify-parity.mjs /absolute/new-evidence-directory');
 const output = resolve(process.argv[2]);
 if (existsSync(output) || !existsSync(dirname(output))) throw new Error('Use a new evidence directory with an existing parent');
 const resources = verifyTestResources(), events = [];
-const fixtures = join(repository, 't');
-mkdirSync(fixtures, {recursive:true, mode:0o700});
-const fixtureInformation = lstatSync(fixtures);
-if (!fixtureInformation.isDirectory() || fixtureInformation.isSymbolicLink() || fixtureInformation.uid !== process.getuid() || (fixtureInformation.mode & 0o077) !== 0) throw new Error('Verification fixtures require a private owned worktree directory');
-process.env.TMPDIR=fixtures; process.env.TMP=fixtures; process.env.TEMP=fixtures;
+const fixtures = verificationFixtures();
 mkdirSync(output, { mode: 0o700 });
 mkdirSync(join(repository, '.temp'), { recursive: true, mode: 0o700 });
 const temporary = mkdtempSync(join(repository, '.temp/parity-')), managed = join(temporary, 'managed'), native = join(temporary, 'nativeaot'), rust = join(temporary, 'rust'), matrix = join(temporary, 'matrix.json');
@@ -43,6 +40,6 @@ try {
   verified = true;
   console.log(JSON.stringify({ status: 'passed', targets: ['node', 'csharp-managed', 'csharp-nativeaot','rust'], resources, evidence: output }));
 } finally {
-  if (verified) rmSync(temporary, { recursive: true, force: true });
-  else console.error('Failed-gate distributions retained for bounded diagnosis: ' + temporary + '; remove after their last diagnostic use.');
+  if (verified) { rmSync(temporary, { recursive: true, force: true }); fixtures.close(); }
+  else console.error('Failed-gate artifacts retained for bounded diagnosis: ' + temporary + '; fixtures: ' + fixtures.directory + '; remove after their last diagnostic use.');
 }

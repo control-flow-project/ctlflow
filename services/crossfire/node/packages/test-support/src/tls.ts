@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { createServer } from 'node:https';
 import { createServer as createHttpServer, request as forward, type Server } from 'node:http';
 import { getCACertificates, setDefaultCACertificates } from 'node:tls';
-import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { cleanup } from './cleanup.js';
 
 type Scope = Parameters<typeof cleanup>[0];
 
@@ -100,6 +100,13 @@ function trustCertificate(scope: Scope) {
     if (previousSslFile === undefined) delete process.env.SSL_CERT_FILE; else process.env.SSL_CERT_FILE = previousSslFile;
     rmSync(directory, { recursive: true, force: true }); });
   return directory;
+}
+
+export function browserExecutable(scope: Scope) {
+  const directory = trustCertificate(scope), file = join(directory, 'chrome');
+  const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'";
+  writeFileSync(file, '#!/bin/sh\nexec ' + [browserOptions.executablePath, ...browserOptions.args].map(quote).join(' ') + ' "$@"\n', { mode: 0o700 });
+  return file;
 }
 
 export async function secureRouter(scope: Scope, router: Server) {

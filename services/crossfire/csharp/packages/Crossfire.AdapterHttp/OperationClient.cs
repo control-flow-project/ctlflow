@@ -4,7 +4,7 @@ using Crossfire.Kernel;
 
 namespace Crossfire.AdapterHttp;
 
-public sealed class OperationClient(HttpClient http, string origin, Func<string?> token, IReadOnlyDictionary<string, RestOperation> operations, int timeoutMilliseconds = 45000)
+public sealed class OperationClient(HttpClient http, string origin, Func<string?> token, IReadOnlyDictionary<string, RestOperation> operations, int timeoutMilliseconds = HttpLimits.RequestMilliseconds, int responseBytes = HttpLimits.ResponseBytes)
 {
     public ValueTask<Result<JsonElement>> Call(RestCall input, CancellationToken cancellation)
         => Operation(input.Operation, input.Parameters, input.Body, null, null, input.Query, cancellation);
@@ -12,11 +12,12 @@ public sealed class OperationClient(HttpClient http, string origin, Func<string?
         => Operation(operation, parameters, null, body, "application/octet-stream", null, cancellation);
     private async ValueTask<Result<JsonElement>> Operation(string operation, IReadOnlyDictionary<string, string> parameters, JsonElement? body, ReadOnlyMemory<byte>? binary, string? contentType, IReadOnlyDictionary<string, string>? query, CancellationToken cancellation)
     {
+        if (responseBytes is < 1 or > HttpLimits.ResponseBytes || timeoutMilliseconds is < 100 or > 120000) return Results.Fail<JsonElement>("invalid", "Invalid operation transport resource bounds");
         if (!operations.TryGetValue(operation, out var contract) || contract.Binary != (binary is not null)) return Results.Fail<JsonElement>("invalid", "Unknown operation or mismatched JSON/binary request");
         var path = Path(contract, parameters, query); if (!path.IsSuccess) return Result<JsonElement>.Fail(path.Error); var credential = token(); if (contract.Authentication != "public" && string.IsNullOrEmpty(credential)) return Results.Fail<JsonElement>("unauthorized", "The selected operation requires its configured identity credential");
         var endpoint = new NativeEndpoint(origin, contract.Authentication == "public" ? null : credential, timeoutMilliseconds);
-        var response = binary is { } bytes ? await NativeHttp.Binary(http, endpoint, contract.Method, path.Value, bytes, contentType!, contract.MaximumBodyBytes, 16777216, cancellation)
-            : await NativeHttp.Json(http, endpoint, contract.Method, path.Value, contract.Method == "GET" ? null : body ?? WireJson.Object(_ => { }), 16777216, cancellation, contract.MaximumBodyBytes);
+        var response = binary is { } bytes ? await NativeHttp.Binary(http, endpoint, contract.Method, path.Value, bytes, contentType!, contract.MaximumBodyBytes, responseBytes, cancellation)
+            : await NativeHttp.Json(http, endpoint, contract.Method, path.Value, contract.Method == "GET" ? null : body ?? WireJson.Object(_ => { }), responseBytes, cancellation, contract.MaximumBodyBytes);
         if (!response.IsSuccess) return Result<JsonElement>.Fail(response.Error.Code == "native" ? response.Error with { Code = "unavailable" } : response.Error); using var received = response.Value;
         var input = received.Body;
         if (input.ValueKind != JsonValueKind.Object || !input.TryGetProperty("meta", out var meta) || !Metadata(meta, contract.Collection && received.Status == contract.Status)) return Results.Fail<JsonElement>("invalid", "Coordination response has invalid request or pagination metadata");
@@ -39,7 +40,7 @@ public sealed class OperationClient(HttpClient http, string origin, Func<string?
         foreach (var name in new[] { "page", "pageSize", "totalItems", "totalPages" })
         {
             if (!value.TryGetProperty(name, out var item)) { if (collection) return false; continue; }
-            if (!Validation.Integer(item, name is "page" or "pageSize" ? 1 : 0, name == "pageSize" ? 100 : Validation.MaxWireInteger).IsSuccess) return false;
+            if (!Validation.Integer(item, name is "page" or "pageSize" or "totalPages" ? 1 : 0, name == "pageSize" ? 100 : Validation.MaxWireInteger).IsSuccess) return false;
         }
         return true;
     }

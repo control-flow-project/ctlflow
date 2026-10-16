@@ -30,7 +30,7 @@ is not proof of every possible state transition. Language-local suites retain
 internal failure-injection, compiler and algorithm checks. Paid-provider quality,
 arbitrary subprocess containment and unselected platforms are outside this bank.
 
-The shared TLS fixture owns a distinct authority and CA:FALSE server certificate,
+The shared `@ctlflow/crossfire-test-support/tls` fixture owns a distinct authority and CA:FALSE server certificate,
 with localhost/IP subject alternatives and serverAuth usage. Strict native clients
 verify its actual chain; no backend disables TLS verification. The installed
 ingress fixture uses a real TLS proxy that overwrites the peer IP;

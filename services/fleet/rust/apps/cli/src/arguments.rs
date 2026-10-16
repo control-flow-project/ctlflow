@@ -104,6 +104,32 @@ pub fn parse(values: Vec<String>) -> Result<Arguments> {
     if options.keys().any(|key| !allowed.contains(key.as_str())) {
         return Err(invalid("An option is not valid for this command"));
     }
+    if !options.contains_key("help") && !words.is_empty() {
+        use crossfire_contracts::validation as check;
+        use serde_json::json;
+        if let Some(operation) = options.get("operation-id") {
+            check::identifier(&json!(operation))?;
+        }
+        if let Some(label) = options.get("name") {
+            check::text(&json!(label), 1, 100)?;
+        }
+        let agent_start = command == "agent" && action == "start";
+        if command == "start" || agent_start {
+            if words.len() != if agent_start { 4 } else { 2 } {
+                return Err(invalid(USAGE));
+            }
+            let fleet = json!(words[if agent_start { 2 } else { 1 }]);
+            if check::name(&fleet).is_err() && check::identifier(&fleet).is_err() {
+                return Err(invalid("Use a configured fleet key or UUID"));
+            }
+            if agent_start {
+                check::name(&json!(words[3]))?;
+            }
+        }
+        if command == "daemon" && action == "start" && words.len() != 2 {
+            return Err(invalid(USAGE));
+        }
+    }
     Ok(Arguments { words, options })
 }
 pub const USAGE: &str = "fleet setup [--descriptor PERSONALIZED_SETUP_URL] [--config /absolute/runtime.toml] [--root DIRECTORY]\nfleet daemon start|status|stop|restart [--root DIRECTORY]\nfleet remote add NAME --ssh USER@HOST --root DIRECTORY\nfleet [--root DIRECTORY | --remote NAME] add DIRECTORY\nfleet list|show|test|enroll|start|stop|remove|activate|deactivate FLEET\nfleet start FLEET [--fresh-history] [--operation-id UUID]\nfleet update FLEET [--release-directory DIRECTORY] [--operation-id UUID]\nfleet message FLEET --text TEXT [--message-id UUID]\nfleet agent list FLEET\nfleet agent add FLEET INSTANCE --definition DEFINITION\nfleet agent start|stop|update|remove|contexts|attach FLEET INSTANCE [--context CONTEXT]\nStart resumes retained history; --fresh-history explicitly replaces it.\nStop retains histories and pauses selected bindings. Daemon shutdown retains desired activation.\nAttach prints a pointer without waking or replacing a native session.";

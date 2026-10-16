@@ -1,7 +1,8 @@
-use crossfire_contracts::validation::{truncate_utf16, utf16_length};
+use crossfire_contracts::validation::utf16_length;
 use crossfire_domain::statistics::{
     Batch, Flow, INTERVAL_MS, MAX_FLOWS, MAX_SESSIONS, RECENT_EVENTS, Totals, Usage,
 };
+use crossfire_kernel::text::truncate_utf16;
 use std::{
     collections::{BTreeMap, HashMap},
     sync::Arc,
