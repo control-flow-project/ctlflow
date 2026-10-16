@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { main } from '../apps/server/src/operator.js';
@@ -7,9 +7,10 @@ import { runArguments, cgroupArguments } from '../apps/server/src/container-comm
 import { ownedDocker } from '../apps/server/src/container-lifecycle.js';
 import { checkContainerConfiguration } from '../scripts/container-configuration.js';
 
-test('initialization is private, explicit, non-destructive and rejects unrelated options', async () => {
+test('initialization is private, explicit, non-destructive and rejects unrelated options', async context => {
   mkdirSync(join(process.cwd(), '.temp'), { recursive: true });
   const directory = mkdtempSync(join(process.cwd(), '.temp/operator-'));
+  context.after(() => rmSync(directory, { recursive: true, force: true }));
   const args = ['init', '--directory', directory, '--instance', 'preview', '--origin', 'http://127.0.0.1:8098',
     '--content-origin', 'http://localhost:8099',
     '--server-name', 'preview.localhost', '--administrator', 'admin'];
@@ -18,6 +19,8 @@ test('initialization is private, explicit, non-destructive and rejects unrelated
   await assert.rejects(main([...args, '--cgroup-parent', 'app-test.slice']), /Invalid option/);
   await assert.rejects(main(['start', '--directory', directory, '--instance', 'ignored']), /Invalid option/);
   for (const action of ['reset', 'install', 'run', 'kill']) await assert.rejects(main([action]), /Use init or start/);
+  for (const repeated of [['--instance', 'preview'], ['--instance', 'other'], ['--instance=other']])
+    await assert.rejects(main([...args, ...repeated]), /Duplicated option --instance/u);
   await main(args);
   const configurationArguments = args.slice(1).filter((value, index, values) => value !== '--administrator' && values[index - 1] !== '--administrator');
   const configuration = readFileSync(join(directory, 'config.json'), 'utf8');

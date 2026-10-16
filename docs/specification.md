@@ -797,6 +797,14 @@ lease, lock-inode deletion or external lock executable supplies another owner.
 
 Rootless Docker and explicit private instance configuration are required.
 No host services or machine-wide permission changes are installed.
+Initialization and startup reject repeated options, including identical values,
+before using their values or touching instance state. Explicit application and
+content ports are canonical ASCII decimal integers in 1024..65535: no leading
+zeros, signs, whitespace, fractions, exponent notation or alternate numeric bases.
+The two ports must differ. Invalid arguments cannot acquire the instance lock,
+invoke Docker or rewrite configuration/credentials.
+Operator failures report their diagnostic on standard error and exit with code 1;
+expected input rejection must not abort the process or trigger a crash dump.
 One operator owns the directory for its complete lifetime: package verification/import,
 reconciliation, backup, migration, runtime attachment and cleanup.
 A second live operator fails before those actions.

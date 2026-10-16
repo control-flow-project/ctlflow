@@ -11,11 +11,22 @@ import { acquireFileLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import { ownedDocker, reconcileContainers } from './container-lifecycle.js';
 import { prepareContainerPackage } from './container-package.js';
 
+function port(value: string): number {
+  const parsed = Number(value);
+  if (!/^[1-9][0-9]{3,4}$/u.test(value) || parsed < 1024 || parsed > 65535) throw new Error('Port must be a canonical decimal integer within 1024..65535');
+  return parsed;
+}
+
 export async function main(args = process.argv.slice(2)): Promise<void> {
   if (args[0] === 'serve') { await standalone(args.slice(1)); return; }
-  const parsed = parseArgs({ args, allowPositionals: true, options: { directory: { type: 'string' }, instance: { type: 'string' },
+  const parsed = parseArgs({ args, allowPositionals: true, tokens: true, options: { directory: { type: 'string' }, instance: { type: 'string' },
     origin: { type: 'string' }, 'content-origin': { type: 'string' }, 'server-name': { type: 'string' }, administrator: { type: 'string' }, port: { type: 'string' }, 'content-port': { type: 'string' },
     'cgroup-parent': { type: 'string' }, package: { type: 'string' }, help: { type: 'boolean' } } });
+  const seen = new Set<string>();
+  for (const token of parsed.tokens) if (token.kind === 'option') {
+    if (seen.has(token.name)) throw new Error('Duplicated option --' + token.name);
+    seen.add(token.name);
+  }
   const action = parsed.positionals[0];
   if (parsed.values.help || !action) { console.log('crossfire init --directory DIR --instance NAME --origin URL --content-origin URL --server-name HOST --administrator USERNAME\ncrossfire start --directory DIR --package PACKAGE_DIR [--port PORT] [--content-port PORT] [--cgroup-parent EXISTING.slice]\nPrivate files stay in DIR. A verified Docker package selects the backend without a source checkout. Separate HTTPS main/content hosts proxy to their loopback ports. Startup uses rootless Docker; Ctrl+C stops this stack.'); return; }
   if (parsed.positionals.length !== 1 || !['init', 'start'].includes(action)) throw new Error('Use init or start; see --help');
@@ -41,10 +52,9 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   }
   const configuration = config(readJson(join(directory, 'config.json')));
   if (!configuration.ok) throw new Error(configuration.error.message);
-  const port = Number(parsed.values.port ?? (new URL(configuration.value.publicOrigin).port || '8080'));
-  if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Port must be 1024..65535');
-  const contentPort = Number(parsed.values['content-port'] ?? '8082');
-  if (!Number.isInteger(contentPort) || contentPort < 1024 || contentPort > 65535 || contentPort === port) throw new Error('Content port must be separate and within 1024..65535');
+  const applicationPort = port(parsed.values.port ?? (new URL(configuration.value.publicOrigin).port || '8080'));
+  const contentPort = port(parsed.values['content-port'] ?? '8082');
+  if (contentPort === applicationPort) throw new Error('Content and application ports must differ');
   if (!parsed.values.package) throw new Error('Supply an explicit --package directory');
   const releaseOwnership = acquireFileLock(join(directory, 'operator'));
   const stopping = new AbortController();
@@ -55,7 +65,7 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
     const docker = await captureDocker(['info', '--format', '{{json .SecurityOptions}}'], stopping.signal);
     if (docker.code !== 0 || !docker.output.includes('rootless')) throw new Error('A working rootless Docker engine is required; no host changes are made by Crossfire');
     const selected = await prepareContainerPackage(parsed.values.package, stopping.signal);
-    const options = runArguments(directory, selected.runtimeImage, port, contentPort, parsed.values['cgroup-parent']);
+    const options = runArguments(directory, selected.runtimeImage, applicationPort, contentPort, parsed.values['cgroup-parent']);
     await prepareDatabaseUpgrade({
       async stopWriters() { await reconcileContainers(directory, stopping.signal); },
       async backup() { stopping.signal.throwIfAborted(); await backupBeforeMigration(directory); },
