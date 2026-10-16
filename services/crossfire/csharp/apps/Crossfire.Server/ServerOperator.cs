@@ -28,7 +28,10 @@ public static class ServerOperator
         Console.WriteLine("Public: " + config.PublicOrigin + "/\nManagement: " + config.PublicOrigin + "/manage/\nContent: " + config.ContentOrigin + "/"); await ContainerLifecycle.Owned(ContainerCommands.Server(directory, selected.RuntimeImage, name, port, contentPort, resources), directory, stop.Token);
     }
     private static T Parse<T>(Result<T> value) => value.IsSuccess ? value.Value : throw new ArgumentException(value.Error.Message);
-    private static int Port(string value) => int.TryParse(value, out var port) && port is >= 1024 and <= 65535 ? port : throw new ArgumentException("Port must be within 1024..65535");
+    private static int Port(string value) => value.Length is >= 4 and <= 5 && value[0] is >= '1' and <= '9'
+        && value.All(character => character is >= '0' and <= '9')
+        && int.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var port) && port is >= 1024 and <= 65535
+        ? port : throw new ArgumentException("Port must be a canonical decimal integer within 1024..65535");
     private static void Initialize(string directory, IReadOnlyDictionary<string, string> options)
     {
         if (Directory.Exists(directory) && Directory.EnumerateFileSystemEntries(directory).Any()) throw new IOException("Initialization requires an empty directory; existing data is never overwritten"); var username = options.GetValueOrDefault("administrator") ?? "";
