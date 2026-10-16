@@ -22,7 +22,7 @@ Run through the root coordinators in a finite resource scope.
 | CLI and SSH | fleet/tests/contracts/cli.contract.ts | Installed commands, private API, host-key refusal and noninteractive setup |
 | Data interchange | server.contract.ts | Every selected implementation reopens the same SQLite file |
 | Container deployment | container.contract.ts | Actual operator/image, Element login/room/media, assets and persisted restart |
-| Operator arguments | operator.contract.ts | Repeated options, canonical port bounds, no native calls or state changes for invalid arguments |
+| Operator arguments | operator.contract.ts | Repeated-option refusal, canonical decimal port bounds, unchanged private state and validation before native operations |
 | Operator recovery | container-recovery.contract.ts | Concurrent refusal, real launcher death, running/exited orphans and foreign-ownership fencing |
 
 An authentication check is not successful-operation coverage. A decoded success

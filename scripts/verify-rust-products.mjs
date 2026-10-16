@@ -26,7 +26,7 @@ process.chdir(join(root,'services/crossfire'));
 await runCommand(process.execPath, ['dist/scripts/architecture-proof/conduit-assets.js'], process.cwd());
 await runCommand(process.execPath, ['dist/scripts/architecture-proof/pi-assets.js'], process.cwd());
 test('Rust actual product contracts: shared assertion bank', {timeout:780000}, async scope => {
-  await scope.test('Crossfire operator argument contracts', child => operatorContracts(child,target));
+  await scope.test('Crossfire operator argument contract', child => operatorContracts(child,target));
   const fixture = await contractStack(scope,target,[target]);
   await scope.test('HTTP, Matrix, security and persisted data', child => serverContracts(child,fixture));
   for (const runtime of ['codex','pi']) await scope.test('Actual '+runtime+' fleetd contract', child => daemonContracts(child,fixture,target,runtime));

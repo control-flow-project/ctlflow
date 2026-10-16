@@ -142,11 +142,6 @@ Knex image. All three operators use --package; image construction belongs to the
 not a source-dependent deployment mode. Archive/image digests, platform and release
 labels are checked before touching writers. Backend selection is explicit, never
 chosen from the operator's language or substituted after failure.
-Operator options cannot repeat. Application/content ports use four or five ASCII
-digits, with no leading zero, and must be within 1024..65535. Signs, whitespace,
-fractions, exponents and alternate bases fail. Invalid arguments are rejected
-before acquiring an instance lock, invoking Docker or rewriting configuration or
-credentials.
 GAAP and Bad Bets select C# NativeAOT server packages by default. Their branding,
 DNS/TLS and deployment state remain site-owned. This does not change fleet
 attachment: generated instructions are addressed to the coding harness and always
@@ -835,6 +830,14 @@ lease, lock-inode deletion or external lock executable supplies another owner.
 
 Rootless Docker and explicit private instance configuration are required.
 No host services or machine-wide permission changes are installed.
+Initialization and startup reject repeated options, including identical values,
+before using their values or touching instance state. Explicit application and
+content ports are canonical ASCII decimal integers in 1024..65535: no leading
+zeros, signs, whitespace, fractions, exponent notation or alternate numeric bases.
+The two ports must differ. Invalid arguments cannot acquire the instance lock,
+invoke Docker or rewrite configuration/credentials.
+Operator failures report their diagnostic on standard error and exit with code 1;
+expected input rejection must not abort the process or trigger a crash dump.
 One operator owns the directory for its complete lifetime: package verification/import,
 reconciliation, backup, migration, runtime attachment and cleanup.
 A second live operator fails before those actions.

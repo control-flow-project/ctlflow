@@ -53,6 +53,13 @@ the common Knex image is an explicit migration dependency.
 
 ## Server operator
 
+All three implementations reject repeated options, including identical values, and
+accept explicit ports only as canonical ASCII decimal integers in 1024..65535.
+Argument rejection precedes state-lock creation and native engine operations.
+Operator failures use a standard-error diagnostic and normal exit code 1, not a
+native abort or crash dump.
+The same external operator scenarios exercise all three boundaries.
+
 One cross-language private SQLite lock owns an instance's entire operator
 lifetime. A competing live start fails before touching containers or data.
 All three operator implementations consume --package. The package selects the runtime
