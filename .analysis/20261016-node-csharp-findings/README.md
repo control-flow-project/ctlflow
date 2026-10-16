@@ -2,6 +2,12 @@
 
 Date: 16 October 2026. Reference: origin/main `09fec7c`.
 
+This is the earlier baseline report, not the current verification verdict.
+Main a9c7c42 is now integrated. The current findings, resolved upstream items and
+Rust-only evidence are in `../20261016-rust-main-integration/verification.md`.
+In particular, the common external TLS fixture no longer blocks installed Rust
+contracts; its authority/leaf correction does not disable native TLS validation.
+
 The owner restricted this fork to Rust. Every Node/C# product file, test, asset,
 Dockerfile, the C# solution and the C# publisher now match that reference exactly.
 This includes removing earlier branch changes, not just the last uncommitted

@@ -48,13 +48,15 @@ node /absolute/crossfire/services/crossfire/crossfire init \
   --origin http://127.0.0.1:8098 --content-origin http://localhost:8099 \
   --server-name team.localhost --administrator admin
 node /absolute/crossfire/services/crossfire/crossfire start \
-  --directory /absolute/private/crossfire-state --port 8098 --content-port 8099
+  --directory /absolute/private/crossfire-state --package /absolute/packages/node \
+  --port 8098 --content-port 8099
 ```
 
 Initialization refuses a nonempty directory. The initial password is the
 `administratorPassword` field in private `bootstrap.json`; do not print or
-commit it. The operator derives its build checkout from its installed location.
-It selects the Node runtime image, confirms exclusive ownership, verifies any
+commit it. Build transferable server packages with `npm run package:containers --
+--output /absolute/packages` before deployment. The operator verifies the selected
+package's archive and immutable image identities, confirms exclusive ownership, verifies any
 required upgrade backup, runs the shared Knex image and then starts the server.
 Ctrl+C stops its owned container without deleting persistent state.
 

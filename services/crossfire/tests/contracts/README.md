@@ -22,6 +22,7 @@ Run through the root coordinators in a finite resource scope.
 | CLI and SSH | fleet/tests/contracts/cli.contract.ts | Installed commands, private API, host-key refusal and noninteractive setup |
 | Data interchange | server.contract.ts | Every selected implementation reopens the same SQLite file |
 | Container deployment | container.contract.ts | Actual operator/image, Element login/room/media, assets and persisted restart |
+| Operator arguments | operator.contract.ts | Repeated options, canonical port bounds, no native calls or state changes for invalid arguments |
 | Operator recovery | container-recovery.contract.ts | Concurrent refusal, real launcher death, running/exited orphans and foreign-ownership fencing |
 
 An authentication check is not successful-operation coverage. A decoded success
@@ -29,7 +30,10 @@ is not proof of every possible state transition. Language-local suites retain
 internal failure-injection, compiler and algorithm checks. Paid-provider quality,
 arbitrary subprocess containment and unselected platforms are outside this bank.
 
-The installed ingress fixture uses a real TLS proxy that overwrites the peer IP;
+The shared TLS fixture owns a distinct authority and CA:FALSE server certificate,
+with localhost/IP subject alternatives and serverAuth usage. Strict native clients
+verify its actual chain; no backend disables TLS verification. The installed
+ingress fixture uses a real TLS proxy that overwrites the peer IP;
 its immediate application peer is explicitly trusted. Container deployment tests
 separately exercise rootless port publication and persistent data. Migration-orphan
 fixtures represent abandoned native-container states; they do not simulate every

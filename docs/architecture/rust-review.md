@@ -1,7 +1,7 @@
 # Rust integration review
 
 Review date: 16 October 2026. Coordinated version: 0.1.20.
-Main `09fec7c` was merged into `feat/rust-native-20261014` at `8ffc9db` before
+Main `a9c7c42` was merged into `feat/rust-native-20261014` at `e033d42` before
 this review. Work is confined to the isolated Rust worktree; it does not deploy,
 publish packages, reset data or change peer worktrees.
 
@@ -17,8 +17,8 @@ assertions, REST declarations, agent-tool assets and Knex migrations each have
 one owner. Rust uses native HTTP, Matrix HTTP and Diesel queries; it does not
 delegate backend requests to Node/C#.
 
-The file review reads all 790 Node and 523 C# owned files, including manifests,
-tests, build inputs, generated metadata and operator tools, and maps them to 585
+The file review inventories all 801 Node and 525 C# owned files, including manifests,
+tests, build inputs, generated metadata and operator tools, and maps them to 591
 Rust files or explicitly shared owners. Matching paths alone do not prove
 behavior. Producer/consumer inspection and executable regressions check the
 affected decisions.
@@ -34,10 +34,13 @@ affected decisions.
 | Contracts and collections | Canonical decimal pagination, one-page empty collections, strict client metadata, deterministic ordering and one SQLite LIKE search rule |
 | Server HTTP | Literal trusted ingress, bounded per-client/aggregate admissions, malformed UTF-8 refusal and unchanged-state regressions |
 | Container operator | Lifetime SQLite ownership, inspect both exact identities before cleanup, shared backup/Knex/start ordering |
+| Container packages | Same bounded manifest/archive and exact-image/release checks; only --package activates a backend, with no source compilation or language fallback |
+| Native readiness/removal | Image-owned HTTP/Matrix probes and bounded exact-ID deletion; an existing removal is observed without competing stop/delete commands |
+| Operator arguments | Repeated options and noncanonical ports fail before state-lock creation or Docker; defaults obey the same port bounds |
 | Native transport | Exact binary request bytes, public/private bounds, cancellation and explicit private proxy bypass |
 | Listener statistics | Scalar-safe labels, shared runtime/session validation and atomic overflow refusal without poisoning heartbeats |
 | Native assets | Rust's Pi asset is generated from the unchanged shared extension source, not a separate runtime implementation |
-| Calendar verification | Rust uses the checksum-pinned IANA source and derived catalogue, independent of host timezone updates |
+| Calendar verification | Rust derives its catalogue from the shared checksum-pinned IANA archive and reuses the canonical compiler, independent of host timezone updates |
 | Fleet CLI | Full directory pagination and invalid-command rejection before controller activation |
 | Verification wiring | Rust invokes the common assertions without editing Node/C# product implementations or removing existing assertions |
 | Documentation/distribution | Separate target guides, Rust's standalone bundled README, explicit prerequisites and factual failure boundaries |
@@ -49,24 +52,27 @@ remains separate from runtime admission.
 ## Verification
 
 Current Rust-only evidence passes architecture, type checking, formatting,
-warnings-denied Clippy, 260 tests in 133 compiled targets, 2,072 Node/Rust calendar
+warnings-denied Clippy, 265 tests in 136 compiled targets, 2,072 Node/Rust calendar
 comparisons, bidirectional SQLite/journal/lock proofs, actual Conduit authority
 and Linux x64 release packaging. Actual Codex and Pi adapter tests use inert
-providers. This does not establish that every installed product scenario passed.
+providers. All 58 installed-product assertions now pass, including real daemon
+delivery, steering, restart, CLI/SSH and browser scenarios. The common fixture
+now uses a CA:FALSE server certificate signed by a distinct test authority;
+strict native certificate, hostname and chain validation remains enabled.
 
-The installed assertion bank exposes a shared Node-owned TLS fixture defect:
-its server certificate has CA:TRUE. Rust correctly rejects it as
-CaUsedAsEndEntity. Controller enrollment and CLI setup cannot complete through
-that fixture. Certificate verification remains enabled. Independent follow-up
-passes all 29 Rust container checks, including every REST operation, actual
-Element/media, both browser widths and all operator/orphan scenarios. Actual
-Knex migration containers pass schemas 0/13/17 and reject future 18. The 28
-root tooling regressions and checks of 63 current Markdown guides also pass.
+The subsequent isolated parser change passes warnings-denied Clippy, six native
+checks, the five shared CLI checks against the compiled release, and type
+checking. Thirty-two root tooling regressions and checks of 65 current Markdown
+guides pass. The complete gate and final targeted results are recorded in the
+dated integration report; earlier failed runs are not substituted for it.
 
 The scoped command is `npm run verify:rust -- /absolute/new-evidence-directory`
 inside a finite 16 GiB, zero-swap, 2,048-task scope. It retains the failed outcome
-and exits nonzero; an unsuccessful gate is not certification. The main session
-owns the fixture correction and the final four-target `verify:parity` run.
+and exits nonzero; an unsuccessful gate is not certification. This Rust-only
+scope does not rerun or certify all four target combinations. The main session
+owns remaining Node/C# findings and the final four-target `verify:parity` run.
+
+- [Current integration evidence and remaining owner findings](../../.analysis/20261016-rust-main-integration/verification.md)
 
 - [Main-session findings and preserved proposals](../../.analysis/20261016-node-csharp-findings/README.md)
 

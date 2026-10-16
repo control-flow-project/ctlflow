@@ -49,34 +49,121 @@ async fn identities(
     }
     Ok(output)
 }
-pub async fn remove(identity: &str, workspace: &Path, stop: CancellationToken) -> Result<()> {
-    if !exact(identity) {
-        return Err(failed("Cleanup requires an exact container identity"));
-    }
+async fn state(
+    identity: &str,
+    workspace: &Path,
+    stop: CancellationToken,
+) -> Result<Option<String>> {
     let filter = format!("id={identity}");
-    let stopped = docker::captured(
+    if identities(&filter, workspace, stop.clone())
+        .await?
+        .is_empty()
+    {
+        return Ok(None);
+    }
+    let inspected = docker::captured(
         &[
-            "stop".into(),
-            "--timeout".into(),
-            "15".into(),
+            "container".into(),
+            "inspect".into(),
+            "--format".into(),
+            "{{.State.Status}}".into(),
             identity.into(),
         ],
         workspace,
         stop.clone(),
     )
     .await?;
-    if !stopped.status.success()
-        && !identities(&filter, workspace, stop.clone())
-            .await?
-            .is_empty()
+    if !inspected.status.success() {
+        if identities(&filter, workspace, stop).await?.is_empty() {
+            return Ok(None);
+        }
+        return Err(failed("Cannot establish owned container state"));
+    }
+    let value = inspected.output.trim();
+    if ![
+        "created",
+        "running",
+        "paused",
+        "restarting",
+        "removing",
+        "exited",
+        "dead",
+    ]
+    .contains(&value)
     {
-        return Err(failed("Owned container stop is not confirmed"));
+        return Err(failed("Docker returned an invalid owned container state"));
     }
-    docker::captured(&["rm".into(), identity.into()], workspace, stop.clone()).await?;
-    if !identities(&filter, workspace, stop).await?.is_empty() {
-        return Err(failed("Owned container cleanup is not confirmed"));
+    Ok(Some(value.into()))
+}
+async fn remove_observed(identity: &str, workspace: &Path, stop: CancellationToken) -> Result<()> {
+    let Some(mut current) = state(identity, workspace, stop.clone()).await? else {
+        return Ok(());
+    };
+    if current != "removing" {
+        let stopped = docker::captured(
+            &[
+                "stop".into(),
+                "--timeout".into(),
+                "15".into(),
+                identity.into(),
+            ],
+            workspace,
+            stop.clone(),
+        )
+        .await?;
+        let Some(next) = state(identity, workspace, stop.clone()).await? else {
+            return Ok(());
+        };
+        current = next;
+        if !stopped.status.success()
+            && !["created", "exited", "dead", "removing"].contains(&current.as_str())
+        {
+            return Err(failed(&format!(
+                "Owned container stop is not confirmed: {}",
+                stopped.errors
+            )));
+        }
+        if current != "removing" {
+            let removed =
+                docker::captured(&["rm".into(), identity.into()], workspace, stop.clone()).await;
+            let Some(next) = state(identity, workspace, stop.clone()).await? else {
+                return Ok(());
+            };
+            current = next;
+            if current != "removing" {
+                match removed {
+                    Ok(value) if value.status.success() => {}
+                    Ok(value) => {
+                        return Err(failed(&format!(
+                            "Owned container cleanup is not confirmed: {}",
+                            value.errors
+                        )));
+                    }
+                    Err(error) => return Err(error),
+                }
+            }
+        }
     }
-    Ok(())
+    loop {
+        tokio::select! { biased;
+            _ = stop.cancelled() => return Err(failed("Owned container cleanup cancelled")),
+            _ = tokio::time::sleep(std::time::Duration::from_millis(25)) => {},
+        }
+        if state(identity, workspace, stop.clone()).await?.is_none() {
+            return Ok(());
+        }
+    }
+}
+pub async fn remove(identity: &str, workspace: &Path, stop: CancellationToken) -> Result<()> {
+    if !exact(identity) {
+        return Err(failed("Cleanup requires an exact container identity"));
+    }
+    tokio::time::timeout(
+        std::time::Duration::from_secs(120),
+        remove_observed(identity, workspace, stop),
+    )
+    .await
+    .map_err(|_| failed("Owned container cleanup deadline exceeded"))?
 }
 pub async fn reconcile(directory: &str, workspace: &Path, stop: CancellationToken) -> Result<()> {
     let mut owned = Vec::new();

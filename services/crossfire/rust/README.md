@@ -10,7 +10,9 @@ Node or C# as backend substitutes.
 `apps/server/` contains server/operator composition. `packages/` contains rules,
 contracts, ports and adapters. Integration tests belong to their crates;
 service-wide native tests live under `tests/`. Fleet and fleetd have their own
-service-owned Rust applications and packages. The root Cargo workspace checks
+service-owned Rust applications and packages. `scripts/` owns native container
+package construction; the root coordinator composes all backend packages with
+the shared format/exporter and Knex image. The root Cargo workspace checks
 their dependency graph together.
 
 Generated Diesel metadata derives from the shared Knex contract. The Linux
@@ -40,6 +42,7 @@ Run inside the finite resource scope in the development guide:
 
 ```sh
 npm run test:rust
+npm run verify:rust -- /absolute/new-evidence-directory
 npm run verify:parity -- /absolute/new-evidence-directory
 ```
 

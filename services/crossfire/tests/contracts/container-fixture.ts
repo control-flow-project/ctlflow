@@ -8,7 +8,7 @@ import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { contractProcess, freePorts, observe, record, text, type ContractProcess, type ContractTarget } from '@ctlflow/crossfire-test-support/contract-process';
 import { contractHttp } from '@ctlflow/crossfire-test-support/contract-http';
-import { secureProxy } from '../../node/tests/support/tls.js';
+import { secureProxy } from './tls.js';
 import { builtRelease } from '../../node/scripts/test-support/release.js';
 import { contractClient } from './fixture.js';
 

@@ -46,7 +46,7 @@ services/
     apps/web/
     node/{apps/server,packages,tests,scripts,tools}/
     csharp/{apps/Crossfire.Server,packages,tests,build,scripts}/
-    rust/{apps/server,packages,tests}/
+    rust/{apps/server,packages,tests,scripts}/
     database/management/sqlite/{migrations,seeds}/
     knexfile.management.mjs
     tests/contracts/
@@ -138,10 +138,15 @@ Recovery and wake do not download or silently install software.
 
 Server deployment uses a transferable per-backend Docker package: bounded
 release.json plus images.tar, containing an exact runtime image and the common
-Knex image. Both operators use --package; image construction belongs to the build,
+Knex image. All three operators use --package; image construction belongs to the build,
 not a source-dependent deployment mode. Archive/image digests, platform and release
 labels are checked before touching writers. Backend selection is explicit, never
 chosen from the operator's language or substituted after failure.
+Operator options cannot repeat. Application/content ports use four or five ASCII
+digits, with no leading zero, and must be within 1024..65535. Signs, whitespace,
+fractions, exponents and alternate bases fail. Invalid arguments are rejected
+before acquiring an instance lock, invoking Docker or rewriting configuration or
+credentials.
 GAAP and Bad Bets select C# NativeAOT server packages by default. Their branding,
 DNS/TLS and deployment state remain site-owned. This does not change fleet
 attachment: generated instructions are addressed to the coding harness and always
@@ -151,7 +156,7 @@ Images own readiness and entrypoints; site-specific branding uses build stages,
 not language-specific commands injected into another backend's runtime.
 Container removal is complete only after the exact immutable container identity
 is absent. An already-removing container is observed, not stopped/deleted again.
-Both operators bound that observation and preserve explicit cleanup failures;
+All three operators bound that observation and preserve explicit cleanup failures;
 test-process guards allow the complete native stop/cleanup budget before killing
 their owned launcher. No presence/ownership assertion is waived for slow I/O.
 The current verified package platform is Linux amd64. Other native host/CPU

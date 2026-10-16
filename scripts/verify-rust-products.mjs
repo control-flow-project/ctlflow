@@ -11,6 +11,7 @@ import { cliContracts } from '../services/fleet/dist/tests/contracts/cli.contrac
 import { serverContracts } from '../services/crossfire/dist/tests/contracts/server.contract.js';
 import { browserContracts } from '../services/crossfire/dist/tests/contracts/browser.contract.js';
 import { ingressContracts } from '../services/crossfire/dist/tests/contracts/ingress.contract.js';
+import { operatorContracts } from '../services/crossfire/dist/tests/contracts/operator.contract.js';
 
 verifyTestResources();
 const [distribution] = process.argv.slice(2);
@@ -25,6 +26,7 @@ process.chdir(join(root,'services/crossfire'));
 await runCommand(process.execPath, ['dist/scripts/architecture-proof/conduit-assets.js'], process.cwd());
 await runCommand(process.execPath, ['dist/scripts/architecture-proof/pi-assets.js'], process.cwd());
 test('Rust actual product contracts: shared assertion bank', {timeout:780000}, async scope => {
+  await scope.test('Crossfire operator argument contracts', child => operatorContracts(child,target));
   const fixture = await contractStack(scope,target,[target]);
   await scope.test('HTTP, Matrix, security and persisted data', child => serverContracts(child,fixture));
   for (const runtime of ['codex','pi']) await scope.test('Actual '+runtime+' fleetd contract', child => daemonContracts(child,fixture,target,runtime));

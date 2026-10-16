@@ -11,7 +11,7 @@ import { readContractMatrix } from './contract-targets.mjs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { buildContainerPackages } from '../services/crossfire/dist/scripts/container-packages.js';
+import { buildContainerPackages } from './container-packages.mjs';
 
 verifyTestResources();
 if (!process.env.CROSSFIRE_CONTRACT_MATRIX || !process.env.CROSSFIRE_TEST_CGROUP_PARENT) throw new Error('Use the container matrix coordinator');

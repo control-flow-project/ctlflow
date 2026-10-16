@@ -1,16 +1,14 @@
-use crate::{configuration, container_commands as docker, container_lifecycle};
+use crate::{configuration, container_commands as docker, container_lifecycle, container_package};
 use crossfire_adapter_filesystem::{PrivateDirectory, lock::StateLock};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
 use serde_json::json;
-use sha2::{Digest, Sha256};
 use std::{
     collections::BTreeMap,
-    io::Read,
     path::{Path, PathBuf},
 };
 use tokio_util::sync::CancellationToken;
 
-pub const USAGE: &str = "crossfire init --directory DIR --instance NAME --origin URL --content-origin URL --server-name HOST --administrator USERNAME\ncrossfire start --directory DIR --source REPOSITORY [--port PORT] [--content-port PORT] [--compile] [--cgroup-parent EXISTING.slice]\nUses rootless Docker, a verified backup, the shared Knex migration container and the native Rust runtime. No host services or data resets.";
+pub const USAGE: &str = "crossfire init --directory DIR --instance NAME --origin URL --content-origin URL --server-name HOST --administrator USERNAME\ncrossfire start --directory DIR --package PACKAGE_DIR [--port PORT] [--content-port PORT] [--cgroup-parent EXISTING.slice]\nUses rootless Docker, a verified package and backup, and the shared Knex migration container. The package selects the backend without a source checkout. No host services or data resets.";
 fn invalid(message: &str) -> Failure {
     Failure::new(ErrorCode::Invalid, message)
 }
@@ -51,10 +49,9 @@ fn parse(values: &[String]) -> Result<BTreeMap<&str, &str>> {
         ][..],
         Some("start") => &[
             "directory",
-            "source",
+            "package",
             "port",
             "content-port",
-            "compile",
             "cgroup-parent",
         ][..],
         _ => return Err(invalid(USAGE)),
@@ -66,30 +63,36 @@ fn parse(values: &[String]) -> Result<BTreeMap<&str, &str>> {
             .strip_prefix("--")
             .filter(|key| allowed.contains(key))
             .ok_or_else(|| invalid("Invalid operator option"))?;
-        let value = if key == "compile" {
-            "true"
-        } else {
-            index += 1;
-            values
-                .get(index)
-                .map(String::as_str)
-                .filter(|value| !value.is_empty())
-                .ok_or_else(|| invalid("Missing operator option value"))?
-        };
+        index += 1;
+        let value = values
+            .get(index)
+            .map(String::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| invalid(&format!("Duplicated or empty option --{key}")))?;
         if output.insert(key, value).is_some() {
-            return Err(invalid("Repeated operator option"));
+            return Err(invalid(&format!("Duplicated option --{key}")));
         }
         index += 1;
     }
     Ok(output)
 }
 fn port(value: Option<&&str>, default: u16) -> Result<u16> {
-    value
-        .map(|value| value.parse::<u16>().map_err(|_| invalid("Invalid port")))
-        .transpose()?
-        .filter(|value| *value >= 1024)
-        .or_else(|| value.is_none().then_some(default))
-        .ok_or_else(|| invalid("Port must be within 1024..65535"))
+    let failed = || invalid("Port must be a canonical decimal integer within 1024..65535");
+    let selected = match value {
+        Some(value)
+            if matches!(value.len(), 4 | 5)
+                && value.as_bytes()[0] != b'0'
+                && value.bytes().all(|byte| byte.is_ascii_digit()) =>
+        {
+            value.parse::<u16>().map_err(|_| failed())?
+        }
+        Some(_) => return Err(failed()),
+        None => default,
+    };
+    if selected < 1024 {
+        return Err(failed());
+    }
+    Ok(selected)
 }
 fn initialize(directory: &Path, options: &BTreeMap<&str, &str>) -> Result<()> {
     match std::fs::symlink_metadata(directory) {
@@ -140,79 +143,6 @@ fn initialize(directory: &Path, options: &BTreeMap<&str, &str>) -> Result<()> {
     );
     Ok(())
 }
-fn image_digest(source: &Path) -> Result<String> {
-    fn add(hash: &mut Sha256, root: &Path, path: &Path) -> Result<()> {
-        let information =
-            std::fs::symlink_metadata(path).map_err(|_| invalid("Build input unavailable"))?;
-        if information.file_type().is_symlink() {
-            return Err(invalid("Build input cannot be a symbolic link"));
-        }
-        if information.is_dir() {
-            let mut paths = std::fs::read_dir(path)
-                .map_err(|_| invalid("Build directory unavailable"))?
-                .map(|entry| entry.map(|entry| entry.path()))
-                .collect::<std::io::Result<Vec<_>>>()
-                .map_err(|_| invalid("Build inventory failed"))?;
-            paths.sort();
-            for path in paths {
-                if ![
-                    "node_modules",
-                    "dist",
-                    "bin",
-                    "obj",
-                    "target",
-                    ".temp",
-                    ".analysis",
-                    ".git",
-                ]
-                .iter()
-                .any(|name| path.file_name().is_some_and(|leaf| leaf == *name))
-                {
-                    add(hash, root, &path)?;
-                }
-            }
-        } else if information.is_file() {
-            hash.update(text(
-                path.strip_prefix(root)
-                    .map_err(|_| invalid("Build input escaped its root"))?,
-            )?);
-            let mut file =
-                std::fs::File::open(path).map_err(|_| invalid("Build file unavailable"))?;
-            let mut buffer = [0; 65536];
-            loop {
-                let count = file
-                    .read(&mut buffer)
-                    .map_err(|_| invalid("Build file read failed"))?;
-                if count == 0 {
-                    break;
-                }
-                hash.update(&buffer[..count]);
-            }
-        } else {
-            return Err(invalid(
-                "Build inputs must be regular files and directories",
-            ));
-        }
-        Ok(())
-    }
-    let mut hash = Sha256::new();
-    for name in [
-        ".dockerignore",
-        ".npmrc",
-        "LICENSE",
-        "package.json",
-        "package-lock.json",
-        "tsconfig.base.json",
-        "Cargo.toml",
-        "Cargo.lock",
-        "rust-toolchain.toml",
-        "services",
-        "scripts",
-    ] {
-        add(&mut hash, source, &source.join(name))?;
-    }
-    Ok(format!("{:x}", hash.finalize())[..20].into())
-}
 pub async fn run(values: &[String], stop: CancellationToken) -> Result<()> {
     let options = parse(values)?;
     let directory = absolute(
@@ -225,11 +155,10 @@ pub async fn run(values: &[String], stop: CancellationToken) -> Result<()> {
     }
     PrivateDirectory::open(&directory, false)?;
     let config = configuration::load(&directory)?;
-    let _ownership = StateLock::acquire(&directory.join("operator"))?;
-    let source = absolute(
+    let package = absolute(
         options
-            .get("source")
-            .ok_or_else(|| invalid("Supply --source with the Crossfire source repository"))?,
+            .get("package")
+            .ok_or_else(|| invalid("Supply an explicit --package directory"))?,
     )?;
     let selected = port(
         options.get("port"),
@@ -240,13 +169,14 @@ pub async fn run(values: &[String], stop: CancellationToken) -> Result<()> {
         return Err(invalid("Content and application ports must differ"));
     }
     let resources = docker::resources(options.get("cgroup-parent").copied())?;
+    let _ownership = StateLock::acquire(&directory.join("operator"))?;
     let engine = docker::captured(
         &[
             "info".into(),
             "--format".into(),
             "{{json .SecurityOptions}}".into(),
         ],
-        &source,
+        &directory,
         stop.clone(),
     )
     .await?;
@@ -255,44 +185,9 @@ pub async fn run(values: &[String], stop: CancellationToken) -> Result<()> {
             "A working rootless Docker engine is required; no host settings are changed",
         ));
     }
-    let digest = image_digest(&source)?;
-    let assets = format!("crossfire-assets:{digest}");
-    let migrations = format!("crossfire-migrations:{digest}");
-    let image = format!("crossfire-rust:{digest}");
-    for (target, tag) in [("assets", &assets), ("migrations", &migrations)] {
-        if options.contains_key("compile") || !docker::image(tag, &source, stop.clone()).await? {
-            let mut args = vec!["build".into()];
-            args.extend_from_slice(&resources);
-            args.extend([
-                "--file".into(),
-                text(&source.join("services/crossfire/node/Dockerfile"))?.into(),
-                "--target".into(),
-                target.into(),
-                "--tag".into(),
-                tag.into(),
-                text(&source)?.into(),
-            ]);
-            docker::run(&args, &source, stop.clone()).await?;
-        }
-    }
-    if options.contains_key("compile") || !docker::image(&image, &source, stop.clone()).await? {
-        let mut args = vec!["build".into()];
-        args.extend_from_slice(&resources);
-        args.extend([
-            "--file".into(),
-            text(&source.join("services/crossfire/rust/Dockerfile"))?.into(),
-            "--build-arg".into(),
-            format!("CROSSFIRE_ASSETS_IMAGE={assets}"),
-            "--target".into(),
-            "production".into(),
-            "--tag".into(),
-            image.clone(),
-            text(&source)?.into(),
-        ]);
-        docker::run(&args, &source, stop.clone()).await?;
-    }
+    let selected_package = container_package::prepare(&package, &directory, stop.clone()).await?;
     let [name, _migration] = container_lifecycle::names(text(&directory)?);
-    container_lifecycle::reconcile(text(&directory)?, &source, stop.clone()).await?;
+    container_lifecycle::reconcile(text(&directory)?, &directory, stop.clone()).await?;
     if stop.is_cancelled() {
         return Ok(());
     }
@@ -300,8 +195,12 @@ pub async fn run(values: &[String], stop: CancellationToken) -> Result<()> {
         println!("Verified pre-migration backup: {}", backup.display());
     }
     container_lifecycle::owned(
-        &docker::migration(text(&directory)?, &migrations, &resources),
-        &source,
+        &docker::migration(
+            text(&directory)?,
+            &selected_package.migration_image,
+            &resources,
+        ),
+        &directory,
         stop.clone(),
     )
     .await?;
@@ -315,14 +214,31 @@ pub async fn run(values: &[String], stop: CancellationToken) -> Result<()> {
     container_lifecycle::owned(
         &docker::server(
             text(&directory)?,
-            &image,
+            &selected_package.runtime_image,
             &name,
             selected,
             content,
             &resources,
         ),
-        &source,
+        &directory,
         stop,
     )
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::port;
+
+    #[test]
+    fn configured_port_defaults_obey_the_same_bounds_as_explicit_options() {
+        for selected in [0, 1, 80, 443, 1023] {
+            assert!(port(None, selected).is_err(), "invalid default {selected}");
+        }
+        for selected in [1024, 8080, 65535] {
+            assert_eq!(port(None, selected).ok(), Some(selected));
+            let text = selected.to_string();
+            assert_eq!(port(Some(&text.as_str()), 8080).ok(), Some(selected));
+        }
+    }
 }

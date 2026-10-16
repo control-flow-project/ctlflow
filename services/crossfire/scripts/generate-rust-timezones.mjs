@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { prepareTimezones } from './timezones.mjs';
 if (process.argv.length !== 3 || process.argv[2] !== '--check') throw new Error('Use --check to verify the native IANA catalogue');
 const {version,zones:ordered}=JSON.parse(readFileSync(join(await prepareTimezones(),'catalogue.json'),'utf8'));
-if (version !== process.versions.tz || version !== '2026c') throw new Error('Node and native implementations require the same pinned IANA 2026c data');
+if (version !== process.versions.tz) throw new Error('Node and native implementations require the same pinned IANA data');
 const table = 'pub const VERSION: &str = "' + version + '";\npub const ZONES: &[(&str, &str)] = &[\n'
     + ordered.map(([name, target]) => '    (' + JSON.stringify(name) + ', ' + JSON.stringify(target) + '),').join('\n') + '\n];\n';
 const formatted = spawnSync('rustfmt', ['--edition', '2024', '--emit', 'stdout'], {input:table, encoding:'utf8', maxBuffer:1048576});

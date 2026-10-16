@@ -11,8 +11,8 @@ this is not a static or musl distribution.
 Installed products need no Rust toolchain. Fleet agents still require Node for
 the shared tool client, the selected Codex or verified Pi 1.0.0 executable and an
 authorized native provider login. Remote commands require SSH. The server
-operator requires rootless Docker and an explicit source checkout to build its
-Rust runtime and common Knex migration images. Public use needs operator-owned
+operator requires rootless Docker and an explicit verified container package.
+The deployment host does not need source or build dependencies. Public use needs operator-owned
 DNS, HTTPS and separate application/content hostnames.
 
 The full verification bank additionally requires the pinned .NET SDK and native
@@ -43,6 +43,17 @@ coordinated version, tool release and executable paths.
 This writes a local distribution, not a release upload, npm package or deployment.
 Only the Node Fleet/fleetd products may be public npm packages.
 
+Server image construction is separate from executable packaging. After the shared
+Node build, the root command builds Node, managed C#, NativeAOT C# and Rust packages:
+
+```sh
+npm run package:containers -- --output /absolute/packages/release
+```
+
+Each backend directory contains `release.json`, `images.tar` and trusted build-side
+`package-tool.mjs`. Copy the chosen complete package to the deployment host. The
+archive contains its runtime and the common Knex image, selected by immutable IDs.
+
 ## Install and run the server
 
 Copy the entire completed directory to its selected release location. Preserve
@@ -57,21 +68,30 @@ For a new local instance:
   --origin http://127.0.0.1:8098 --content-origin http://localhost:8099 \
   --server-name team.localhost --administrator admin
 /absolute/releases/rust/crossfire/crossfire start \
-  --directory /absolute/private/crossfire-state --source /absolute/crossfire \
+  --directory /absolute/private/crossfire-state --package /absolute/packages/release/rust \
   --port 8098 --content-port 8099
 ```
 
 Initialization refuses nonempty state. The initial password is in private
-`bootstrap.json`, field `administratorPassword`. The operator selects the Rust
-image, verifies exclusive ownership and exact owned orphan cleanup, verifies a
-required upgrade backup and runs Knex before startup. There is no `--runtime`
-mode switch or Node/C# backend fallback. Ctrl+C stops the owned container and
+`bootstrap.json`, field `administratorPassword`. The package selects its backend
+independently of the operator language. Rust can run any verified backend package,
+and Node/C# operators can run the Rust package. The operator verifies exclusive
+ownership, archive bytes, image platform/release labels and exact owned orphan
+cleanup, verifies a required upgrade backup and runs Knex before startup.
+The superseded `--source`, `--compile` and `--runtime` flags are rejected.
+There is no backend fallback. Ctrl+C stops the owned container and
 retains persistent data.
 
 The example serves Element at `http://127.0.0.1:8098/` and management at
 `http://127.0.0.1:8098/manage/`. The separate content port serves report files
 only. Public deployment needs exact HTTPS origins, trusted ingress and separate
 proxy routes. These example addresses are not live deployments.
+
+The image's native `health` command probes both application and Matrix readiness
+over loopback with the configured public Host, three-second request bounds and no
+redirects. It does not need Node, curl or a shell-based HTTP client in the Rust
+runtime. Removal observes an already-removing exact container for at most two
+minutes; failure to confirm absence blocks replacement.
 
 ## Install and connect Fleet and fleetd
 

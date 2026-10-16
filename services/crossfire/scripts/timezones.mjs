@@ -4,8 +4,9 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, renameSync, rmSync, cpSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { timeZoneSource, prepareTimeZones } from '../node/scripts/time-zones.ts';
 
-const pin=JSON.parse(readFileSync(new URL('../timezones.json',import.meta.url),'utf8'));
+const pin=timeZoneSource();
 const sourceNames=['africa','antarctica','asia','australasia','europe','northamerica','southamerica','etcetera','factory','backward'];
 export function timezoneCatalogue(version,sources) {
   const zones=new Map(),links=new Map();
@@ -38,12 +39,12 @@ export async function prepareTimezones() {
     const response=await fetch(pin.url,{redirect:'error',signal:AbortSignal.timeout(30000)});assert(response.ok&&response.body,'Pinned IANA archive must be available');
     const chunks=[];let count=0;for await(const bytes of response.body){count+=bytes.length;assert(count<=8*1024*1024,'Bounded IANA archive');chunks.push(bytes);}
     const archive=Buffer.concat(chunks);assert.equal(createHash('sha256').update(archive).digest('hex'),pin.sha256,'Exact pinned IANA archive');writeFileSync(join(stage,'source.tar.gz'),archive);
-    const source=join(stage,'source'),compiled=join(stage,'compiled');mkdirSync(source);mkdirSync(compiled);
+    const source=join(stage,'source'),compiled=join(stage,'compiled');mkdirSync(source);
     execFileSync('tar',['-xzf',join(stage,'source.tar.gz'),'--no-same-owner','--no-same-permissions','-C',source],{timeout:10000,stdio:'pipe'});
     assert.equal(readFileSync(join(source,'version'),'utf8').trim(),pin.version);
-    execFileSync('zic',['-d',compiled,...sourceNames.map(name=>join(source,name))],{timeout:30000,stdio:'pipe'});
+    await prepareTimeZones(compiled,async()=>new Response(archive));
     writeFileSync(join(compiled,'catalogue.json'),JSON.stringify(timezoneCatalogue(pin.version,sourceNames.map(name=>readFileSync(join(source,name),'utf8'))))+'\n');
-    for(const name of ['version','LICENSE'])cpSync(join(source,name),join(compiled,name));writeFileSync(join(compiled,'source.sha256'),pin.sha256+'\n');
+    cpSync(join(source,'version'),join(compiled,'version'));writeFileSync(join(compiled,'source.sha256'),pin.sha256+'\n');
     assert(existsSync(join(compiled,'Asia/Calcutta'))&&existsSync(join(compiled,'Etc/UTC')),'Historical and canonical aliases are compiled');renameSync(compiled,output);return output;
   } finally {rmSync(stage,{recursive:true,force:true});}
 }

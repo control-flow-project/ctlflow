@@ -36,6 +36,7 @@ services/
       apps/server/
       packages/
       tests/
+      scripts/                        native container package construction
       Dockerfile
     tests/contracts/                  implementation-independent assertions
     scripts/                          shared asset/schema generators

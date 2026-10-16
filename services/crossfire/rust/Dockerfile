@@ -14,7 +14,7 @@ COPY --from=build /native-metadata.json /native-metadata.json
 COPY --from=build /usr/local/cargo/registry/src /usr/local/cargo/registry/src
 COPY scripts/rust-licenses.mjs /rust-licenses.mjs
 RUN node /rust-licenses.mjs --metadata /native-metadata.json --output /licenses
-COPY services/crossfire/timezones.json /timezones.json
+COPY services/crossfire/assets/time-zones.json /timezones.json
 RUN node -e 'const fs=require("node:fs"),assert=require("node:assert/strict"),pin=require("/timezones.json");assert.equal(pin.version,process.versions.tz);fs.writeFileSync("/timezone-version",pin.version+"\n")'
 
 FROM debian:bookworm-slim@sha256:a4672c0cb26fbdde88e38fa2dfb6c681942306680e41e4378b28770b6e79ee91 AS production
@@ -33,4 +33,5 @@ COPY --from=licenses /licenses ./third-party-licenses
 ENV TZDIR=/app/zoneinfo
 STOPSIGNAL SIGTERM
 EXPOSE 8080 8082
+HEALTHCHECK --interval=30s --timeout=8s --start-period=90s --retries=3 CMD ["/app/server/crossfire", "health"]
 ENTRYPOINT ["/app/server/crossfire", "container"]

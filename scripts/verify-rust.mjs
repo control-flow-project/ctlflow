@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execute } from './rust-process.mjs';
 import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 import { availableParallelism } from 'node:os';
@@ -25,37 +25,6 @@ process.on('exit', () => rmSync(prepared, {recursive:true, force:true}));
 await migrateDatabase(template);
 process.env.CROSSFIRE_TEST_DATABASE_TEMPLATE = template;
 
-function execute(command, arguments_, {environment = process.env, line, timeout = 300_000, workingDirectory = root} = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(command, arguments_, {cwd:workingDirectory, env:environment, stdio:['ignore','pipe','pipe']});
-    let output = '', buffered = '', timedOut = false, parseError = null, escalation;
-    const timer = setTimeout(() => { timedOut = true; child.kill('SIGTERM'); escalation = setTimeout(() => child.kill('SIGKILL'), 2000); }, timeout);
-    child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
-    const capture = chunk => {
-      output = (output + chunk).slice(-262_144);
-      if (output.charCodeAt(0) >= 0xdc00 && output.charCodeAt(0) <= 0xdfff) output = output.slice(1);
-    };
-    child.stderr.on('data', capture);
-    child.stdout.on('data', chunk => {
-      capture(chunk);
-      if (!line || parseError) return;
-      buffered += chunk;
-      if (buffered.length > 2_097_152) { parseError = new Error('Compiler metadata exceeds its line resource bound'); child.kill('SIGTERM'); return; }
-      while (buffered.includes('\n')) {
-        const newline = buffered.indexOf('\n'), text = buffered.slice(0, newline); buffered = buffered.slice(newline + 1);
-        try { if (text.trim()) line(text); } catch (error) { parseError = error; child.kill('SIGTERM'); return; }
-      }
-    });
-    child.once('error', error => { clearTimeout(timer); clearTimeout(escalation); reject(error); });
-    child.once('close', (code, signal) => {
-      clearTimeout(timer);
-      clearTimeout(escalation);
-      if (parseError) return reject(parseError);
-      if (code !== 0 || timedOut) return reject(new Error(`${command} failed (${timedOut ? 'timeout' : code ?? signal})\n${output}`));
-      resolve(output);
-    });
-  });
-}
 
 await execute('node', ['--test','scripts/native-architecture.test.mjs']);
 await execute('node', ['scripts/native-architecture.mjs']);

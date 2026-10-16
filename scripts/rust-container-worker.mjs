@@ -7,6 +7,9 @@ import { serverContracts } from '../services/crossfire/dist/tests/contracts/serv
 import { browserContracts } from '../services/crossfire/dist/tests/contracts/browser.contract.js';
 import { containerContracts } from '../services/crossfire/dist/tests/contracts/container.contract.js';
 import { containerRecoveryContracts } from '../services/crossfire/dist/tests/contracts/container-recovery.contract.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { buildRustContainerPackage } from '../services/crossfire/rust/scripts/container-packages.mjs';
 
 verifyTestResources();
 const distribution = process.env.CROSSFIRE_RUST_DISTRIBUTION;
@@ -15,7 +18,10 @@ const command = product => ({ binary: join(distribution, product === 'server' ? 
 const target = { name: 'rust', implementation: 'rust', server: command('server'), daemon: command('daemon'), cli: command('cli') };
 process.chdir(fileURLToPath(new URL('../services/crossfire/', import.meta.url)));
 test('Rust container: shared assertion bank', { timeout: 3600000 }, async scope => {
-  const fixture = await containerStack(scope, target, [target]);
+  const temporary = mkdtempSync(join(tmpdir(), 'crossfire-rust-packages-'));
+  scope.after(() => rmSync(temporary, { recursive: true, force: true }));
+  await buildRustContainerPackage(fileURLToPath(new URL('../', import.meta.url)), join(temporary, 'rust'), process.env.CROSSFIRE_TEST_CGROUP_PARENT);
+  const fixture = await containerStack(scope, target, [target], temporary);
   await scope.test('Actual Element, artifacts and container', child => containerContracts(child, fixture));
   await scope.test('HTTP, Matrix, security and persisted data', child => serverContracts(child, fixture));
   await scope.test('Shared React browser', child => browserContracts(child, fixture));

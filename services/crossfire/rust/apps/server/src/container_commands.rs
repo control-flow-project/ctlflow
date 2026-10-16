@@ -85,7 +85,7 @@ pub async fn run(args: &[String], workspace: &Path, stop: CancellationToken) -> 
     let errors = process.errors()?;
     let streams = async {
         tokio::try_join!(
-            pump(output, tokio::io::stdout()),
+            pump(output, tokio::io::stderr()),
             pump(errors, tokio::io::stderr())
         )
         .map(|_| ())

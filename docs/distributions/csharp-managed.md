@@ -53,16 +53,18 @@ For a new local instance:
   --origin http://127.0.0.1:8098 --content-origin http://localhost:8099 \
   --server-name team.localhost --administrator admin
 /absolute/releases/csharp-managed/crossfire/Crossfire.Server start \
-  --directory /absolute/private/crossfire-state --source /absolute/crossfire \
-  --runtime managed --port 8098 --content-port 8099
+  --directory /absolute/private/crossfire-state --package /absolute/packages/csharp-managed \
+  --port 8098 --content-port 8099
 ```
 
 Initialization refuses nonempty state. The initial password is in private
 `bootstrap.json`, field `administratorPassword`. The operator validates ownership,
 removes only confirmed owned container orphans, verifies a required upgrade
 backup, runs Knex, then starts the selected managed image. Ctrl+C stops the
-owned container and retains data. Always pass `--runtime managed`: omission
-selects NativeAOT, not the mode of the executable that invokes the operator.
+owned container and retains data. Build packages with the root
+`npm run package:containers -- --output /absolute/packages` command first.
+The package, not the operator's implementation, selects the server backend.
+`--source`, `--compile` and `--runtime` are rejected.
 
 The example serves Element at `http://127.0.0.1:8098/` and management at
 `http://127.0.0.1:8098/manage/`. The content port serves committed reports only.
@@ -103,7 +105,8 @@ Deliberately stopped bindings stay stopped. Closing the CLI does not stop fleetd
 Record the exact source revision and `distribution.json`. Back up server,
 controller and fleet state, credentials and native histories; capture SQLite
 through a WAL-consistent backup. Stop the old operator normally before starting
-the new one with the same directory and explicit `--runtime managed`.
+the new one with the same directory and explicit `--package` directory for the
+managed C# backend.
 All implementations open the same Knex-created database; changing backend is not
 a reset or a second migration path.
 

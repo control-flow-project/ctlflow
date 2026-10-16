@@ -54,17 +54,18 @@ For a new local instance:
   --origin http://127.0.0.1:8098 --content-origin http://localhost:8099 \
   --server-name team.localhost --administrator admin
 /absolute/releases/csharp-nativeaot/crossfire/Crossfire.Server start \
-  --directory /absolute/private/crossfire-state --source /absolute/crossfire \
-  --runtime nativeaot --port 8098 --content-port 8099
+  --directory /absolute/private/crossfire-state --package /absolute/packages/csharp-nativeaot \
+  --port 8098 --content-port 8099
 ```
 
 Initialization refuses nonempty state. The initial password is in private
 `bootstrap.json`, field `administratorPassword`. The operator validates ownership,
 confirms removal of its owned container orphans, verifies any required upgrade
 backup and runs Knex before the selected NativeAOT runtime image. Ctrl+C stops
-the owned container and retains data. Pass `--runtime nativeaot` explicitly;
-selecting managed would build a different runtime image, not repair a failed AOT
-executable.
+the owned container and retains data. Build packages with the root
+`npm run package:containers -- --output /absolute/packages` command first.
+The package, not the operator's implementation, selects the server backend.
+`--source`, `--compile` and `--runtime` are rejected.
 
 The example serves Element at `http://127.0.0.1:8098/` and management at
 `http://127.0.0.1:8098/manage/`. The separate content port serves committed

@@ -115,6 +115,42 @@ impl NativeHttp {
         })
     }
 
+    pub async fn probe(&self, path: &str, host: &str, timeout: Duration) -> Result<u16> {
+        if let Some(socket) = &self.socket {
+            socket.validate()?;
+        }
+        if !path.starts_with('/')
+            || path.starts_with("//")
+            || path.contains(['#', '\\'])
+            || !(Duration::from_millis(100)..=Duration::from_secs(120)).contains(&timeout)
+        {
+            return Err(Failure::new(
+                ErrorCode::Invalid,
+                "Invalid HTTP readiness probe",
+            ));
+        }
+        let destination = self
+            .origin
+            .join(path)
+            .map_err(|_| Failure::new(ErrorCode::Invalid, "Invalid HTTP readiness probe"))?;
+        if destination.origin() != self.origin.origin() {
+            return Err(Failure::new(
+                ErrorCode::Invalid,
+                "Probe must remain on its configured origin",
+            ));
+        }
+        let request = self
+            .client
+            .get(destination)
+            .header("host", host)
+            .timeout(timeout);
+        let response = tokio::select! { biased;
+            _ = self.cancellation.cancelled() => return Err(Failure::new(ErrorCode::Native, "HTTP readiness probe cancelled")),
+            response = request.send() => response.map_err(transport_failure)?,
+        };
+        Ok(response.status().as_u16())
+    }
+
     pub async fn json(
         &self,
         token: Option<&Secret>,

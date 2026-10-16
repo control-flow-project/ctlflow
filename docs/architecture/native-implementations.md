@@ -12,7 +12,7 @@ services/
   crossfire/
     node/{apps/server,packages,tests,scripts,tools,Dockerfile}
     csharp/{apps/Crossfire.Server,packages,tests,build,scripts,Dockerfile}
-    rust/{apps/server,packages,tests,Dockerfile}
+    rust/{apps/server,packages,tests,scripts,Dockerfile}
     apps/web/
     database/management/sqlite/
     knexfile.management.mjs
@@ -55,7 +55,7 @@ the common Knex image is an explicit migration dependency.
 
 One cross-language private SQLite lock owns an instance's entire operator
 lifetime. A competing live start fails before touching containers or data.
-Both operator implementations consume --package. The package selects the runtime
+All three operator implementations consume --package. The package selects the runtime
 independently of the operator language. Source compilation is a build step, not
 another deployment path. Exact archive/image/source identities and release labels
 are verified before stopping writers. Current packages target Linux amd64 only.
