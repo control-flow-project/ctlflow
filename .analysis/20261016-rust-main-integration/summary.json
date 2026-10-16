@@ -2,6 +2,35 @@
   "schemaVersion": 1,
   "platform": "Linux x64",
   "scope": "Rust and shared external contracts; not full four-target certification",
+  "latestMain": {
+    "commit": "7378d1254bf7c82968e05c203a0fc577e9c293c9",
+    "merge": "9e90bdf",
+    "branch": "feat/rust-native-20261014"
+  },
+  "postMerge": {
+    "status": "passed",
+    "typecheck": "passed",
+    "build": "passed",
+    "rootTooling": 32,
+    "nodeOperatorUnit": 4,
+    "nodeSharedOperator": 5,
+    "format": "passed",
+    "structureAndDocumentation": "passed",
+    "protectedProductAndDependencyDiff": "empty against latest main",
+    "rustRuntimeAndSharedOperatorCorpusDiff": "empty against verified d401193 checkpoint",
+    "failures": 0,
+    "skipped": 0
+  },
+  "cleanup": {
+    "status": "complete",
+    "remainingGeneratedArtifacts": 0,
+    "initialWorktreeBytes": 11566227456,
+    "worktreeBytesAfterCleanup": 18337792,
+    "reclaimedBytes": 11547889664,
+    "reclaimedGiB": 10.754810333251953,
+    "globalCachesAndOtherWorktrees": "untouched",
+    "rawLogs": "removed; concise phase outcomes, failure details and per-file native timings retained"
+  },
   "fullGate": {
     "exitCode": 1,
     "events": [

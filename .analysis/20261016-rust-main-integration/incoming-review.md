@@ -56,3 +56,23 @@ proves behavior. Verification evidence is in the adjacent gate summaries.
 | `services/crossfire/tests/contracts/container-fixture.ts` | Same package-based external assertion bank executes Rust; no target-specific substitute assertions. |
 | `services/crossfire/tests/contracts/container-recovery.contract.ts` | Same package-based external assertion bank executes Rust; no target-specific substitute assertions. |
 | `services/crossfire/tests/contracts/container.contract.ts` | Same package-based external assertion bank executes Rust; no target-specific substitute assertions. |
+
+## Latest main 7378d12
+
+Merged at 9e90bdf into the same feat/rust-native-20261014 branch after checkpoint
+d401193. All ten incoming paths were inspected in full or as their complete
+changed declarations. Rust runtime source and the shared operator corpus are
+unchanged from that verified checkpoint.
+
+| Incoming path | Disposition |
+| --- | --- |
+| `docs/architecture/native-implementations.md` | Canonical duplicate/port/error-exit rule retained; wording includes all three implementations. |
+| `docs/specification.md` | One detailed operator rule under operator ownership; redundant earlier paragraph removed. |
+| `docs/verification/20261016-operator-symmetry.md` | Retain upstream's dated focused Node/managed/AOT evidence; do not represent it as a new Rust or full-matrix execution. |
+| `scripts/contract-worker.mjs` | Resolve duplicate import/call into exactly one canonical shared operator test. |
+| `services/crossfire/csharp/apps/Crossfire.Server/Program.cs` | Adopt main unchanged; Rust already prints stderr and returns normal exit 1 rather than aborting. |
+| `services/crossfire/csharp/apps/Crossfire.Server/ServerOperator.cs` | Adopt main unchanged; Rust's tested four/five-digit ASCII grammar, bounds/defaults and pre-lock validation match. |
+| `services/crossfire/node/apps/server/src/operator.ts` | Adopt main unchanged; normalized duplicate rejection and canonical ports correspond to Rust's owning parser. |
+| `services/crossfire/node/tests/operator.test.ts` | Adopt main unchanged; verify affected built test without altering assertions. |
+| `services/crossfire/tests/contracts/README.md` | Retain upstream corpus description plus the corrected common TLS fixture. |
+| `services/crossfire/tests/contracts/operator.contract.ts` | Exact same strict corpus: signal null and status 1; no target-specific allowance. |

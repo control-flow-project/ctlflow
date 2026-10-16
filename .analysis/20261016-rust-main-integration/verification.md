@@ -1,12 +1,13 @@
 # Rust integration and verification
 
 Date: 16 October 2026. Version: 0.1.20. Branch: feat/rust-native-20261014.
-Main a9c7c42 was merged at e033d42. Only this isolated worktree is modified.
+Main a9c7c42 was merged at e033d42; latest main 7378d12 is merged at 9e90bdf.
+Only this isolated worktree is modified.
 No deployment, registry publication, production reset or other-worktree edit.
 
 ## Scope and ownership
 
-- All 48 incoming paths were reviewed; the per-file map covers 801 Node and
+- All 48 initial and ten subsequent incoming paths were reviewed; the per-file map covers 801 Node and
   525 C# files and their Rust/shared owners. There are 591 Rust-owned files.
   The inventory reads complete files but is not behavioral certification.
 - Rust now consumes the same transferable Docker package, verifies immutable
@@ -37,6 +38,7 @@ TasksMax=2048. Isolated Rust tests use all 24 available cores.
 | Final isolated parser correction | Rebuilt release passes the five common CLI checks; six focused native checks, formatting, warnings-denied Clippy and type checking pass |
 | Root tooling | All 32 tests pass: layout, inventory, native ownership, timezone catalogue, packaging, command output/deadlines, licenses and documentation treatments |
 | Current documentation | 65 Markdown guides checked for local links and promotional wording; standalone target guide tests pass |
+| Latest-main integration | Typecheck/build, 32 root tests, four affected Node unit tests and five common Node CLI checks pass; formatting/layout/docs and all protected-path comparisons pass |
 
 The full internal/distribution/installed/container evidence precedes the final
 isolated operator parser correction. That correction has its own rebuilt native
@@ -52,12 +54,13 @@ unchanged script, assertions and cleanup budgets, with a freshly built image
 from the same Knex sources. Its successful result remains
 separate from this unsuccessful full run.
 
-## Remaining work owned by the main session
+## Cross-target disposition
 
-1. Integrate the concurrent Node/C# SYM-001/002 parser fixes. This fork implements
-   the same four/five-digit ASCII port rule and the same shared assertions, but
-   does not copy unmerged changes into those excluded product trees. Invalid
-   options must not acquire the lock, call Docker or change configuration/login.
+1. SYM-001/002/003 are integrated from main, not remaining owner work. Rust has
+   the same port/duplicate rules and normal error exit. The common corpus is
+   byte-identical to the verified checkpoint and main; no second set of target
+   expectations or permissive signal handling remains. The merge changes no
+   Rust runtime files. Focused postmerge validation covers the integration.
 2. Extend the canonical Node-owned containerSourceDigest input list to include
    root Cargo.toml, Cargo.lock and rust-toolchain.toml. Rust verifies those bytes
    remain unchanged during its build; archive hashes and exact image IDs verify
@@ -81,8 +84,19 @@ explicit documented scopes.
 
 ## Cleanup and handoff
 
-After the active checks finish, remove all worktree-local test/native homes,
-temporary databases and credentials, compiled outputs, package staging,
-dependencies and build caches. Preserve source, Git, authored inputs, concise
-verification summaries and saved user/native histories. No global Docker prune
-or other-worktree cleanup is authorized by this worktree-local request.
+Cleanup is complete: the 11,135,062,016-byte target tree, failed distribution
+staging and 82 further ignored artifact entries are removed. This includes all
+worktree-local test/native homes, databases and test credentials, compiled
+outputs, dependencies, caches and raw test logs. Four empty superseded database
+package directories are removed. The worktree falls from 11,566,227,456 to
+18,337,792 bytes, reclaiming about 10.75 GiB; remaining source/evidence additions
+are only small text files.
+
+Source, Git, authored inputs, concise summaries, per-file native timings and the
+preserved main-session proposal remain. No global Docker/cache prune, other
+worktree, production state or saved user/native history is touched. The final
+protected-path comparison remains empty against main 7378d12.
+
+The same feat/rust-native-20261014 branch carries both main merges and all Rust
+work. The user creates or updates the PR manually; no second branch, automatic
+PR, deployment or publication is part of this task.

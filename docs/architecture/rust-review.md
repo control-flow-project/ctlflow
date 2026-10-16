@@ -1,7 +1,7 @@
 # Rust integration review
 
 Review date: 16 October 2026. Coordinated version: 0.1.20.
-Main `a9c7c42` was merged into `feat/rust-native-20261014` at `e033d42` before
+Main `7378d12` was merged into `feat/rust-native-20261014` at `9e90bdf` before
 this review. Work is confined to the isolated Rust worktree; it does not deploy,
 publish packages, reset data or change peer worktrees.
 
@@ -65,6 +65,16 @@ checks, the five shared CLI checks against the compiled release, and type
 checking. Thirty-two root tooling regressions and checks of 65 current Markdown
 guides pass. The complete gate and final targeted results are recorded in the
 dated integration report; earlier failed runs are not substituted for it.
+
+All 32 actual-container assertions pass. Actual Knex migrations pass schemas
+0/13/17 and reject future 18 on an unchanged isolated retry. The first full
+run remains failed: Docker exceeded the Node-owned exact-container cleanup
+deadline after correctly rejecting schema 18. Its cleanup failure and retained
+primary cause are handed to the owning session, not hidden by the retry.
+
+The final main merge adds SYM-001/002/003. It changes no Rust runtime source or
+shared operator assertions relative to the verified Rust checkpoint. The merged
+build, validation and shared operator wiring receive focused verification.
 
 The scoped command is `npm run verify:rust -- /absolute/new-evidence-directory`
 inside a finite 16 GiB, zero-swap, 2,048-task scope. It retains the failed outcome

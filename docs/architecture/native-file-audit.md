@@ -1,6 +1,6 @@
 # Native implementation file audit
 
-Baseline: main `a9c7c42`, integrated on the isolated Rust branch at `e033d42`.
+Baseline: main `7378d12`, integrated on the isolated Rust branch at `9e90bdf`.
 This review extends the earlier package-level assessment with per-file coverage.
 Current verification is recorded separately from historical results.
 
@@ -37,6 +37,7 @@ Node/C# differences are recorded for the main session rather than changed here.
 | Main replaced source-built activation with transferable packages | Rust verifies the bounded manifest/archive, imports missing exact images, validates platform/release labels and only then reconciles writers | Shared actual export/import, corrupt archive, mismatched label, image-owned health and operator/orphan assertions |
 | Native readiness and asynchronous deletion needed the same explicit owners | Header-only native health probes and bounded exact-ID state observation; an already-removing container is not stopped/deleted again | Real HTTP response/cancellation tests, subprocess transition tests and actual Docker removal |
 | SYM-001/002 define canonical operator arguments | Rust rejects repeated options and every noncanonical port before the instance lock or Docker; configured defaults receive the same bounds | Same shared operator assertions as the concurrent Node/C# fix, against the compiled Rust release; default-port unit regression |
+| SYM-003 forbids native aborts for operator input failures | Rust's existing entrypoint returns normal exit code 1 with a stderr diagnostic; merged C# now follows that rule | Identical strict signal/status assertions; no signal allowance or target-specific expected result |
 | Search compilers produced different predicates; directory order and active filters also differed | Rust uses bound SQLite LIKE, no host Unicode normalization, canonical creation-time/ID order and active identity fences | Rust repository checks and shared agent/discovery/fleet/wake/report assertions; other adapters remain the main session's responsibility |
 | Invitation/enrollment equal-time tie order differed | Reference ascending ID tie-breaker | Query owner review plus integration/repository gates |
 | Native HTTP client lacked declared binary upload | One bounded HTTP implementation for JSON and exact binary bytes; common operation/auth/error owner | Actual HTTP binary, invalid-kind, size, cancellation and metadata checks |
