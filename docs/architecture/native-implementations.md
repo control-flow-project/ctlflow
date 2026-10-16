@@ -41,6 +41,7 @@ The tree lists owners, not mandatory empty directories.
 | Native sessions | fleetd-owned Codex/Pi adapters | Native process and transport libraries |
 | Execution composition | fleetd execution adapter, not daemon-domain code | Language-local adapter projects |
 | Distribution | Standalone products and shared tool bytes | npm archives / managed or NativeAOT trees |
+| Server deployment | One Docker package format, shared migration image and image-owned readiness | Backend-specific runtime image, never language-specific site activation |
 | Verification | One external scenario bank | Separate internal unit/compiler tests |
 
 The selected implementation never invokes another backend as a fallback.
@@ -51,6 +52,10 @@ the common Knex image is an explicit migration dependency.
 
 One cross-language private SQLite lock owns an instance's entire operator
 lifetime. A competing live start fails before touching containers or data.
+Both operator implementations consume --package. The package selects the runtime
+independently of the operator language. Source compilation is a build step, not
+another deployment path. Exact archive/image/source identities and release labels
+are verified before stopping writers. Current packages target Linux amd64 only.
 After launcher death, the next owner inspects both deterministic container names,
 validates their directory labels, then stops and removes their exact IDs.
 Foreign ownership or unconfirmed cleanup blocks migration and replacement.
@@ -58,6 +63,8 @@ Foreign ownership or unconfirmed cleanup blocks migration and replacement.
 Backup, migration and runtime startup are ordered phases. Docker automatic
 removal is not used. The instance lock is retained through runtime cleanup.
 A native agent's process/history ownership is a separate controller concern.
+
+- [Docker package format and site integration](../../services/crossfire/docs/container-packages.md)
 
 ## HTTP boundaries
 

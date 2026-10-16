@@ -16,7 +16,7 @@ function command(args: string[], capture: boolean, signal?: AbortSignal): Promis
     };
     child.stdout.on('data', (bytes: Buffer) => { output = append(output, bytes); });
     child.stderr.on('data', (bytes: Buffer) => { errors = append(errors, bytes); });
-    if (!capture) { child.stdout.pipe(process.stdout, { end: false }); child.stderr.pipe(process.stderr, { end: false }); }
+    if (!capture) { child.stdout.pipe(process.stderr, { end: false }); child.stderr.pipe(process.stderr, { end: false }); }
     child.once('error', error => { failed ??= error; });
     child.once('close', code => {
       clearTimeout(escalation); signal?.removeEventListener('abort', stop);

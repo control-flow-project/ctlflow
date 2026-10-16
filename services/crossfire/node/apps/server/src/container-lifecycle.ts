@@ -1,4 +1,5 @@
 import { captureDocker, containerNames, runDocker } from './container-commands.js';
+import { setTimeout as observeAfter } from 'node:timers/promises';
 
 export async function ownedDocker(args: string[], signal: AbortSignal): Promise<void> {
   if (args[0] !== 'run' || !args.includes('--name') || args.some(value => value === '--rm' || value.startsWith('--rm='))) throw new Error('Use the explicit owned-container command without automatic removal');
@@ -23,7 +24,7 @@ export async function ownedDocker(args: string[], signal: AbortSignal): Promise<
     try { await removeContainer(identity); }
     catch (error) { failure = new Error('Owned container cleanup is not confirmed', { cause: failure ?? error }); }
   }
-  if (failure !== undefined && !(signal.aborted && failure instanceof Error && failure.name === 'AbortError')) throw failure;
+  if (failure !== undefined && !(signal.aborted && failure instanceof Error && ['AbortError', 'TimeoutError'].includes(failure.name))) throw failure;
 }
 
 async function containerIds(filter: string, signal?: AbortSignal): Promise<string[]> {
@@ -36,10 +37,34 @@ async function containerIds(filter: string, signal?: AbortSignal): Promise<strin
 
 export async function removeContainer(identity: string, signal?: AbortSignal): Promise<void> {
   if (!/^[a-f0-9]{64}$/u.test(identity)) throw new Error('Cleanup requires an exact container identity');
-  const stopped = await captureDocker(['stop', '--timeout', '15', identity], signal);
-  if (stopped.code !== 0 && (await containerIds('id=' + identity, signal)).length) throw new Error('Owned container stop is not confirmed: ' + stopped.errors);
-  const removed = await captureDocker(['rm', identity], signal);
-  if ((await containerIds('id=' + identity, signal)).length) throw new Error('Owned container cleanup is not confirmed: ' + removed.errors);
+  const deadline = AbortSignal.timeout(120000), observation = signal ? AbortSignal.any([signal, deadline]) : deadline;
+  async function state(): Promise<string | undefined> {
+    if (!(await containerIds('id=' + identity, observation)).length) return undefined;
+    const inspected = await captureDocker(['container', 'inspect', '--format', '{{.State.Status}}', identity], observation);
+    if (inspected.code !== 0) {
+      if (!(await containerIds('id=' + identity, observation)).length) return undefined;
+      throw new Error('Cannot establish owned container state: ' + inspected.errors);
+    }
+    const value = inspected.output.trim();
+    if (!['created', 'running', 'paused', 'restarting', 'removing', 'exited', 'dead'].includes(value)) throw new Error('Docker returned an invalid owned container state');
+    return value;
+  }
+  let current = await state(); if (current === undefined) return;
+  if (current !== 'removing') {
+    const stopped = await captureDocker(['stop', '--timeout', '15', identity], observation);
+    current = await state(); if (current === undefined) return;
+    if (stopped.code !== 0 && !['created', 'exited', 'dead', 'removing'].includes(current)) throw new Error('Owned container stop is not confirmed: ' + stopped.errors);
+    if (current !== 'removing') {
+      let removed: Awaited<ReturnType<typeof captureDocker>> | undefined, failure: unknown;
+      try { removed = await captureDocker(['rm', identity], observation); } catch (error) { observation.throwIfAborted(); failure = error; }
+      current = await state(); if (current === undefined) return;
+      if (removed?.code !== 0 && current !== 'removing') throw new Error('Owned container cleanup is not confirmed: ' + (removed?.errors ?? ''), { cause: failure });
+    }
+  }
+  while (current !== undefined) {
+    await observeAfter(25, undefined, { signal: observation });
+    current = await state();
+  }
 }
 
 export async function reconcileContainers(directory: string, signal: AbortSignal): Promise<void> {

@@ -47,6 +47,7 @@ public static class Onboarding
         {
             "# Set up a Crossfire agent", "",
             "Crossfire lets people message managed agents through Matrix. fleetd owns each agent’s native session and the shared listener; a single agent is an ordinary one-agent fleet.",
+            "These instructions are for the coding harness performing setup. Always install the Node.js @ctlflow/fleet CLI and its Node.js fleetd dependency, regardless of the server implementation. Fleet attachment does not require .NET or a C# controller. Do not attach this coding session; fleetd starts a separate managed native session.",
             "Server: " + origin, "Verified human owner: " + owner, "", "## 1. Check prerequisites",
             "Use the human-selected project directory on Linux or macOS. Requires Node.js 26+, npm, Git, Bash and Codex. Check node --version, npm --version, git --version and codex --version. The controller performs model-free native capability and authentication checks before enrolling or starting an agent.",
             "If something is missing, help install it within the human’s normal permission policy. Official installation instructions: https://nodejs.org/en/download ; https://git-scm.com/downloads ; https://developers.openai.com/codex/cli . Provider login uses native Codex authentication. Never request Matrix passwords, administrator tokens, ports or session IDs. Do not silently use sudo, change host services or install global skills.",

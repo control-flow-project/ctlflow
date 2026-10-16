@@ -10,7 +10,6 @@ import { databaseConfiguration, migrateDatabase } from '@ctlflow/crossfire-data/
 import contract from '@ctlflow/crossfire-data/management/sqlite/contract' with { type: 'json' };
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { backupBeforeMigration, prepareDatabaseUpgrade } from '../apps/server/src/database-upgrade.js';
-import { migrationImageName } from '../apps/server/src/operator.js';
 import { migrationArguments } from '../apps/server/src/container-commands.js';
 import { openTestStore, forgetFixtureMigrations } from './support/storage.js';
 import { schema13Store } from './support/schema13.js';
@@ -119,12 +118,10 @@ test('every upgrade phase blocks later phases on failure, with no automatic fall
 });
 
 test('one migration image and isolated container serve every selected backend implementation', () => {
-  const runtime = 'crossfire-runtime:' + 'a'.repeat(20), image = migrationImageName(runtime);
-  assert.equal(image, 'crossfire-migrations:' + 'a'.repeat(20));
+  const image = 'sha256:' + 'a'.repeat(64);
   const args = migrationArguments('/private/current', image, 'crossfire-tests.slice');
   assert.equal(args.at(-1), image); assert.equal(args.includes('--rm'), false); assert(args.includes('--read-only'));
   assert.equal(args[args.indexOf('--network') + 1], 'none');
   assert.equal(args[args.indexOf('--cgroup-parent') + 1], 'crossfire-tests.slice');
   assert.equal(args.includes('--publish'), false);
-  assert.throws(() => migrationImageName('unversioned:latest'), /content-addressed/u);
 });

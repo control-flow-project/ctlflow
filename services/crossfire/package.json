@@ -39,6 +39,7 @@
     "migrate:make:management:sqlite": "knex migrate:make --knexfile ./knexfile.management.mjs --env development -x mjs",
     "typecheck": "tsc -p node/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
     "build": "node ../../scripts/build-service.mjs crossfire",
+    "package:containers": "npm run build && node dist/scripts/package-containers.js",
     "test": "node ../../scripts/test.mjs crossfire all",
     "test:browser": "node ../../scripts/test.mjs crossfire browser",
     "test:integration": "node ../../scripts/test.mjs crossfire integration",

@@ -3,19 +3,14 @@ FROM vectorim/element-web:v1.12.29@sha256:da32e88c8dafe2c3d4f40ca5e90ab2f43a7c9a
 FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS build
 WORKDIR /app
 RUN apk add --no-cache python3 make g++ tzdata-utils
-RUN wget -O /tmp/tzdata.tar.gz https://data.iana.org/time-zones/releases/tzdata2026c.tar.gz \
-    && echo 'e4a178a4477f3d0ea77cc31828ff72aa38feff8d61aa13e7e99e142e9d902be4  /tmp/tzdata.tar.gz' | sha256sum -c - \
-    && mkdir /tmp/tzdata /zoneinfo \
-    && tar -xzf /tmp/tzdata.tar.gz -C /tmp/tzdata \
-    && test "$(cat /tmp/tzdata/version)" = "$(node -p process.versions.tz)" \
-    && zic -d /zoneinfo /tmp/tzdata/africa /tmp/tzdata/antarctica /tmp/tzdata/asia /tmp/tzdata/australasia /tmp/tzdata/europe /tmp/tzdata/northamerica /tmp/tzdata/southamerica /tmp/tzdata/etcetera /tmp/tzdata/factory /tmp/tzdata/backward \
-    && test -f /zoneinfo/Asia/Calcutta \
-    && cp /tmp/tzdata/LICENSE /zoneinfo/LICENSE \
-    && rm -rf /tmp/tzdata /tmp/tzdata.tar.gz
+COPY services/crossfire/assets/time-zones.json /time-zone-build/assets/time-zones.json
+COPY services/crossfire/node/scripts/time-zones.ts /time-zone-build/node/scripts/time-zones.ts
+RUN node /time-zone-build/node/scripts/time-zones.ts /zoneinfo && rm -rf /time-zone-build
 COPY .npmrc package.json package-lock.json tsconfig.base.json ./
 COPY LICENSE ./LICENSE
 COPY scripts ./scripts
 COPY services ./services
+RUN npm audit --package-lock-only --omit=dev --audit-level=moderate
 RUN npm ci --ignore-scripts && npm rebuild better-sqlite3 --build-from-source
 RUN npm run build --workspace=@ctlflow/crossfire
 
@@ -42,4 +37,5 @@ COPY --from=production-dependencies /runtime-app ./
 COPY --from=assets /element ./element
 STOPSIGNAL SIGTERM
 EXPOSE 8080 8082
+HEALTHCHECK --interval=30s --timeout=8s --start-period=90s --retries=3 CMD ["node", "/app/services/crossfire/dist/apps/server/src/container-health.js"]
 ENTRYPOINT ["node", "/app/services/crossfire/dist/apps/server/src/container.js"]

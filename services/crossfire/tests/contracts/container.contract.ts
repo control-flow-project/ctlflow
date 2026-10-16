@@ -17,6 +17,11 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
   const cgroupParent = process.env.CROSSFIRE_TEST_CGROUP_PARENT ?? '';
   assert(cgroupParent, 'Run the repository-root verify:container command inside a verified bounded test scope');
   const { origin, state: directory, port, contentPort, containerName: name } = fixture;
+  const release = JSON.parse(readFileSync(join(fixture.packages, fixture.current().name, 'release.json'), 'utf8')) as { migrationImage: string };
+  const checked = spawnSync('docker', ['run', '--rm', '--cgroup-parent', cgroupParent, '--network', 'none', '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=128m', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+    '--mount', 'type=bind,source=' + directory + ',target=/runtime,readonly', '--entrypoint', 'node', release.migrationImage, '/app/services/crossfire/dist/scripts/container-configuration.js',
+    '--directory', '/runtime', '--instance', 'verification', '--origin', origin, '--content-origin', 'http://localhost:' + contentPort, '--server-name', 'verification.localhost'], { encoding: 'utf8', timeout: 30000 });
+  assert.equal(checked.status, 0, checked.stderr);
   const empty = await fetch(origin + '/_matrix/client/v3/joined_rooms', { headers: { Authorization: 'Bearer ' + fixture.owner.nativeToken } });
   assert.equal(empty.status, 200); assert.deepEqual((await empty.json() as { joined_rooms: string[] }).joined_rooms, [], 'First-run Element assertions precede room-seeding API scenarios');
   const secrets = readJson<{ administratorPassword: string }>(join(directory, 'bootstrap.json'));
@@ -147,6 +152,9 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
         const guideText = await guide.text();
         const descriptorUrl = setupDescriptorUrl(origin, account.user_id);
         assert(guideText.includes('@ctlflow/fleet@' + health.version));
+        assert(guideText.includes('Always install the Node.js @ctlflow/fleet CLI and its Node.js fleetd dependency, regardless of the server implementation.'));
+        assert(guideText.includes('Do not attach this coding session; fleetd starts a separate managed native session.'));
+        assert(!guideText.includes('dotnet '), 'Server selection cannot switch fleet setup to a .NET command');
         assert(guideText.includes('setup --descriptor ' + "'" + descriptorUrl + "'"));
         const descriptorResponse = await fetch(descriptorUrl);
         assert.equal(descriptorResponse.status, 200);
