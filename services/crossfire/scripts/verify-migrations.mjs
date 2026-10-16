@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
 import { withDockerTestResources } from '../../../scripts/docker-test-resources.mjs';
-import { imageName, migrationImageName } from '../dist/apps/server/src/operator.js';
+import { containerSourceDigest } from '../dist/scripts/container-packages.js';
 import { migrationArguments } from '../dist/apps/server/src/container-commands.js';
 import { ownedDocker } from '../dist/apps/server/src/container-lifecycle.js';
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
@@ -15,13 +15,16 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const service = join(root, 'services/crossfire');
 const temporary = join(service, '.temp'); mkdirSync(temporary, { recursive: true, mode: 0o700 });
 const directory = mkdtempSync(join(temporary, 'migration-container-'));
-const image = migrationImageName(imageName(root));
+const tag = 'crossfire-migrations:' + containerSourceDigest(root).slice(0, 20);
+let image;
 const outcomes = [];
 
 try {
   await withDockerTestResources(async parent => {
-    execFileSync('docker', ['build', '--cgroup-parent', parent, '--file', join(service, 'node/Dockerfile'), '--target', 'migrations', '--tag', image, root],
+    execFileSync('docker', ['build', '--cgroup-parent', parent, '--file', join(service, 'node/Dockerfile'), '--target', 'migrations', '--tag', tag, root],
       { stdio: 'inherit', timeout: 1_800_000 });
+    image = execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', tag], { encoding: 'utf8', timeout: 30000 }).trim();
+    assert.match(image, /^sha256:[a-f0-9]{64}$/u);
     for (const version of [0, 13, 17, 18]) {
       const selected = join(directory, String(version)); mkdirSync(selected, { mode: 0o700 });
       const path = join(selected, 'management.sqlite');

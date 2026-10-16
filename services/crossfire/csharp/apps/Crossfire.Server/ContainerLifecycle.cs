@@ -47,10 +47,37 @@ public static class ContainerLifecycle
     public static async Task Remove(string identity, string workspace, CancellationToken cancellation)
     {
         if (identity.Length != 64 || identity.Any(character => !char.IsAsciiHexDigitLower(character))) throw new ArgumentException("Cleanup requires an exact container identity");
-        var stopped = await ContainerCommands.Capture(["stop", "--timeout", "15", identity], workspace, cancellation);
-        if (stopped.ExitCode != 0 && (await Identities("id=" + identity, workspace, cancellation)).Length != 0) throw new IOException("Owned container stop is not confirmed: " + stopped.Errors);
-        var removed = await ContainerCommands.Capture(["rm", identity], workspace, cancellation);
-        if ((await Identities("id=" + identity, workspace, cancellation)).Length != 0) throw new IOException("Owned container cleanup is not confirmed: " + removed.Errors);
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+        using var observation = CancellationTokenSource.CreateLinkedTokenSource(cancellation, deadline.Token);
+        async Task<string?> State()
+        {
+            if ((await Identities("id=" + identity, workspace, observation.Token)).Length == 0) return null;
+            var inspected = await ContainerCommands.Capture(["container", "inspect", "--format", "{{.State.Status}}", identity], workspace, observation.Token);
+            if (inspected.ExitCode != 0)
+            {
+                if ((await Identities("id=" + identity, workspace, observation.Token)).Length == 0) return null;
+                throw new IOException("Cannot establish owned container state: " + inspected.Errors);
+            }
+            var value = inspected.Output.Trim();
+            if (value is not ("created" or "running" or "paused" or "restarting" or "removing" or "exited" or "dead")) throw new IOException("Docker returned an invalid owned container state");
+            return value;
+        }
+        var current = await State(); if (current is null) return;
+        if (current != "removing")
+        {
+            var stopped = await ContainerCommands.Capture(["stop", "--timeout", "15", identity], workspace, observation.Token);
+            current = await State(); if (current is null) return;
+            if (stopped.ExitCode != 0 && current is not ("created" or "exited" or "dead" or "removing")) throw new IOException("Owned container stop is not confirmed: " + stopped.Errors);
+            if (current != "removing")
+            {
+                Crossfire.AdapterProcess.CommandOutput? removed = null; Exception? failure = null;
+                try { removed = await ContainerCommands.Capture(["rm", identity], workspace, observation.Token); }
+                catch (IOException error) { observation.Token.ThrowIfCancellationRequested(); failure = error; }
+                current = await State(); if (current is null) return;
+                if (removed?.ExitCode != 0 && current != "removing") throw new IOException("Owned container cleanup is not confirmed: " + removed?.Errors, failure);
+            }
+        }
+        while (current is not null) { await Task.Delay(25, observation.Token); current = await State(); }
     }
     public static async Task Reconcile(string directory, string workspace, CancellationToken cancellation)
     {

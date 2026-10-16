@@ -28,12 +28,15 @@ export async function observe(predicate: () => boolean | Promise<boolean>, messa
   const deadline = Date.now() + milliseconds;
   for (;;) { if (await predicate()) return; assert(Date.now() < deadline, message); await delay(25); }
 }
-export function contractProcess(context: TestContext, command: ContractCommand, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): ContractProcess {
+export function contractProcess(context: TestContext, command: ContractCommand, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env, shutdownMilliseconds = 10000): ContractProcess {
+  if (!Number.isInteger(shutdownMilliseconds) || shutdownMilliseconds < 1 || shutdownMilliseconds > 2147483647) throw new Error('Supply a positive native shutdown timer budget');
   const child = spawn(command.binary, [...command.arguments, ...args], { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '', errors = '', failed: Error | undefined, closing: Promise<void> | undefined, exited = false;
   child.stdout?.on('data', (bytes: Buffer) => { output = (output + bytes.toString('utf8')).slice(-65536); }); child.stderr?.on('data', (bytes: Buffer) => { errors = (errors + bytes.toString('utf8')).slice(-65536); }); child.once('error', error => { failed = error; });
   const ended = new Promise<number | null>(resolveExit => child.once('close', code => { exited = true; resolveExit(code); }));
   function signal(signal: NodeJS.Signals): void { if (child.pid !== undefined) try { process.kill(-child.pid, signal); } catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error; } }
-  const close = () => closing ??= (async () => { if (!exited) { signal('SIGTERM'); const timer = setTimeout(() => { signal('SIGKILL'); child.stdout?.destroy(); child.stderr?.destroy(); }, 10000); try { await ended; } finally { clearTimeout(timer); } } if (failed) throw failed; })(); cleanup(context, close);
+  const close = () => {
+    return closing ??= (async () => { if (!exited) { signal('SIGTERM'); const timer = setTimeout(() => { signal('SIGKILL'); child.stdout?.destroy(); child.stderr?.destroy(); }, shutdownMilliseconds); try { await ended; } finally { clearTimeout(timer); } } if (failed) throw failed; })();
+  }; cleanup(context, close);
   return { child, ended, alive: () => !exited && failed === undefined && child.exitCode === null && child.signalCode === null, output: () => output, errors: () => failed?.message ?? errors, close };
 }

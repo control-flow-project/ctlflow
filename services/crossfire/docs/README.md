@@ -1,6 +1,7 @@
 # Crossfire guides
 
 - [Install the server](getting-started.md)
+- [Build and deploy Docker packages](container-packages.md)
 - [Configure the instance and trusted ingress](configuration.md)
 - [Operate, upgrade and recover](operations.md)
 - [Use management](management.md)

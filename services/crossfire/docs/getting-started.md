@@ -2,8 +2,10 @@
 
 ## Requirements
 
-Use Linux, Node.js 26+, npm 11.17+, Git and an existing rootless Docker engine.
-C# additionally needs the repository-pinned .NET SDK and selected build tools.
+Use Linux, an installed Crossfire operator and an existing rootless Docker engine.
+The Node operator needs Node.js 26+. Packaged C# operators include their runtime
+or are NativeAOT. The selected Docker package carries the server dependencies.
+Source builds additionally need npm 11.17+, Git and the pinned .NET/native tools.
 Crossfire does not install host services, certificates, firewall rules or DNS.
 
 Build the selected checkout inside the finite resource scope described in the
@@ -11,6 +13,7 @@ development guide. Do not use an active test output tree for deployment.
 
 - [Development prerequisites](../../../docs/development.md)
 - [C# operator](../csharp/README.md)
+- [Build and transfer Docker packages](container-packages.md)
 
 ## Initialize a local instance
 
@@ -22,7 +25,7 @@ node crossfire init --directory /absolute/private/crossfire-state \
   --content-origin http://localhost:8099 \
   --server-name team.localhost --administrator admin
 ./start.sh --directory /absolute/private/crossfire-state \
-  --port 8098 --content-port 8099
+  --package /absolute/packages/node --port 8098 --content-port 8099
 ```
 
 Initialization refuses a nonempty directory. The initial password is the
@@ -33,10 +36,10 @@ The application port serves Element, management and the API. The separate
 content port serves committed public reports only; its root returns 404.
 Host port publication is loopback-only. Public use requires HTTPS.
 
-The operator builds content-addressed images, acquires exclusive instance
-ownership, reconciles abandoned owned containers, verifies an upgrade backup
+The operator acquires exclusive instance ownership, verifies and imports the
+selected package, reconciles abandoned owned containers, verifies an upgrade backup
 when needed, runs Knex and starts the runtime only after success.
-`--compile` rebuilds selected images. Ctrl+C stops and removes the owned
+It never builds source or substitutes another backend. Ctrl+C stops and removes the owned
 container while retaining state.
 
 A live competing launcher is refused. If a launcher dies, start the instance
