@@ -21,6 +21,7 @@ crossfire-adapter-http.workspace = true
 crossfire-adapter-codex.workspace = true
 crossfire-adapter-toml.workspace = true
 fleetd-contracts.workspace = true
+fleetd-storage.workspace = true
 fleetd-domain.workspace = true
 fleet-daemon-client.workspace = true
 fleet-ssh-transport.workspace = true

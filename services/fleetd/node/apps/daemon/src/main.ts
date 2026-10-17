@@ -2,6 +2,7 @@
 import { parseArgs } from 'node:util';
 import { resolve, join, dirname } from 'node:path';
 import { existsSync, lstatSync, unlinkSync, chmodSync, realpathSync } from 'node:fs';
+import { authenticationPath, initializeAuthentication } from '@ctlflow/fleetd-storage/authentication';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { createConnection } from 'node:net';
@@ -25,11 +26,12 @@ import { createLoggingMaintenance } from '@ctlflow/crossfire-agent-core/logging-
 import { LOGGING_MAINTENANCE_MS } from '@ctlflow/crossfire-kernel/logging';
 import { success } from '@ctlflow/crossfire-kernel/result';
 
-export async function startDaemon(root: string, name?: string, execution?: Execution) {
+export async function startDaemon(root: string, name?: string, execution?: Execution, configuration = authenticationPath()) {
   if (!['linux', 'darwin'].includes(process.platform)) throw new Error('Fleet controller requires Linux or macOS');
   let parsed = parseController({ name: name ?? 'local' });
   if (!parsed.ok) throw new Error(parsed.error.message);
   prepareControllerRoot(root);
+  const authenticationKey = await initializeAuthentication(configuration);
   const loggingConfiguration = readLoggingConfiguration(root);
   if (!loggingConfiguration.ok) throw new Error(loggingConfiguration.error.message);
   const unlock = await acquireProcessLock(join(root, 'daemon'));
@@ -76,7 +78,7 @@ export async function startDaemon(root: string, name?: string, execution?: Execu
     }, LOGGING_MAINTENANCE_MS, diagnostics.maintenanceError);
     cleanup = async () => { try { await logging.close(); await controller.close(); } finally { await unlock(); } };
     let closing: Promise<void> | undefined;
-    const server = createDaemonHttp(controller, () => { void close(); }, () => ({ loggingRetentionDays: loggingConfiguration.value.loggingRetentionDays,
+    const server = createDaemonHttp(controller, authenticationKey, () => { void close(); }, () => ({ loggingRetentionDays: loggingConfiguration.value.loggingRetentionDays,
       loggingError: diagnostics.error() }));
     const close = () => closing ??= (async () => {
       try { await logging.close(); await controller.close(); }

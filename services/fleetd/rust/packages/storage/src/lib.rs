@@ -1,3 +1,4 @@
+pub mod authentication;
 pub mod binding;
 pub mod configuration;
 pub mod registry;

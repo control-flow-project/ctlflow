@@ -35,6 +35,11 @@ try {
   await command(process.execPath, ['services/crossfire/scripts/generate-rest-catalog.mjs', '--check'], 'canonical REST catalog drift check');
   await command(process.execPath, ['services/fleetd/scripts/generate-rest-catalog.mjs', '--check'], 'canonical daemon REST catalog drift check');
   await command(dotnet, ['build', 'Ctlflow.CSharp.slnx', '-c', 'Release'], 'managed solution build');
+  const storageProject = 'services/fleetd/csharp/tests/Fleetd.Storage.Tests';
+  await command(dotnet, ['run', '--project', storageProject, '-c', 'Release', '--no-build'], 'managed fleetd authentication storage');
+  const storagePublish = join(directory, 'native-storage');
+  await command(dotnet, ['publish', storageProject, '-c', 'Release', '-r', 'linux-x64', '-p:PublishAot=true', '-p:CppCompilerAndLinker=gcc', '-o', storagePublish], 'NativeAOT fleetd storage publication');
+  await command(join(storagePublish, 'Fleetd.Storage.Tests'), [], 'NativeAOT fleetd authentication storage');
   const controllerProject = 'services/fleetd/csharp/tests/Fleetd.Domain.Tests';
   await command(dotnet, ['run', '--project', controllerProject, '-c', 'Release', '--no-build'], 'managed controller ownership transitions');
   const controllerPublish = join(directory, 'native-controller');

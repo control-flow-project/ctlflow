@@ -7,6 +7,11 @@ fleet validates crossfire's personalized setup descriptor and submits
 An existing coding assistant may execute that command, but its process and
 conversation are never imported or attached.
 
+Management installs pinned npm fleet/fleetd on supported Linux/macOS hosts,
+independent of server implementation. No .NET/Rust installation is needed.
+fleetd initializes private OS-native authentication before setup calls its API;
+fleet reads that same file and sends its key automatically.
+
 The descriptor identifies one active registered human, exact server origin and
 exact installed public fleet version. Unknown fields, redirects, origin/owner
 substitution, ambiguous queries, oversized data and malformed text fail.

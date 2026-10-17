@@ -17,7 +17,9 @@ crossfire-adapter-toml.workspace = true
 fleetd-domain.workspace = true
 fleetd-contracts.workspace = true
 serde_json.workspace = true
+serde.workspace = true
 sha2.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

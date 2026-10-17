@@ -2,13 +2,13 @@
 
 ## Prerequisites
 
-Use Linux, Node.js 26+, npm 11.17+ and an authorized checkout of the selected
+Use Linux for server building/verification, Node.js 26+, npm 11.17+ and an authorized checkout of the selected
 ctlflow revision. Dependency versions and install policy come from its
 lockfile and `.npmrc`; install scripts are disabled. The server operator also
 requires an existing rootless Docker engine. Public deployment requires
 operator-configured DNS, HTTPS and separate application/content hostnames.
 
-Fleet controllers require the selected Codex or Earendil Pi executable and an
+Installed npm fleet/controllers support Linux and macOS. They require the selected Codex or Earendil Pi executable and an
 authorized native provider login. Setup does not install or upgrade those
 runtimes. Pi requires the verified native version 1.0.0. OpenSSH is required for
 remote commands. The full verification bank additionally requires the pinned
@@ -67,6 +67,20 @@ HTTPS origins, explicit trusted ingress and separate proxy routes. crossfire
 does not configure the host's DNS, TLS, firewall or boot services.
 
 ## Install and connect fleet and fleetd
+
+fleetd automatically creates one private OS-user authentication file on first
+start: Linux `$XDG_CONFIG_HOME/ctlflow/fleetd.json` (default
+`$HOME/.config/ctlflow/fleetd.json`), or macOS
+`$HOME/Library/Application Support/ctlflow/fleetd.json` for the Node products.
+fleet reads the same persistent random key and authenticates every daemon
+request. Back it up separately from controller roots; remote clients read the
+remote host's file over strict SSH. See the
+[authentication contract](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/docs/authentication.md).
+
+Management-generated setup always uses pinned npm fleet and Node fleetd,
+independent of the server backend. Native controllers are explicit operator
+choices, not prerequisites imposed on a setup harness.
+
 
 Install both locally built archives together, using the checkout's version:
 

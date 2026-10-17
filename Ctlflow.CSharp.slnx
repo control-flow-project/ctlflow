@@ -37,5 +37,6 @@
     <Project Path="services/crossfire/csharp/tests/Crossfire.Storage.Tests/Crossfire.Storage.Tests.csproj" />
     <Project Path="services/crossfire/csharp/tests/Crossfire.Runtime.Tests/Crossfire.Runtime.Tests.csproj" />
     <Project Path="services/fleetd/csharp/tests/Fleetd.Domain.Tests/Fleetd.Domain.Tests.csproj" />
+    <Project Path="services/fleetd/csharp/tests/Fleetd.Storage.Tests/Fleetd.Storage.Tests.csproj" />
   </Folder>
 </Solution>

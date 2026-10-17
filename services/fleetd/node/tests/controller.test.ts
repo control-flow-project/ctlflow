@@ -850,9 +850,11 @@ test('private controller API stays responsive while resource-bounded restoration
     });
     return failure('unavailable', 'Controlled native restoration stopped');
   };
-  const starting = startDaemon(join(current.directory, 'controller'), 'desktop', current.services.execution);
+  const authenticationKey = 'a'.repeat(64), authenticationFile = join(current.directory, 'fleetd.json');
+  writeFileSync(authenticationFile, JSON.stringify({ schemaVersion: 1, authenticationKey }), { mode: 0o600 });
+  const starting = startDaemon(join(current.directory, 'controller'), 'desktop', current.services.execution, authenticationFile);
   cleanup(scope, async () => { released = true; for (const complete of completions) complete(); await (await starting).close(); });
-  const daemon = await starting, client = createDaemonClient(daemon.socketPath);
+  const daemon = await starting, client = createDaemonClient(daemon.socketPath, undefined, () => authenticationKey);
   await until(() => started === 4);
   assert.equal(value(await client.call(daemonOperations.status, {}, {})).data.stopping, false);
   const restoring = value(await client.call(daemonOperations.fleet, { fleetId: current.record.fleetId }, {})).data;

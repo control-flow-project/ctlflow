@@ -8,6 +8,7 @@ import { operations, createDaemonClient } from '@ctlflow/fleet-daemon-client/cli
 import { parseToml, validateRoster } from '@ctlflow/fleetd-contracts/configuration';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { descriptorUrl } from '@ctlflow/fleetd-contracts/setup';
+import { currentConfigurationRoot } from '@ctlflow/fleetd-storage/authentication';
 import { launchDaemon } from './daemon.js';
 import { loadConnections, saveConnections } from './configuration.js';
 import { fetchSetupDescriptor, installedVersion } from './setup-descriptor.js';
@@ -30,8 +31,7 @@ function configuredDescriptor(file: string): string {
 }
 export async function setup(options: SetupOptions, signal: AbortSignal, output: (value: unknown) => void): Promise<void> {
   const workspace = realpathSync(process.cwd()), hash = createHash('sha256').update(workspace).digest('hex');
-  const configRoot = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config');
-  if (!isAbsolute(configRoot)) throw new Error('XDG_CONFIG_HOME must be absolute');
+  const configRoot = currentConfigurationRoot();
   const recordPath = join(configRoot, 'fleet', 'projects', hash + '.json');
   const previous = existsSync(recordPath) ? value(stored(readJson<unknown>(recordPath))) : undefined;
   if (options.config && !isAbsolute(options.config)) throw new Error('--config requires an absolute runtime.toml path');

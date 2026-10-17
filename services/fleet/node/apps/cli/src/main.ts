@@ -15,6 +15,7 @@ import { launchDaemon, restartDaemon } from './daemon.js';
 import { terminalPointer } from './attachment.js';
 import { setup } from './setup.js';
 import { listFleets, observeOperation } from './operation.js';
+import { readAuthentication } from '@ctlflow/fleetd-storage/authentication';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) throw new Error(result.error.code + ': ' + result.error.message); return result.value; }
 function output(value: unknown): void { process.stdout.write(JSON.stringify(value, null, 2) + '\n'); }
@@ -98,7 +99,7 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
   if (!remote && (positionals[0] === 'start' || positionals[0] === 'agent' && positionals[1] === 'start')) await launchDaemon(root, undefined, signal);
   const tunnel = remote ? await openTunnel(remote.ssh, root, signal) : undefined;
   try {
-    const client = createDaemonClient(tunnel?.socketPath ?? join(root, 'fleetd.sock'), signal);
+    const client = createDaemonClient(tunnel?.socketPath ?? join(root, 'fleetd.sock'), signal, () => tunnel ? tunnel.authenticationKey : readAuthentication());
     if (positionals[0] === 'daemon') {
       if (positionals.length !== 2 || !['status', 'stop', 'restart'].includes(positionals[1]!)) throw new Error(usage);
       if (positionals[1] === 'restart') {

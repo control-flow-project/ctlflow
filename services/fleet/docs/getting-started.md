@@ -22,10 +22,11 @@ is reused on repeated setup; an explicitly stopped binding stays stopped.
 
 ## Prerequisites
 
-Install the selected fleet/fleetd implementation first. Node npm packages and
-the managed, NativeAOT and Rust distributions have separate installation guides.
-The setup command and product configuration are shared; native fleet selects
-its sibling controller, not a different implementation on PATH.
+The personalized guide installs exact public @ctlflow/fleet and Node fleetd
+through npm on Linux/macOS. It remains npm-based for every server backend and
+does not assume .NET/Rust is installed. Native fleet/controller distributions
+are explicit operator choices with separate guides; their CLI selects its
+sibling controller, not a different implementation on PATH.
 
 - [Installation and packaging by target](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/README.md)
 

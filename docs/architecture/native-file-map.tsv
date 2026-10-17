@@ -1191,6 +1191,7 @@ services/fleet/csharp/apps/Fleet.Cli/Program.cs	services/fleet/rust/apps/cli	app
 services/fleet/csharp/apps/Fleet.Cli/Setup.cs	services/fleet/rust/apps/cli	application
 services/fleet/csharp/packages/Fleet.DaemonClient/DaemonClient.cs	services/fleet/rust/packages/daemon-client	native library
 services/fleet/csharp/packages/Fleet.DaemonClient/Fleet.DaemonClient.csproj	services/fleet/rust/packages/daemon-client	native library
+services/fleet/csharp/packages/Fleet.SshTransport/Authentication.cs	services/fleet/rust/packages/ssh-transport	native library
 services/fleet/csharp/packages/Fleet.SshTransport/Fleet.SshTransport.csproj	services/fleet/rust/packages/ssh-transport	native library
 services/fleet/csharp/packages/Fleet.SshTransport/SshTunnel.cs	services/fleet/rust/packages/ssh-transport	native library
 services/fleet/node/apps/cli/LICENSE	services/fleet/rust/apps/cli	application
@@ -1206,6 +1207,7 @@ services/fleet/node/packages/daemon-client/LICENSE	services/fleet/rust/packages/
 services/fleet/node/packages/daemon-client/package.json	services/fleet/rust/packages/daemon-client	native library
 services/fleet/node/packages/daemon-client/src/client.ts	services/fleet/rust/packages/daemon-client	native library
 services/fleet/node/packages/ssh-transport/LICENSE	services/fleet/rust/packages/ssh-transport	native library
+services/fleet/node/packages/ssh-transport/assets/authentication.json	services/fleet/rust/packages/ssh-transport	native library
 services/fleet/node/packages/ssh-transport/package.json	services/fleet/rust/packages/ssh-transport	native library
 services/fleet/node/packages/ssh-transport/src/host.ts	services/fleet/rust/packages/ssh-transport	native library
 services/fleet/node/packages/ssh-transport/src/terminal.ts	services/fleet/rust/packages/ssh-transport	native library
@@ -1245,6 +1247,7 @@ services/fleetd/csharp/packages/Fleetd.Domain/Models.cs	services/fleetd/rust/pac
 services/fleetd/csharp/packages/Fleetd.Domain/NativeLifecycle.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/NativeLogicalConnection.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/ResumeTasks.cs	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Storage/Authentication.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/ConfigurationFiles.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/FleetBinding.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/Fleetd.Storage.csproj	services/fleetd/rust/packages/storage	native library
@@ -1255,6 +1258,8 @@ services/fleetd/csharp/packages/Fleetd.Storage/SetupFiles.cs	services/fleetd/rus
 services/fleetd/csharp/tests/Fleetd.Domain.Tests/ControllerFixture.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/csharp/tests/Fleetd.Domain.Tests/Fleetd.Domain.Tests.csproj	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/csharp/tests/Fleetd.Domain.Tests/Program.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Storage.Tests/Fleetd.Storage.Tests.csproj	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Storage.Tests/Program.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/apps/daemon/LICENSE	services/fleetd/rust/apps/daemon	application
 services/fleetd/node/apps/daemon/package.json	services/fleetd/rust/apps/daemon	application
 services/fleetd/node/apps/daemon/src/context-migration.ts	services/fleetd/rust/apps/daemon	application
@@ -1285,6 +1290,7 @@ services/fleetd/node/packages/domain/src/resume-work.ts	services/fleetd/rust/pac
 services/fleetd/node/packages/domain/src/setup.ts	services/fleetd/rust/packages/domain	native library
 services/fleetd/node/packages/storage/LICENSE	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/package.json	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/authentication.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/binding.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/configuration.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/controller-root.ts	services/fleetd/rust/packages/storage	native library
@@ -1297,6 +1303,7 @@ services/fleetd/node/packages/storage/src/resume-selection.ts	services/fleetd/ru
 services/fleetd/node/packages/storage/src/resume-work.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/setup.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/scripts/build-package.mjs	scripts/publish-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/fleetd/node/tests/authentication.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/context-migration.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/controller.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/coordination.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank

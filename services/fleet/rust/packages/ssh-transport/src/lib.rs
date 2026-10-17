@@ -10,6 +10,7 @@ use std::{
 use tempfile::TempDir;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
+mod authentication;
 
 pub fn valid_host(value: &str) -> bool {
     let parts = value.split('@').collect::<Vec<_>>();
@@ -59,6 +60,7 @@ fn invalid() -> Failure {
     )
 }
 pub struct Tunnel {
+    authentication_key: crossfire_kernel::secret::Secret,
     directory: TempDir,
     process: NativeProcess,
     socket: Option<Ownership>,
@@ -67,6 +69,9 @@ pub struct Tunnel {
     stop: CancellationToken,
 }
 impl Tunnel {
+    pub fn authentication_key(&self) -> crossfire_kernel::secret::Secret {
+        self.authentication_key.clone()
+    }
     pub fn socket(&self) -> PathBuf {
         self.directory.path().join("daemon.sock")
     }
@@ -74,6 +79,7 @@ impl Tunnel {
         if !valid_host(host) || !valid_root(root) {
             return Err(invalid());
         }
+        let authentication_key = authentication::read(host, stop.clone()).await?;
         let directory = tempfile::Builder::new()
             .prefix("fleet-ssh-")
             .permissions(std::fs::Permissions::from_mode(0o700))
@@ -115,6 +121,7 @@ impl Tunnel {
         let first = capture.clone();
         let second = capture.clone();
         let mut tunnel = Self {
+            authentication_key,
             directory,
             process,
             socket: None,

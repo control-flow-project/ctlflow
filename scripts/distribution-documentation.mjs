@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import { documentationLinks } from './verify-documentation.mjs';
 
 export const distributionGuides = Object.freeze({
+  'csharp-managed': 'csharp-managed.md',
+  'csharp-nativeaot': 'csharp-nativeaot.md',
   rust: 'rust.md',
 });
 

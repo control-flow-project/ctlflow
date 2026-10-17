@@ -11,11 +11,13 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { operations } from '@ctlflow/fleetd-contracts/api';
+import { initializeAuthentication } from '@ctlflow/fleetd-storage/authentication';
 
 test('CLI fleet-wide and per-agent start resume by default; only --fresh-history selects reset', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fc-')), root = join(directory, 'controller'), home = join(directory, 'home');
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(root, { mode: 0o700 }); mkdirSync(home, { mode: 0o700 });
+  const authenticationKey = await initializeAuthentication(join(directory, 'config/ctlflow/fleetd.json'));
   const fleetId = randomUUID(), inputs: { operationId: string; action: string; target: { kind: string; instanceKey?: string } }[] = [];
   let loseResponse = false, rejectOperation = false, paginated = false;
   const pages: number[] = [];
@@ -25,6 +27,7 @@ test('CLI fleet-wide and per-agent start resume by default; only --fresh-history
       listenerActive: false, desiredActive: false, lastActivityAt: null, historyAvailable: null,
       sessionId: null, error: null, startedAt: null }] };
   const server = createServer(async (request, response) => {
+    assert.equal(request.headers.authorization, 'Bearer ' + authenticationKey);
     let data: unknown, meta: object = { requestId: randomUUID() }, status = 200;
     if (request.url === '/api/status') data = { controller: { name: 'test' }, startedAt: 1, stopping: false, loggingRetentionDays: 7, loggingError: null };
     else if (request.method === 'GET') {

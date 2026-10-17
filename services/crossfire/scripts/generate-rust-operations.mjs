@@ -43,7 +43,7 @@ ${[...groups.keys()].map(group => `mod ${group};`).join('\n')}
 pub enum Method { Get, Post, Put, Patch, Delete }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Authentication { Public, Human, Agent, Either, Fleet }
+pub enum Authentication { Public, Human, Agent, Either, Fleet, Controller }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperationId {

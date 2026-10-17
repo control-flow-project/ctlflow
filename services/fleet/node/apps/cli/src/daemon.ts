@@ -6,6 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { prepareControllerRoot } from '@ctlflow/fleetd-storage/controller-root';
 import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
 import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
+import { existsSync } from 'node:fs';
 
 export async function launchDaemon(root: string, name: string | undefined, signal: AbortSignal) {
   prepareControllerRoot(root);
@@ -34,7 +35,8 @@ export async function restartDaemon(root: string, signal: AbortSignal) {
 }
 async function launch(root: string, name: string | undefined, signal: AbortSignal) {
   const client = createDaemonClient(join(root, 'fleetd.sock'), signal);
-  const existing = await client.call(operations.status, {}, {});
+  const existing = existsSync(join(root, 'fleetd.sock')) ? await client.call(operations.status, {}, {})
+    : { ok: false as const, error: { code: 'unavailable' as const, message: 'Controller has not started' } };
   if (existing.ok) {
     if (name !== undefined && existing.value.data.controller.name !== name || existing.value.data.stopping) throw new Error('The selected controller has another identity or is stopping');
     return existing.value.data;

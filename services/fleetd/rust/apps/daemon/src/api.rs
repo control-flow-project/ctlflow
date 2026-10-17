@@ -17,6 +17,7 @@ use std::{collections::BTreeMap, path::Path, sync::Arc};
 use tokio_util::sync::CancellationToken;
 
 pub struct State {
+    pub authentication_key: crossfire_kernel::secret::Secret,
     pub controller: Arc<ControllerOwner>,
     pub diagnostics: Arc<Store>,
     pub days: i64,
@@ -72,17 +73,32 @@ pub async fn handle(
                 .get(server::header::HOST)
                 .and_then(|header| header.to_str().ok())
                 != Some("localhost")
-            || [
-                server::header::ORIGIN,
-                server::header::AUTHORIZATION,
-                server::header::COOKIE,
-            ]
-            .iter()
-            .any(|header| request.headers().contains_key(header))
+            || [server::header::ORIGIN, server::header::COOKIE]
+                .iter()
+                .any(|header| request.headers().contains_key(header))
         {
             return Err(Failure::new(
                 ErrorCode::Forbidden,
-                "Use the private controller socket without browser or bearer credentials",
+                "Use the private controller socket without browser credentials",
+            ));
+        }
+        if request
+            .headers()
+            .get_all(server::header::AUTHORIZATION)
+            .iter()
+            .count()
+            != 1
+            || !fleetd_storage::authentication::matches(
+                request
+                    .headers()
+                    .get(server::header::AUTHORIZATION)
+                    .and_then(|header| header.to_str().ok()),
+                &state.authentication_key,
+            )
+        {
+            return Err(Failure::new(
+                ErrorCode::Unauthorized,
+                "Valid fleetd authentication is required",
             ));
         }
         let path = routing::path(&request)?;

@@ -364,8 +364,20 @@ and unread positions are not tracked source.
 
 The daemon owns registry, desired intent, saved stop selections and operations.
 Local CLI uses a private Unix socket; SSH forwards the same API with normal
-host-key/user authentication. No public controller port, global skill, privileged
-service or boot service is installed.
+host-key/user authentication. Every private operation also requires the shared
+OS-user fleetd credential, including status. fleetd atomically initializes one
+persistent random 256-bit key in private OS-native ctlflow/fleetd.json. It inserts
+a missing key into valid schemaVersion-1 configuration, but rejects unsafe,
+malformed, unknown/duplicate or oversized state. fleet only reads the key.
+Linux uses XDG_CONFIG_HOME or HOME/.config; macOS uses HOME/Library/Application
+Support. fleet connection/project profiles use the same native root under fleet/.
+Remote fleet reads the remote configuration over strict SSH and retains its key
+in memory only. No secrets enter argv, logs or profiles. Config readers are
+trusted with full controller authority; this is not per-agent isolation.
+Origin/Cookie headers remain forbidden. No public controller port, global skill,
+privileged service or boot service is installed.
+
+- [Controller authentication and recovery](../services/fleetd/docs/authentication.md)
 
 - [File schemas and examples](../services/fleet/docs/configuration.md)
 - [CLI commands](../services/fleet/docs/commands.md)

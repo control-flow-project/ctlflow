@@ -14,6 +14,11 @@ The CLI checks the fixed path, exact origin/owner/version, strict schema and
 response bounds. Redirects, ambiguous queries and credential-bearing URLs fail.
 No default deployment account or inferred owner is used.
 
+All server implementations emit pinned npm setup for @ctlflow/fleet and Node
+fleetd on Linux/macOS. The calling Codex/Pi harness does not need .NET or Rust.
+fleetd creates private OS-native authentication configuration automatically;
+fleet reads it and authenticates private API calls without asking for a key.
+
 Setup asks no configuration questions. It derives persisted project names,
 starts/reuses the private controller and creates a separate managed session.
 The invoking coding assistant is never adopted.

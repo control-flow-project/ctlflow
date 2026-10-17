@@ -19,6 +19,12 @@ delivery/messages, contexts/attachment and idempotent operations.
 Unknown routes, methods, fields and duplicated queries are rejected.
 Pagination is canonical positive decimal, page up to 100000, size up to 100.
 
+Every request requires the persistent key in OS-native ctlflow/fleetd.json.
+fleetd creates it on first start or completes valid keyless configuration.
+fleet only reads it. SSH clients read the remote user's config, not the local key.
+
+- [Authentication, upgrades and recovery](authentication.md)
+
 Private SQLite exclusive locks own controller, fleet and receiver lifetimes.
 They survive process suspension and release on exit. Do not delete lock inodes
 or substitute an expiring PID lease. Directories must be private, owned and

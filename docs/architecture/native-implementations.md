@@ -36,7 +36,7 @@ The tree lists owners, not mandatory empty directories.
 
 | Concern | Shared contract | Implementation difference |
 | --- | --- | --- |
-| API | Same routes, input validation, errors and response fields | Node HTTP / ASP.NET / Axum |
+| API | Same routes, input validation, errors and response fields | Node HTTP / ASP.NET / Hyper |
 | Domain | Functional operations, explicit ports, expected failure values | TypeScript modules / C# static modules and records / Rust modules and values |
 | Data | Same SQLite file and normalized schema | Tinqer / EF / Diesel |
 | Migrations | One service-owned Knex image | No runtime or EF migrations |
@@ -77,6 +77,13 @@ A native agent's process/history ownership is a separate controller concern.
 - [Docker package format and site integration](../../services/crossfire/docs/container-packages.md)
 
 ## HTTP boundaries
+
+Private fleetd HTTP requires its OS-user configuration credential on every
+operation, including inspection. Local fleet reads the same private file; SSH
+reads the remote file and retains the secret only in memory. No anonymous
+controller path exists. Origin/Cookie headers remain forbidden.
+
+- [Controller authentication contract](../../services/fleetd/docs/authentication.md)
 
 Public mutation limits distinguish the actual client from a configured trusted
 ingress. Only an immediate peer listed in `trustedProxyAddresses` may supply

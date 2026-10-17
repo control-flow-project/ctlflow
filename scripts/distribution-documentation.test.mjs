@@ -10,7 +10,7 @@ import { documentationLinks } from './verify-documentation.mjs';
 const repository = fileURLToPath(new URL('../', import.meta.url));
 const headings = ['Prerequisites', 'Build and package', 'Install and run the server', 'Install and connect fleet and fleetd', 'Upgrade and verify'];
 
-test('every target has separate installation instructions; the Rust publisher retains its exact canonical guide', () => {
+test('every target has separate installation instructions; native publishers retain their exact canonical guides', () => {
   const temporary = mkdtempSync(join(tmpdir(), 'crossfire-distribution-docs-'));
   try {
     for (const target of ['node', 'csharp-managed', 'csharp-nativeaot', 'rust']) {
@@ -24,7 +24,7 @@ test('every target has separate installation instructions; the Rust publisher re
       assert.equal(readFileSync(join(destination, 'README.md'), 'utf8'), expected, target + ' ships the reviewed target-specific instructions');
     }
     assert.throws(() => stageDistributionDocumentation(repository, temporary, 'csharp'), /explicit native distribution/u);
-    assert.throws(() => stageDistributionDocumentation(repository, temporary, 'csharp-managed'), /explicit native distribution/u);
+    assert.throws(() => stageDistributionDocumentation(repository, temporary, 'node'), /explicit native distribution/u);
     assert.throws(() => stageDistributionDocumentation(repository, temporary, '__proto__'), /explicit native distribution/u);
   } finally { rmSync(temporary, { recursive: true, force: true }); }
 });

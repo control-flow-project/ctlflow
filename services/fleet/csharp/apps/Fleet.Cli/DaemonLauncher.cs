@@ -22,7 +22,7 @@ public static partial class DaemonLauncher
         try
         {
             while (ownership is null) { linked.Token.ThrowIfCancellationRequested(); try { ownership = new(Path.Combine(root, "launcher")); } catch (IOException) { await Task.Delay(TimeSpan.FromMilliseconds(100), clock, linked.Token); } }
-            using var client = new Client(Path.Combine(root, "fleetd.sock")); var previous = await Call(client, "status", linked.Token);
+            using var client = new Client(Path.Combine(root, "fleetd.sock")); var previous = PrivateFiles.Exists(Path.Combine(root, "fleetd.sock")) ? await Call(client, "status", linked.Token) : Crossfire.Kernel.Results.Fail<JsonElement>("unavailable", "Controller has not started");
             if (previous.IsSuccess) { ValidateStatus(previous.Value, name); return previous.Value; } if (previous.Error.Code != "unavailable") throw new CommandFailure(previous.Error.Message);
             var executable = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "fleetd", "fleetd")); PrivateFiles.Executable(executable); var start = new ProcessStartInfo("/usr/bin/setsid") { UseShellExecute = false, WorkingDirectory = root, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
             foreach (var item in new[] { "--", executable, "--root", root, "--artifacts", ReleaseDirectory, "--background" }) start.ArgumentList.Add(item); if (name is not null) { start.ArgumentList.Add("--name"); start.ArgumentList.Add(name); }
@@ -31,7 +31,7 @@ public static partial class DaemonLauncher
             {
                 for (;;)
                 {
-                    linked.Token.ThrowIfCancellationRequested(); var status = await Call(client, "status", linked.Token); if (status.IsSuccess) { ValidateStatus(status.Value, name); ready = true; return status.Value; }
+                    linked.Token.ThrowIfCancellationRequested(); var status = PrivateFiles.Exists(Path.Combine(root, "fleetd.sock")) ? await Call(client, "status", linked.Token) : Crossfire.Kernel.Results.Fail<JsonElement>("unavailable", "Controller has not started"); if (status.IsSuccess) { ValidateStatus(status.Value, name); ready = true; return status.Value; }
                     if (status.Error.Code != "unavailable" || process.HasExited) throw new CommandFailure("Controller did not become ready; inspect " + Path.Combine(root, "logs")); await Task.Delay(TimeSpan.FromMilliseconds(100), clock, linked.Token);
                 }
             }

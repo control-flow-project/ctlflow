@@ -17,6 +17,10 @@ Every agent belongs to a fleet. A single agent uses a one-agent fleet.
 Setup creates a separate managed conversation; it does not attach the coding
 assistant that runs setup.
 
+Personalized setup always installs pinned npm fleet and Node fleetd, independent
+of server backend. Setup hosts do not need .NET or Rust. fleetd creates a private
+OS-native authentication file automatically; fleet reads it.
+
 Node, C# and Rust implement the same products. C# targets .NET 11 with managed and
 NativeAOT outputs. They share the React UI, wire contracts and SQLite database.
 Knex alone owns database creation and migrations for all implementations. The

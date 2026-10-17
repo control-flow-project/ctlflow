@@ -1,6 +1,6 @@
 import type { Parser, Parsed } from '../schema/validation.js';
 export type Operation<Params, Query, Input, Output> = {
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string; auth: 'public' | 'human' | 'agent' | 'either' | 'fleet';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; path: string; auth: 'public' | 'human' | 'agent' | 'either' | 'fleet' | 'controller';
   params: Parser<Params>; query: Parser<Query>; input: Parser<Input>; output: Parser<Output>;
   status: 200 | 201 | 202; collection: boolean; permissions: readonly string[]; description: string;
   requestBytes?: number;

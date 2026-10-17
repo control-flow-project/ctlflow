@@ -13,9 +13,10 @@ public sealed class SshTunnel : IAsyncDisposable
     private readonly object gate = new();
     private Task? closing;
     public string Socket { get; }
-    private SshTunnel(string directory, Process process)
+    public string AuthenticationKey { get; }
+    private SshTunnel(string directory, Process process, string authenticationKey)
     {
-        this.directory = directory; this.process = process; Socket = Path.Combine(directory, "daemon.sock");
+        this.directory = directory; this.process = process; AuthenticationKey = authenticationKey; Socket = Path.Combine(directory, "daemon.sock");
     }
     private void Arm(CancellationToken cancellation)
     { var registration = cancellation.Register(() => _ = DisposeAsync()); lock (gate) { if (closing is null) cancel = registration; else registration.Unregister(); } }
@@ -30,10 +31,11 @@ public sealed class SshTunnel : IAsyncDisposable
     {
         if (!OperatingSystem.IsLinux()) return Results.Fail<SshTunnel>("invalid", "The owned native SSH transport requires Linux");
         if (!ValidHost(host) || !Path.IsPathFullyQualified(root) || root.Contains(':') || root.Any(char.IsControl)) return Results.Fail<SshTunnel>("invalid", "Use a configured SSH hostname and an absolute remote Unix root without colon or control characters");
-        cancellation.ThrowIfCancellationRequested(); var directory = PrivateFiles.Directory(Directory.CreateTempSubdirectory("fs-").FullName); var socket = Path.Combine(directory, "daemon.sock");
+        cancellation.ThrowIfCancellationRequested(); var authentication = await RemoteAuthentication.Read(host, cancellation); if (!authentication.IsSuccess) return Result<SshTunnel>.Fail(authentication.Error);
+        var directory = PrivateFiles.Directory(Directory.CreateTempSubdirectory("fs-").FullName); var socket = Path.Combine(directory, "daemon.sock");
         var start = new ProcessStartInfo("ssh") { UseShellExecute = false, WorkingDirectory = directory };
         foreach (var argument in new[] { "-N", "-T", "-o", "ExitOnForwardFailure=yes", "-o", "StrictHostKeyChecking=yes", "-o", "StreamLocalBindUnlink=no", "-L", "./daemon.sock:" + Path.Combine(root, "fleetd.sock"), host }) start.ArgumentList.Add(argument);
-        Process process; try { process = Process.Start(start) ?? throw new IOException("SSH process was not created"); } catch (Exception error) when (error is IOException or Win32Exception) { Directory.Delete(directory); return Results.Fail<SshTunnel>("unavailable", "Cannot open the configured SSH transport: " + error.Message); } var tunnel = new SshTunnel(directory, process); tunnel.Arm(cancellation);
+        Process process; try { process = Process.Start(start) ?? throw new IOException("SSH process was not created"); } catch (Exception error) when (error is IOException or Win32Exception) { Directory.Delete(directory); return Results.Fail<SshTunnel>("unavailable", "Cannot open the configured SSH transport: " + error.Message); } var tunnel = new SshTunnel(directory, process, authentication.Value); tunnel.Arm(cancellation);
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(120), clock); using var scope = CancellationTokenSource.CreateLinkedTokenSource(cancellation, deadline.Token);
         try
         {

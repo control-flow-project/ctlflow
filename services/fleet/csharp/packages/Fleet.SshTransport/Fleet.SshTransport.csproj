@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <EmbeddedResource Include="../../../node/packages/ssh-transport/assets/authentication.json" LogicalName="Fleet.RemoteAuthentication" />
+    <ProjectReference Include="../../../../fleetd/csharp/packages/Fleetd.Storage/Fleetd.Storage.csproj" />
+    <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterProcess/Crossfire.AdapterProcess.csproj" />
     <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj" />
   </ItemGroup>
 </Project>

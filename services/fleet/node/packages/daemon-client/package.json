@@ -3,5 +3,5 @@
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
-  "dependencies": { "@ctlflow/fleetd-contracts": "0.1.20", "@ctlflow/crossfire-contracts": "0.1.20", "@ctlflow/crossfire-kernel": "0.1.20" }
+  "dependencies": { "@ctlflow/fleetd-contracts": "0.1.20", "@ctlflow/fleetd-storage": "0.1.20", "@ctlflow/crossfire-contracts": "0.1.20", "@ctlflow/crossfire-kernel": "0.1.20" }
 }

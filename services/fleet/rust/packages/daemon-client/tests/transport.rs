@@ -1,6 +1,7 @@
 use crossfire_adapter_filesystem::{PrivateDirectory, socket::Socket};
 use crossfire_adapter_http::server;
 use crossfire_contracts::{call::Call, operations::Method};
+use crossfire_kernel::secret::Secret;
 use fleet_daemon_client::Client;
 use fleetd_contracts::operations::{OPERATIONS, OperationId};
 use serde_json::json;
@@ -42,6 +43,13 @@ async fn every_daemon_operation_uses_the_same_contract_transport_over_a_real_pri
         server::Listener::Unix(listener),
         Arc::new(()),
         |_state, request, peer| async move {
+            assert_eq!(
+                request
+                    .headers()
+                    .get("authorization")
+                    .and_then(|value| value.to_str().ok()),
+                Some(format!("Bearer {}", "a".repeat(64)).as_str())
+            );
             if !matches!(peer, server::Peer::Unix(_)) {
                 return Err(crossfire_kernel::Failure::new(
                     crossfire_kernel::failure::ErrorCode::Forbidden,
@@ -109,7 +117,11 @@ async fn every_daemon_operation_uses_the_same_contract_transport_over_a_real_pri
         stop.clone(),
     ));
     let running = Running { stop, task };
-    let client = Client::open(&path, running.stop.child_token())?;
+    let client = Client::authenticated(
+        &path,
+        running.stop.child_token(),
+        Secret::new("a".repeat(64)),
+    )?;
     for operation in OPERATIONS {
         let mut request = Call::new(operation.id);
         for name in operation.path.split('/').filter_map(|part| {
@@ -144,7 +156,14 @@ async fn every_daemon_operation_uses_the_same_contract_transport_over_a_real_pri
     );
     let linked = path.parent().ok_or("parent required")?.join("linked.sock");
     symlink(&path, &linked)?;
-    assert!(Client::open(&linked, CancellationToken::new()).is_err());
+    assert!(
+        Client::authenticated(
+            &linked,
+            CancellationToken::new(),
+            Secret::new("a".repeat(64))
+        )
+        .is_err()
+    );
     running.stop.cancel();
     Ok(())
 }

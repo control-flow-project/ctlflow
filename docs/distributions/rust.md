@@ -95,6 +95,20 @@ minutes; failure to confirm absence blocks replacement.
 
 ## Install and connect fleet and fleetd
 
+fleetd automatically creates one private OS-user authentication file on first
+start: Linux `$XDG_CONFIG_HOME/ctlflow/fleetd.json` (default
+`$HOME/.config/ctlflow/fleetd.json`), or macOS
+`$HOME/Library/Application Support/ctlflow/fleetd.json` for the Node products.
+fleet reads the same persistent random key and authenticates every daemon
+request. Back it up separately from controller roots; remote clients read the
+remote host's file over strict SSH. See the
+[authentication contract](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/docs/authentication.md).
+
+Management-generated setup always uses pinned npm fleet and Node fleetd,
+independent of the server backend. Native controllers are explicit operator
+choices, not prerequisites imposed on a setup harness.
+
+
 Keep sibling `fleet` and `fleetd` directories together. The CLI resolves its
 controller and `fleetd/artifacts` from that layout. The packaged process guard
 must remain beside fleetd. It runs only while its owned native engine runs;

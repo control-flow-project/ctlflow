@@ -17,9 +17,8 @@ C# NativeAOT are two build modes of the same implementation.
 - [Rust installation and packaging](rust.md)
 
 Each guide covers prerequisites, packaging, server startup, fleet setup, upgrades
-and verification. The Rust publisher copies its selected guide into the
-distribution as `README.md`. The C# publisher remains unchanged and retains its
-existing implementation README. Node npm archives contain their product README and
+and verification. Each native publisher copies its selected target/mode guide
+into the distribution as `README.md`. Node npm archives contain their product README and
 product guides. No installed guide requires a local source checkout merely to
 resolve its documentation links.
 
@@ -30,9 +29,10 @@ internal packages remain private. No native release-download service is assumed.
 
 Build dependencies and runtime dependencies differ. Native fleet controllers
 still require Node for the shared agent-tool client; selecting a native backend
-does not remove that requirement. The server operator uses an explicit source
-checkout to build its runtime and shared migration images. It does not deploy
-the host distribution executable into a container by copying it.
+does not remove that requirement. Building runtime and migration images requires
+a source checkout. Deployment uses the completed explicit Docker package; a
+native server operator does not need the checkout or copy its host executable
+into a container.
 
 - [Shared product configuration](../../services/fleet/docs/configuration.md)
 - [Development and all-target verification](../development.md)
