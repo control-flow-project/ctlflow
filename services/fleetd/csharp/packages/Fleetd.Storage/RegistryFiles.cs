@@ -15,8 +15,9 @@ public sealed class RegistryFiles
     public FleetRegistry Port { get; }
     public RegistryFiles(string root)
     {
-        if (PrivateFiles.Exists(root)) PrivateFiles.ExistingDirectory(root, true); else PrivateFiles.Directory(root); this.root = root; operations = PrivateFiles.Directory(Path.Combine(root, "operations"));
-        ConvertOperationHistory(); var setup = new SetupFiles(root);
+        if (PrivateFiles.Exists(root)) PrivateFiles.ExistingDirectory(root, true); else PrivateFiles.Directory(root); this.root = root;
+        foreach (var name in new[] { "operations.json", "daemon.log" }) if (PrivateFiles.Exists(Path.Combine(root, name))) throw new InvalidDataException("Unsupported controller state: " + name + "; normal startup does not import obsolete files");
+        operations = PrivateFiles.Directory(Path.Combine(root, "operations")); var setup = new SetupFiles(root);
         Port = new(Registrations, values => Save("fleets.json", values, FleetWire.Registration, 1048576), Desired, SaveDesired, Selections, SaveSelections, Pending, Operation, SaveOperation, Prune, directory => ConfigurationFiles.Load(directory), ConfigurationFiles.WriteRoster, setup.Prepare, setup.Complete, setup.Retry);
     }
     private Result<IReadOnlyList<T>> Read<T>(string name, Func<JsonElement, Result<T>> parse, int limit, int maximum = 1048576) => ConfigurationFiles.Boundary(() =>
@@ -44,17 +45,6 @@ public sealed class RegistryFiles
     { if (!Validation.Identifier(id)) return Results.Fail<FleetOperation?>("invalid", "Invalid operation identity"); var file = Path.Combine(operations, id + ".json"); if (!PrivateFiles.Exists(file)) return Result<FleetOperation?>.Success(null); var parsed = OperationContract.Parse(WireJson.Parse(PrivateFiles.Read(file, 1048576))); return parsed.IsSuccess && parsed.Value.Request.OperationId != id ? Results.Fail<FleetOperation?>("invalid", "Operation file identity mismatch") : parsed.Map<FleetOperation?>(value => value); });
     private Result<Unit> SaveOperation(FleetOperation value) => ConfigurationFiles.Boundary(() =>
     { var wire = FleetWire.Operation(value); var parsed = OperationContract.Parse(wire); if (!parsed.IsSuccess) return Result<Unit>.Fail(parsed.Error); lock (gate) PrivateFiles.Write(Path.Combine(operations, value.Request.OperationId + ".json"), WireJson.Bytes(wire, true), 1048576); return Results.Done(); });
-    private void ConvertOperationHistory()
-    {
-        var file = Path.Combine(root, "operations.json"); if (!PrivateFiles.Exists(file)) return; var original = PrivateFiles.Read(file, 1048576); var parsed = Validation.List(WireJson.Parse(original), OperationContract.Parse, 700);
-        if (!parsed.IsSuccess || parsed.Value.Select(value => value.Request.OperationId).Distinct(StringComparer.Ordinal).Count() != parsed.Value.Count) throw new InvalidDataException("Invalid or duplicate deployed operation history");
-        foreach (var operation in parsed.Value)
-        {
-            var existing = Operation(operation.Request.OperationId); if (!existing.IsSuccess || existing.Value is { } saved && WireJson.Compact(FleetWire.Operation(saved)) != WireJson.Compact(FleetWire.Operation(operation))) throw new InvalidDataException("Operation conversion conflicts with a retained record");
-            if (existing.Value is null) { var stored = SaveOperation(operation); if (!stored.IsSuccess) throw new IOException(stored.Error.Message); }
-        }
-        if (!PrivateFiles.Read(file, 1048576).AsSpan().SequenceEqual(original)) throw new InvalidDataException("Deployed operation history changed during conversion"); PrivateFiles.DeletePrivate(file);
-    }
     private IReadOnlyList<string> Files()
     {
         var result = new List<string>(); foreach (var path in Directory.EnumerateFileSystemEntries(operations)) { var name = Path.GetFileName(path); if (name.StartsWith(".pending-", StringComparison.Ordinal) && Validation.Identifier(name[9..])) { PrivateFiles.DeletePrivate(path); continue; } if (!name.EndsWith(".json", StringComparison.Ordinal) || !Validation.Identifier(name[..^5])) throw new InvalidDataException("Unexpected file in private operation storage"); result.Add(name[..^5]); } return result;

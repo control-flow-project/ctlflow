@@ -114,7 +114,6 @@ services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/AgentProjects.cs	
 services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/AssetFiles.cs	services/crossfire/rust/packages/adapter-filesystem	native library
 services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/AtomicFile.cs	services/crossfire/rust/packages/adapter-filesystem	native library
 services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj	services/crossfire/rust/packages/adapter-filesystem	native library
-services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/DiagnosticMigration.cs	services/crossfire/rust/packages/adapter-filesystem	native library
 services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/DiagnosticStore.cs	services/crossfire/rust/packages/adapter-filesystem	native library
 services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/ManagedLinks.cs	services/crossfire/rust/packages/adapter-filesystem	native library
 services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/NativeHistory.cs	services/crossfire/rust/packages/adapter-filesystem	native library
@@ -1251,7 +1250,6 @@ services/fleetd/csharp/packages/Fleetd.Storage/Authentication.cs	services/fleetd
 services/fleetd/csharp/packages/Fleetd.Storage/ConfigurationFiles.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/FleetBinding.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/Fleetd.Storage.csproj	services/fleetd/rust/packages/storage	native library
-services/fleetd/csharp/packages/Fleetd.Storage/ProfileMigration.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/RegistryFiles.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/ResumeFiles.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/SetupFiles.cs	services/fleetd/rust/packages/storage	native library
@@ -1297,7 +1295,6 @@ services/fleetd/node/packages/storage/src/controller-root.ts	services/fleetd/rus
 services/fleetd/node/packages/storage/src/history.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/logging.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/operation.ts	services/fleetd/rust/packages/storage	native library
-services/fleetd/node/packages/storage/src/profile-migration.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/registry.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/resume-selection.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/resume-work.ts	services/fleetd/rust/packages/storage	native library
@@ -1320,7 +1317,6 @@ services/fleetd/node/tests/observation-migration.test.ts	services/fleetd/tests/c
 services/fleetd/node/tests/operator-tools.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/pi-lifecycle-integration.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/pi-provider-acceptance.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
-services/fleetd/node/tests/profile-migration.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/registry-intent.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/resume-authority.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/resume-work.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank

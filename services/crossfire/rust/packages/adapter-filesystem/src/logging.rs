@@ -71,19 +71,14 @@ fn partition(name: &str) -> Result<Option<i64>> {
     let Some(date) = stem.get(..10) else {
         return Ok(None);
     };
-    let tail = &stem[10..];
-    if !date.bytes().enumerate().all(|(index, value)| {
-        if [4, 7].contains(&index) {
-            value == b'-'
-        } else {
-            value.is_ascii_digit()
-        }
-    }) || !tail.is_empty()
-        && !(tail.len() == 65
-            && tail.starts_with('-')
-            && tail[1..]
-                .bytes()
-                .all(|value| value.is_ascii_digit() || (b'a'..=b'f').contains(&value)))
+    if stem.len() != 10
+        || !date.bytes().enumerate().all(|(index, value)| {
+            if [4, 7].contains(&index) {
+                value == b'-'
+            } else {
+                value.is_ascii_digit()
+            }
+        })
     {
         return Ok(None);
     }
@@ -266,96 +261,6 @@ impl Store {
             state.closed = true;
         }
     }
-}
-pub async fn migrate(file: &Path, destination: &Path, days: i64, now: i64) -> Result<()> {
-    Retention::new(Some(days))?;
-    match std::fs::symlink_metadata(file) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(_) => return Err(failed()),
-        Ok(_) => {}
-    }
-    let parent = PrivateDirectory::open(file.parent().ok_or_else(failed)?, false)?;
-    let leaf = file
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(failed)?;
-    let mut input = parent.open_private(leaf, false)?;
-    let before = input.metadata().map_err(|_| failed())?;
-    let at = before
-        .mtime()
-        .checked_mul(1000)
-        .and_then(|value| value.checked_add(before.mtime_nsec() / 1000000))
-        .filter(|value| *value >= 0)
-        .ok_or_else(failed)?;
-    if at < now.checked_sub(days * DAY_MS).ok_or_else(failed)? {
-        unchanged(&parent, leaf, &input, &before)?;
-        return parent.remove(leaf);
-    }
-    let directory = PrivateDirectory::open(destination, true)?;
-    let modified = before.mtime() as f64 * 1000.0 + before.mtime_nsec() as f64 / 1000000.0;
-    let identity = identity::hash(&format!(
-        "[{},{},{},{}]",
-        before.dev(),
-        before.ino(),
-        before.len(),
-        modified
-    ));
-    let name = format!("{}-{}.jsonl", &iso_timestamp(at)?[..10], identity);
-    if directory.private_file_size(&name)?.is_none() {
-        let pending = Pending {
-            directory: &directory,
-            name: format!("{name}.pending-{}", identity::id()),
-        };
-        directory.write_new(&pending.name, &[])?;
-        let mut output = directory.open_private(&pending.name, false)?;
-        let mut buffer = [0; MESSAGE_BYTES];
-        let mut pending_bytes = Vec::with_capacity(MESSAGE_BYTES + 4);
-        let mut position = 0_u64;
-        loop {
-            let maximum = (before
-                .len()
-                .saturating_sub(position)
-                .min(MESSAGE_BYTES as u64)) as usize;
-            let count =
-                std::io::Read::read(&mut input, &mut buffer[..maximum]).map_err(|_| failed())?;
-            position += count as u64;
-            pending_bytes.extend_from_slice(&buffer[..count]);
-            let length = match std::str::from_utf8(&pending_bytes) {
-                Ok(_) => pending_bytes.len(),
-                Err(error) if error.error_len().is_none() && count != 0 => error.valid_up_to(),
-                Err(_) => return Err(failed()),
-            };
-            if length != 0 {
-                let message =
-                    std::str::from_utf8(&pending_bytes[..length]).map_err(|_| failed())?;
-                let bytes = serde_json::to_vec(
-                    &json!({"at":at,"message":message,"timeBasis":"file-modification-upper-bound"}),
-                )
-                .map_err(|_| failed())?;
-                if bytes.len() > RECORD_BYTES {
-                    return Err(failed());
-                }
-                output
-                    .write_all(&bytes)
-                    .and_then(|_| output.write_all(b"\n"))
-                    .map_err(|_| failed())?;
-                pending_bytes.drain(..length);
-            }
-            if count == 0 {
-                if !pending_bytes.is_empty() {
-                    return Err(failed());
-                }
-                break;
-            }
-            tokio::task::yield_now().await;
-        }
-        unchanged(&parent, leaf, &input, &before)?;
-        output.sync_all().map_err(|_| failed())?;
-        drop(output);
-        directory.publish_file(&pending.name, &name)?;
-    }
-    unchanged(&parent, leaf, &input, &before)?;
-    parent.remove(leaf)
 }
 fn uuid_like(value: &str) -> bool {
     value.len() == 36

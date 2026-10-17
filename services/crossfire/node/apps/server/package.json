@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-server",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
@@ -11,16 +11,16 @@
   },
   "dependencies": {
     "better-sqlite3": "13.0.3",
-    "@ctlflow/crossfire-data": "0.1.20",
-    "@ctlflow/crossfire-client": "0.1.20",
-    "@ctlflow/crossfire-contracts": "0.1.20",
-    "@ctlflow/crossfire-kernel": "0.1.20",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.20",
-    "@ctlflow/crossfire-adapter-matrix": "0.1.20",
-    "@ctlflow/crossfire-adapter-sqlite": "0.1.20",
-    "@ctlflow/crossfire-adapter-schedule": "0.1.20",
-    "@ctlflow/crossfire-agent-core": "0.1.20",
-    "@ctlflow/crossfire-adapter-runtime": "0.1.20",
-    "@ctlflow/crossfire-domain": "0.1.20"
+    "@ctlflow/crossfire-data": "0.1.21",
+    "@ctlflow/crossfire-client": "0.1.21",
+    "@ctlflow/crossfire-contracts": "0.1.21",
+    "@ctlflow/crossfire-kernel": "0.1.21",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.21",
+    "@ctlflow/crossfire-adapter-matrix": "0.1.21",
+    "@ctlflow/crossfire-adapter-sqlite": "0.1.21",
+    "@ctlflow/crossfire-adapter-schedule": "0.1.21",
+    "@ctlflow/crossfire-agent-core": "0.1.21",
+    "@ctlflow/crossfire-adapter-runtime": "0.1.21",
+    "@ctlflow/crossfire-domain": "0.1.21"
   }
 }

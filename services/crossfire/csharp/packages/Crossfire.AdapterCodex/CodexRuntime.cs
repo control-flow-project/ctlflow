@@ -76,7 +76,7 @@ public static partial class CodexRuntime
                 new(_ => { }, (_, _) => ValueTask.FromResult(Results.Fail<JsonElement>("invalid", "Capability inspection cannot answer native decisions")), _ => { }), cancellation);
             if (!connected.IsSuccess) return Result<Unit>.Fail(connected.Error); await using var protocol = connected.Value;
             var initialized = CodexJson.ObjectReply(await protocol.Request("initialize", CodexJson.Object(writer =>
-            { writer.WriteStartObject("clientInfo"); writer.WriteString("name", "crossfire-inspection"); writer.WriteString("version", "0.1.20"); writer.WriteEndObject(); writer.WriteStartObject("capabilities"); writer.WriteBoolean("experimentalApi", true); writer.WriteEndObject(); }), cancellation));
+            { writer.WriteStartObject("clientInfo"); writer.WriteString("name", "crossfire-inspection"); writer.WriteString("version", "0.1.21"); writer.WriteEndObject(); writer.WriteStartObject("capabilities"); writer.WriteBoolean("experimentalApi", true); writer.WriteEndObject(); }), cancellation));
             if (!initialized.IsSuccess) return Result<Unit>.Fail(initialized.Error); var notified = await protocol.Notify("initialized", cancellation); if (!notified.IsSuccess) return notified;
             return (await ModelAdmission.Read(protocol, parsed.Value, cancellation)).Map(_ => default(Unit));
         }

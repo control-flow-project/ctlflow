@@ -5,6 +5,12 @@ resume selections, operation files, diagnostics and private `fleetd.sock`.
 Registered fleets may live elsewhere. Private state is retained with its owning
 directory; a workarea does not move when native cwd changes.
 
+Normal startup accepts only UUID operation files in `operations/` and daily
+diagnostic partitions in `logs/`. Obsolete `operations.json` and `daemon.log`
+block startup without being read, imported or deleted. Profiles and listener
+state are addressed only by immutable instance key; display names never locate
+or relocate saved state. Resolve unsupported files offline after a verified backup.
+
 The OS-user authentication file is separate from each controller root: Linux
 XDG_CONFIG_HOME (default HOME/.config) or macOS HOME/Library/Application Support,
 followed by ctlflow/fleetd.json. Include it in private backups.

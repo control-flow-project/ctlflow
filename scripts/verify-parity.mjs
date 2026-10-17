@@ -26,8 +26,8 @@ async function run(label, binary, args) {
   if (failure) throw new Error(label + ' failed; inspect ' + log);
 }
 try {
-  await run('architecture', 'npm', ['run', 'verify:architecture']);
   await run('node', 'npm', ['test']);
+  await run('architecture', 'npm', ['run', 'verify:architecture']);
   await run('csharp', 'npm', ['run', 'verify:csharp']);
   await run('rust', process.execPath, ['scripts/verify-rust.mjs']);
   await run('managed-distribution', process.execPath, ['scripts/publish-csharp.mjs', '--mode', 'managed', '--output', managed]);

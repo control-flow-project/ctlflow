@@ -18,6 +18,7 @@ import { messageContracts } from './messages.contract.js';
 import { paginationContracts } from '@ctlflow/crossfire-test-support/contract-pagination';
 import { readAuthentication } from '@ctlflow/fleetd-storage/authentication';
 import { authenticationContracts } from './authentication.contract.js';
+import { storageContracts } from './storage.contract.js';
 
 type Declaration = { method: string; path: string; status: number; collection: boolean; output: Parser<unknown> };
 export async function daemonContracts(scope: TestContext, platform: ContractPlatform, selected: ContractTarget, runtime: 'codex' | 'pi'): Promise<void> {
@@ -30,6 +31,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   }
   await observe(async () => { assert.equal(daemon.alive(), true, daemon.errors()); try { return (await raw('/api/status')).status === 200; } catch { return false; } }, 'Private daemon must start');
   await authenticationContracts(scope, socket, authenticationFile);
+  await storageContracts(scope, selected, directory, environment);
   await paginationContracts(scope, query => raw('/api/fleets' + query));
   cleanup(scope, async () => { try { await call(operations.operate, {}, { operationId: randomUUID(), action: 'stop', target: { kind: 'daemon' }, expectedRevision: 0 }); } catch { await daemon.close(); } });
   const role = join(fleetDirectory, 'agents/analyst'); mkdirSync(role, { recursive: true, mode: 0o700 });

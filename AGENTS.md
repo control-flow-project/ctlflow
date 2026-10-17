@@ -21,6 +21,15 @@ the superseded path; do not leave it available behind a flag. Record any explici
 exception and its exact scope in these instructions, local memory and the ledger.
 There are currently no project-wide compatibility exceptions.
 
+The owner reaffirmed on 2026-10-17: preserving existing data, deployment state,
+old clients or prior implementation choices never justifies a second path.
+Do not retain or introduce any compatibility reader/writer, old/new handler,
+alias, bridge or fallback to save existing state. Any such exception requires
+the owner's explicit approval of that specific path; none is approved. Necessary
+one-time forward migrations end at the single current schema and do not leave
+old runtime support. Explicitly selected Node/C#/Rust build targets remain
+separate implementations of that same current contract, not compatibility modes.
+
 On 2026-10-13 the owner explicitly authorized independently selected Node and
 C# implementations of all three products in this monorepo. C# targets .NET 11,
 NativeAOT and EF Core. All implementations must use one shared React UI, identical
@@ -120,6 +129,11 @@ server implementation; do not require .NET/Rust on ordinary setup hosts.
 No systemd/global services, global skills, unrequested host changes, production
 resets or unrequested deployment. Preserve credentials and shared source work.
 Do not delegate or start subagents without explicit authorization.
+Every authorized subagent must be forked with full parent context
+(`fork_context: true`) and work in a separate Git worktree. Scoped assignments
+supplement, never replace, that context. The parent integrates the changes and
+owns all quality, diff, review and final verification gates; a worker's report
+or passing isolated tests never replaces parent acceptance.
 
 ## Work discipline
 A user request to deploy authorizes completing the in-scope release end to end,

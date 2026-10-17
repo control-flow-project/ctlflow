@@ -26,9 +26,9 @@ public sealed partial class DiagnosticStore : PlatformDiagnostics
         if (days is < 1 or > 104249991) throw new ArgumentOutOfRangeException(nameof(days));
         directory = PrivateFiles.Directory(path); this.days = days; this.now = now;
     }
-    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}(?:-[a-f0-9]{64})?\.jsonl$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}\.jsonl$", RegexOptions.CultureInvariant)]
     private static partial Regex Partition();
-    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}(?:-[a-f0-9]{64})?\.jsonl\.pending-[a-f0-9-]{36}$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\d{4}-\d{2}-\d{2}\.jsonl\.pending-[a-f0-9-]{36}$", RegexOptions.CultureInvariant)]
     private static partial Regex Pending();
     public string? Error { get { lock (gate) return writeError ?? cleanupError ?? maintenanceError; } }
     public void MaintenanceError(string? message) { lock (gate) maintenanceError = message; }

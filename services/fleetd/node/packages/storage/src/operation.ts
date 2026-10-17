@@ -1,13 +1,15 @@
-import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
 import { lstatSync, readdirSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { operationView } from '@ctlflow/fleetd-contracts/api';
 import type { Registry } from '@ctlflow/fleetd-domain/port';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
-import { privateDir, readJson, writeJson, readPrivateBytes } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 
 export function operationStorage(root: string): Pick<Registry, 'pendingOperations' | 'operation' | 'saveOperation' | 'pruneOperations'> {
+  for (const name of ['operations.json', 'daemon.log']) {
+    if (lstatSync(join(root, name), { throwIfNoEntry: false })) throw new Error('Unsupported controller state: ' + name + '; normal startup does not import obsolete files');
+  }
   const directory = privateDir(join(root, 'operations'));
   function read(id: string) {
     const valid = check.identifier(id); if (!valid.ok) return valid;
@@ -31,21 +33,6 @@ export function operationStorage(root: string): Pick<Registry, 'pendingOperation
     const valid = operationView(value); if (!valid.ok) return valid;
     writeJson(join(directory, value.operationId + '.json'), valid.value);
     return success(undefined);
-  }
-  const previous = join(root, 'operations.json');
-  if (lstatSync(previous, { throwIfNoEntry: false })) {
-    const bytes = readPrivateBytes(previous, 1024 * 1024);
-    const parsed = check.list(operationView, 700)(JSON.parse(decodeUtf8(bytes)));
-    if (!parsed.ok) throw new Error(parsed.error.message);
-    if (new Set(parsed.value.map(value => value.operationId)).size !== parsed.value.length) throw new Error('Duplicate operation in deployed history');
-    for (const value of parsed.value) {
-      const existing = read(value.operationId);
-      if (!existing.ok || existing.value && JSON.stringify(existing.value) !== JSON.stringify(value)) throw new Error('Operation conversion conflicts with a retained record');
-      const saved = existing.value ? success(undefined) : save(value);
-      if (!saved.ok) throw new Error(saved.error.message);
-    }
-    if (!readPrivateBytes(previous, 1024 * 1024).equals(bytes)) throw new Error('Deployed operation history changed during conversion');
-    unlinkSync(previous);
   }
   function attempt<Value>(action: () => Result<Value>): Result<Value> {
     try { return action(); } catch { return failure('unavailable', 'Private operation storage is unavailable'); }

@@ -11,6 +11,12 @@ implicit fallbacks and parallel old/new implementations are prohibited.
 Forward migrations preserve deployed data without keeping old runtime models.
 Production resets are prohibited.
 
+Existing state never justifies keeping an old runtime reader, writer, handler,
+alias, bridge or hidden fallback. A specific exception requires explicit owner
+approval; none is currently approved. A necessary forward migration produces
+only the current schema. Independently selected language targets implement that
+same contract and never substitute for one another.
+
 ## 1. Products
 
 ctlflow names the monorepo, not a server or controller. Product names are lowercase
