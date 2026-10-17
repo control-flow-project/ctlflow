@@ -124,9 +124,10 @@ Install scripts do not start processes. The seven-day npm release-age policy
 retains only its recorded exact named exceptions. Dependency updates do not
 grant new exceptions. Lockfile ownership and installed bytes are verified.
 
-First-party material is proprietary under the root LICENSE, copyright
-Jeswin P Kumar, jeswinpk@agilehead.com. Workspace metadata/distributed licenses
-must agree; public npm availability grants no open-source rights.
+First-party material is MIT-licensed under the root LICENSE, copyright
+Jeswin P Kumar, jeswinpk@agilehead.com. Node, C# and Rust metadata and distributed
+license copies must agree. Internal packages remain private; licensing does not
+authorize their publication.
 Third-party notices remain unchanged.
 
 Each selectable target has separate factual installation/packaging instructions:

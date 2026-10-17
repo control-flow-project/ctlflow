@@ -33,7 +33,7 @@ version = "0.1.20"
 edition = "2024"
 rust-version = "1.98"
 authors = ["Jeswin P Kumar <jeswinpk@agilehead.com>"]
-license-file = "LICENSE"
+license = "MIT"
 publish = false
 
 [workspace.dependencies]

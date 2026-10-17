@@ -18,7 +18,7 @@ native agents or write controller state directly.
 
 Node source lives under `node/`, C# under `csharp/` and Rust under `rust/`.
 External behavior is tested under `tests/contracts/`.
-`@ctlflow/fleet` may be publicly distributed; first-party licensing remains
-proprietary. Internal dependencies are bundled, not published separately.
+`@ctlflow/fleet` may be publicly distributed; first-party material is MIT-licensed.
+Internal dependencies are bundled, not published separately.
 
 - [License](LICENSE)

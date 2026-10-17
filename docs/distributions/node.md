@@ -130,4 +130,4 @@ npm run verify:parity -- /absolute/new-evidence-directory
 - [Configuration and command reference](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/docs/README.md)
 - [Server configuration and backup](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/operations.md)
 - [Verification scope and prerequisites](https://github.com/control-flow-project/ctlflow/blob/main/docs/development.md)
-- [Proprietary license](https://github.com/control-flow-project/ctlflow/blob/main/LICENSE)
+- [MIT license](https://github.com/control-flow-project/ctlflow/blob/main/LICENSE)

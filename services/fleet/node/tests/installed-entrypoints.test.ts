@@ -68,9 +68,9 @@ test('clean installed public tarballs resolve only public dependencies and own o
       ...(name === 'fleetd' ? ['README.md', 'SKILL.md', 'crossfire-client.mjs', 'manifest.json', 'matrix-spec-LICENSE.txt'].map(file => join('dist', 'assets', file)) : [])];
     assert.deepEqual(installedFiles(packageRoot).sort(), expected.sort(), 'Exact public files contain no source, tests, credentials or extra artifact path');
     const license = readFileSync(join(sourceRoot, 'LICENSE'), 'utf8');
-    assert.equal(readFileSync(join(packageRoot, 'LICENSE'), 'utf8'), license, 'The installed public product includes the complete proprietary license');
+    assert.equal(readFileSync(join(packageRoot, 'LICENSE'), 'utf8'), license, 'The installed public product includes the complete MIT license');
     const manifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as { license: string; author: string };
-    assert.equal(manifest.license, 'SEE LICENSE IN LICENSE');
+    assert.equal(manifest.license, 'MIT');
     assert.equal(manifest.author, 'Jeswin P Kumar <jeswinpk@agilehead.com>');
     if (name === 'fleetd') {
       assert(readFileSync(join(packageRoot, 'dist', 'assets', 'README.md'), 'utf8').endsWith(license), 'Standalone agent tools carry the full first-party license');
