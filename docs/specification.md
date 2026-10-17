@@ -461,6 +461,10 @@ shutdown cannot invent an unfinished task for an idle context.
 Native owner questions use the currently active listener run. A reporting
 replacement invalidates the preceding run; callers waiting during reconnection
 receive the new run, never the first run cached at initial startup.
+Delivery admission and reporting have distinct cancellation lifetimes. Pausing
+new input retains the authenticated reporting run, native observations, owner
+questions and explicit answers for work already running. Lost controller
+authority closes both. Paused delivery cannot admit scheduled or chat input.
 
 Reset stops selected processes before retiring any selected history. It exports
 available authorized Matrix history/nonsecret configuration to verified private
@@ -500,7 +504,8 @@ unregistration after archive revokes the credential. A repeated close reuses
 its completed local outcome; failed remote release is never marked confirmed.
 
 Each reporting run proves exact fleet/connection/credential, active owner/agent,
-immutable instance binding and delivery intent. A run cannot switch generations.
+immutable instance binding. Delivery additionally requires enabled delivery
+intent; native reporting does not. A run cannot switch generations.
 Secrets never enter model context, projections, logs or audit.
 A label/boolean cannot authenticate a controller.
 

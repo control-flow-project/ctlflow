@@ -49,7 +49,8 @@ public sealed partial class ListenerReceiver
             try
             {
                 if ((!options.Control.Current().Active || state.Paused) && chat.Unpublished) { Take(chat.DiscardUnpublished()); completed = null; }
-                if (!options.Control.Current().Active) { await PauseActivity(); await Wait(previous); continue; } if (!await Activate() || generation.IsCancellationRequested) continue;
+                var reporting = await Activate();
+                if (!options.Control.Current().Active) { await Wait(previous); continue; } if (!reporting || generation.IsCancellationRequested) continue;
                 if (!synchronized) { await Wait(previous); continue; }
                 lock (gate) { if (controlling && (completed is null || ordinary.IsCancellationRequested || Urgent() is not null)) previous = -1; }
                 if (previous == -1) { await changed.Wait(TimeSpan.FromMilliseconds(options.ReconcileMs), options.Clock, lifetime.Token); continue; }

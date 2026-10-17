@@ -35,7 +35,7 @@ public static class WakeDeliveries
         var now = ports.Rules.Discovery.Authorization.Now();
         if (run.Value.StoppedAt is not null || run.Value.DisconnectRequestedAt is not null || run.Value.LastSeenAt < now - ControllerAdmission.HeartbeatExpiryMs || run.Value.Controller is null) return Result<bool>.Success(false);
         var controller = run.Value.Controller;
-        return ports.Listener.Facts(agentId, controller.FleetId, controller.CredentialId).Map(value => ControllerAdmission.Admits(run.Value, value, now));
+        return ports.Listener.Facts(agentId, controller.FleetId, controller.CredentialId).Map(value => ControllerAdmission.Admits(run.Value, value, now, ControllerPurpose.Delivery));
     }
 
     private static Result<bool> Allowed(WakeDeliveryPorts ports, WakeRule rule, string agentId)

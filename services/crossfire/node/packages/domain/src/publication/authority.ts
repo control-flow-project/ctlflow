@@ -10,7 +10,7 @@ function publisherLease(services: PublicationDependencies, agentId: string) {
   const runs = services.listenerRead.admissionCandidates([agentId], now - HEARTBEAT_EXPIRY_MS); if (!runs.ok) return runs;
   for (const { run, facts } of runs.value) {
     if (run.disconnectRequestedAt !== null) continue;
-    if (admitsController(run, facts, now)) return success(undefined);
+    if (admitsController(run, facts, now, 'reporting')) return success(undefined);
   }
   return failure('forbidden', 'Publication requires the current authenticated fleet controller listener');
 }

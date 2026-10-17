@@ -23,7 +23,7 @@ test('listener activity counts cumulative receipts once and excludes offline gap
   value(beat(another, 3)); assert.equal(activity().activeRuns.length, 2);
   const fleet = value(services.repositories.fleet.findById(agent.controller.fleetId))!;
   value(changeFleetDelivery(services, admin.actor, fleet.id, { expectedRevision: fleet.revision, enabled: false }, randomUUID()));
-  assert.equal(activity().status, 'offline'); assert.equal(value(beat(run, 4)).disconnect, true);
+  assert.equal(activity().status, 'online'); assert.equal(value(beat(run, 4)).disconnect, false);
   value(beat(run, 4, true)); value(beat(another, 3, true));
   assert.equal(activity().status, 'offline'); value(beat(run, 999)); assert.equal(activity().messagesDelivered, 7);
   const paused = value(services.repositories.fleet.findById(fleet.id))!;
@@ -62,5 +62,5 @@ test('HTTP heartbeat binds native identity and controller; delivery intent requi
   assert.equal((await request(delivery, 'PUT', stop, headers(other))).status, 403);
   assert.equal((await request(delivery, 'PUT', stop, headers(owner))).status, 200);
   const result = await request(path + '/listener-runs/' + run, 'PUT', input, auth);
-  assert.equal((await result.json() as { data: { disconnect: boolean } }).data.disconnect, true);
+  assert.equal((await result.json() as { data: { disconnect: boolean } }).data.disconnect, false, 'Paused delivery retains authenticated reporting');
 });

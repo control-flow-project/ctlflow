@@ -82,6 +82,7 @@ test('owned native Codex receipts, interruption recovery, commands and Matrix in
     .catch(error => error);
   cleanup(context, async () => { stop.abort(new Error('verification complete')); await receiving; });
   await until(() => matrix.waiting() === 1);
+  await until(() => existsSync(matrix.cursorFile) && JSON.parse(readFileSync(matrix.cursorFile, 'utf8'))[ROOM] === 'sync-0');
   native.hold();
   await native.call('turn/start', { threadId: native.thread.id, input: [{ type: 'text', text: 'hold during Matrix burst', text_elements: [] }] });
   await until(() => native.held() !== undefined);

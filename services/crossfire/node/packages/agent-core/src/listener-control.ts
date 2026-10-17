@@ -4,20 +4,24 @@ import type { RuntimeConnection } from './runtime.js';
 import type { MessageArtifacts } from './message-artifacts.js';
 import type { DirectedInput, ListenerControl } from './listener-control-port.js';
 export function createListenerControl(acknowledge: ListenerControl['acknowledge'], binding: ListenerControl['binding'], unavailable?: (reason: string) => void) {
-  let active = false, input: DirectedInput | null = null, generation = new AbortController();
+  let connected = false, active = false, input: DirectedInput | null = null, connection = new AbortController(), generation = new AbortController();
+  connection.abort(new Error('Controller connection is inactive'));
   generation.abort(new Error('Controller delivery is inactive'));
   const observers = new Set<() => void>();
-  const connection: ListenerControl = { current: () => ({ active, signal: generation.signal, input }), binding, acknowledge,
-    unavailable(reason) { update({ active: false, input }); unavailable?.(reason); },
+  const control: ListenerControl = { current: () => ({ connected, connection: connection.signal, active, signal: generation.signal, input }), binding, acknowledge,
+    unavailable(reason) { update({ connected: false, active: false, input }); unavailable?.(reason); },
     subscribe(changed) { observers.add(changed); return () => { observers.delete(changed); }; } };
-  function update(next: { active: boolean; input: DirectedInput | null }): void {
-    const different = active !== next.active || input?.messageId !== next.input?.messageId || input?.text !== next.input?.text;
+  function update(next: { connected: boolean; active: boolean; input: DirectedInput | null }): void {
+    if (next.active && !next.connected) throw new Error('Delivery requires an authenticated controller connection');
+    const different = connected !== next.connected || active !== next.active || input?.messageId !== next.input?.messageId || input?.text !== next.input?.text;
+    if (connected && !next.connected) connection.abort(new Error('Controller connection became inactive'));
+    if (!connected && next.connected) connection = new AbortController();
     if (active && !next.active) generation.abort(new Error('Controller connection or fleet delivery became inactive'));
     if (!active && next.active) generation = new AbortController();
-    active = next.active; input = next.input;
+    connected = next.connected; active = next.active; input = next.input;
     if (different) for (const changed of [...observers]) changed();
   }
-  return { connection, update, close: () => update({ active: false, input: null }) };
+  return { connection: control, update, close: () => update({ connected: false, active: false, input: null }) };
 }
 export async function waitForActivation(control: ListenerControl, signal: AbortSignal): Promise<void> {
   signal.throwIfAborted();

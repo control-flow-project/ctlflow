@@ -7,39 +7,45 @@ using Crossfire.Kernel;
 namespace Crossfire.AgentCore;
 
 public sealed record DirectedInput(string MessageId, string Text, long ExpiresAt);
-public sealed record ListenerControlState(bool Active, CancellationToken Generation, DirectedInput? Input);
+public sealed record ListenerControlState(bool Connected, CancellationToken ConnectionGeneration, bool Active, CancellationToken Generation, DirectedInput? Input);
 public sealed class ListenerControl : IDisposable
 {
     private readonly object gate = new();
     private readonly Func<ListenerController> binding;
     private readonly Func<string, string, string?, CancellationToken, ValueTask<Result<Unit>>> acknowledge;
     private readonly Action<string>? unavailable;
-    private CancellationTokenSource generation = new();
+    private CancellationTokenSource connection = new(), generation = new();
     private readonly List<CancellationTokenSource> retired = [];
-    private bool active;
+    private bool connected, active;
     private DirectedInput? input;
     public event Action? Changed;
     public ListenerControl(Func<ListenerController> binding, Func<string, string, string?, CancellationToken, ValueTask<Result<Unit>>> acknowledge, Action<string>? unavailable = null)
-    { this.binding = binding; this.acknowledge = acknowledge; this.unavailable = unavailable; generation.Cancel(); }
+    { this.binding = binding; this.acknowledge = acknowledge; this.unavailable = unavailable; connection.Cancel(); generation.Cancel(); }
     public ListenerController Binding() => binding();
-    public ListenerControlState Current() { lock (gate) return new(active, generation.Token, input); }
-    public void Update(bool enabled, DirectedInput? next)
+    public ListenerControlState Current() { lock (gate) return new(connected, connection.Token, active, generation.Token, input); }
+    public void Update(bool nextConnected, bool enabled, DirectedInput? next)
     {
-        CancellationTokenSource? cancel = null; bool different;
+        if (enabled && !nextConnected) throw new InvalidDataException("Delivery requires an authenticated controller connection");
+        CancellationTokenSource? cancelConnection = null, cancelDelivery = null; bool different;
         lock (gate)
         {
-            different = active != enabled || input != next; if (active && !enabled) cancel = generation; if (!active && enabled) { retired.Add(generation); generation = new(); } active = enabled; input = next;
+            different = connected != nextConnected || active != enabled || input != next;
+            if (connected && !nextConnected) cancelConnection = connection;
+            if (!connected && nextConnected) { retired.Add(connection); connection = new(); }
+            if (active && !enabled) cancelDelivery = generation;
+            if (!active && enabled) { retired.Add(generation); generation = new(); }
+            connected = nextConnected; active = enabled; input = next;
         }
-        cancel?.Cancel(); if (different) Changed?.Invoke();
+        cancelConnection?.Cancel(); cancelDelivery?.Cancel(); if (different) Changed?.Invoke();
     }
-    public void Unavailable(string reason) { Update(false, Current().Input); unavailable?.Invoke(reason); }
+    public void Unavailable(string reason) { Update(false, false, Current().Input); unavailable?.Invoke(reason); }
     public ValueTask<Result<Unit>> Acknowledge(string id, string status, string? error, CancellationToken cancellation) => acknowledge(id, status, error, cancellation);
     public async ValueTask WaitForActivation(CancellationToken cancellation)
     {
         if (Current().Active) return; var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); void ChangedState() { if (Current().Active) ready.TrySetResult(); }
         Changed += ChangedState; try { ChangedState(); await ready.Task.WaitAsync(cancellation); } finally { Changed -= ChangedState; }
     }
-    public void Dispose() { Update(false, null); generation.Dispose(); foreach (var previous in retired) previous.Dispose(); }
+    public void Dispose() { Update(false, false, null); connection.Dispose(); generation.Dispose(); foreach (var previous in retired) previous.Dispose(); }
 }
 
 public sealed class ControlledPublication(LocalState storage, string file, ListenerControl control, RuntimeConnection runtime, MessageArtifacts artifacts, Func<int> maximum, TimeProvider clock)

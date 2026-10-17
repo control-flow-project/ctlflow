@@ -12,7 +12,7 @@ test('listener with only an owner DM reports activity without model input and pa
   matrix.joined.delete(ROOM);
   matrix.reporting.disconnect = true;
   const stop = new AbortController(), binding = createListenerControl(async () => {}, () => matrix.reporting.controller);
-  binding.update({ active: true, input: null });
+  binding.update({ connected: true, active: true, input: null });
   let finished = false;
   const receiving = listen({ ...matrix, control: binding.connection, runtime: runtime.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20 }, stop.signal)
     .catch(error => error).finally(() => { finished = true; });

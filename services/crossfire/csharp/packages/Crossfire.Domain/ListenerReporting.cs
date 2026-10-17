@@ -49,8 +49,8 @@ public static class ListenerReporting
             var now = ports.Fleet.Authorization.Now();
             var record = new ListenerRun(runId, agentId, input.Release, controller, previous.Value?.StartedAt ?? now, Math.Max(now, previous.Value?.LastSeenAt ?? now),
                 previous.Value?.ActiveMs ?? 0, Math.Max(input.MessagesDelivered, previous.Value?.MessagesDelivered ?? 0), input.Stopped ? now : null, previous.Value?.DisconnectRequestedAt);
-            var admitted = ControllerAdmission.Admits(record, facts.Value, now);
-            if (previous.Value is null && !admitted) return Results.Fail<ListenerReportResult>("conflict", "An active authenticated controller lease and delivery intent are required");
+            var admitted = ControllerAdmission.Admits(record, facts.Value, now, ControllerPurpose.Reporting);
+            if (previous.Value is null && !admitted) return Results.Fail<ListenerReportResult>("conflict", "An active authenticated controller lease is required");
             if (previous.Value is null)
             {
                 var runs = ports.Recent(agentId, now - ControllerAdmission.HeartbeatExpiryMs);
@@ -61,7 +61,7 @@ public static class ListenerReporting
                     if (run.Controller is null) continue;
                     var runFacts = ports.Facts(agentId, run.Controller.FleetId, run.Controller.CredentialId);
                     if (!runFacts.IsSuccess) return Result<ListenerReportResult>.Fail(runFacts.Error);
-                    if (ControllerAdmission.Admits(run, runFacts.Value, now)) active++;
+                    if (ControllerAdmission.Admits(run, runFacts.Value, now, ControllerPurpose.Reporting)) active++;
                 }
                 if (active >= 100) return Results.Fail<ListenerReportResult>("limit", "Too many reporting listeners");
             }
@@ -83,7 +83,7 @@ public static class ListenerReporting
             if (run.Controller is null) continue;
             var facts = ports.Facts(agentId, run.Controller.FleetId, run.Controller.CredentialId);
             if (!facts.IsSuccess) return Result<ListenerActivity>.Fail(facts.Error);
-            if (ControllerAdmission.Admits(run, facts.Value, now)) active.Add(run);
+            if (ControllerAdmission.Admits(run, facts.Value, now, ControllerPurpose.Reporting)) active.Add(run);
         }
         var total = ports.Totals(agentId);
         return total.Map(value => Summarize(active, value));

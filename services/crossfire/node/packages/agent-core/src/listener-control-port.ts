@@ -3,7 +3,7 @@ export type ControllerState = { connected: boolean; deliveryEnabled: boolean; re
 export type ControllerBinding = { fleetId: string; connectionId: string; credential: string };
 export type ListenerControl = {
   binding(): ControllerBinding;
-  current(): { active: boolean; signal: AbortSignal; input: DirectedInput | null };
+  current(): { connected: boolean; connection: AbortSignal; active: boolean; signal: AbortSignal; input: DirectedInput | null };
   subscribe(changed: () => void): () => void;
   unavailable(reason: string): void;
   acknowledge(messageId: string, status: 'delivered' | 'skipped', errorMessage: string | null, signal?: AbortSignal): Promise<void>;

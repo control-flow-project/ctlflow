@@ -23,7 +23,7 @@ test('real Conduit and stock Codex deliver idle-only scheduled input without cre
   const release = await releaseFixture(), fixture = await nativeServer(scope, release), { services, admin, origin } = fixture;
   const agent = await fixture.agent(admin.actor, 'scheduled'), ruleId = randomUUID();
   const host = await createListenerHost(), controller = createListenerControl(async () => {}, () => agent.controller);
-  controller.update({ active: true, input: null }); cleanup(scope, () => host.close()); cleanup(scope, controller.close);
+  controller.update({ connected: true, active: true, input: null }); cleanup(scope, () => host.close()); cleanup(scope, controller.close);
   const principal = value(services.repositories.principal.find({ id: agent.id })); assert(principal);
   value(changeWakePolicy(services, admin.actor, agent.id, { expectedRevision: principal.revision, mode: 'selected', senders: [] }, randomUUID()));
   const directory = mkdtempSync(join(process.cwd(), '.temp/wake-native-')), home = join(directory, 'home'), workspace = join(directory, 'project');

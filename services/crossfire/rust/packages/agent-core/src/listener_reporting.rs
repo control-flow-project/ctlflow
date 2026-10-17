@@ -219,13 +219,13 @@ impl<C: Coordination, T: Clock + Send + Sync> Reporter<C, T> {
             .map_err(|_| invalid("Listener reporting ownership failed"))?
             .as_ref()
             .map(|run| run.stopped || run.generation.is_cancelled());
-        if previous == Some(false) && snapshot.active {
+        if previous == Some(false) && snapshot.connected {
             return self.run();
         }
         if previous.is_some() {
             self.pause_owned(stop.clone()).await?;
         }
-        if !snapshot.active || snapshot.generation.is_cancelled() {
+        if !snapshot.connected || snapshot.connection.is_cancelled() {
             return Ok(None);
         }
         let id = identity::id();
@@ -234,7 +234,7 @@ impl<C: Coordination, T: Clock + Send + Sync> Reporter<C, T> {
             .lock()
             .map_err(|_| invalid("Listener reporting ownership failed"))? = Some(Run {
             id: id.clone(),
-            generation: snapshot.generation,
+            generation: snapshot.connection,
             binding: snapshot.binding,
             messages: 0,
             reported_at: 0,

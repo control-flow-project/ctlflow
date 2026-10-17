@@ -66,7 +66,7 @@ test("reconciliation respects human pause, mute and suspension without empty mod
 test('server admission loss pauses delivery and rebinds the same desired receiver rather than treating it as an owner stop', withClock(async (scope, clock) => {
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock), stop = new AbortController();
   const notices: string[] = [], binding = createListenerControl(async () => {}, () => matrix.reporting.controller, reason => notices.push(reason));
-  binding.update({ active: true, input: null });
+  binding.update({ connected: true, active: true, input: null });
   matrix.reporting.disconnect = true;
   let finished = false;
   const result = listen({ ...matrix, control: binding.connection, reconcileMs: 1000, limit: 100, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal)
@@ -77,7 +77,7 @@ test('server admission loss pauses delivery and rebinds the same desired receive
   matrix.add(ROOM, message('$unread-after-admission-loss')); await clock.advance(20);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
   matrix.reporting.disconnect = false; matrix.reporting.controller = { ...CONTROLLER, connectionId: 'dddddddd-bbbb-cccc-dddd-eeeeeeeeeeee' };
-  binding.update({ active: true, input: null });
+  binding.update({ connected: true, active: true, input: null });
   await clock.until(() => existsSync(matrix.cursorFile) && readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '1');
   assert.equal(native.requests().filter(request => request.method === 'thread/resume').length, 1);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1); assert.equal(finished, false);

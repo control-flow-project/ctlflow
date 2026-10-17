@@ -49,6 +49,27 @@ test('malformed decision receipts cannot enter automatic recovery or erase retai
   }
 });
 
+test('cancelled native questions stop waiting for reporting without publishing a decision or granting a choice', async scope => {
+  const clock = testClock(scope), matrix = await matrixFixture(scope, temporary(scope), clock);
+  const stop = new AbortController(), cancelled = new AbortController(); let entered = false;
+  const broker = decisions({ clock, client: matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token,
+    signal: stop.signal, timeoutMs: 1000 }), coordination: matrix.coordination, settings: matrix.settings,
+    agent: matrix.id, matrixUserId: SELF, storage: localState, file: matrix.cursorFile + '.decisions',
+    run: async signal => {
+      entered = true; signal.throwIfAborted();
+      await new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
+      return randomUUID();
+    } }, stop.signal);
+  cleanup(scope, async () => { cancelled.abort(); stop.abort(); await broker.close(); });
+  const result = broker.request({ runtime: 'codex', session: 'original', request: 'cancelled', turn: 'turn', item: 'item',
+    action: 'Review', scope: {}, choices: [{ label: 'Explicit choice', value: { approved: true } }] }, cancelled.signal);
+  await until(() => entered); cancelled.abort(new Error('Original native request cancelled'));
+  const response = await result; assert.equal(response.ok, false);
+  if (!response.ok) assert.equal(response.error.code, 'unavailable');
+  assert.equal(broker.unresolved(), false);
+  assert.equal(matrix.requests.some(request => request.path.includes('/runtime-decisions') || request.path.includes('/send/')), false);
+});
+
 test('current native observations use exact discriminants and never guess alternative output fields', () => {
   const events: RuntimeObservationEvent[] = [], observer = nativeObservation({ requestDecision: async () => { throw new Error('Unexpected decision'); }, observe: event => events.push(event) }, () => 'original');
   const send = (method: string, params: Record<string, unknown>) => observer.event({ method, params: { threadId: 'original', ...params } });

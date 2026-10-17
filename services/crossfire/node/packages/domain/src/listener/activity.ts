@@ -14,7 +14,7 @@ export function readActivity(services: Pick<Services, 'listenerRead' | 'clock'>,
   const byTotal = new Map(totals.value.map(total => [total.agentId, total]));
   const byRuns = new Map<string, ListenerRun[]>();
   for (const { run, facts } of runs.value) {
-    if (!admitsController(run, facts, now)) continue;
+    if (!admitsController(run, facts, now, 'reporting')) continue;
     const group = byRuns.get(run.agentId) ?? []; group.push(run); byRuns.set(run.agentId, group);
   }
   const result = new Map<string, AgentActivity>();

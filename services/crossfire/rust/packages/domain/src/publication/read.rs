@@ -22,7 +22,13 @@ fn lease(repo: &mut impl PublicationRepository, id: &str, now: i64) -> Result<()
         repo.publication_listener_runs(id, now.saturating_sub(listener::HEARTBEAT_EXPIRY_MS))?
     {
         if run.disconnect_requested_at.is_none()
-            && listener::controller_admission(repo, id, run.controller.as_ref(), now)?
+            && listener::controller_admission(
+                repo,
+                id,
+                run.controller.as_ref(),
+                now,
+                listener::ControllerPurpose::Reporting,
+            )?
         {
             return Ok(());
         }

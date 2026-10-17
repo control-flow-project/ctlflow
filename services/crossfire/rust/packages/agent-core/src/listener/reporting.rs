@@ -15,7 +15,7 @@ impl<
                 return self.hooks.check();
             }
             let reporting = async {
-                if self.resources.control.current()?.active {
+                if self.resources.control.current()?.connected {
                     self.hooks
                         .reporter
                         .activate(self.hooks.stop.clone())

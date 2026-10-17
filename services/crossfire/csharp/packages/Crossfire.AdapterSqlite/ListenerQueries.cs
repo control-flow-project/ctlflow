@@ -30,7 +30,7 @@ public static class ListenerQueries
         var controller = found.Value.Controller;
         if (controller is null) return Results.Fail<Unit>("conflict", "The original controller lease is no longer available");
         var facts = Facts(context, agentId, controller.FleetId, controller.CredentialId);
-        return !facts.IsSuccess ? Result<Unit>.Fail(facts.Error) : ControllerAdmission.Admits(found.Value, facts.Value, now)
+        return !facts.IsSuccess ? Result<Unit>.Fail(facts.Error) : ControllerAdmission.Admits(found.Value, facts.Value, now, ControllerPurpose.Reporting)
             ? Results.Done() : Results.Fail<Unit>("conflict", "The original controller lease is no longer available");
     }
 

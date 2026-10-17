@@ -2,7 +2,7 @@ import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Services } from '../port/services.js';
 import type { ListenerRun } from '../activity/types.js';
 import { authenticateController } from '../fleet/authority.js';
-import { admitsController } from './admission.js';
+import { admitsController, type ControllerPurpose } from './admission.js';
 
 type Dependencies = Pick<Services, 'repositories' | 'identity' | 'clock'>;
 export type ControllerProof = { fleetId: string; connectionId: string; credential: string };
@@ -19,7 +19,7 @@ export function controllerProof(services: Dependencies, agentId: string, proof: 
   return success({ fleetId: proof.fleetId, connectionId: proof.connectionId, credentialId: actor.value.credentialId });
 }
 
-export function controllerAdmission(services: Pick<Services, 'repositories' | 'clock'>, run: Pick<ListenerRun, 'agentId' | 'controller'>) {
+export function controllerAdmission(services: Pick<Services, 'repositories' | 'clock'>, run: Pick<ListenerRun, 'agentId' | 'controller'>, purpose: ControllerPurpose) {
   if (!run.controller) return success(false);
   const binding = services.repositories.fleetInstance.findByAgent(run.agentId); if (!binding.ok) return binding;
   const fleet = services.repositories.fleet.findById(run.controller.fleetId); if (!fleet.ok) return fleet;
@@ -28,5 +28,5 @@ export function controllerAdmission(services: Pick<Services, 'repositories' | 'c
   const owner = fleet.value ? services.repositories.principal.find({ id: fleet.value.ownerId }) : success(null); if (!owner.ok) return owner;
   const facts = binding.value && fleet.value && connection.value && credential.value && owner.value
     ? { binding: binding.value, fleet: fleet.value, connection: connection.value, credential: credential.value, ownerStatus: owner.value.status } : null;
-  return success(admitsController(run, facts, services.clock.now()));
+  return success(admitsController(run, facts, services.clock.now(), purpose));
 }

@@ -29,7 +29,13 @@ pub fn live_run(
                 "The original listener is no longer available",
             )
         })?;
-    if !listener::controller_admission(repo, agent_id, run.controller.as_ref(), now)? {
+    if !listener::controller_admission(
+        repo,
+        agent_id,
+        run.controller.as_ref(),
+        now,
+        listener::ControllerPurpose::Reporting,
+    )? {
         return Err(Failure::new(
             ErrorCode::Conflict,
             "The original controller lease is no longer available",

@@ -29,15 +29,22 @@ public static class ListenerReportingAcceptance
         try
         {
             Equal((await reporting.Activate()).Value, false, "inactive listener performs no registration"); Equal(calls, 0, "inactive reporting makes no request");
-            control.Update(true, null); var pending = reporting.Activate().AsTask(); await entered.Task.WaitAsync(TimeSpan.FromSeconds(5)); control.Update(false, null);
+            control.Update(true, true, null); var pending = reporting.Activate().AsTask(); await entered.Task.WaitAsync(TimeSpan.FromSeconds(5)); control.Update(false, false, null);
             Equal((await pending.WaitAsync(TimeSpan.FromSeconds(5))).Value, false, "pause cancels in-flight registration without claiming activation");
             Equal(disconnected, 0, "expected delivery cancellation never invalidates the fleet connection"); Equal(started, 0, "cancelled registration is not reported as a listener run");
-            control.Update(true, null); Equal((await reporting.Activate()).Value, true, "delivery resumes with the same controller binding"); var first = reporting.RunId;
+            control.Update(true, true, null); Equal((await reporting.Activate()).Value, true, "delivery resumes with the same controller binding"); var first = reporting.RunId;
             Equal(first is not null, true, "successful registration supplies a run identity"); Equal((await reporting.Activate()).Value, true, "current activity is reused"); Equal(calls, 2, "reuse does not register twice");
             Equal((await reporting.Ready(lifetime.Token)).Value, first, "native questions read the current reporting identity");
-            holdClose = true; control.Update(false, null); control.Update(true, null); var replacing = reporting.Activate().AsTask(); await closing.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var admitted = control.Current(); control.Update(true, false, null);
+            Equal(admitted.Generation.IsCancellationRequested, true, "delivery pause cancels new input admission");
+            Equal(admitted.ConnectionGeneration.IsCancellationRequested, false, "delivery pause retains reporting authority");
+            Equal((await reporting.Activate()).Value, true, "paused delivery keeps its reporting channel");
+            Equal((await reporting.Ready(lifetime.Token)).Value, first, "paused native questions retain their exact live run");
+            Equal(calls, 2, "delivery pause does not register a second reporter"); Equal(stopped, 0, "delivery pause does not close the live reporter");
+            control.Update(true, true, null);
+            holdClose = true; control.Update(false, false, null); control.Update(true, true, null); var replacing = reporting.Activate().AsTask(); await closing.Task.WaitAsync(TimeSpan.FromSeconds(5));
             var currentReady = reporting.Ready(lifetime.Token).AsTask(); Equal(currentReady.IsCompleted, false, "a closed generation cannot supply the first run to a new question");
-            control.Update(false, null); control.Update(true, null); release.TrySetResult();
+            control.Update(false, false, null); control.Update(true, true, null); release.TrySetResult();
             Equal((await replacing.WaitAsync(TimeSpan.FromSeconds(5))).Value, false, "a generation cancelled during old-run cleanup is not activated"); Equal(calls, 2, "stale activation cannot register a replacement");
             Equal((await reporting.Activate()).Value, true, "next activation registers the current generation"); Equal(reporting.RunId != first, true, "new reporting generation has its own authenticated run");
             Equal((await currentReady.WaitAsync(TimeSpan.FromSeconds(5))).Value, reporting.RunId, "a waiting native question receives the replacement reporting identity");
@@ -48,7 +55,7 @@ public static class ListenerReportingAcceptance
         }
         finally { release.TrySetResult(); await reporting.Pause(); }
         using var failedControl = new ListenerControl(() => new("fleet", "connection", "credential"), (_, _, _, _) => ValueTask.FromResult(Results.Done()), _ => disconnected++);
-        failedControl.Update(true, null);
+        failedControl.Update(true, true, null);
         var unavailable = new Coordination("https://fixture.invalid", (_, _) => ValueTask.FromResult(Results.Fail<JsonElement>("unavailable", "Actual unavailable coordination")));
         var failed = new ListenerReporting(new(unavailable, "agent", "release", failedControl, new("@agent:fixture", clock), clock, _ => { }, _ => { }, (_, _) => { }, _ => { }), lifetime.Token);
         Equal((await failed.Activate()).Value, false, "actual transport failure refuses activation"); Equal(disconnected, 1, "uncancelled transport failure still disconnects the controller"); await failed.Pause();

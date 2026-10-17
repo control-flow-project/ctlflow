@@ -36,7 +36,7 @@ function fixture(execution: Partial<Execution> = {}) {
         calls.push('start:' + instance.key + ':' + reason);
         const sessionId = histories.get(instance.key) ?? randomUUID(); histories.set(instance.key, sessionId);
         const stop = new AbortController(), binding = createListenerControl(async () => {}, () => ({ fleetId: randomUUID(), connectionId: randomUUID(), credential: 'fixture-lease' }));
-        binding.update({ active: true, input: null });
+        binding.update({ connected: true, active: true, input: null });
         return success({ sessionId, signal: stop.signal, control: binding.connection,
           nativeState: () => ({ phase: 'running' as const, lastActivityAt: 1, historyAvailable: true }), resume: async () => success(undefined),
           contexts: async () => success([{ context: 'shared', runtime: 'codex', sessionId }]),

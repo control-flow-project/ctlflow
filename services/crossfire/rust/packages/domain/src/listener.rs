@@ -67,11 +67,17 @@ pub struct AdmissionFacts {
     pub credential: Credential,
     pub owner_status: Status,
 }
+#[derive(Clone, Copy)]
+pub enum ControllerPurpose {
+    Reporting,
+    Delivery,
+}
 
 pub fn admits_controller(
     controller: Option<&Controller>,
     facts: Option<&AdmissionFacts>,
     now: i64,
+    purpose: ControllerPurpose,
 ) -> bool {
     let (Some(controller), Some(facts)) = (controller, facts) else {
         return false;
@@ -82,7 +88,7 @@ pub fn admits_controller(
         && facts.binding.owner_id == facts.fleet.owner_id
         && facts.binding.fleet_key == facts.fleet.fleet_key
         && facts.fleet.id == controller.fleet_id
-        && facts.fleet.delivery_enabled
+        && (matches!(purpose, ControllerPurpose::Reporting) || facts.fleet.delivery_enabled)
         && facts.connection.connection_id == controller.connection_id
         && facts.connection.credential_id == controller.credential_id
         && facts.connection.closed_at.is_none()
@@ -142,6 +148,7 @@ pub fn controller_admission(
     id: &str,
     controller: Option<&Controller>,
     now: i64,
+    purpose: ControllerPurpose,
 ) -> Result<bool> {
     let Some(controller) = controller else {
         return Ok(false);
@@ -173,6 +180,7 @@ pub fn controller_admission(
             owner_status: owner.status,
         }),
         now,
+        purpose,
     ))
 }
 
@@ -208,8 +216,8 @@ pub fn report(
         if previous.as_ref().is_some_and(|run| run.release.as_deref() != Some(input.release.as_str())) { return Err(Failure::new(ErrorCode::Conflict, "A running listener cannot change its software version")); }
         if previous.as_ref().is_some_and(|run| run.controller.as_ref() != Some(&controller)) { return Err(Failure::new(ErrorCode::Conflict, "A listener run cannot change its controller generation")); }
         if previous.is_none() && input.release != current_release { return Err(Failure::new(ErrorCode::Conflict, format!("Update the project-local Crossfire client and skill before reconnecting. Current release: {current_release}"))); }
-        let admitted = controller_admission(repo, id, Some(&controller), now)?;
-        if previous.is_none() && !admitted { return Err(Failure::new(ErrorCode::Conflict, "An active authenticated controller lease and delivery intent are required")); }
+        let admitted = controller_admission(repo, id, Some(&controller), now, ControllerPurpose::Reporting)?;
+        if previous.is_none() && !admitted { return Err(Failure::new(ErrorCode::Conflict, "An active authenticated controller lease is required")); }
         let elapsed = previous.as_ref().map_or(0, |run| now.saturating_sub(run.last_seen_at).max(0));
         let active_ms = previous.as_ref().map_or(0, |run| run.active_ms).checked_add(if elapsed <= HEARTBEAT_EXPIRY_MS { elapsed } else { 0 })
             .filter(|value| *value <= 9_007_199_254_740_991).ok_or_else(|| Failure::new(ErrorCode::Limit, "Listener active duration exceeds the exact integer range"))?;

@@ -292,7 +292,7 @@ async fn verify(prepared_query: bool) -> std::result::Result<(), Box<dyn std::er
         credential: Secret::new("private".to_owned()),
     };
     let control = Arc::new(Control::new(binding.clone())?);
-    control.update(true, None, binding)?;
+    control.update(true, true, None, binding)?;
     let options = Options {
         profile: profile::parse(
             &json!({"id":AGENT,"workspace":"/private/workarea","account":{"user_id":"@agent:local","access_token":"private","device_id":"NATIVE"},"settings":{"instance":"analyst","homeserver":"http://localhost:3000","server_name":"local","owner":"@owner:local","max_upload_bytes":16777216}}),

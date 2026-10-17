@@ -10,7 +10,23 @@ public sealed record AgentRuntimeState(string AgentId, RuntimeStateObservation O
 public static class RuntimeQueries
 {
     public static Result<IReadOnlyList<RuntimeObservation>> Observations(CrossfireDbContext context, string agentId)
-        => Load(context, [agentId]).Map<IReadOnlyList<RuntimeObservation>>(values => values.Where(value => value.AgentId == agentId).Select(value => value.Observation).ToArray());
+    {
+        var latest = Stored.Read(() => context.ListenerRun.AsNoTracking().Where(row => row.AgentId == agentId)
+            .OrderByDescending(row => row.StartedAt).ThenByDescending(row => row.Id).Select(row => row.Id).FirstOrDefault());
+        if (!latest.IsSuccess) return Result<IReadOnlyList<RuntimeObservation>>.Fail(latest.Error);
+        if (latest.Value is not { } runId) return Result<IReadOnlyList<RuntimeObservation>>.Success([]);
+        var rows = Stored.Read(() => context.RuntimeObservation.AsNoTracking().Where(row => row.RunId == runId)
+            .OrderByDescending(row => row.ObservedAt).ThenBy(row => row.SessionId).ToArray());
+        if (!rows.IsSuccess) return Result<IReadOnlyList<RuntimeObservation>>.Fail(rows.Error);
+        var settings = Stored.Read(() => context.RuntimeSetting.AsNoTracking().Where(row => row.RunId == runId).OrderBy(row => row.Name).ToArray());
+        return settings.Map<IReadOnlyList<RuntimeObservation>>(values =>
+        {
+            var bySession = values.ToLookup(setting => setting.SessionId, StringComparer.Ordinal);
+            return rows.Value.Select(row => new RuntimeObservation(row.RunId, row.SessionId, row.RoomId, row.Runtime,
+                row.State, row.ObservedAt, row.LastActivityAt, row.HistoryAvailable is null ? null : row.HistoryAvailable == 1, row.HistoryMode, row.MaxInputBytes,
+                bySession[row.SessionId].Select(setting => new RuntimeSetting(setting.Name, setting.ConfiguredValue, setting.EffectiveValue)).ToArray(), row.ErrorMessage)).ToArray();
+        });
+    }
 
     public static Result<RuntimeSummary?> Summary(CrossfireDbContext context, string agentId)
         => Summaries(context, [agentId]).Map(values => values.GetValueOrDefault(agentId));
@@ -41,22 +57,4 @@ public static class RuntimeQueries
         });
     }
 
-    private static Result<IReadOnlyList<AgentObservation>> Load(CrossfireDbContext context, IReadOnlyList<string> requested)
-    {
-        var runs = ListenerQueries.Latest(context, requested);
-        if (!runs.IsSuccess) return Result<IReadOnlyList<AgentObservation>>.Fail(runs.Error);
-        var runIds = runs.Value.Select(run => run.Id).ToArray();
-        var rows = Stored.Read(() => context.RuntimeObservation.AsNoTracking().Where(row => runIds.Contains(row.RunId)).OrderByDescending(row => row.ObservedAt).ThenBy(row => row.SessionId).ToArray());
-        if (!rows.IsSuccess) return Result<IReadOnlyList<AgentObservation>>.Fail(rows.Error);
-        var settings = Stored.Read(() => context.RuntimeSetting.AsNoTracking().Where(row => runIds.Contains(row.RunId)).OrderBy(row => row.Name).ToArray());
-        return settings.Map<IReadOnlyList<AgentObservation>>(values =>
-        {
-            var bySession = values.ToLookup(setting => (setting.RunId, setting.SessionId));
-            return rows.Value.Select(row => new AgentObservation(row.AgentId, new RuntimeObservation(row.RunId, row.SessionId, row.RoomId, row.Runtime,
-                row.State, row.ObservedAt, row.LastActivityAt, row.HistoryAvailable is null ? null : row.HistoryAvailable == 1, row.HistoryMode, row.MaxInputBytes,
-                bySession[(row.RunId, row.SessionId)].Select(setting => new RuntimeSetting(setting.Name, setting.ConfiguredValue, setting.EffectiveValue)).ToArray(), row.ErrorMessage))).ToArray();
-        });
-    }
-
-    private sealed record AgentObservation(string AgentId, RuntimeObservation Observation);
 }

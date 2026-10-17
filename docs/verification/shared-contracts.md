@@ -9,6 +9,9 @@ server, fleetd, fleet, UI and ingress scenarios. Both controller and installed
 CLI scenarios run with actual Codex and Pi processes and inert local providers.
 Language-local compiler and algorithm tests supplement this bank; they cannot
 replace it or establish another set of externally observable expectations.
+The shared native question flow includes upstream reconnection, pending decisions
+across delivery pause and new native questions while chat admission remains
+paused. Answers must reach the exact original native tool request and history.
 
 ## Targets
 

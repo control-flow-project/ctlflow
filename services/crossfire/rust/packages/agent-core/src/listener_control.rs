@@ -44,6 +44,8 @@ impl Input {
 }
 #[derive(Clone)]
 pub struct Snapshot {
+    pub connected: bool,
+    pub connection: CancellationToken,
     pub active: bool,
     pub generation: CancellationToken,
     pub input: Option<Input>,
@@ -58,9 +60,13 @@ impl Control {
         binding.validate()?;
         let generation = CancellationToken::new();
         generation.cancel();
+        let connection = CancellationToken::new();
+        connection.cancel();
         let (changed, _) = watch::channel(0);
         Ok(Self {
             state: Mutex::new(Snapshot {
+                connected: false,
+                connection,
                 active: false,
                 generation,
                 input: None,
@@ -79,7 +85,18 @@ impl Control {
     pub fn subscribe(&self) -> watch::Receiver<u64> {
         self.changed.subscribe()
     }
-    pub fn update(&self, active: bool, input: Option<Input>, binding: Binding) -> Result<()> {
+    pub fn update(
+        &self,
+        connected: bool,
+        active: bool,
+        input: Option<Input>,
+        binding: Binding,
+    ) -> Result<()> {
+        if active && !connected {
+            return Err(invalid(
+                "Delivery requires an authenticated controller connection",
+            ));
+        }
         binding.validate()?;
         if let Some(input) = &input {
             input.validate()?;
@@ -91,13 +108,23 @@ impl Control {
         let rebound = state.binding.connection_id != binding.connection_id
             || state.binding.fleet_id != binding.fleet_id
             || state.binding.credential.expose() != binding.credential.expose();
-        let changed = state.active != active || state.input != input || rebound;
+        let changed = state.connected != connected
+            || state.active != active
+            || state.input != input
+            || rebound;
+        if state.connected && (!connected || rebound) {
+            state.connection.cancel();
+        }
+        if connected && (!state.connected || rebound) {
+            state.connection = CancellationToken::new();
+        }
         if state.active && (!active || rebound) {
             state.generation.cancel();
         }
         if active && (!state.active || rebound) {
             state.generation = CancellationToken::new();
         }
+        state.connected = connected;
         state.active = active;
         state.input = input;
         state.binding = binding;
@@ -109,7 +136,7 @@ impl Control {
     }
     pub fn unavailable(&self) -> Result<()> {
         let current = self.current()?;
-        self.update(false, current.input, current.binding)
+        self.update(false, false, current.input, current.binding)
     }
     pub async fn wait(&self, stop: CancellationToken) -> Result<()> {
         let mut changed = self.subscribe();

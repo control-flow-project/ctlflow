@@ -11,7 +11,7 @@ export function liveRun(services: Services, agentId: string, runId: string) {
   if (!run.ok) return run;
   if (!run.value || run.value.agentId !== agentId || run.value.stoppedAt !== null || run.value.disconnectRequestedAt !== null
     || run.value.lastSeenAt + HEARTBEAT_EXPIRY_MS <= services.clock.now()) return failure('conflict', 'The original listener is no longer available');
-  const admission = controllerAdmission(services, run.value); if (!admission.ok) return admission;
+  const admission = controllerAdmission(services, run.value, 'reporting'); if (!admission.ok) return admission;
   return admission.value ? success(run.value) : failure('conflict', 'The original controller lease is no longer available');
 }
 function sameDecision(original: DecisionCreation, input: DecisionCreation): boolean {

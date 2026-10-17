@@ -40,6 +40,11 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   writeFileSync(join(role, 'agent.toml'), 'name = "Contract analyst"\nruntime = ' + JSON.stringify(runtime) + '\n[runtime_options]\n' + defaults + effort + ' = "medium"\n', { mode: 0o600 }); writeFileSync(join(role, 'AGENTS.md'), 'Only obey the authorized shared contract fixture. Use explicit tools for room replies.\n', { mode: 0o600 });
   writeFileSync(join(fleetDirectory, 'runtime.toml'), 'fleet = "shared-' + runtime + '"\n[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(platform.origin) + '\nowner = ' + JSON.stringify(platform.owner.matrixUserId) + '\n[[instances]]\nkey = "analyst"\nname = "shared-analyst-' + runtime + '"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/analyst"\n[instances.runtime_options]\n' + effort + ' = "high"\n', { mode: 0o600 });
   let fleetId = '', revision = 0, saved: unknown, agentId = '', matrixUserId = '', token = '';
+  async function delivery(enabled: boolean): Promise<void> {
+    const fleet = record((await call(operations.fleet, { fleetId })).data);
+    await call(operations.changeFleetDelivery, { fleetId }, { expectedRevision: integer(record(fleet.connection).revision), enabled });
+    await observe(async () => record(list(record((await call(operations.fleet, { fleetId })).data).instances)[0]).listenerActive === enabled, 'Controller applies delivery intent');
+  }
   await scope.test('Unix transport, strict contracts and private ownership are identical', async () => {
     const status = record((await call(operations.status)).data); assert.equal(record(status.controller).name, 'shared-contract'); assert.equal(statSync(root).mode & 0o777, 0o700); assert.equal(statSync(socket).mode & 0o777, 0o600);
     contractError(await raw('/api/status', 'GET', undefined, { Origin: 'https://foreign.invalid' }), 403, 'forbidden'); contractError(await raw('/api/status', 'GET', undefined, { Host: 'foreign.invalid' }), 403, 'forbidden'); contractError(await raw('/api/status', 'GET', undefined, { Authorization: 'Bearer guessed' }), 401, 'unauthorized');
@@ -185,7 +190,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   });
   await scope.test('real native chat, steering and bounded history contracts', child => messageContracts(child, { platform, fleetDirectory, agent: { id: agentId, matrixUserId, token }, provider,
     async idle() { const file = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/listener.json'); const endpoint = record(JSON.parse(readFileSync(file, 'utf8')) as unknown); const response = await contractHttp('http://127.0.0.1:' + String(endpoint.port), 'POST', '/bindings/' + text(endpoint.binding) + '/control', { action: 'test' }, { Authorization: 'Bearer ' + text(endpoint.secret) }); return response.status === 200 && record(record(response.body).test).busy === false; },
-    async delivery(enabled) { const fleet = record((await call(operations.fleet, { fleetId })).data); await call(operations.changeFleetDelivery, { fleetId }, { expectedRevision: integer(record(fleet.connection).revision), enabled }); await observe(async () => record(list(record((await call(operations.fleet, { fleetId })).data).instances)[0]).listenerActive === enabled, 'Controller applies delivery intent'); } }));
+    delivery }));
   await scope.test('an actual native question waits for explicit owner submission and returns only to its original history', async () => {
     const requests = provider.requests.length, choice = 'Reviewed choice ' + randomUUID();
     provider.tool(runtime === 'codex' ? 'request_user_input' : 'crossfire_question', runtime === 'codex'
@@ -226,6 +231,51 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     const reply = record(provider.requests.at(-1)), outputs = list(reply.input ?? reply.messages).map(record);
     assert(outputs.some(value => (value.type === 'function_call_output' || value.role === 'tool')
       && JSON.stringify(value.output ?? value.content).includes(choice)), 'The selected answer reaches the native tool output, not just the preceding question text');
+  });
+  await scope.test('paused delivery retains pending owner decisions and reports new native questions without admitting chat', async () => {
+    const requests = provider.requests.length, base = '/api/agents/' + agentId + '/runtime-decisions';
+    const headers = { Cookie: platform.owner.cookie, Origin: platform.origin, 'X-Crossfire-CSRF': platform.owner.csrf };
+    async function decision(path: string, method = 'GET', body?: unknown) {
+      const response = await contractHttp(platform.origin, method, path, body, headers);
+      assert.equal(response.status, 200, JSON.stringify(response.body).slice(0, 2048));
+      return record(response.body).data;
+    }
+    function question(id: string): void {
+      provider.tool(runtime === 'codex' ? 'request_user_input' : 'crossfire_question', runtime === 'codex'
+        ? { questions: [{ id, header: 'Review', question: 'Review this native request.', options: [
+          { label: 'Wait', description: 'Do not proceed' }, { label: id, description: 'Explicit reviewed choice' }] }] }
+        : { title: 'Review', prompt: 'Review this native request.', options: ['Wait', id] });
+    }
+    async function pending(excluded?: string): Promise<Record<string, unknown>> {
+      let selected: Record<string, unknown> | undefined;
+      await observe(async () => {
+        selected = list(await decision(base)).map(record).find(value => value.status === 'pending' && value.id !== excluded);
+        return selected !== undefined;
+      }, 'Native questions remain reportable while new chat admission is paused', 30000);
+      assert(selected); return record(await decision(base + '/' + text(selected.id)));
+    }
+    async function answer(view: Record<string, unknown>, choice: string): Promise<void> {
+      const offered = record(list(view.questions)[0]), selected = list(offered.options).map(record).find(option => option.label === choice);
+      assert(selected); const path = base + '/' + text(view.id);
+      await decision(path + '/answer', 'POST', { answers: [{ questionId: offered.id, optionId: selected.id, text: null }] });
+      await observe(async () => record(await decision(path)).status === 'responded', 'The exact native answer is acknowledged while chat stays paused', 30000);
+    }
+    const first = 'Before pause ' + randomUUID(), second = 'During pause ' + randomUUID();
+    question(first);
+    await call(operations.createFleetMessage, { fleetId }, { messageId: randomUUID(), body: 'Ask two reviewed owner questions.' });
+    const original = await pending();
+    try {
+      await delivery(false);
+      assert.equal(record(await decision(base + '/' + text(original.id))).status, 'pending', 'Pausing chat must not expire a running native decision');
+      question(second); await answer(original, first);
+      const next = await pending(text(original.id));
+      assert.equal(next.sessionId, original.sessionId); assert.equal(next.runId, original.runId, 'Pausing delivery preserves reporting ownership');
+      await answer(next, second);
+      assert.equal(record(record((await call(operations.fleet, { fleetId })).data).connection).deliveryEnabled, false);
+      assert.equal(record(list(record((await call(operations.fleet, { fleetId })).data).instances)[0]).listenerActive, false);
+      assert.equal(provider.requests.length, requests + 3, 'Only the two native tool continuations run while chat is paused');
+      assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
+    } finally { await delivery(true); }
   });
   await scope.test('a crash during a held native response resumes the same history and unfinished request', async child => {
     child.after(() => { if (provider.held()) provider.finish(); });

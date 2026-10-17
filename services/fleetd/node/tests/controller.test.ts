@@ -328,10 +328,10 @@ test('an interrupted remote operation becomes a recorded failure, never an autom
 });
 
 test('delivery deactivation retains owned engines and unregister closes the control connection', async scope => {
-  const binding = createListenerControl(async () => {}); binding.update({ active: true, input: null });
+  const binding = createListenerControl(async () => {}); binding.update({ connected: true, active: true, input: null });
   let enabled = true, disconnected = false;
   const fixture = fixtureController({ connection: () => ({ connected: true, deliveryEnabled: enabled, revision: 4, error: null }),
-    delivery: async (_configuration, input) => { enabled = input.enabled; binding.update({ active: enabled, input: null });
+    delivery: async (_configuration, input) => { enabled = input.enabled; binding.update({ connected: true, active: enabled, input: null });
       return success({ fleetId: randomUUID(), revision: input.expectedRevision + 1, deliveryEnabled: enabled, connection: { status: 'online', lastSeenAt: 1 } }); },
     start: async () => { const stop = new AbortController(); return success(runtimeFixture({ sessionId: 'unchanged', signal: stop.signal,
       control: binding.connection, pointer: { runtime: 'fixture', sessionId: 'unchanged', workspace: '/fixture', connection: {} }, close: async () => { stop.abort(); } })); },
@@ -436,7 +436,7 @@ test('runtime failures retain their cause, become inactive immediately and canno
   const cleaning = new Promise<void>(resolve => { release = resolve; });
   const fixture = fixtureController({ start: async (_configuration, instance) => {
     const stop = new AbortController(), control = createListenerControl(async () => {});
-    control.update({ active: true, input: null }); stops.set(instance.key, stop);
+    control.update({ connected: true, active: true, input: null }); stops.set(instance.key, stop);
     return success(runtimeFixture({ sessionId: 'native-' + instance.key, signal: stop.signal, control: control.connection,
       pointer: { runtime: 'fixture', sessionId: 'native-' + instance.key, workspace: '/fixture', connection: {} },
       close: async () => { if (instance.key === 'analyst') await cleaning; closed.push(instance.key); stop.abort(); } }));
@@ -494,7 +494,7 @@ test('inspection never accepts edited configuration; a revision-checked start ap
 });
 
 test('sleeping and waking native phases retain the listener and inspection never resumes them', async scope => {
-  const binding = createListenerControl(async () => {}); binding.update({ active: true, input: null });
+  const binding = createListenerControl(async () => {}); binding.update({ connected: true, active: true, input: null });
   let phase: NativeSessionState['phase'] = 'sleeping', starts = 0, stoppedReads = 0;
   const fixture = fixtureController({ contexts: async () => { stoppedReads++; return success([{ context: 'shared', runtime: 'fixture', sessionId: 'saved' }]); },
     start: async () => { starts++; const stop = new AbortController(); return success(runtimeFixture({ sessionId: 'saved', signal: stop.signal,
@@ -519,7 +519,7 @@ test('sleeping and waking native phases retain the listener and inspection never
 });
 
 test('explicit start wakes a sleeping native generation without replacing its binding or reenrolling', async scope => {
-  const binding = createListenerControl(async () => {}); binding.update({ active: false, input: null });
+  const binding = createListenerControl(async () => {}); binding.update({ connected: true, active: false, input: null });
   let phase: NativeSessionState['phase'] = 'sleeping', starts = 0, resumes = 0, deny = false;
   const fixture = fixtureController({ start: async () => {
     starts++; const stop = new AbortController();

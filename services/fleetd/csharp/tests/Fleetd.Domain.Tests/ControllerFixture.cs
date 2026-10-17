@@ -94,7 +94,7 @@ public sealed class ProbeAgent : RunningAgent
     public bool ListenerActive => Control.Current().Active;
     public ProbeAgent()
     {
-        lifetimeToken = lifetime.Token; Control = new(() => new(ControllerFixture.FleetId, "connection", "credential"), (_, _, _, _) => ValueTask.FromResult(Results.Done())); Control.Update(true, null);
+        lifetimeToken = lifetime.Token; Control = new(() => new(ControllerFixture.FleetId, "connection", "credential"), (_, _, _, _) => ValueTask.FromResult(Results.Done())); Control.Update(true, true, null);
     }
     public NativeSessionState NativeState() => new("sleeping", 0, true);
     public ValueTask<Result<Unit>> Resume() => ValueTask.FromResult(Results.Done());

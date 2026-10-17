@@ -30,7 +30,7 @@ public static class ListenerBatchQueries
         return candidates.Map<IReadOnlyDictionary<string, ListenerActivity>>(values =>
         {
             var byTotal = totals.Value.ToDictionary(value => value.AgentId, value => value.Total, StringComparer.Ordinal);
-            var byAgent = values.Where(value => ControllerAdmission.Admits(value.Run, value.Facts, now)).ToLookup(value => value.Run.AgentId, value => value.Run, StringComparer.Ordinal);
+            var byAgent = values.Where(value => ControllerAdmission.Admits(value.Run, value.Facts, now, ControllerPurpose.Reporting)).ToLookup(value => value.Run.AgentId, value => value.Run, StringComparer.Ordinal);
             return ids.ToDictionary(id => id, id => ListenerReporting.Summarize(byAgent[id].ToArray(), byTotal.GetValueOrDefault(id)), StringComparer.Ordinal);
         });
     }

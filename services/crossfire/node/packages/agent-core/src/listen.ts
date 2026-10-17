@@ -87,7 +87,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   let maximum = INPUT_BYTES;
   let pendingInput = () => true;
   let destination: Awaited<ReturnType<RuntimeAdapter>>;
-  let reportingRun: string | undefined;
+  let activity: ReturnType<typeof createListenerActivity> | undefined;
   let runReady!: () => void;
   const reporting = new Promise<void>(resolve => { runReady = resolve; });
   const observer = ownerObservation({ agentId: options.id, userId: options.account.user_id, file: options.cursorFile + '.observation', storage,
@@ -97,7 +97,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     client: options.transport(lifetime, 45_000),
     clock: options.clock,
     coordination: options.coordination, settings: options.settings, matrixUserId: options.account.user_id, agent: options.id,
-    run: async () => { await reporting; lifetime.throwIfAborted(); if (!reportingRun) throw new Error('Listener reporting is not ready'); return reportingRun; },
+    run: async signal => { await reporting; signal.throwIfAborted(); if (!activity) throw new Error('Listener reporting is not ready'); return activity.ready(signal); },
     storage, file: options.cursorFile + '.decisions',
   }, lifetime);
   try {
@@ -112,14 +112,13 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       },
     });
   } catch (error) { failed.abort(error); runReady(); await approval.close(); await observer.close(); throw error; }
-  let activity: ReturnType<typeof createListenerActivity> | undefined;
   try {
   const updates = releaseUpdates(storage, options.cursorFile, options.release.release, options.settings.owner, destination.sessionId);
   const signal = AbortSignal.any([stop, destination.signal, failed.signal]);
   activity = createListenerActivity({ client: options.coordination, agentId: options.id, release: options.release, control: options.control,
     log: options.log,
     clock: options.clock, statistics, updated: release => { updates.available(release); changed(); }, failed: error => failed.abort(error),
-    started: (runId, binding) => { reportingRun = runId; runReady(); approval.start(); observer.start(runId); options.activity?.(runId, binding); } }, signal);
+    started: (runId, binding) => { runReady(); approval.start(); observer.start(runId); options.activity?.(runId, binding); } }, signal);
   const client = options.transport(signal, 45_000);
   const artifacts = messageArtifacts(storage, options.cursorFile + '.messages', options.clock.now, observer.busy,
     () => new Set([...snapshotContentFiles(storage, options.cursorFile), ...chat.contentFiles(), ...priorityChat.contentFiles(), ...queries.contentFiles()]));
@@ -303,7 +302,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     const selected = options.room ? selectRoom(options.room) : undefined;
     let joined = new Set(await joinedRooms(client));
     retainJoinedCursors(storage, options.cursorFile, joined);
-    if (options.control.current().active) await activity.activate();
+    if (options.control.current().connected) await activity.activate();
     signal.throwIfAborted();
     options.ready?.(() => {
       const deadline = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
@@ -418,11 +417,12 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       const generation = options.control.current().signal;
       try {
       if ((!options.control.current().active || state.paused) && chat.unpublished()) { chat.discardUnpublished(); completed = undefined; }
+      if (options.control.current().connected) await activity.activate();
+      else await activity.pause();
       if (!options.control.current().active) {
-        await activity.pause();
         await wait(previous); continue;
       }
-      if (!await activity.activate() || generation.aborted) continue;
+      if (!activity.runId() || generation.aborted) continue;
       if (!synchronized) { await wait(previous); continue; }
       if (controlling && (!completed || ordinary.signal.aborted || urgentControl())) { await wait(previous, options.reconcileMs, true); continue; }
       if (!controlling && priorityChat.pending()) {
