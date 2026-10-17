@@ -36,7 +36,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   await paginationContracts(scope, query => raw('/api/fleets' + query));
   cleanup(scope, async () => { try { await call(operations.operate, {}, { operationId: randomUUID(), action: 'stop', target: { kind: 'daemon' }, expectedRevision: 0 }); } catch { await daemon.close(); } });
   const role = join(fleetDirectory, 'agents/analyst'); mkdirSync(role, { recursive: true, mode: 0o700 });
-  const effort = runtime === 'codex' ? 'model_reasoning_effort' : 'thinking_level'; const defaults = runtime === 'codex' ? 'sandbox_mode = "read-only"\napproval_policy = "never"\n' : 'provider = "fixture"\nmodel = "fixture-model"\n';
+  const effort = runtime === 'codex' ? 'model_reasoning_effort' : 'thinking_level'; const defaults = runtime === 'codex' ? 'sandbox_mode = "read-only"\napproval_policy = "never"\nfeatures = { default_mode_request_user_input = true }\n' : 'provider = "fixture"\nmodel = "fixture-model"\n';
   writeFileSync(join(role, 'agent.toml'), 'name = "Contract analyst"\nruntime = ' + JSON.stringify(runtime) + '\n[runtime_options]\n' + defaults + effort + ' = "medium"\n', { mode: 0o600 }); writeFileSync(join(role, 'AGENTS.md'), 'Only obey the authorized shared contract fixture. Use explicit tools for room replies.\n', { mode: 0o600 });
   writeFileSync(join(fleetDirectory, 'runtime.toml'), 'fleet = "shared-' + runtime + '"\n[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(platform.origin) + '\nowner = ' + JSON.stringify(platform.owner.matrixUserId) + '\n[[instances]]\nkey = "analyst"\nname = "shared-analyst-' + runtime + '"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/analyst"\n[instances.runtime_options]\n' + effort + ' = "high"\n', { mode: 0o600 });
   let fleetId = '', revision = 0, saved: unknown, agentId = '', matrixUserId = '', token = '';
@@ -186,6 +186,47 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   await scope.test('real native chat, steering and bounded history contracts', child => messageContracts(child, { platform, fleetDirectory, agent: { id: agentId, matrixUserId, token }, provider,
     async idle() { const file = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/listener.json'); const endpoint = record(JSON.parse(readFileSync(file, 'utf8')) as unknown); const response = await contractHttp('http://127.0.0.1:' + String(endpoint.port), 'POST', '/bindings/' + text(endpoint.binding) + '/control', { action: 'test' }, { Authorization: 'Bearer ' + text(endpoint.secret) }); return response.status === 200 && record(record(response.body).test).busy === false; },
     async delivery(enabled) { const fleet = record((await call(operations.fleet, { fleetId })).data); await call(operations.changeFleetDelivery, { fleetId }, { expectedRevision: integer(record(fleet.connection).revision), enabled }); await observe(async () => record(list(record((await call(operations.fleet, { fleetId })).data).instances)[0]).listenerActive === enabled, 'Controller applies delivery intent'); } }));
+  await scope.test('an actual native question waits for explicit owner submission and returns only to its original history', async () => {
+    const requests = provider.requests.length, choice = 'Reviewed choice ' + randomUUID();
+    provider.tool(runtime === 'codex' ? 'request_user_input' : 'crossfire_question', runtime === 'codex'
+      ? { questions: [{ id: 'destination', header: 'Destination', question: 'Choose the reviewed destination.', options: [
+        { label: 'Do not proceed', description: 'Wait for review' }, { label: choice, description: 'The reviewed destination' }] }] }
+      : { title: 'Destination', prompt: 'Choose the reviewed destination.', options: ['Do not proceed', choice] });
+    await call(operations.createFleetMessage, { fleetId }, { messageId: randomUUID(), body: 'Ask the owner to select the reviewed destination.' });
+    const base = '/api/agents/' + agentId + '/runtime-decisions';
+    const headers = { Cookie: platform.owner.cookie, Origin: platform.origin, 'X-Crossfire-CSRF': platform.owner.csrf };
+    async function decision(path: string, method = 'GET', body?: unknown) {
+      const response = await contractHttp(platform.origin, method, path, body, headers);
+      assert.equal(response.status, 200, JSON.stringify(response.body).slice(0, 2048));
+      return record(response.body).data;
+    }
+    let pending: Record<string, unknown> | undefined;
+    await observe(async () => {
+      pending = list(await decision(base)).map(record).find(value => value.status === 'pending');
+      return pending !== undefined;
+    }, 'The actual native question is published as an owner decision', 30000);
+    assert(pending);
+    const path = base + '/' + text(pending.id), view = record(await decision(path));
+    assert.equal(view.sessionId, record(list(saved)[0]).sessionId);
+    assert.equal(view.runtime, runtime); assert.equal(view.kind, 'question'); assert.equal(view.status, 'pending');
+    const question = record(list(view.questions)[0]), selectedChoice = list(question.options).map(record).find(value => value.label === choice);
+    assert(selectedChoice, 'Review retains the exact choices offered by the native question');
+    assert.equal(record(await decision(path)).status, 'pending', 'Opening the review is never an answer');
+    assert.equal(provider.requests.length, requests + 1, 'The native engine remains waiting without a routing model call');
+    assert.equal(daemon.alive(), true, daemon.errors());
+    const refused = await contractHttp(platform.origin, 'POST', path + '/answer', { answers: [
+      { questionId: question.id, optionId: selectedChoice.id, text: null }] }, { Authorization: 'Bearer ' + token });
+    contractError(refused, 401, 'unauthorized');
+    assert.equal(record(await decision(path)).status, 'pending');
+    await decision(path + '/answer', 'POST', { answers: [{ questionId: question.id, optionId: selectedChoice.id, text: null }] });
+    await observe(async () => record(await decision(path)).status === 'responded', 'The listener confirms the exact answer reached the original native request', 30000);
+    await observe(async () => (await raw('/api/fleets/' + fleetId + '/readiness')).status === 200, 'The answered native question leaves the same listener ready');
+    assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
+    assert.equal(provider.requests.length, requests + 2, 'Only the actual native tool continuation performs another model request');
+    const reply = record(provider.requests.at(-1)), outputs = list(reply.input ?? reply.messages).map(record);
+    assert(outputs.some(value => (value.type === 'function_call_output' || value.role === 'tool')
+      && JSON.stringify(value.output ?? value.content).includes(choice)), 'The selected answer reaches the native tool output, not just the preceding question text');
+  });
   await scope.test('a crash during a held native response resumes the same history and unfinished request', async child => {
     child.after(() => { if (provider.held()) provider.finish(); });
     const before = provider.requests.length, marker = 'Resume this unfinished fleet request ' + randomUUID();

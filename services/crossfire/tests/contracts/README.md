@@ -16,7 +16,7 @@ through the controller and installed CLI scenarios.
 | Trusted ingress | ingress.contract.ts | Two actual TLS clients, overwritten spoofed headers, untrusted peer and missing/chained forwarding refusal |
 | Human enrollment | fixture.ts, resources.contract.ts | Native invited registration, owner approval, roles, claim/exchange and unique names |
 | Room authorization | resources.contract.ts | Native room application, full-plan preview/apply, scoped delegation and addition provenance |
-| Native decisions | server.contract.ts, management-browser.contract.ts | Exact review/answer/receipt, read-only links and explicit browser selection |
+| Native decisions | server.contract.ts, management-browser.contract.ts, fleetd/tests/contracts/daemon.contract.ts | Actual Codex/Pi question → owner review → explicit answer → original native tool output; no GET/agent consent, exact history/receipt, explicit browser selection |
 | Scheduled input | resources.contract.ts | Rule CRUD, due claim, exact-session validation and acknowledgment |
 | Publications | server.contract.ts, management-browser.contract.ts | Upload/commit, inventory, opaque script origin, owner deletion and durable files view |
 | Management navigation | management-browser.contract.ts | Main/detail routes and mobile/desktop geometry |

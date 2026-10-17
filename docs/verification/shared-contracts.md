@@ -69,7 +69,7 @@ omitted; each worker still runs the complete other container/recovery scenarios.
 | Input boundaries | Canonical pagination, duplicate/unknown fields, host, origin, CSRF and request bounds |
 | Authorization | Owner/admin scope, native room authority, delegated invitations and recorded addition provenance |
 | Coordination | Enrollment, controller leases, exact lifecycle claims/receipts, stop evidence and retirement |
-| Decisions | Exact owner review/answer, generation-bound publication and no answer on GET |
+| Decisions | Actual Codex/Pi question through fleetd and crossfire to exact owner review/answer and original native tool output; generation-bound publication, no consent on GET or agent self-answer |
 | Scheduled input | Rule CRUD, due claim, eligibility and exact-session acknowledgment |
 | Publications | Manifest/upload/commit, opaque-origin execution, inventory and deletion fence |
 | UI | Durable management routes, wake selection, stale edits, room delegation, schedules, decisions, confirmations and reports at mobile/desktop widths |
