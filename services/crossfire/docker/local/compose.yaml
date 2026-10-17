@@ -1,0 +1,78 @@
+name: ctlflow-local
+
+x-server-state: &server-state
+  - server-state:/runtime
+
+x-server-resources: &server-resources
+  platform: linux/amd64
+  pull_policy: never
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  mem_limit: 2g
+  pids_limit: 512
+  cgroup_parent: ${CTLFLOW_CGROUP_PARENT:-}
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,size=256m,mode=1777
+
+services:
+  initialize:
+    <<: *server-resources
+    profiles: [maintenance]
+    image: ${CROSSFIRE_MIGRATION_IMAGE:?Set the exact matching migration image}
+    network_mode: none
+    volumes: *server-state
+    entrypoint: [node, /app/services/crossfire/crossfire]
+    command: [init, --directory, /runtime, --instance, local, --origin, "http://127.0.0.1:8080", --content-origin, "http://localhost:8082", --server-name, local.test, --administrator, admin]
+
+  migrate:
+    <<: *server-resources
+    profiles: [maintenance]
+    image: ${CROSSFIRE_MIGRATION_IMAGE:?Set the exact matching migration image}
+    network_mode: none
+    volumes: *server-state
+
+  crossfire:
+    <<: *server-resources
+    image: ${CROSSFIRE_RUNTIME_IMAGE:?Set the exact csharp-nativeaot runtime image}
+    volumes: *server-state
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:8082:8082"
+    stop_grace_period: 30s
+
+  fleetd:
+    platform: linux/amd64
+    image: ${CTLFLOW_FLEET_IMAGE:?Set the exact Node fleet image}
+    pull_policy: never
+    build:
+      context: ../../../..
+      dockerfile: services/fleetd/docker/node/Dockerfile
+    entrypoint: [/opt/ctlflow/start-local.sh]
+    command: [fleetd, --root, /home/node/.ctlflow/controller, --name, local-docker]
+    depends_on:
+      crossfire:
+        condition: service_healthy
+        restart: true
+    init: true
+    healthcheck:
+      test: [CMD-SHELL, "fleet daemon status --root /home/node/.ctlflow/controller >/dev/null && node -e 'fetch(\"http://127.0.0.1:8080/api/health\").then(response=>{if(!response.ok)process.exit(1)}).catch(()=>process.exit(1))'"]
+      interval: 10s
+      timeout: 8s
+      start_period: 30s
+      retries: 3
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 2g
+    pids_limit: 512
+    cgroup_parent: ${CTLFLOW_CGROUP_PARENT:-}
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=1g,mode=1777
+    volumes:
+      - fleet-home:/home/node
+    stop_grace_period: 60s
+
+volumes:
+  server-state:
+  fleet-home:

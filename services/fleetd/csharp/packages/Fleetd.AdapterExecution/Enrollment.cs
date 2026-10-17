@@ -14,7 +14,7 @@ public static class Enrollment
     public static async ValueTask<Result<Unit>> Prepare(FleetConfiguration configuration, ControllerIdentity controller, string intent,
         Func<string?, Coordination> clients, TimeProvider clock, Action<ApprovalLink> approval, CancellationToken cancellation)
     {
-        var loaded = BindingFiles.Load(configuration); if (!loaded.IsSuccess) return Result<Unit>.Fail(loaded.Error); var binding = loaded.Value; var roster = configuration.Roster; ProfileMigration.Run(configuration, binding);
+        var loaded = BindingFiles.Load(configuration); if (!loaded.IsSuccess) return Result<Unit>.Fail(loaded.Error); var binding = loaded.Value; var roster = configuration.Roster;
         if (binding.Server != roster.Coordination.Server || binding.Owner != roster.Coordination.Owner || binding.FleetKey != roster.Fleet) return Results.Fail<Unit>("conflict", "Fleet connection differs from its saved identity; it cannot be silently replaced");
         if (intent == "resume" && binding.FleetId is not null && binding.ControllerCredential is not null && roster.Instances.All(instance => binding.Identities.Any(identity => identity.InstanceKey == instance.Key && identity.Name == instance.Name)))
         {

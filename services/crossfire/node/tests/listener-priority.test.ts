@@ -27,14 +27,19 @@ test('86 enabled bindings watch concurrently and an accepted mention bypasses sa
       deliver: async (text, _id, cancelled, priority) => { cancelled?.throwIfAborted(); delivered.push({ binding, text, priority }); } });
     receivers.push(listen({ ...matrix, binding: 'scale-' + binding, host, runtime, clock, limit: 20, pollMs: 10000, reconcileMs: 30000, debounceMs: 1000 }, stop.signal)
       .catch(error => { if (!stop.signal.aborted) failures.push(error); }));
+    await until(() => {
+      if (failures.length) throw failures[0];
+      return existsSync(matrix.cursorFile + '.sync') && matrix.waiting() === 1;
+    }, 'Binding ' + binding + ' did not establish its initial native watch');
   }
   const observed = async (predicate: () => boolean) => {
     try { await until(() => {
       if (failures.length) throw failures[0];
       return predicate();
     }); } catch (error) {
-      const matrix = matrices.at(-1);
-      assert.fail(String(error) + ' Last binding requests: ' + JSON.stringify(matrix?.requests.slice(-20).map(request => request.path)));
+      const pending = matrices.flatMap((matrix, binding) => existsSync(matrix.cursorFile + '.sync') && matrix.waiting() === 1 ? []
+        : [{ binding, cursor: existsSync(matrix.cursorFile + '.sync'), waiting: matrix.waiting(), requests: matrix.requests.slice(-8).map(request => request.path) }]);
+      assert.fail(String(error) + ' Pending watches: ' + JSON.stringify(pending));
     }
   };
   await observed(() => matrices.every(matrix => existsSync(matrix.cursorFile + '.sync') && matrix.waiting() === 1));

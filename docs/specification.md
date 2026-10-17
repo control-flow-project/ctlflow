@@ -11,6 +11,12 @@ implicit fallbacks and parallel old/new implementations are prohibited.
 Forward migrations preserve deployed data without keeping old runtime models.
 Production resets are prohibited.
 
+Existing state never justifies keeping an old runtime reader, writer, handler,
+alias, bridge or hidden fallback. A specific exception requires explicit owner
+approval; none is currently approved. A necessary forward migration produces
+only the current schema. Independently selected language targets implement that
+same contract and never substitute for one another.
+
 ## 1. Products
 
 ctlflow names the monorepo, not a server or controller. Product names are lowercase
@@ -150,6 +156,14 @@ Knex image. All three operators use --package; image construction belongs to the
 not a source-dependent deployment mode. Archive/image digests, platform and release
 labels are checked before touching writers. Backend selection is explicit, never
 chosen from the operator's language or substituted after failure.
+Package schema 2 records named transport references and the exact OCI configuration
+and root-descriptor digests for each image. The producer exports named images so
+both remain present in the OCI index. Current Docker classic/containerd stores
+expose different native identity objects; each target's Docker adapter verifies
+that exact object and returns the immutable execution handle. A malformed
+descriptor never retries another identity. Schema 1 is rejected, not imported.
+The common Knex image copies the production dependency closure into a clean base;
+it does not ship the compiler/build stage or other target/test source.
 GAAP and Bad Bets select C# NativeAOT server packages by default. Their branding,
 DNS/TLS and deployment state remain site-owned. This does not change fleet
 attachment: generated instructions are addressed to the coding harness and always

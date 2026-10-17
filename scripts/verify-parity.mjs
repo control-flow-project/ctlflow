@@ -26,10 +26,13 @@ async function run(label, binary, args) {
   if (failure) throw new Error(label + ' failed; inspect ' + log);
 }
 try {
-  await run('architecture', 'npm', ['run', 'verify:architecture']);
   await run('node', 'npm', ['test']);
+  await run('architecture', 'npm', ['run', 'verify:architecture']);
   await run('csharp', 'npm', ['run', 'verify:csharp']);
-  await run('rust', process.execPath, ['scripts/verify-rust.mjs']);
+  await run('rust', 'systemd-run', ['--user', '--scope', '--quiet',
+    '--property=MemoryMax=' + String(BigInt(resources['memory.max']) < 16n * 1024n ** 3n ? BigInt(resources['memory.max']) : 16n * 1024n ** 3n),
+    '--property=MemorySwapMax=0', '--property=TasksMax=' + String(BigInt(resources['pids.max']) < 2048n ? BigInt(resources['pids.max']) : 2048n),
+    '--working-directory=' + repository, process.execPath, 'scripts/verify-rust.mjs']);
   await run('managed-distribution', process.execPath, ['scripts/publish-csharp.mjs', '--mode', 'managed', '--output', managed]);
   await run('nativeaot-distribution', process.execPath, ['scripts/publish-csharp.mjs', '--mode', 'nativeaot', '--output', native]);
   await run('rust-distribution', process.execPath, ['scripts/publish-rust.mjs', '--output', rust]);

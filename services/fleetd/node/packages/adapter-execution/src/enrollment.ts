@@ -5,7 +5,6 @@ import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { loadBinding, saveBinding } from '@ctlflow/fleetd-storage/binding';
 import { initializeHistory } from '@ctlflow/fleetd-storage/history';
-import { migrateInstanceProfiles } from '@ctlflow/fleetd-storage/profile-migration';
 import type { Configuration, Controller, Approval } from '@ctlflow/fleetd-domain/model';
 
 export async function prepareEnrollment(configuration: Configuration, controller: Controller, intent: 'resume' | 'enroll', signal: AbortSignal, approval: (value: Approval) => void) {
@@ -35,10 +34,8 @@ export async function prepareEnrollment(configuration: Configuration, controller
         return failure('conflict', 'Approved fleet instance differs from its saved identity: ' + instance.key);
       if (observed.status !== 'active' || observed.owner.status !== 'active') return failure('forbidden', 'Fleet resume requires active existing agent and owner accounts');
     }
-    migrateInstanceProfiles(configuration, binding);
     return success(undefined);
   }
-  migrateInstanceProfiles(configuration, binding);
   const instances = roster.instances.map(instance => {
     const existing = binding.identities.find(item => item.instanceKey === instance.key);
     return { instanceKey: instance.key, name: instance.name, coordinationPolicy: configuration.definitions[instance.definition]!.coordinationPolicy,

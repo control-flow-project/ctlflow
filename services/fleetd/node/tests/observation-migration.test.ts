@@ -79,7 +79,7 @@ test('offline conversion backs up all exact bytes before updates and preserves p
   assert.equal(existsSync(join(backup, 'manifest.json')), true);
   const next = backup + '-next';
   const repeated = migrateObservationJournals({ root, directory: fleet, backup: next }, signal());
-  assert(repeated.ok); assert.equal(existsSync(next), false);
+  assert(repeated.ok, repeated.ok ? 'migration is already complete' : repeated.error.message); assert.equal(existsSync(next), false);
 });
 
 test('active controller/listener/receiver writers fail without journal mutation and release every acquired lock', scope => {

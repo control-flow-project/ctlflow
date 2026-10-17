@@ -29,7 +29,11 @@ export function verifyTestResources() {
   if (process.platform !== 'linux') throw new Error('Verified aggregate test process-group limits require Linux cgroup v2; no unbounded runtime fallback is permitted');
   const matched = /^0::(\/[^\n]*)$/mu.exec(readFileSync('/proc/self/cgroup', 'utf8'));
   if (!matched) throw new Error('Tests require a verified unified cgroup resource scope');
-  try { return resourceLimits(join('/sys/fs/cgroup', matched[1]), '/sys/fs/cgroup'); }
+  try {
+    const limits = resourceLimits(join('/sys/fs/cgroup', matched[1]), '/sys/fs/cgroup');
+    process.env.DBUS_SESSION_BUS_ADDRESS = 'unix:path=/dev/null';
+    return limits;
+  }
   catch (error) {
     throw new Error(error.message + '. Run the command in an operator-sized transient process-group scope with finite memory, swap and task limits and an absolute checkout path.', { cause: error });
   }

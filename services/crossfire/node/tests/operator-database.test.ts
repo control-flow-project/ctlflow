@@ -21,6 +21,7 @@ import { inspectDatabase, verifyPreservation, databaseExpectations } from '../to
 import { restoreSchema14EnrollmentItems } from './support/schema14.js';
 import { schema15Store } from './support/schema15.js';
 import { restoreSchema16Logging } from './support/schema16.js';
+import { DAY_MS } from '@ctlflow/crossfire-kernel/logging';
 
 test('operator database inspection is readonly, complete and proves protected records across upgrades', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-database-'));
@@ -156,5 +157,38 @@ test('operator preservation proves schema 14 conversion including exact prior au
     assert.equal((await verifyPreservation(before, current)).ok, false, 'Independent labels must be preserved in immutable migration evidence');
     database.prepare("UPDATE audit_event SET message='changed' WHERE action<>'agent.name.canonicalized'").run();
     assert.equal((await verifyPreservation(before, current)).ok, false, 'Every original audit record remains exactly protected');
+  } finally { database.close(); }
+});
+
+test('forward preservation applies explicit retention to prior name audits but protects cutoff equality, new evidence and retained bytes', async scope => {
+  const directory = mkdtempSync(join(tmpdir(), 'crossfire-name-audit-retention-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
+  const current = join(directory, 'current.sqlite'), before = join(directory, 'before.sqlite');
+  const fixture = await applicationFixture(scope, current), agent = await fixture.agent(fixture.admin.actor, 'retained');
+  const database = new Database(current), at = fixture.now(), cutoff = at - 7 * DAY_MS;
+  const expired = randomUUID(), boundary = randomUUID(), fresh = randomUUID();
+  const insert = (id: string, createdAt: number) => executeInsert(database, schema, (query, params) => query.insertInto('audit_event').values({
+    id: params.id, request_id: 'schema-15-agent-names', actor_credential_id: null, actor_kind: 'system', actor_principal_id: null,
+    owner_id: params.owner, target_kind: 'agent', target_id: params.agent, room_id: null, membership_generation: null,
+    authorizer_id: null, added_by_id: null, permission_code: null, action: 'agent.name.canonicalized', outcome: 'applied',
+    message: 'Retired caption', created_at: params.createdAt,
+  }), { id, createdAt, owner: fixture.admin.actor.principalId, agent: agent.id });
+  const remove = (id: string) => executeDelete(database, schema, (query, params) => query.deleteFrom('audit_event').where(row => row.id === params.id), { id });
+  try {
+    insert(expired, cutoff - 1); insert(boundary, cutoff); insert(fresh, cutoff + 1);
+    restoreSchema16Logging(database); copyFileSync(current, before); await migrateFixture(database);
+    const original = readFileSync(before), retention = { loggingRetentionDays: 7, at };
+    remove(expired);
+    assert.equal((await verifyPreservation(before, current)).ok, false, 'Absent audit requires explicit retention proof');
+    const report = value(await verifyPreservation(before, current, retention));
+    assert.equal(report.expired.audit_event, 1); assert.equal(report.preserved.agent, 1);
+    remove(boundary);
+    assert.equal((await verifyPreservation(before, current, retention)).ok, false, 'Cutoff equality is retained');
+    insert(boundary, cutoff); remove(fresh);
+    assert.equal((await verifyPreservation(before, current, retention)).ok, false, 'Fresh migration evidence remains required');
+    insert(fresh, cutoff + 1); insert(expired, cutoff - 1);
+    executeUpdate(database, schema, (query, params) => query.update('audit_event').set({ message: 'Changed retained bytes' }).where(row => row.id === params.id), { id: expired });
+    assert.equal((await verifyPreservation(before, current, retention)).ok, false, 'Retention never excuses mutation of a retained row');
+    assert.deepEqual(readFileSync(before), original);
   } finally { database.close(); }
 });

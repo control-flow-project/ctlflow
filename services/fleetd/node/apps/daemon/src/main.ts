@@ -21,7 +21,7 @@ import { createDaemonHttp } from './http.js';
 import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
 import { migrateControllerContexts } from './context-migration.js';
 import { readLoggingConfiguration } from '@ctlflow/fleetd-storage/logging';
-import { createDiagnosticLog, migrateDiagnosticLog } from '@ctlflow/crossfire-adapter-filesystem/logging';
+import { createDiagnosticLog } from '@ctlflow/crossfire-adapter-filesystem/logging';
 import { createLoggingMaintenance } from '@ctlflow/crossfire-agent-core/logging-maintenance';
 import { LOGGING_MAINTENANCE_MS } from '@ctlflow/crossfire-kernel/logging';
 import { success } from '@ctlflow/crossfire-kernel/result';
@@ -70,9 +70,7 @@ export async function startDaemon(root: string, name?: string, execution?: Execu
     const logging = createLoggingMaintenance(nativeClock, async () => {
       const files = await diagnostics.prune();
       const records = controller.maintainHistory();
-      const converted = await migrateDiagnosticLog(join(root, 'daemon.log'), join(root, 'logs'), loggingConfiguration.value.loggingRetentionDays);
       if (!records.ok) return records;
-      if (!converted.ok) return converted;
       if (!files.ok) return files;
       return success({ more: records.value.more });
     }, LOGGING_MAINTENANCE_MS, diagnostics.maintenanceError);

@@ -18,7 +18,12 @@ FROM build AS production-dependencies
 RUN npm ci --omit=dev --ignore-scripts && npm rebuild better-sqlite3 --build-from-source
 RUN node scripts/stage-node-runtime.mjs /runtime-app
 
-FROM build AS migrations
+FROM node:26-alpine@sha256:0b36e8c136b94cd4fcf02188228e76c31ad5872eef3fec8cbd2eee500cfd9e80 AS migrations
+WORKDIR /app
+COPY --from=production-dependencies /runtime-app ./
+COPY --from=build /app/services/crossfire/crossfire /app/services/crossfire/crossfire
+COPY --from=build /app/services/crossfire/knexfile.management.mjs /app/services/crossfire/knexfile.management.mjs
+COPY --from=build /app/services/crossfire/dist/scripts/container-configuration.js /app/services/crossfire/dist/scripts/container-configuration.js
 WORKDIR /app/services/crossfire
 ENV NODE_ENV=production CROSSFIRE_DATA_DIR=/runtime
 CMD ["node", "/app/node_modules/knex/bin/cli.js", "migrate:latest", "--knexfile", "./knexfile.management.mjs", "--env", "production"]

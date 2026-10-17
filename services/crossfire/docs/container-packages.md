@@ -1,6 +1,7 @@
 # Container deployment packages
 
 crossfire packages a selected server backend and the common Knex migration image.
+For a local server and Node fleet container, see the [local Docker quickstart](local-docker.md).
 The deployment host needs rootless Docker and an installed crossfire operator;
 it does not build source or install that server backend's language runtime.
 Node, C# and Rust operators consume the same format and can run any server backend.
@@ -43,29 +44,65 @@ reviewed artifacts rather than maintaining private dependency/source overlays.
 Docker may obtain pinned build dependencies/base images.
 First-party code in these packages is MIT-licensed; dependencies retain their
 separate licenses and notices.
-The bundled package-tool.mjs is trusted Node.js 26 build-side tooling for verifying
+The bundled package-tool.mjs is trusted Node.js 26 maintenance tooling for verifying
 and exporting branded derivatives without a source checkout. It is not executed
-by the server or required by the C# operator. Trust its publisher as executable
+by the server or required by the C# operator. A site activation script can run its
+pure `identities` command in the shared migration image without installing Node
+or mounting a Docker socket. Trust its publisher as executable
 code; the archive checksum is not authentication of this helper.
 
 ## Format and image contract
+
+Verified generic images may be published to GHCR under
+`ghcr.io/control-flow-project/crossfire-node`, `crossfire-csharp-managed`,
+`crossfire-csharp-nativeaot`, `crossfire-rust`, `crossfire-migrations` and
+`fleetd-node`. Publish a coordinated version only after its applicable gates
+pass. Do not overwrite an existing version with different bytes or publish
+site-specific source, instructions, data, configuration or credentials.
+Record the registry manifest digest separately from Docker's local image ID;
+they identify different objects. Consumers use complete immutable references,
+not an automatically updated `latest` tag. Registry publication does not replace
+the matching-release checks or one-shot migration requirement.
 
 `release.json` is a UTF-8 JSON object of at most 8192 bytes. It has exactly:
 
 | Field | Meaning |
 | --- | --- |
-| schemaVersion | Number 1 |
+| schemaVersion | Number 2; superseded package formats are rejected |
 | version | Coordinated product version |
 | sourceDigest | Lowercase SHA-256 of the crossfire build input |
 | backend | Explicit backend slug, such as node or csharp-nativeaot |
 | platform | linux/amd64 |
 | archiveSha256 | Lowercase SHA-256 of images.tar |
-| runtimeImage | Exact Docker sha256 image ID |
-| migrationImage | Different exact Docker sha256 image ID |
+| runtime | Runtime image object |
+| migration | Different common Knex image object |
+
+Each image object has exactly `reference`, `configDigest` and `descriptorDigest`.
+The reference is a package-owned `crossfire-package:` transport tag with a
+64-character lowercase hexadecimal suffix. The two SHA-256 digests identify the
+actual OCI configuration and root descriptor stored in the archive. They are
+different OCI objects, not alternative package schemas. The producer saves named
+references so the OCI index retains both images; saving untagged IDs can lose
+the second index entry.
+
+Docker's current classic and containerd image stores expose different objects as
+their native image ID. All three operator adapters verify the current store's
+exact configuration or descriptor identity, plus platform and release labels,
+then execute its immutable native handle. A malformed descriptor is rejected;
+there is no retry using another identity, old schema reader or host-store change.
+Registry manifests and configuration digests are also distinct in
+[Docker's manifest documentation](https://docs.docker.com/reference/cli/docker/manifest/).
 
 `images.tar` is a regular Docker-save archive, nonempty and at most 16 GiB.
 All three operators verify the archive even when images are cached, load it when
-required, and inspect exact image IDs/platform/labels before stopping any writer.
+required, and inspect exact OCI identities/platform/labels before stopping any writer.
+`package-tool.mjs verify DIR` emits `{package, runtimeImage, migrationImage}`:
+the package definition and the two resolved immutable handles on that host.
+`package-tool.mjs identities DIR` accepts the ordered runtime/migration output
+of `docker image inspect` on stdin, validates the same identities and labels,
+and emits the two handles separated by one space. It does not access Docker,
+write state or validate the archive; activation must verify the archive digest
+and load it before calling this pure inspection command.
 Required labels are org.crossfire.package=1, org.opencontainers.image.version,
 org.crossfire.source and org.crossfire.backend. The migration backend is migrations;
 its version/source must equal the selected runtime. A package has no mutable tag

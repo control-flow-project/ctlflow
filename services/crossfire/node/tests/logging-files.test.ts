@@ -1,16 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, readdirSync, statSync, symlinkSync, linkSync, chmodSync, utimesSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, readdirSync, statSync, symlinkSync, linkSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
-import { createDiagnosticLog, migrateDiagnosticLog } from '@ctlflow/crossfire-adapter-filesystem/logging';
+import { createDiagnosticLog } from '@ctlflow/crossfire-adapter-filesystem/logging';
 import { createLoggingMaintenance } from '@ctlflow/crossfire-agent-core/logging-maintenance';
 import { DAY_MS, LOGGING_MAINTENANCE_MS } from '@ctlflow/crossfire-kernel/logging';
 import { success, failure } from '@ctlflow/crossfire-kernel/result';
 import { withClock } from '../scripts/test-support/clock.js';
 
-type LogRecord = { at: number; message: string; timeBasis?: string };
+type LogRecord = { at: number; message: string };
 function records(directory: string): LogRecord[] {
   return readdirSync(directory).filter(name => name.endsWith('.jsonl')).flatMap(name => readFileSync(join(directory, name), 'utf8')
     .split('\n').filter(Boolean).map(line => JSON.parse(line) as LogRecord));
@@ -66,30 +66,13 @@ test('malformed boundary records remain for inspection and do not get replaced b
   assert.equal(readdirSync(directory).some(name => name.includes('.pending-')), false);
 });
 
-test('deployed untimestamped daemon logs convert once to the current format with an explicit modification-time upper bound', async scope => {
-  const root = mkdtempSync(join(tmpdir(), 'crossfire-log-conversion-'));
-  cleanup(scope, () => rmSync(root, { recursive: true }));
-  const source = join(root, 'daemon.log'), destination = join(root, 'logs'), now = Date.UTC(2026, 9, 13, 12), modified = now - DAY_MS;
-  const text = 'old native diagnostics ξ😀\n'.repeat(5000);
-  writeFileSync(source, text, { mode: 0o600 }); utimesSync(source, modified / 1000, modified / 1000);
-  assert.equal((await migrateDiagnosticLog(source, destination, 7, () => now)).ok, true);
-  assert.equal(records(destination).map(record => record.message).join(''), text);
-  assert(records(destination).every(record => record.at === modified && record.timeBasis === 'file-modification-upper-bound'));
-  const count = records(destination).length;
-  assert.equal((await migrateDiagnosticLog(source, destination, 7, () => now)).ok, true); assert.equal(records(destination).length, count);
-  const log = createDiagnosticLog(destination, 7, () => now + 8 * DAY_MS); cleanup(scope, () => log.close());
-  assert.equal((await log.prune()).ok, true); assert.deepEqual(records(destination), []);
-});
-
-test('invalid deployed output stays inspectable and an unsafe file cannot prevent independent expired diagnostics from being removed', async scope => {
+test('unrelated files stay untouched and an unsafe partition cannot prevent independent expired diagnostics from being removed', async scope => {
   const root = mkdtempSync(join(tmpdir(), 'crossfire-log-invalid-')); cleanup(scope, () => rmSync(root, { recursive: true }));
-  const directory = join(root, 'logs'), source = join(root, 'daemon.log'), now = Date.UTC(2026, 9, 13, 12), malformed = Buffer.from([0xff, 0x0a]);
-  writeFileSync(source, malformed, { mode: 0o600 }); utimesSync(source, now / 1000, now / 1000);
-  assert.equal((await migrateDiagnosticLog(source, directory, 7, () => now)).ok, false);
-  assert.deepEqual(readFileSync(source), malformed); assert.equal(readdirSync(directory).length, 0);
+  const directory = join(root, 'logs'), source = join(root, 'unrelated.bin'), now = Date.UTC(2026, 9, 13, 12), malformed = Buffer.from([0xff, 0x0a]);
+  writeFileSync(source, malformed, { mode: 0o600 });
+  const log = createDiagnosticLog(directory, 7, () => now); cleanup(scope, () => log.close());
   symlinkSync(source, join(directory, '2026-10-01.jsonl'));
   const expired = join(directory, '2026-10-02.jsonl'); writeFileSync(expired, '{"at":1,"message":"old"}\n', { mode: 0o600 });
-  const log = createDiagnosticLog(directory, 7, () => now); cleanup(scope, () => log.close());
   assert.equal((await log.prune()).ok, false); assert.equal(readdirSync(directory).includes('2026-10-02.jsonl'), false);
   assert.deepEqual(readFileSync(source), malformed); log.write('writer remains available');
   assert.deepEqual(JSON.parse(readFileSync(join(directory, '2026-10-13.jsonl'), 'utf8').trim()) as unknown,

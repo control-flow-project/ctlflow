@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, rmSync, writeFileSync, readdirSync, existsSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -47,14 +47,14 @@ test('controller operations expire by age in bounded batches without the superse
   assert.equal(storage.pruneOperations(at, 0).ok, false); assert.equal(storage.pruneOperations(NaN, 100).ok, false);
 });
 
-test('deployed operation arrays convert once, restart keeps pending receipts, and logging cleanup never erases desired state', scope => {
-  const root = mkdtempSync(join(tmpdir(), 'fleet-op-conversion-')); cleanup(scope, () => rmSync(root, { recursive: true }));
+test('restart keeps current pending receipts and logging cleanup never erases desired state', scope => {
+  const root = mkdtempSync(join(tmpdir(), 'fleet-op-restart-')); cleanup(scope, () => rmSync(root, { recursive: true }));
   let now = Date.UTC(2026, 9, 13), at = now - 8 * DAY_MS;
   const completed = operation(at), unacknowledged = operation(at, { receiptPending: true });
-  const previous = join(root, 'operations.json'); writeFileSync(previous, JSON.stringify([completed, unacknowledged]), { mode: 0o600 });
   const registry = createRegistry(root), fleetId = randomUUID();
+  value(registry.saveOperation(completed)); value(registry.saveOperation(unacknowledged));
   value(registry.saveDesiredIntent([{ fleetId, instanceKey: 'retained' }])); value(registry.saveResumeSelections([{ fleetId, instanceKeys: ['retained'] }]));
-  assert.equal(existsSync(previous), false); assert.deepEqual(value(registry.operation(completed.operationId)), completed);
+  assert.deepEqual(value(registry.operation(completed.operationId)), completed);
   const history = value(createOperationHistory(registry, () => now, 7));
   assert.equal(value(history.prune()).more, false); assert.equal(value(history.find(completed.operationId)), null);
   assert.deepEqual(value(history.find(unacknowledged.operationId)), unacknowledged);
@@ -66,16 +66,27 @@ test('deployed operation arrays convert once, restart keeps pending receipts, an
   value(history.prune()); assert.equal(value(history.find(unacknowledged.operationId)), null);
 });
 
-test('abandoned atomic writes are reclaimed, unsafe storage is rejected and conflicting conversion preserves its source', scope => {
+test('abandoned atomic writes are reclaimed and unsafe operation storage is rejected', scope => {
   const root = mkdtempSync(join(tmpdir(), 'fleet-op-safety-')); cleanup(scope, () => rmSync(root, { recursive: true }));
   const storage = operationStorage(root), item = operation(1); value(storage.saveOperation(item));
   const pending = join(root, 'operations', '.pending-' + randomUUID()); writeFileSync(pending, 'incomplete', { mode: 0o600 });
   assert.deepEqual(value(storage.pendingOperations()), []); assert.equal(existsSync(pending), false);
   const unsafe = join(root, 'operations', randomUUID() + '.json'); symlinkSync('/dev/null', unsafe);
   assert.equal(storage.pendingOperations().ok, false); rmSync(unsafe);
-  const previous = join(root, 'operations.json'); writeFileSync(previous, JSON.stringify([{ ...item, expectedRevision: 2 }]), { mode: 0o600 });
-  assert.throws(() => operationStorage(root), /conflicts/u); assert.equal(existsSync(previous), true);
   assert.deepEqual(value(storage.operation(item.operationId)), item);
-  rmSync(previous); symlinkSync(join(root, 'missing-history.json'), previous);
-  assert.throws(() => operationStorage(root)); assert.deepEqual(value(storage.operation(item.operationId)), item);
+});
+
+test('obsolete operation arrays and untimestamped logs are rejected without conversion or deleting current state', scope => {
+  const root = mkdtempSync(join(tmpdir(), 'fleet-op-unsupported-')); cleanup(scope, () => rmSync(root, { recursive: true }));
+  const storage = operationStorage(root), item = operation(1); value(storage.saveOperation(item));
+  for (const name of ['operations.json', 'daemon.log']) {
+    const file = join(root, name), bytes = Buffer.from('unsupported input');
+    writeFileSync(file, bytes, { mode: 0o600 });
+    assert.throws(() => createRegistry(root), /Unsupported controller state/u);
+    assert.deepEqual(readFileSync(file), bytes);
+    assert.deepEqual(value(storage.operation(item.operationId)), item);
+    rmSync(file); symlinkSync(join(root, 'missing-history'), file);
+    assert.throws(() => createRegistry(root), /Unsupported controller state/u);
+    rmSync(file);
+  }
 });

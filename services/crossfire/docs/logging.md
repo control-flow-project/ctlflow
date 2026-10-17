@@ -56,10 +56,12 @@ Pruning streams boundary-day records and replaces only an unchanged source.
 Links, hardlinks, unowned/public files and malformed records are retained with
 an error for inspection. Files are 0600; directories 0700.
 
-The supported old `daemon.log` converts once. Its untimestamped chunks use the
-explicit file-modification-time upper bound, never invented entry timestamps.
-The old `operations.json` converts once to UUID operation files.
-Current runtime does not retain dual readers or a count-only history cap.
+Only daily diagnostic partitions and UUID operation files are current storage.
+Controller roots containing `daemon.log` or `operations.json` are rejected before
+operation recovery. Startup never imports, converts or deletes these files.
+Verify an offline backup and resolve obsolete files before starting the controller.
+Profiles and listener state use immutable instance keys, never display-name lookup
+or automatic relocation. There is no count-only history cap or alternate reader.
 
 ## Errors and delayed receipts
 
@@ -76,6 +78,10 @@ execution admission. Existing ownership/generation conflicts still fail.
 
 Verify production backup before the forward migration.
 Migration retains rows; later maintenance applies the policy.
+Prior name-canonicalization audit records use the same audit retention rule.
+They are historical logging, not another agent-name authority. Without explicit
+retention proof, preservation still requires their exact content. Cutoff equality,
+fresh migration evidence and changed retained rows remain failures.
 
 Strict operator preservation may explicitly allow absent age-eligible logging:
 

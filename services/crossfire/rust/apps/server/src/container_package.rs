@@ -10,6 +10,13 @@ use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PackageImage {
+    pub reference: String,
+    pub config_digest: String,
+    pub descriptor_digest: String,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ContainerPackage {
     pub schema_version: u8,
     pub version: String,
@@ -17,6 +24,11 @@ pub struct ContainerPackage {
     pub backend: String,
     pub platform: String,
     pub archive_sha256: String,
+    pub runtime: PackageImage,
+    pub migration: PackageImage,
+}
+pub struct PreparedContainerPackage {
+    pub package: ContainerPackage,
     pub runtime_image: String,
     pub migration_image: String,
 }
@@ -31,6 +43,14 @@ fn digest(value: &str) -> bool {
 }
 fn image(value: &str) -> bool {
     value.strip_prefix("sha256:").is_some_and(digest)
+}
+fn package_image(value: &PackageImage) -> bool {
+    value
+        .reference
+        .strip_prefix("crossfire-package:")
+        .is_some_and(digest)
+        && image(&value.config_digest)
+        && image(&value.descriptor_digest)
 }
 fn version(value: &str) -> bool {
     let (base, suffix) = value
@@ -50,12 +70,12 @@ fn version(value: &str) -> bool {
 }
 pub fn parse(input: &Value) -> Result<ContainerPackage> {
     let mut normalized = input.clone();
-    if normalized.get("schemaVersion").and_then(Value::as_f64) == Some(1.0) {
-        normalized["schemaVersion"] = 1.into();
+    if normalized.get("schemaVersion").and_then(Value::as_f64) == Some(2.0) {
+        normalized["schemaVersion"] = 2.into();
     }
     let value: ContainerPackage = serde_json::from_value(normalized)
         .map_err(|_| invalid("Invalid container package manifest"))?;
-    if value.schema_version != 1
+    if value.schema_version != 2
         || value.platform != "linux/amd64"
         || !version(&value.version)
         || value.backend == "migrations"
@@ -71,13 +91,43 @@ pub fn parse(input: &Value) -> Result<ContainerPackage> {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'-')
         || !digest(&value.source_digest)
         || !digest(&value.archive_sha256)
-        || !image(&value.runtime_image)
-        || !image(&value.migration_image)
-        || value.runtime_image == value.migration_image
+        || !package_image(&value.runtime)
+        || !package_image(&value.migration)
+        || value.runtime.reference == value.migration.reference
+        || value.runtime.config_digest == value.migration.config_digest
+        || value.runtime.descriptor_digest == value.migration.descriptor_digest
     {
         return Err(invalid("Invalid container package manifest"));
     }
     Ok(value)
+}
+pub fn native_image_identity(expected: &PackageImage, input: &Value) -> Result<String> {
+    let mut identity = &expected.config_digest;
+    if let Some(descriptor) = input.get("Descriptor").filter(|value| !value.is_null()) {
+        let valid_media = descriptor
+            .get("mediaType")
+            .and_then(Value::as_str)
+            .is_some_and(|media| {
+                matches!(
+                    media,
+                    "application/vnd.oci.image.manifest.v1+json"
+                        | "application/vnd.oci.image.index.v1+json"
+                        | "application/vnd.docker.distribution.manifest.v2+json"
+                        | "application/vnd.docker.distribution.manifest.list.v2+json"
+                )
+            });
+        if !valid_media
+            || descriptor.get("digest").and_then(Value::as_str)
+                != Some(expected.descriptor_digest.as_str())
+        {
+            return Err(invalid("Container image descriptor does not match"));
+        }
+        identity = &expected.descriptor_digest;
+    }
+    if input.get("Id").and_then(Value::as_str) != Some(identity.as_str()) {
+        return Err(invalid("Container image identity does not match"));
+    }
+    Ok(identity.clone())
 }
 pub fn labels(value: &ContainerPackage, backend: &str) -> BTreeMap<String, String> {
     BTreeMap::from([
@@ -94,7 +144,7 @@ pub async fn prepare(
     directory: &Path,
     workspace: &Path,
     stop: CancellationToken,
-) -> Result<ContainerPackage> {
+) -> Result<PreparedContainerPackage> {
     let files = Directory::open(directory)?;
     let manifest = files
         .file("release.json", 8192)?
@@ -151,12 +201,12 @@ pub async fn prepare(
         return Err(invalid("Container package archive SHA-256 does not match"));
     }
     let selections = [
-        (&value.runtime_image, value.backend.as_str()),
-        (&value.migration_image, "migrations"),
+        (&value.runtime, value.backend.as_str()),
+        (&value.migration, "migrations"),
     ];
     let mut present = true;
-    for (identity, _) in selections {
-        if !docker::image(identity, workspace, stop.clone()).await? {
+    for (selected, _) in selections {
+        if !docker::image(&selected.reference, workspace, stop.clone()).await? {
             present = false;
         }
     }
@@ -172,9 +222,10 @@ pub async fn prepare(
         )
         .await?;
     }
-    for (identity, backend) in selections {
+    let mut identities = Vec::new();
+    for (selected, backend) in selections {
         let inspected = docker::captured(
-            &["image".into(), "inspect".into(), identity.into()],
+            &["image".into(), "inspect".into(), selected.reference.clone()],
             workspace,
             stop.clone(),
         )
@@ -189,8 +240,8 @@ pub async fn prepare(
             .filter(|entries| entries.len() == 1)
             .ok_or_else(|| invalid("Container package image inspection is ambiguous"))?;
         let found = &entries[0];
-        if found.get("Id").and_then(Value::as_str) != Some(identity.as_str())
-            || found.get("Os").and_then(Value::as_str) != Some("linux")
+        identities.push(native_image_identity(selected, found)?);
+        if found.get("Os").and_then(Value::as_str) != Some("linux")
             || found.get("Architecture").and_then(Value::as_str) != Some("amd64")
             || labels(&value, backend).iter().any(|(key, expected)| {
                 found
@@ -205,5 +256,9 @@ pub async fn prepare(
             ));
         }
     }
-    Ok(value)
+    Ok(PreparedContainerPackage {
+        package: value,
+        runtime_image: identities[0].clone(),
+        migration_image: identities[1].clone(),
+    })
 }

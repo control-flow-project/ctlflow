@@ -176,13 +176,6 @@ pub async fn run(input: Input, stop: CancellationToken) -> Result<()> {
         .transpose()?
         .unwrap_or(7);
     let diagnostics = Arc::new(Store::new(&input.root.join("logs"), days)?);
-    crossfire_adapter_filesystem::logging::migrate(
-        &input.root.join("daemon.log"),
-        &input.root.join("logs"),
-        days,
-        identity::now()?,
-    )
-    .await?;
     let home = std::env::var_os("HOME")
         .map(PathBuf::from)
         .ok_or_else(|| invalid("HOME is required for native credentials"))?;

@@ -1,17 +1,17 @@
 {
   "name": "@ctlflow/crossfire-adapter-pi",
-  "version": "0.1.20",
+  "version": "0.1.21",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
   "type": "module",
   "engines": { "node": ">=26.0.0", "npm": ">=11.17.0" },
   "dependencies": {
-    "@ctlflow/crossfire-agent-core": "0.1.20",
-    "@ctlflow/crossfire-adapter-runtime": "0.1.20",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.20",
-    "@ctlflow/crossfire-contracts": "0.1.20",
-    "@ctlflow/crossfire-kernel": "0.1.20"
+    "@ctlflow/crossfire-agent-core": "0.1.21",
+    "@ctlflow/crossfire-adapter-runtime": "0.1.21",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.21",
+    "@ctlflow/crossfire-contracts": "0.1.21",
+    "@ctlflow/crossfire-kernel": "0.1.21"
   },
   "exports": { "./native-extension": "./native/owned-extension.mjs", "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } }
 }
