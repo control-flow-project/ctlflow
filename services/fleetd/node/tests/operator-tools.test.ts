@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto';
 import WebSocket, { WebSocketServer } from 'ws';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { saveBinding } from '@ctlflow/fleetd-storage/binding';
+import { initializeAuthentication } from '@ctlflow/fleetd-storage/authentication';
 import { success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { FleetView } from '@ctlflow/fleetd-contracts/api';
 import { verifyFleet, preservation, verifyRetainedState, type Preservation } from '../tools/verify.js';
@@ -45,6 +46,10 @@ test('fleet growth preserves every earlier account, exact history and provider f
 
 test('fleet verification uses only daemon GETs, exact native identities and the actual ancestor Git skill boundary', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fleetd-operator-')), root = join(directory, 'controller'), fleetDirectory = join(directory, 'fleet');
+  const previousConfiguration = process.env.XDG_CONFIG_HOME;
+  process.env.XDG_CONFIG_HOME = join(directory, 'config');
+  cleanup(scope, () => { if (previousConfiguration === undefined) delete process.env.XDG_CONFIG_HOME; else process.env.XDG_CONFIG_HOME = previousConfiguration; });
+  const authenticationKey = await initializeAuthentication();
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const definition = join(fleetDirectory, 'agents', 'analyst'), workspace = join(definition, 'workarea', 'helper');
   mkdirSync(workspace, { recursive: true, mode: 0o700 }); mkdirSync(root, { mode: 0o700 });
@@ -65,6 +70,7 @@ test('fleet verification uses only daemon GETs, exact native identities and the 
   const attachment: Attachment = { runtime: 'codex', sessionId, workspace, connection: { endpoint: 'ws://127.0.0.1:12345', tokenFile: join(workspace, 'token') } };
   const requests: string[] = [];
   const server = createServer((request, response) => {
+    assert.equal(request.headers.authorization, 'Bearer ' + authenticationKey);
     requests.push(request.method! + ' ' + request.url);
     const path = new URL(request.url!, 'http://localhost').pathname;
     const data = path === '/api/fleets' ? [view] : path.endsWith('/contexts') ? [{ context: 'shared', runtime: 'codex', sessionId }] : attachment;

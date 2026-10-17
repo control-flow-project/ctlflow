@@ -10,6 +10,7 @@
 - [crossfire service](../services/crossfire/README.md)
 - [fleet CLI](../services/fleet/README.md)
 - [fleetd controller](../services/fleetd/README.md)
+- [Controller authentication](../services/fleetd/docs/authentication.md)
 - [crossfire configuration](../services/crossfire/docs/configuration.md)
 - [Deployment, backup and recovery](../services/crossfire/docs/operations.md)
 - [Database migrations](../services/crossfire/database/README.md)

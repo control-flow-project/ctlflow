@@ -34,7 +34,12 @@ export async function messageContracts(scope: TestContext, fixture: MessageFixtu
     provider.hold(); const first = 'Original task ' + randomUUID(); await send(first); await observe(() => provider.held() !== undefined, 'First native task reaches the held inert provider', 30000); const held = provider.held()!;
     assert.equal(provider.requests.length, 1); assert(lastUser(provider.requests[0]).includes(first)); assert(lastUser(provider.requests[0]).includes(room)); assert(lastUser(provider.requests[0]).includes(platform.owner.matrixUserId));
     provider.hold(); const replacement = 'Interrupt and use this instruction ' + randomUUID(); const started = Date.now(); const mentioned = await send(replacement, true); const event = text(mentioned.event_id);
-    await observe(() => provider.requests.length === 2 && provider.held() !== undefined, 'Mention reaches a replacement native turn without waiting for the first response', 10000);
+    try { await observe(() => provider.requests.length === 2 && provider.held() !== undefined, 'Mention reaches a replacement native turn without waiting for the first response', 10000); }
+    catch (error) {
+      scope.diagnostic(JSON.stringify({ steeringFailure: { requests: provider.requests.length, held: provider.held() !== undefined, originalClosed: held.destroyed,
+        inputs: provider.requests.slice(-4).map(request => lastUser(request).slice(0, 2048)) } }));
+      throw error;
+    }
     assert(Date.now() - started < 10000, 'No ordinary publication hold slot may delay steering'); assert(lastUser(provider.requests[1]).includes(replacement), 'Replacement native input: ' + lastUser(provider.requests[1]).slice(0, 4096)); assert(lastUser(provider.requests[1]).includes(room)); await observe(() => held.destroyed, 'Interruption closes the original held provider request');
     const conversation = await contractHttp(platform.origin, 'POST', '/api/agents/' + agent.id + '/owner-conversation', {}, { Authorization: 'Bearer ' + agent.token }); assert.equal(conversation.status, 200); const ownerRoom = text(record(record(conversation.body).data).roomId); assert.notEqual(ownerRoom, room);
     await observe(async () => {

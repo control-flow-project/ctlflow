@@ -3,6 +3,7 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { buildProducts, command, products, repository } from './build.mjs';
 import { verifyTestResources } from './test-resources.mjs';
+import { stageDistributionDocumentation } from './distribution-documentation.mjs';
 
 const { values, positionals } = parseArgs({ options: { output: { type: 'string' }, mode: { type: 'string' } }, allowPositionals: true });
 if (positionals.length || !values.output || !isAbsolute(values.output) || !['managed', 'nativeaot'].includes(values.mode)) throw new Error('Use publish-csharp.mjs --output /absolute/new-directory --mode managed|nativeaot');
@@ -30,7 +31,7 @@ try {
   cpSync(releases, join(stage, 'crossfire/onboarding'), { recursive: true });
   cpSync(join(repository, 'services/crossfire/dist/web'), join(stage, 'crossfire/web'), { recursive: true });
   cpSync(join(repository, 'LICENSE'), join(stage, 'LICENSE'));
-  cpSync(join(repository, 'services/crossfire/csharp/README.md'), join(stage, 'README.md'));
+  stageDistributionDocumentation(repository, stage, 'csharp-' + values.mode);
   writeFileSync(join(stage, 'distribution.json'), JSON.stringify({ schemaVersion: 1, implementation: 'csharp', mode: values.mode, platform: 'linux-x64', version: release.version, release: release.release, executables: { crossfire: 'crossfire/Crossfire.Server', fleetd: 'fleetd/fleetd', fleet: 'fleet/fleet' } }, null, 2) + '\n');
   renameSync(stage, output);
   console.log(JSON.stringify({ status: 'built-not-certified', output, mode: values.mode, resources, release: release.release }));

@@ -5,6 +5,12 @@ resume selections, operation files, diagnostics and private `fleetd.sock`.
 Registered fleets may live elsewhere. Private state is retained with its owning
 directory; a workarea does not move when native cwd changes.
 
+The OS-user authentication file is separate from each controller root: Linux
+XDG_CONFIG_HOME (default HOME/.config) or macOS HOME/Library/Application Support,
+followed by ctlflow/fleetd.json. Include it in private backups.
+
+- [Authentication schema, ownership and recovery](authentication.md)
+
 ## Native registries
 
 | Runtime | Registry |

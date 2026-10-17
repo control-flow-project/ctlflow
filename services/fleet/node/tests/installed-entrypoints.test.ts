@@ -12,6 +12,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
 import { piBinary } from '@ctlflow/crossfire-test-support/pi';
 import { piProvider } from '@ctlflow/crossfire-test-support/pi-provider';
+import { readAuthentication } from '@ctlflow/fleetd-storage/authentication';
 
 function installedFiles(directory: string): string[] {
   return readdirSync(directory).flatMap(file => {
@@ -28,12 +29,12 @@ test('installed fleetd symlink starts the exact private daemon and stops normall
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const installed = join(directory, 'fleetd'), root = join(directory, 'controller');
   symlinkSync(fileURLToPath(import.meta.resolve('@ctlflow/fleetd/executable')), installed);
-  const child = spawn(process.execPath, [installed, '--root', root, '--name', 'installed-controller'], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [installed, '--root', root, '--name', 'installed-controller'], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, XDG_CONFIG_HOME: join(directory, 'config') } });
   const ended = once(child, 'close'); let output = '', errors = '';
   child.stdout.on('data', chunk => { output += String(chunk); });
   child.stderr.on('data', chunk => { errors += String(chunk); });
   cleanup(scope, async () => { if (child.exitCode === null) child.kill('SIGTERM'); await ended; });
-  const client = createDaemonClient(join(root, 'fleetd.sock'));
+  const client = createDaemonClient(join(root, 'fleetd.sock'), undefined, () => readAuthentication(join(directory, 'config/ctlflow/fleetd.json')));
   const deadline = Date.now() + 10000;
   for (;;) {
     const result = await client.call(operations.status, {}, {});
@@ -90,7 +91,8 @@ test('clean installed public tarballs resolve only public dependencies and own o
   const installed = join(prefix, 'node_modules', '.bin', 'fleet');
   const cli = (...args: string[]) => execute(installed, args, { cwd: directory, env, timeout: 15000 });
   assert((await cli('--help')).stdout.includes('fleet setup'));
-  await assert.rejects(cli('--root', root, 'list'), /unavailable|Daemon request failed/u); assert.equal(existsSync(root), false, 'Read-only commands never create or start a controller');
+  await assert.rejects(cli('--root', root, 'list'), /unauthorized: Cannot read the mandatory fleetd authentication key/u); assert.equal(existsSync(root), false, 'Read-only commands never create or start a controller');
+  assert.equal(existsSync(join(directory, 'config/ctlflow/fleetd.json')), false, 'Read-only commands never initialize controller credentials');
   const first = JSON.parse((await cli('daemon', 'start', '--root', root, '--name', 'installed')).stdout) as { startedAt: number; controller: { name: string } };
   cleanup(scope, async () => { if (existsSync(join(root, 'fleetd.sock'))) await cli('daemon', 'stop'); });
   const repeated = JSON.parse((await cli('daemon', 'start', '--root', root, '--name', 'installed')).stdout) as { startedAt: number; controller: { name: string } };
@@ -103,7 +105,7 @@ test('clean installed public tarballs resolve only public dependencies and own o
   writeFileSync(join(definition, 'AGENTS.md'), 'Native bundle inspection only. No model work is authorized.\n', { mode: 0o600 });
   const agentFile = join(definition, 'agent.toml'), agentOptions = (model: string) => 'name = "Worker"\nruntime = "pi"\n[runtime_options]\nprovider = "fixture"\nmodel = "' + model + '"\nthinking_level = "medium"\n';
   writeFileSync(agentFile, agentOptions('unavailable-model'), { mode: 0o600 });
-  const client = createDaemonClient(join(root, 'fleetd.sock'));
+  const client = createDaemonClient(join(root, 'fleetd.sock'), undefined, () => readAuthentication(join(directory, 'config/ctlflow/fleetd.json')));
   const installedVersion = (JSON.parse(readFileSync(join(prefix, 'node_modules', '@ctlflow', 'fleet', 'package.json'), 'utf8')) as { version: string }).version;
   const setup = () => client.call(operations.setup, {}, { workspace: directory, configuration: join(configuration, 'runtime.toml'),
     descriptor: { schemaVersion: 1, server: 'https://127.0.0.1:1', ownerMatrixId: '@owner:example.test', package: { name: '@ctlflow/fleet', version: installedVersion }, instructions: '' } });

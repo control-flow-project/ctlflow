@@ -15,10 +15,7 @@ public sealed record ProjectSetup(string Workspace, string Descriptor, string Ro
 public static class Connections
 {
     public static string Home => Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
-    private static string ConfigurationRoot
-    {
-        get { var root = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") ?? Path.Combine(Home, ".config"); if (!Path.IsPathFullyQualified(root)) throw new CommandFailure("XDG_CONFIG_HOME must be absolute"); return Path.Combine(root, "fleet"); }
-    }
+    private static string ConfigurationRoot => Path.Combine(Fleetd.Storage.Authentication.Root, "fleet");
     private static string SettingsFile => Path.Combine(ConfigurationRoot, "connections.json");
     private static JsonElement Read(string file) => WireJson.Parse(PrivateFiles.Read(file, 1048576));
     private static void Write(string file, JsonElement value) => PrivateFiles.Write(file, Encoding.UTF8.GetBytes(WireJson.Pretty(value)), 1048576);

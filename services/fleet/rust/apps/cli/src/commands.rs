@@ -102,7 +102,11 @@ pub async fn run(values: Vec<String>, stop: CancellationToken) -> Result<()> {
         .map(Tunnel::socket)
         .unwrap_or_else(|| root.join("fleetd.sock"));
     let result = async {
-        let client = Client::open(&socket, stop.clone())?;
+        let client = if let Some(tunnel) = &tunnel {
+            Client::authenticated(&socket, stop.clone(), tunnel.authentication_key())?
+        } else {
+            Client::open(&socket, stop.clone())?
+        };
         invoke(&args, &client, &root, remote.as_ref(), stop).await
     }
     .await;

@@ -9,6 +9,7 @@ scanning the host. Native process ownership stays behind Codex/Pi adapters.
 crossfire owns remote authorization and coordination, not local process control.
 
 - [Setup](docs/setup.md)
+- [Controller authentication](docs/authentication.md)
 - [Operation and failure boundaries](docs/operations.md)
 - [Coordination defaults](docs/coordination.md)
 - [Private storage and conversions](docs/storage.md)

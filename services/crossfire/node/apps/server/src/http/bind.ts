@@ -13,7 +13,7 @@ export type Context = { services: Services; requestId: string; actor: Actor | nu
   controller?: Extract<FleetActor, { kind: 'controller' }>;
   session: { member: MemberRecord; csrfSecret: string; permissions: string[] } | null; credential: string };
 export type Endpoint = {
-  method: string; path: string; auth: 'public' | 'human' | 'agent' | 'either' | 'fleet'; status: number; collection: boolean;
+  method: string; path: string; auth: Operation<unknown, unknown, unknown, unknown>['auth']; status: number; collection: boolean;
   requestBytes?: number;
   requestFormat?: 'binary';
   match(pathname: string): Record<string, string> | null;

@@ -8,7 +8,7 @@ import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { contractProcess, freePorts, observe } from '@ctlflow/crossfire-test-support/contract-process';
 
-export async function sshFixture(scope: TestContext) {
+export async function sshFixture(scope: TestContext, configurationHome: string) {
   const directory = mkdtempSync(join(homedir(), '.fleet-ssh-contract-'));
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const bin = join(directory, 'bin'); mkdirSync(bin, { mode: 0o700 });
@@ -19,7 +19,7 @@ export async function sshFixture(scope: TestContext) {
   writeFileSync(configuration, 'Host fixture\n  HostName 127.0.0.1\n  Port ' + port + '\n  User ' + userInfo().username + '\n  IdentityFile ' + join(directory, 'client') + '\n  IdentitiesOnly yes\n  BatchMode yes\n  UserKnownHostsFile ' + known + '\n', { mode: 0o600 });
   writeFileSync(join(bin, 'ssh'), '#!/bin/sh\nexec /usr/bin/ssh -F ' + JSON.stringify(configuration) + ' "$@"\n', { mode: 0o700 });
   const server = join(directory, 'sshd_config');
-  writeFileSync(server, 'Port ' + port + '\nListenAddress 127.0.0.1\nHostKey ' + join(directory, 'host') + '\nPidFile ' + join(directory, 'sshd.pid') + '\nAuthorizedKeysFile ' + join(directory, 'client.pub') + '\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nStrictModes yes\nLogLevel VERBOSE\nAllowStreamLocalForwarding local\nAllowTcpForwarding local\n', { mode: 0o600 });
+  writeFileSync(server, 'Port ' + port + '\nListenAddress 127.0.0.1\nHostKey ' + join(directory, 'host') + '\nPidFile ' + join(directory, 'sshd.pid') + '\nAuthorizedKeysFile ' + join(directory, 'client.pub') + '\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nStrictModes yes\nLogLevel VERBOSE\nAllowStreamLocalForwarding local\nAllowTcpForwarding local\nSetEnv XDG_CONFIG_HOME=' + configurationHome + '\n', { mode: 0o600 });
   const process = contractProcess(scope, { binary: '/usr/sbin/sshd', arguments: ['-D', '-e', '-f', server] }, [], directory);
   await observe(() => { assert.equal(process.alive(), true, process.errors()); return process.errors().includes('Server listening'); }, 'Isolated native SSH server must become ready');
   return { bin, distrust: () => trust('wrong-host') };

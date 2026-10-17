@@ -23,7 +23,7 @@ test('fleet terminal pointers dispatch only through the runtime adapter and the 
   });
   server.listen(socket); await once(server, 'listening');
   cleanup(scope, () => new Promise<void>(resolve => server.close(() => resolve())));
-  const client = createDaemonClient(socket), received: unknown[] = [];
+  const client = createDaemonClient(socket, undefined, () => 'a'.repeat(64)), received: unknown[] = [];
   const adapters = { fixture: { command: (attachment: typeof descriptor) => { received.push(attachment); return success('native-fixture --existing-session'); } } };
   const local = await terminalPointer(client, fleetId, 'analyst', adapters);
   assert(local.ok); assert.equal(local.value.command, 'native-fixture --existing-session'); assert.deepEqual(received, [descriptor]);

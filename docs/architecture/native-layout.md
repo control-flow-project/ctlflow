@@ -91,6 +91,10 @@ dependencies cannot reference test fixtures or build tooling.
 fleetd owns one shared listener host and native lifecycle. Its daemon application
 owns the user-scoped private API, configuration, signals and composition only.
 fleet uses that API even locally; SSH wraps the same private API remotely.
+fleetd storage owns OS-native credential initialization/validation. fleet reads
+only this shared authentication file directly, not registry/history state.
+All targets reuse the SSH transport package's shared read asset and authenticate
+every endpoint. C#/Rust embed the asset at build time, not a Node runtime backend.
 crossfire coordinates leases, authorization, activity and receipts but never
 launches an agent. Native adapters encapsulate engine-specific protocols.
 

@@ -37,13 +37,7 @@ pub fn home() -> Result<PathBuf> {
         .ok_or_else(|| invalid("An absolute HOME is required"))
 }
 fn root() -> Result<PathBuf> {
-    let path = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .unwrap_or(home()?.join(".config"));
-    if !path.is_absolute() {
-        return Err(invalid("XDG_CONFIG_HOME must be absolute"));
-    }
-    Ok(path.join("fleet"))
+    fleetd_storage::authentication::root().map(|root| root.join("fleet"))
 }
 pub fn text(path: &Path) -> Result<&str> {
     path.to_str()

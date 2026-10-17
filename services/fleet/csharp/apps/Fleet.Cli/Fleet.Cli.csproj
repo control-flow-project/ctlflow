@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="../../packages/Fleet.DaemonClient/Fleet.DaemonClient.csproj" />
     <ProjectReference Include="../../packages/Fleet.SshTransport/Fleet.SshTransport.csproj" />
+    <ProjectReference Include="../../../../fleetd/csharp/packages/Fleetd.Storage/Fleetd.Storage.csproj" />
     <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterCodex/Crossfire.AdapterCodex.csproj" />
     <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterToml/Crossfire.AdapterToml.csproj" />
   </ItemGroup>

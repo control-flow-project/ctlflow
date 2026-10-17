@@ -22,6 +22,7 @@ pub enum Authentication {
     Agent,
     Either,
     Fleet,
+    Controller,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -1,0 +1,53 @@
+{
+  "valid": [
+    {
+      "label": "keyless",
+      "text": "{\"schemaVersion\":1}",
+      "key": null
+    },
+    {
+      "label": "version-as-decimal",
+      "text": "{\"schemaVersion\":1.0}",
+      "key": null
+    },
+    {
+      "label": "version-as-exponent",
+      "text": "{\"schemaVersion\":1e0}",
+      "key": null
+    },
+    {
+      "label": "credential",
+      "text": "{\"schemaVersion\":1,\"authenticationKey\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "label": "escaped-name",
+      "text": "{\"schemaVersion\":1,\"authentication\\u004bey\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "invalid": [
+    "",
+    "{}",
+    "null",
+    "[]",
+    "{\"schemaVersion\":0}",
+    "{\"schemaVersion\":2}",
+    "{\"schemaVersion\":\"1\"}",
+    "{\"schemaVersion\":true}",
+    "{\"schemaVersion\":null}",
+    "{\"schemaVersion\":1,\"schemaVersion\":1}",
+    "{\"schemaVersion\":1,\"schema\\u0056ersion\":1}",
+    "{\"schemaVersion\":1,\"authenticationKey\":null}",
+    "{\"schemaVersion\":1,\"authenticationKey\":true}",
+    "{\"schemaVersion\":1,\"authenticationKey\":{}}",
+    "{\"schemaVersion\":1,\"authenticationKey\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+    "{\"schemaVersion\":1,\"authenticationKey\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\"}",
+    "{\"schemaVersion\":1,\"secret\":\"do-not-leak-secret\"}",
+    "{\"schemaVersion\":1,\"authenticationKey\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"authenticationKey\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+    "{\"schemaVersion\":1,\"authenticationKey\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"authentication\\u004bey\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"}",
+    "{\"schemaVersion\":1} trailing",
+    "﻿{\"schemaVersion\":1}",
+    "{\"schemaVersion\":NaN}"
+  ]
+}

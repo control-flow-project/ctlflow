@@ -48,7 +48,7 @@ Keep sibling directories together so the CLI resolves its installed controller.
   --package /absolute/packages/csharp-managed --port 8080 --content-port 8082
 ```
 
-The package explicitly selects Node, C# managed or C# nativeaot, independently
+The package explicitly selects Node, C# managed, C# NativeAOT or Rust, independently
 of the installed operator's language. There is no automatic fallback or source
 build during deployment. The operator requires rootless Docker and verifies/imports
 the selected runtime image and common Knex migration image.
@@ -67,7 +67,7 @@ npm run verify:csharp
 npm run verify:parity -- /absolute/new-evidence-directory
 ```
 
-The integrated gate builds and runs both C# outputs plus Node, common external
+The integrated gate builds and runs both C# outputs plus Node/Rust, common external
 API/UI/native/CLI assertions, containers and migration containers.
 The SDK/EF versions are pinned previews. IL diagnostics remain visible;
 supported-query execution is not arbitrary EF reflection/query support.

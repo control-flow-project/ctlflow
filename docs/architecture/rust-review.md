@@ -65,7 +65,6 @@ platform, native-runtime scope, resource bounds and remaining dependency limits.
 
 - [Parent quality gate and findings](../verification/20261016-rust-quality-gate.md)
 - [Executable shared scenario coverage](../verification/shared-contracts.md)
-- [Earlier Rust-only integration evidence](../../.analysis/20261016-rust-main-integration/verification.md)
 - [Earlier 15 October evidence](../verification/20261015-rust-integration.md)
 
 ## Limits

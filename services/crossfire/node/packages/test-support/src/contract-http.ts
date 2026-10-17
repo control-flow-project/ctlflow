@@ -4,7 +4,7 @@ import { request as secureRequest } from 'node:https';
 import { record } from './contract-process.js';
 
 export type ContractReply = { status: number; body: unknown; headers: Record<string, string | string[] | undefined> };
-export async function contractHttp(origin: string, method: string, path: string, body?: unknown, headers: Record<string, string> = {}, socket?: string, localAddress?: string): Promise<ContractReply> {
+export async function contractHttp(origin: string, method: string, path: string, body?: unknown, headers: Record<string, string | string[]> = {}, socket?: string, localAddress?: string): Promise<ContractReply> {
   const url = new URL(path, origin), bytes = body === undefined ? undefined : body instanceof Uint8Array ? Buffer.from(body) : typeof body === 'string' && headers['Content-Type'] === 'application/x-www-form-urlencoded' ? Buffer.from(body) : Buffer.from(JSON.stringify(body));
   return new Promise((resolveReply, reject) => {
     const outgoing = (url.protocol === 'https:' ? secureRequest : request)({ protocol: url.protocol, hostname: url.hostname, port: url.port, path: url.pathname + url.search, method, family: 4,

@@ -4,6 +4,7 @@ import type { Operation } from '@ctlflow/crossfire-contracts/rest/operation';
 import { failure, success, type Result, type FailureCode } from '@ctlflow/crossfire-kernel/result';
 import type { FleetController } from '@ctlflow/fleetd-domain/controller';
 import { operations } from '@ctlflow/fleetd-contracts/api';
+import { authenticated } from '@ctlflow/fleetd-storage/authentication';
 
 type Reply = { data: unknown; pagination?: { page: number; pageSize: number; totalItems: number; totalPages: number } };
 type Endpoint = { method: string; status: number; match(path: string): Record<string, string> | null; invoke(params: unknown, query: URLSearchParams, input: unknown): Promise<Result<Reply>> };
@@ -50,7 +51,7 @@ async function body(request: IncomingMessage): Promise<Result<unknown>> {
   try { return success(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(buffers)))); }
   catch { return failure('invalid', 'Invalid JSON'); }
 }
-export function createDaemonHttp(controller: FleetController, stopped: () => void, logging: () => { loggingRetentionDays: number; loggingError: string | null }) {
+export function createDaemonHttp(controller: FleetController, authenticationKey: string, stopped: () => void, logging: () => { loggingRetentionDays: number; loggingError: string | null }) {
   const routes = [
     bind(operations.setup, async (_params, _query, input) => reply(await controller.setup(input))),
     bind(operations.status, () => reply(success({ ...controller.status(), ...logging() }))),
@@ -76,7 +77,9 @@ export function createDaemonHttp(controller: FleetController, stopped: () => voi
     const requestId = randomUUID();
     void (async () => {
       let result: Result<Reply>, status = 200;
-      if (request.headers.host !== 'localhost' || request.headers.origin || request.headers.authorization || request.headers.cookie) result = failure('forbidden', 'Use the private controller socket without browser or bearer credentials');
+      if (request.headers.host !== 'localhost' || request.headers.origin !== undefined || request.headers.cookie !== undefined) result = failure('forbidden', 'Use the private controller socket without browser credentials');
+      else if (request.rawHeaders.filter((_value, index) => index % 2 === 0 && request.rawHeaders[index]!.toLowerCase() === 'authorization').length !== 1
+        || !authenticated(request.headers.authorization, authenticationKey)) result = failure('unauthorized', 'Valid fleetd authentication is required');
       else {
         const url = new URL(request.url ?? '/', 'http://localhost'), matches = routes.map(route => ({ route, params: route.match(url.pathname) })).filter(value => value.params);
         const selected = matches.find(value => value.route.method === request.method);

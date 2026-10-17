@@ -123,6 +123,9 @@ pub async fn run(input: Input, stop: CancellationToken) -> Result<()> {
         crossfire_adapter_process::background::redirect()?;
     }
     let private = PrivateDirectory::open(&input.root, true)?;
+    let authentication_key =
+        fleetd_storage::authentication::initialize(&fleetd_storage::authentication::file_path()?)
+            .await?;
     let _ownership = StateLock::acquire(&input.root.join("daemon"))?;
     let selected = private
         .read_optional("controller.json", 65536)?
@@ -229,6 +232,7 @@ pub async fn run(input: Input, stop: CancellationToken) -> Result<()> {
     let listener = server::private_unix(&input.root.join("fleetd.sock"))?;
     let socket_owner = socket.claim()?;
     let state = Arc::new(api::State {
+        authentication_key,
         controller: controller.clone(),
         diagnostics: diagnostics.clone(),
         days,

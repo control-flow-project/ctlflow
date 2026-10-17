@@ -20,6 +20,7 @@ import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 import type { OwnedRuntimeConnection } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import { randomUUID } from 'node:crypto';
 import { nativeModels } from '@ctlflow/crossfire-test-support/native-models';
+import { readAuthentication } from '@ctlflow/fleetd-storage/authentication';
 
 const execute = promisify(execFile);
 test('native SSH forwards the private controller API, attaches the exact Codex TUI and leaves the daemon running', { timeout: 90000 }, async scope => {
@@ -34,6 +35,7 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   let nativeRuntime: OwnedRuntimeConnection | undefined, terminal: ReturnType<typeof spawn> | undefined, terminalEnded: Promise<unknown> | undefined;
   cleanup(scope, async () => { terminal?.kill('SIGTERM'); await terminalEnded; await nativeRuntime?.close(); stop.abort(); await tunnel?.close(); sshd?.kill('SIGTERM'); await ended; await command('daemon', 'stop').catch(() => {}); rmSync(directory, { recursive: true, force: true }); });
   await command('daemon', 'start', '--root', root, '--name', 'ssh-proof');
+  const localClient = createDaemonClient(join(root, 'fleetd.sock'), undefined, () => readAuthentication(join(directory, 'config/ctlflow/fleetd.json')));
   for (const key of ['host', 'client', 'wrong-host']) await execute('/usr/bin/ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', join(directory, key)]);
   const listener = createServer(); listener.listen(0, '127.0.0.1'); await once(listener, 'listening');
   const address = listener.address(); assert(address && typeof address !== 'string');
@@ -47,7 +49,7 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   const daemonConfig = join(directory, 'sshd_config');
   writeFileSync(daemonConfig, 'Port ' + port + '\nListenAddress 127.0.0.1\nHostKey ' + join(directory, 'host')
     + '\nPidFile ' + join(directory, 'sshd.pid') + '\nAuthorizedKeysFile ' + join(directory, 'client.pub')
-    + '\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nStrictModes yes\nLogLevel VERBOSE\nAllowStreamLocalForwarding local\nAllowTcpForwarding local\n', { mode: 0o600 });
+    + '\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nUsePAM no\nStrictModes yes\nLogLevel VERBOSE\nAllowStreamLocalForwarding local\nAllowTcpForwarding local\nSetEnv XDG_CONFIG_HOME=' + join(directory, 'config') + '\n', { mode: 0o600 });
   sshd = spawn('/usr/sbin/sshd', ['-D', '-e', '-f', daemonConfig], { stdio: ['ignore', 'ignore', 'pipe'] });
   let log = ''; sshd.stderr!.on('data', chunk => { log += String(chunk); });
   ended = once(sshd, 'close');
@@ -56,10 +58,10 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   const previousPath = process.env.PATH; process.env.PATH = bin + ':' + previousPath;
   cleanup(scope, () => { if (previousPath === undefined) delete process.env.PATH; else process.env.PATH = previousPath; });
   tunnel = await openTunnel('fixture', root, AbortSignal.any([stop.signal, scope.signal])).catch(error => { throw new Error(String(error) + '\n' + log); });
-  const status = await createDaemonClient(tunnel.socketPath, AbortSignal.timeout(5000)).call(operations.status, {}, {});
+  const status = await createDaemonClient(tunnel.socketPath, AbortSignal.timeout(5000), () => tunnel!.authenticationKey).call(operations.status, {}, {});
   assert(status.ok, JSON.stringify(status) + '\n' + log); assert.equal(status.value.data.controller.name, 'ssh-proof');
   await tunnel.close(); assert.equal(existsSync(tunnel.socketPath), false);
-  assert((await createDaemonClient(join(root, 'fleetd.sock')).call(operations.status, {}, {})).ok);
+  assert((await localClient.call(operations.status, {}, {})).ok);
   const tokenFile = join(directory, "private-'token"), native = join(bin, "native-'terminal");
   writeFileSync(tokenFile, 'private-terminal-proof', { mode: 0o600 });
   writeFileSync(native, '#!' + process.execPath + '\nconsole.log(JSON.stringify({arguments:process.argv.slice(2),authenticated:process.env.FLEET_RUNTIME_AUTH_TOKEN==="private-terminal-proof"}));', { mode: 0o700 });
@@ -69,7 +71,7 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   assert(!remoteCommand.includes('private-terminal-proof'));
   const attached = JSON.parse((await execute('/bin/sh', ['-c', remoteCommand], { timeout: 10000 })).stdout) as { arguments: string[]; authenticated: boolean };
   assert(attached.authenticated); assert(attached.arguments.includes(descriptor.workspace)); assert(attached.arguments.includes(descriptor.sessionId));
-  assert((await createDaemonClient(join(root, 'fleetd.sock')).call(operations.status, {}, {})).ok);
+  assert((await localClient.call(operations.status, {}, {})).ok);
   const workspace = join(directory, 'workspace'), nativeHome = join(workspace, '.codex');
   mkdirSync(nativeHome, { recursive: true, mode: 0o700 });
   writeFileSync(join(nativeHome, 'auth.json'), '{}', { mode: 0o600 });
@@ -114,8 +116,8 @@ test('native SSH forwards the private controller API, attaches the exact Codex T
   assert.equal(await nativeRuntime.turnControl.activeTurn(), null);
   assert.equal(modelCalls, 0, 'Real SSH TUI attachment and exit make no model calls: ' + JSON.stringify(requests));
   await nativeRuntime.close(); nativeRuntime = undefined;
-  assert((await createDaemonClient(join(root, 'fleetd.sock')).call(operations.status, {}, {})).ok);
+  assert((await localClient.call(operations.status, {}, {})).ok);
   writeFileSync(known, trusted('wrong-host'), { mode: 0o600 });
-  await assert.rejects(openTunnel('fixture', root, stop.signal), /SSH tunnel closed/);
-  assert((await createDaemonClient(join(root, 'fleetd.sock')).call(operations.status, {}, {})).ok);
+  await assert.rejects(openTunnel('fixture', root, stop.signal), /trusted SSH/);
+  assert((await localClient.call(operations.status, {}, {})).ok);
 });

@@ -13,8 +13,9 @@ host libraries used by the `linux-x64` .NET runtime. Fleet agents also require
 Node for the shared tool client, the selected Codex or verified Pi 1.0.0
 executable and an authorized native provider login. Remote commands require SSH.
 
-The server operator requires rootless Docker and an explicit source checkout to
-build its managed runtime and shared Knex migration images. Public deployment
+Building managed runtime and shared Knex images requires a source checkout.
+The installed server operator needs rootless Docker and a completed explicit
+container package, not the checkout. Public deployment
 requires operator-owned DNS, HTTPS and separate application/content hostnames.
 The full verification bank additionally requires Rust, Chrome and native test
 assets. No command here installs a host service or native agent runtime.
@@ -32,7 +33,7 @@ systemd-run --user --scope --quiet \
 
 The publisher stages all products before renaming the completed directory.
 It produces `crossfire/Crossfire.Server`, `fleetd/fleetd`, `fleet/fleet`, their
-runtime files, common web/tool assets, licenses, the implementation README and
+runtime files, common web/tool assets, licenses, this target-specific README and
 `distribution.json`. The manifest records implementation, mode, platform,
 coordinated version, tool release and executable paths.
 
@@ -72,6 +73,20 @@ Public deployments must configure their exact HTTPS origins, separate proxy
 routes and trusted ingress. These example addresses are not live deployments.
 
 ## Install and connect fleet and fleetd
+
+fleetd automatically creates one private OS-user authentication file on first
+start: Linux `$XDG_CONFIG_HOME/ctlflow/fleetd.json` (default
+`$HOME/.config/ctlflow/fleetd.json`), or macOS
+`$HOME/Library/Application Support/ctlflow/fleetd.json` for the Node products.
+fleet reads the same persistent random key and authenticates every daemon
+request. Back it up separately from controller roots; remote clients read the
+remote host's file over strict SSH. See the
+[authentication contract](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/docs/authentication.md).
+
+Management-generated setup always uses pinned npm fleet and Node fleetd,
+independent of the server backend. Native controllers are explicit operator
+choices, not prerequisites imposed on a setup harness.
+
 
 Keep the distribution's sibling `fleet` and `fleetd` directories together.
 The CLI resolves its controller and `fleetd/artifacts` from that layout; do not

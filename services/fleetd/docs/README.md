@@ -1,6 +1,7 @@
 # Controller guides
 
 - [Setup and descriptor validation](setup.md)
+- [Controller authentication and OS configuration](authentication.md)
 - [Operation, sleep and recovery](operations.md)
 - [Wake and invitation policy](coordination.md)
 - [Storage ownership and forward conversions](storage.md)

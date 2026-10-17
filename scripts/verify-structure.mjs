@@ -9,7 +9,9 @@ import { verifyCsharpArchitecture } from './verify-csharp-architecture.mjs';
 import { verifyImplementationLayout } from './verify-implementation-layout.mjs';
 import { verifyDocumentation } from './verify-documentation.mjs';
 import { inventory } from './native-file-inventory.mjs';
+import { verifyPrivateFiles } from './verify-private-files.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
+verifyPrivateFiles(root);
 assert.deepEqual(readdirSync(join(root, 'services')).sort(), ['crossfire', 'fleet', 'fleetd']);
 for (const name of ['apps', 'packages', 'tests', 'skills', 'src', 'third-party']) {
   assert(!existsSync(join(root, name)) || readdirSync(join(root, name)).length === 0, 'Root application directory: ' + name);

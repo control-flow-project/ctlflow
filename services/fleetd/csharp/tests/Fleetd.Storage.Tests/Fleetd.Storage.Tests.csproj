@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../packages/Fleetd.Storage/Fleetd.Storage.csproj" />
+    <EmbeddedResource Include="../../../tests/contracts/authentication-cases.json" LogicalName="Fleetd.AuthenticationCases" />
+  </ItemGroup>
+</Project>

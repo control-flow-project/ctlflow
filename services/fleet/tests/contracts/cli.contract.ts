@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
 import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
@@ -8,6 +8,7 @@ import { contractHttp } from '@ctlflow/crossfire-test-support/contract-http';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import type { ContractPlatform } from '@ctlflow/crossfire-test-support/contract-platform';
 import { sshFixture } from './ssh-fixture.js';
+import { readAuthentication } from '@ctlflow/fleetd-storage/authentication';
 
 export async function cliContracts(scope: TestContext, platform: ContractPlatform, selected: ContractTarget): Promise<void> {
   const directory = join(platform.directory, 'c'); mkdirSync(directory, { mode: 0o700 }); const root = join(directory, 'd'), home = join(directory, 'home'), fleet = join(directory, 'fleet'); mkdirSync(home, { mode: 0o700 }); const provider = await nativeProvider(scope, home); const environment: NodeJS.ProcessEnv = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(home, '.config') };
@@ -37,9 +38,17 @@ export async function cliContracts(scope: TestContext, platform: ContractPlatfor
     const restarted = record(await json('daemon', 'start')); assert.equal(record(restarted.controller).name, 'cli-contract'); assert.equal(list(await json('list')).length, 0);
   });
   await scope.test('actual SSH forwards the same private API and rejects an untrusted host', async child => {
-    const ssh = await sshFixture(child), previous = environment.PATH; environment.PATH = ssh.bin + delimiter + (previous ?? '');
+    const ssh = await sshFixture(child, environment.XDG_CONFIG_HOME!), previous = environment.PATH; environment.PATH = ssh.bin + delimiter + (previous ?? '');
     try {
       await json('remote', 'add', 'verified-remote', '--ssh', 'fixture', '--root', root);
+      assert.deepEqual(await json('list', '--remote', 'verified-remote'), []);
+      const file = join(environment.XDG_CONFIG_HOME!, 'ctlflow/fleetd.json'), original = readFileSync(file), key = readAuthentication(file);
+      try {
+        chmodSync(file, 0o644); const publicFile = await cli('list', '--remote', 'verified-remote');
+        assert.notEqual(publicFile.code, 0, 'SSH refuses a public authentication file'); assert(!(publicFile.output + publicFile.error).includes(key), 'Errors never expose remote credentials');
+        chmodSync(file, 0o600); writeFileSync(file, '{"schemaVersion":1,"authenticationKey":"' + key + '","invalid":true}');
+        const invalid = await cli('list', '--remote', 'verified-remote'); assert.notEqual(invalid.code, 0); assert(!(invalid.output + invalid.error).includes(key));
+      } finally { chmodSync(file, 0o600); writeFileSync(file, original); }
       assert.deepEqual(await json('list', '--remote', 'verified-remote'), []);
       ssh.distrust(); assert.notEqual((await cli('list', '--remote', 'verified-remote')).code, 0, 'Wrong SSH host keys never receive implicit trust');
       assert.equal(record(record(await json('daemon', 'status')).controller).name, 'cli-contract', 'Tunnel teardown never stops its remote controller');
@@ -55,7 +64,7 @@ export async function cliContracts(scope: TestContext, platform: ContractPlatfor
         assert(starting.alive() || starting.child.exitCode === 0, starting.errors() + '\n' + starting.output());
         const operationId = /"operationId"\s*:\s*"([a-f0-9-]{36})"/u.exec(starting.output())?.[1];
         if (operationId) {
-          const response = await contractHttp('http://localhost', 'GET', '/api/operations/' + operationId, undefined, {}, join(root, 'fleetd.sock')); assert.equal(response.status, 200); const operation = record(record(response.body).data);
+          const response = await contractHttp('http://localhost', 'GET', '/api/operations/' + operationId, undefined, { Authorization: 'Bearer ' + readAuthentication(join(environment.XDG_CONFIG_HOME!, 'ctlflow/fleetd.json')) }, join(root, 'fleetd.sock')); assert.equal(response.status, 200); const operation = record(record(response.body).data);
           if (operation.approval !== null) { const approval = record(operation.approval), id = new URL(text(approval.url)).pathname.split('/').at(-1)!; if (!approved.has(id)) { approved.add(id); await platform.approve(id, text(approval.code)); } }
         }
         return starting.child.exitCode === 0;

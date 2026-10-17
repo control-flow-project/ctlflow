@@ -14,6 +14,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
 import type { Result } from '@ctlflow/crossfire-kernel/result';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
+import { readAuthentication } from '@ctlflow/fleetd-storage/authentication';
 const execute = promisify(execFile);
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
 const entry = fileURLToPath(new URL('../apps/cli/src/main.js', import.meta.url));
@@ -27,7 +28,8 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   const provider = await nativeProvider(scope, home);
   const env = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'config') };
   const cli = (...args: string[]) => execute(process.execPath, [installed, ...args], { env, timeout: 15000 });
-  const client = createDaemonClient(join(root, 'fleetd.sock'));
+  const credential = () => readAuthentication(join(directory, 'config/ctlflow/fleetd.json'));
+  const client = createDaemonClient(join(root, 'fleetd.sock'), undefined, credential);
   cleanup(scope, async () => {
     await client.call(operations.operate, {}, { operationId: randomUUID(), action: 'stop', target: { kind: 'daemon' }, expectedRevision: 0 });
   });
@@ -70,7 +72,7 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   async function raw(path: string, method: string, body: unknown, extra: Record<string, string> = {}) {
     const content = method === 'GET' ? undefined : JSON.stringify(body);
     return new Promise<number>((resolve, reject) => {
-      const outgoing = request({ socketPath: join(root, 'fleetd.sock'), path, method, agent: false, headers: { Host: 'localhost', 'Content-Type': 'application/json', ...(content ? { 'Content-Length': Buffer.byteLength(content) } : {}), ...extra } }, response => {
+      const outgoing = request({ socketPath: join(root, 'fleetd.sock'), path, method, agent: false, headers: { Host: 'localhost', Authorization: 'Bearer ' + credential(), 'Content-Type': 'application/json', ...(content ? { 'Content-Length': Buffer.byteLength(content) } : {}), ...extra } }, response => {
         response.resume(); response.once('end', () => resolve(response.statusCode!));
       }); outgoing.once('error', reject); outgoing.end(content);
     });

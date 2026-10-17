@@ -1,6 +1,6 @@
 use crossfire_adapter_http::{NativeHttp, operation};
 use crossfire_contracts::call::Call;
-use crossfire_kernel::Result;
+use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use fleetd_contracts::operations::OperationId;
 use serde_json::{Value, json};
 use std::{path::Path, time::Duration};
@@ -11,10 +11,20 @@ pub struct Client {
 }
 impl Client {
     pub fn open(socket: &Path, stop: CancellationToken) -> Result<Self> {
+        let key = fleetd_storage::authentication::file_path()
+            .and_then(|path| fleetd_storage::authentication::read(&path))
+            .map_err(|_| Failure::new(ErrorCode::Unauthorized, "Cannot read the private fleetd authentication configuration; start fleetd to initialize it"))?;
+        Self::authenticated(socket, stop, key)
+    }
+    pub fn authenticated(
+        socket: &Path,
+        stop: CancellationToken,
+        key: crossfire_kernel::secret::Secret,
+    ) -> Result<Self> {
         Ok(Self {
             transport: operation::Client::from_http(
                 NativeHttp::unix(socket, stop)?,
-                None,
+                Some(key),
                 Duration::from_secs(120),
                 16 * 1024 * 1024,
             )?,

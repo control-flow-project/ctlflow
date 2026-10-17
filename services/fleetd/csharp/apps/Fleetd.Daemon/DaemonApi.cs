@@ -5,6 +5,7 @@ using Crossfire.Contracts;
 using Crossfire.Kernel;
 using Fleetd.Contracts;
 using Fleetd.Domain;
+using Fleetd.Storage;
 
 namespace Fleetd.Daemon;
 
@@ -16,12 +17,13 @@ public static class DaemonApi
     private static void Fields(JsonElement value, params string[] names) => Value(Validation.Fields(value, names));
     private static string Text(JsonElement value, string name, int maximum = 4096) => Value(Validation.Text(value.GetProperty(name), maximum));
     private static long Revision(JsonElement value) => Value(Validation.Integer(value.GetProperty("expectedRevision")));
-    public static async Task Handle(FleetController controller, Func<(int Days, string? Error)> logging, Action stopped, HttpContext http)
+    public static async Task Handle(FleetController controller, string authenticationKey, Func<(int Days, string? Error)> logging, Action stopped, HttpContext http)
     {
         var id = Identity.Identifier(); RestOperation? operation = null; Result<DaemonReply> result;
         try
         {
-            if (http.Request.Host.Value != "localhost" || http.Request.Headers.ContainsKey("Origin") || http.Request.Headers.ContainsKey("Authorization") || http.Request.Headers.ContainsKey("Cookie")) throw new RequestFailure(new("forbidden", "Use the private controller socket without browser or bearer credentials"));
+            if (http.Request.Host.Value != "localhost" || http.Request.Headers.ContainsKey("Origin") || http.Request.Headers.ContainsKey("Cookie")) throw new RequestFailure(new("forbidden", "Use the private controller socket without browser credentials"));
+            if (http.Request.Headers.Authorization.Count != 1 || !Authentication.Matches(http.Request.Headers.Authorization[0], authenticationKey)) throw new RequestFailure(new("unauthorized", "Valid fleetd authentication is required"));
             var path = http.Request.Path.Value ?? "/"; var matches = DaemonOperations.All.Values.Select(operation => (Operation: operation, Parameters: Match(operation.Path, path))).Where(value => value.Parameters is not null).ToArray();
             var selected = matches.FirstOrDefault(value => value.Operation.Method == http.Request.Method); operation = selected.Operation; if (operation is null) throw new RequestFailure(new(matches.Length == 0 ? "missing" : "method_not_allowed", "No such daemon operation"));
             foreach (var parameter in selected.Parameters!) if (parameter.Key is "fleetId" or "operationId" ? !Validation.Identifier(parameter.Value) : !IdentitySyntax.Name(parameter.Value)) throw new RequestFailure(new("invalid", "Invalid daemon path identity"));

@@ -20,6 +20,7 @@ Run through the root coordinators in a finite resource scope.
 | Native chat and interruption | fleetd/tests/contracts/messages.contract.ts | Actual Codex/Pi input, source attribution, held-turn interruption and owner notices |
 | History/lifecycle | fleetd/tests/contracts/daemon.contract.ts | Saved contexts, controller restart, explicit stopped intent and management receipts |
 | CLI and SSH | fleet/tests/contracts/cli.contract.ts | Installed commands, private API, host-key refusal and noninteractive setup |
+| Controller authentication | fleetd/tests/contracts/authentication.contract.ts | Mandatory bearer for every daemon operation, duplicate/wrong/missing key refusal, private initialization and browser-header denial |
 | Data interchange | server.contract.ts | Every selected implementation reopens the same SQLite file |
 | Container deployment | container.contract.ts | Actual operator/image, Element login/room/media, assets and persisted restart |
 | Operator arguments | operator.contract.ts | Repeated-option refusal, canonical decimal port bounds, unchanged private state and validation before native operations |
