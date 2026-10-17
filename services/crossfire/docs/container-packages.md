@@ -1,6 +1,7 @@
 # Container deployment packages
 
 crossfire packages a selected server backend and the common Knex migration image.
+For a local server and Node fleet container, see the [local Docker quickstart](local-docker.md).
 The deployment host needs rootless Docker and an installed crossfire operator;
 it does not build source or install that server backend's language runtime.
 Node, C# and Rust operators consume the same format and can run any server backend.
