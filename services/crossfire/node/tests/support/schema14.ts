@@ -1,8 +1,9 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import type Database from 'better-sqlite3';
 import { migrationChange, migrationQuery, migrationRows } from './migration-data.js';
 
 export function restoreSchema14EnrollmentItems(database: Database.Database): void {
-  const foreignKeys = database.pragma('foreign_keys', { simple: true });
+  const foreignKeys = sqliteMetadata.foreignKeys(database);
   database.pragma('foreign_keys = OFF');
   try {
     database.transaction(() => {

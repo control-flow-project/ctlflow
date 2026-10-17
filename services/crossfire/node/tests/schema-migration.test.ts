@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { migrateFixture, loggingSchema } from './support/storage.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,7 +17,7 @@ test('schema 13 advances atomically with exact wake semantics and protected hist
     seed(database);
     const before = snapshot(database), schema = migrationCatalog(database);
     await migrateFixture(database);
-    assert.equal(database.pragma('user_version', { simple: true }), SCHEMA_VERSION);
+    assert.equal(sqliteMetadata.databaseIdentity(database).version, SCHEMA_VERSION);
     const after = snapshot(database), converted = new Set([...schema13Tables, 'enrollment_request']);
     for (const [table, rows] of before) if (!converted.has(table)) {
       const expected = table === 'enrollment_item' ? rows.map(({ failure_code, ...row }) => {
@@ -46,9 +47,9 @@ test('schema 13 advances atomically with exact wake semantics and protected hist
     assert.equal(snapshot(database).get('enrollment_archive_wake_sender')!.length, 0);
     assert.throws(() => migrationChange(database, migrationQuery('agent').update({ wake_mode: 'owner' })), /CHECK/u);
     assert.throws(() => migrationChange(database, migrationQuery('agent_wake_sender').update({ include_agents: 2 })), /CHECK/u);
-    assert.equal(database.pragma('foreign_keys', { simple: true }), 1);
-    assert.deepEqual(database.pragma('foreign_key_check'), []);
-    assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
+    assert.equal(sqliteMetadata.foreignKeys(database), 1);
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
+    assert.equal(sqliteMetadata.integrityResult(database), 'ok');
     assert.equal(migrationCatalog(database).length,
       schema.length + [...loggingSchema.matchAll(/CREATE INDEX /gu)].length + 1 - 6,
       'Forward migrations add the totals/logging indexes and remove exactly six obsolete archive delete guards');
@@ -62,9 +63,9 @@ test('a failed forward conversion rolls back every table, guard, credential and 
     seed(database); migrationChange(database, migrationQuery.schema.alterTable('principal', table => table.index(['created_at'], 'ix_agent_owner_next')));
     const before = snapshot(database), schema = migrationCatalog(database);
     await assert.rejects(() => migrateFixture(database), /already exists/u);
-    assert.equal(database.pragma('user_version', { simple: true }), 13);
+    assert.equal(sqliteMetadata.databaseIdentity(database).version, 13);
     assert.deepEqual(snapshot(database), before); assert.deepEqual(migrationCatalog(database), schema);
-    assert.equal(database.pragma('foreign_keys', { simple: true }), 1); assert.deepEqual(database.pragma('foreign_key_check'), []);
+    assert.equal(sqliteMetadata.foreignKeys(database), 1); assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   } finally { database.close(); }
 });
 
@@ -75,13 +76,13 @@ test('schema 16 logging migration preserves every row, matches a fresh schema an
     const before = snapshot(database);
     migrationChange(database, migrationQuery.schema.alterTable('listener_run', table => table.index(['last_seen_at', 'id'], 'ix_listener_run_retention')));
     await assert.rejects(() => migrateFixture(database), /already exists/u);
-    assert.equal(database.pragma('user_version', { simple: true }), 16);
+    assert.equal(sqliteMetadata.databaseIdentity(database).version, 16);
     assert.equal(migrationRows(database, migrationQuery('sqlite_schema').select('name').where('type', 'trigger').whereLike('name', 'protect_enrollment_archive%_delete')).length, 6);
     migrationChange(database, migrationQuery.schema.alterTable('listener_run', table => table.dropIndex([], 'ix_listener_run_retention'))); await migrateFixture(database);
     assert.deepEqual(snapshot(database), before);
     const metadata = (store: DatabaseConstructor.Database) => migrationRows(store, migrationQuery('sqlite_schema').select('type', 'name', 'tbl_name', 'sql').where('name', 'not like', 'sqlite_%').orderBy(['type', 'name']));
-    assert.deepEqual(metadata(database), metadata(fresh)); assert.deepEqual(database.pragma('foreign_key_check'), []);
-    assert.equal(database.pragma('user_version', { simple: true }), SCHEMA_VERSION);
+    assert.deepEqual(metadata(database), metadata(fresh)); assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
+    assert.equal(sqliteMetadata.databaseIdentity(database).version, SCHEMA_VERSION);
   } finally { fresh.close(); database.close(); }
 });
 
@@ -92,7 +93,7 @@ test('only the verified deployed schema can migrate; prototypes, foreign stores 
       seed(database); database.pragma('user_version = ' + version);
       const before = snapshot(database), schema = migrationCatalog(database);
       await assert.rejects(() => migrateFixture(database), /only deployed schemas 13 through 18/u);
-      assert.equal(database.pragma('user_version', { simple: true }), version); assert.deepEqual(snapshot(database), before);
+      assert.equal(sqliteMetadata.databaseIdentity(database).version, version); assert.deepEqual(snapshot(database), before);
       assert.deepEqual(migrationCatalog(database), schema);
       database.pragma('application_id = 99'); await assert.rejects(() => migrateFixture(database), /Unsupported/u);
     } finally { database.close(); }

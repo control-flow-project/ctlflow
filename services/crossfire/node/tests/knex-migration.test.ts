@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import Database from 'better-sqlite3';
@@ -39,7 +40,7 @@ test('applications only open existing Knex databases and cannot create or migrat
   const current = openStore(path);
   try {
     assert.deepEqual(appliedMigrations(current), contract.migrations);
-    assert.equal(current.pragma('user_version', { simple: true }), contract.version);
+    assert.equal(sqliteMetadata.databaseIdentity(current).version, contract.version);
   } finally { current.close(); }
 });
 
@@ -52,20 +53,20 @@ test('schema 17 advances through the covering activity index without changing ro
   } finally { await historical.destroy(); }
   const previous = new Database(path);
   try {
-    assert.equal(previous.pragma('user_version', { simple: true }), 17);
+    assert.equal(sqliteMetadata.databaseIdentity(previous).version, 17);
     value(createRepositories(previous).principal.insert({ id: 'retained', matrixUserId: '@retained:test', kind: 'human', status: 'active', revision: 7, createdAt: 1 }));
   } finally { previous.close(); }
   await migrateDatabase(path);
   const current = openStore(path);
   try {
-    assert.equal(current.pragma('user_version', { simple: true }), contract.version);
+    assert.equal(sqliteMetadata.databaseIdentity(current).version, contract.version);
     assert.equal(value(createRepositories(current).principal.find({ id: 'retained' }))?.revision, 7);
     const generated = toSql(defineSelect(schema, query => query.from('listener_run').groupBy(row => row.agent_id)
       .select(group => ({ agentId: group.key, activeMs: group.sum(row => row.active_ms),
         messagesDelivered: group.sum(row => row.messages_delivered), lastSeenAt: group.max(row => row.last_seen_at) }))), {});
     const plan = current.prepare<[Record<string, unknown>], { detail: string }>('EXPLAIN QUERY PLAN ' + generated.sql).all(generated.params);
     assert(plan.some(row => row.detail.includes('COVERING INDEX ix_listener_run_agent_totals')), 'Lifetime totals must read the covering index rather than history row pages');
-    assert.deepEqual(current.pragma('foreign_key_check'), []);
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(current), []);
   } finally { current.close(); }
 });
 
@@ -119,7 +120,7 @@ test('Knex recovers clean initial migration failure without a reset or another c
   const failed = new Database(path);
   try {
     assert.equal(executeSelect(failed, metadataSchema, query => query.from('sqlite_schema').where(row => row.type === 'table' && row.name === 'transient').count()), 0);
-    assert.equal(failed.pragma('user_version', { simple: true }), 0);
+    assert.equal(sqliteMetadata.databaseIdentity(failed).version, 0);
   } finally { failed.close(); }
   await migrateDatabase(path);
   const ready = openStore(path); ready.close();
@@ -134,8 +135,8 @@ test('upgrade backs up a deployed store and verifies it before Knex mutation', a
   assert(backup); assert.deepEqual(readFileSync(path), before);
   const copy = new Database(backup, { readonly: true });
   try {
-    assert.equal(copy.pragma('integrity_check', { simple: true }), 'ok');
-    assert.deepEqual(copy.pragma('foreign_key_check'), []);
+    assert.equal(sqliteMetadata.integrityResult(copy), 'ok');
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(copy), []);
     assert.equal(executeSelect(copy, schema, query => query.from('permission').count()), 36);
   } finally { copy.close(); }
   await migrateDatabase(path);

@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { migrateFixture } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -27,9 +28,9 @@ test('schema 14 partial rosters become exact immutable history without a runtime
     assert.deepEqual(migrationRows(database, migrationQuery('agent_name').select('name').orderBy('name')), [{ name:'exact' },{ name:'saved' }]);
     assert.throws(() => migrationChange(database, migrationQuery('enrollment_item').insert({ request_id: 'current', instance_key: 'invalid', requested_name: 'invalid', outcome: 'failed', agent_id: null })), /CHECK/u);
     assert.throws(() => migrationRows(database, migrationQuery('enrollment_item').select('failure_code')), /no such column/u);
-    assert.deepEqual(database.pragma('foreign_key_check'), []);
-    assert.equal(database.pragma('integrity_check', { simple:true }), 'ok');
-    assert.equal(database.pragma('foreign_keys', { simple:true }), 1);
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
+    assert.equal(sqliteMetadata.integrityResult(database), 'ok');
+    assert.equal(sqliteMetadata.foreignKeys(database), 1);
     await migrateFixture(database);
     assert.equal(migrationRows(database, migrationQuery('enrollment_archive').count({ count: '*' }))[0]?.count, 2);
   } finally { database.close(); }
@@ -45,8 +46,8 @@ test('a partial-roster archival conflict rolls back the complete name and enroll
     const before = database.serialize();
     await assert.rejects(() => migrateFixture(database), /UNIQUE/u);
     assert.deepEqual(database.serialize(), before);
-    assert.equal(database.pragma('user_version', { simple:true }), 14);
-    assert.equal(database.pragma('foreign_keys', { simple:true }), 1);
-    assert.deepEqual(database.pragma('foreign_key_check'), []);
+    assert.equal(sqliteMetadata.databaseIdentity(database).version, 14);
+    assert.equal(sqliteMetadata.foreignKeys(database), 1);
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   } finally { database.close(); }
 });

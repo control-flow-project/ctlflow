@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import Database from 'better-sqlite3';
@@ -18,7 +19,7 @@ test('one schema refuses unrelated storage without modifying it', () => {
   assert.throws(() => openStore(path), /Unsupported Crossfire schema.*No data was changed/u);
   const inspection = new Database(path);
   assert.deepEqual(migrationRows(inspection, migrationQuery('unrelated').select('id')), [{ id: 'retained' }]);
-  assert.equal(inspection.pragma('user_version', { simple: true }), 0); inspection.close();
+  assert.equal(sqliteMetadata.databaseIdentity(inspection).version, 0); inspection.close();
 });
 test('wake mode and selected senders persist in their canonical normalized relations', async scope => {
   const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'wake');

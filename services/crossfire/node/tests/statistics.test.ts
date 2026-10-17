@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { openTestStore } from './support/storage.js';
 import assert from 'node:assert/strict';
 import { defineSelect } from '@tinqerjs/tinqer';
@@ -112,7 +113,7 @@ test('hourly normalized summaries are idempotent, paginated in SQL, token-baseli
   const restarted = randomUUID(); assert(heartbeat({ ...second, sequence: 1, flows: [], usage: [sample(session, 200, 50)] }, restarted).statisticsAccepted);
   assert.equal(read().tokens!.input, 100, 'A new reporting run retains the original native session counter');
   const database = fixture.database;
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   const generated = toSql(defineSelect(schema, (query, params: { agentId: string; cutoff: number }) => query.from('listener_stat_interval')
     .where(row => row.agent_id === params.agentId && row.captured_at >= params.cutoff)), { agentId: agent.id, cutoff: 0 });
   const plan = database.prepare<[Record<string, unknown>], { detail: string }>('EXPLAIN QUERY PLAN ' + generated.sql).all(generated.params);

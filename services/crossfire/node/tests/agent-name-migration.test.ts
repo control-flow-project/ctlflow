@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { migrateFixture } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -27,7 +28,7 @@ test('schema 14 preserves identity and private state while retiring independent 
     const identities = migrationRows(database, migrationQuery('principal').orderBy('id'));
     const credentials = migrationRows(database, migrationQuery('agent_credential'));
     await migrateFixture(database);
-    assert.equal(database.pragma('user_version', { simple: true }), SCHEMA_VERSION);
+    assert.equal(sqliteMetadata.databaseIdentity(database).version, SCHEMA_VERSION);
     assert.deepEqual(migrationRows(database, migrationQuery('principal').orderBy('id')), identities);
     assert.deepEqual(migrationRows(database, migrationQuery('agent_credential')), credentials);
     assert.deepEqual(migrationRows(database, migrationQuery('agent_name').select('name', 'agent_id')), [{ name: 'registered', agent_id: 'agent' }]);
@@ -36,8 +37,8 @@ test('schema 14 preserves identity and private state while retiring independent 
       [{ target_id: 'agent', action: 'agent.name.canonicalized', message: '{"retiredDisplayName":"Ambiguous caption"}' }]);
     assert.throws(() => migrationChange(database, migrationQuery('agent').update({ display_name_override: 'registered' })), /no such column/u);
     await migrateFixture(database); assert.equal(migrationRows(database, migrationQuery('audit_event').count({ count: '*' }))[0]?.count, 1);
-    assert.deepEqual(database.pragma('foreign_key_check'), []);
-    assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
+    assert.equal(sqliteMetadata.integrityResult(database), 'ok');
     assert.equal(agentChange({ expectedRevision: 7, displayName: 'Another caption' }).ok, false);
   } finally { database.close(); }
 });

@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { openTestStore } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -21,13 +22,13 @@ test('private normalized state survives reopen and transaction failures preserve
   assert.throws(() => unit.run(() => { value(repositories.principal.update({ ...principal, status: 'revoked' })); throw Error('rollback'); }), /rollback/);
   assert.deepEqual(value(repositories.principal.find({ id: principal.id })), principal);
   assert.equal(repositories.member.insert({ principalId: 'missing', principalKind: 'human', displayName: 'Missing' }).ok, false);
-  assert.equal(database.pragma('journal_mode', { simple: true }), 'wal');
+  assert.equal(sqliteMetadata.journalMode(database), 'wal');
   const policy = { id: 'instance' as const, revision: 0, fleetIdleTimeoutSeconds: 1800, maxMessageBytes: 65536, maxOwnerAgents: 7, maxAgents: 50, maxPending: 35, enrollmentSeconds: 120, reconcileSeconds: 300, agentInstructions: 'Use project tickets. 東京', signupMode: 'invitation' as const, invitationIssuers: 'administrators' as const };
   value(repositories.instancePolicy.insert(policy)); database.close();
   database = openTestStore(path); repositories = createRepositories(database);
   assert.deepEqual(value(repositories.principal.find({ id: principal.id })), principal);
   assert.deepEqual(value(repositories.instancePolicy.find({ id: 'instance' })), policy);
-  assert.equal(database.pragma('integrity_check', { simple: true }), 'ok'); assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.equal(sqliteMetadata.integrityResult(database), 'ok'); assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   assert.equal(statSync(path).mode & 0o777, 0o600); assert.equal(statSync(join(path, '..')).mode & 0o777, 0o700);
   database.close();
 });

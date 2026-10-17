@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { openTestStore } from './support/storage.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -23,8 +24,8 @@ test('canonical schema has singular normalized tables and enforced identity/role
       .select(row => ({ name: row.name, sql: row.sql })));
     assert.equal(tables.length, 63);
     assert(tables.every(table => table.sql !== null && !/json_valid/iu.test(table.sql)));
-    assert.deepEqual(database.pragma('foreign_key_check'), []);
-    assert.deepEqual(database.pragma('integrity_check'), [{ integrity_check: 'ok' }]);
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
+    assert.deepEqual(sqliteMetadata.integrityResults(database), [{ integrity_check: 'ok' }]);
     assert.equal(unit.run(() => {
       const inserted = repositories.principal.insert({ id: 'rolled-back', matrixUserId: '@rolled-back:test', kind: 'human', status: 'active', revision: 0, createdAt: 1 });
       if (!inserted.ok) return inserted;
@@ -75,6 +76,6 @@ test('canonical schema has singular normalized tables and enforced identity/role
     assert.equal(value(repositories.agentRoomGrant.find({ agentId: 'agent', roomId: '!room:test' }))?.muted, false);
     assert.equal(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'policy.manage', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }).ok, false);
     value(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'room.agent.invite', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }));
-    assert.deepEqual(database.pragma('foreign_key_check'), []);
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   } finally { database.close(); }
 });

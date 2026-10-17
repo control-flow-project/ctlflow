@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { migrateFixture } from './support/storage.js';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
@@ -52,6 +53,6 @@ test('actual Tinqer Wake-up pages, deadlines and pending claims seek normalized 
   assert.match(plan(statements[0]!), /SEARCH .*ix_wake_rule_agent_due.*agent_id=/u);
   statements = []; assert.equal(value(repositories.wakeDelivery.pending('agent-1'))?.id, 'owner-1-rule-0-delivery');
   assert.match(plan(statements[0]!), /SEARCH .*uq_wake_delivery_pending_agent.*agent_id=/u);
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   scope.diagnostic('2,000 rules and assignments; owner pages use two queries plus one batched assignment read; due and pending reads are indexed.');
 });

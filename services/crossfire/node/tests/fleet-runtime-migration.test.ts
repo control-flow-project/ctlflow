@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { openTestStore } from './support/storage.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,6 +12,6 @@ test('current fleet session commands retain normalized indexed lifecycle state',
     assert.deepEqual(executeSelect(database, schema, query => query.from('fleet_runtime_operation')), []);
     for (const index of ['uq_fleet_runtime_operation_active', 'ix_fleet_runtime_operation_created', 'ix_fleet_runtime_operation_agent', 'ix_fleet_runtime_operation_author', 'ix_fleet_runtime_operation_credential'])
       assert(executeSelect(database, metadataSchema, (query, params) => query.from('sqlite_schema').where(row => row.type === 'index' && row.name === params.name).any(), { name: index }), index);
-    assert.deepEqual(database.pragma('foreign_key_check'), []); assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []); assert.equal(sqliteMetadata.integrityResult(database), 'ok');
   } finally { database.close(); }
 });

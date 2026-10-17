@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { openTestStore } from './support/storage.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,8 +12,8 @@ import { metadataSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/metadat
 test('shared SQLite schema preserves canonical authorization and direct language interchangeability', () => {
   const database = openTestStore(':memory:');
   try {
-    assert.equal(database.pragma('user_version', { simple: true }), contract.version);
-    assert.equal(database.pragma('application_id', { simple: true }), schemaDefinition.application);
+    assert.equal(sqliteMetadata.databaseIdentity(database).version, contract.version);
+    assert.equal(sqliteMetadata.databaseIdentity(database).application, schemaDefinition.application);
     const schema = executeSelect(database, metadataSchema, query => query.from('sqlite_schema')
       .where(row => !row.name.startsWith('sqlite_') && !row.name.startsWith('knex_')).select(row => ({ type: row.type, name: row.name })));
     assert.equal(schema.filter(row => row.type === 'table').length, 63);
@@ -24,6 +25,6 @@ test('shared SQLite schema preserves canonical authorization and direct language
     assert.deepEqual(executeSelect(database, tables, query => query.from('role')), schemaDefinition.reference.role);
     assert.deepEqual(executeSelect(database, tables, query => query.from('permission')), schemaDefinition.reference.permission);
     assert.deepEqual(executeSelect(database, tables, query => query.from('role_permission')), schemaDefinition.reference.role_permission);
-    assert.deepEqual(database.pragma('foreign_key_check'), []);
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   } finally { database.close(); }
 });

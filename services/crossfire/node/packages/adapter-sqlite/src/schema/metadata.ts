@@ -8,6 +8,9 @@ export type MetadataTables = {
   pragma_application_id: { application_id: number };
   pragma_user_version: { user_version: number };
   pragma_journal_mode: { journal_mode: string };
+  pragma_foreign_keys: { foreign_keys: number };
+  pragma_page_size: { page_size: number };
+  pragma_max_page_count: { max_page_count: number };
   pragma_integrity_check: { integrity_check: string };
   pragma_foreign_key_check: { table: string; rowid: number | null; parent: string; fkid: number };
   pragma_table_info: { arg: string; cid: number; name: string; type: string; notnull: number; dflt_value: string | null; pk: number };
@@ -16,6 +19,40 @@ export type MetadataTables = {
 };
 
 export const metadataSchema = createSchema<MetadataTables>();
+
+function metadataValue<Value>(rows: readonly { value: Value }[]): Value {
+  if (rows.length !== 1) throw new Error('Invalid management database metadata cardinality');
+  return rows[0]!.value;
+}
+
+export function foreignKeyViolations(database: Database.Database) {
+  return executeSelect(database, metadataSchema, query => query.from('pragma_foreign_key_check')
+    .select(row => ({ table: row.table, rowid: row.rowid, parent: row.parent, fkid: row.fkid })));
+}
+
+export function integrityResult(database: Database.Database): string {
+  return metadataValue(executeSelect(database, metadataSchema, query => query.from('pragma_integrity_check').select(row => ({ value: row.integrity_check }))));
+}
+
+export function integrityResults(database: Database.Database) {
+  return executeSelect(database, metadataSchema, query => query.from('pragma_integrity_check').select(row => ({ integrity_check: row.integrity_check })));
+}
+
+export function foreignKeys(database: Database.Database): number {
+  return metadataValue(executeSelect(database, metadataSchema, query => query.from('pragma_foreign_keys').select(row => ({ value: row.foreign_keys }))));
+}
+
+export function journalMode(database: Database.Database): string {
+  return metadataValue(executeSelect(database, metadataSchema, query => query.from('pragma_journal_mode').select(row => ({ value: row.journal_mode }))));
+}
+
+export function pageSize(database: Database.Database): number {
+  return metadataValue(executeSelect(database, metadataSchema, query => query.from('pragma_page_size').select(row => ({ value: row.page_size }))));
+}
+
+export function maximumPageCount(database: Database.Database): number {
+  return metadataValue(executeSelect(database, metadataSchema, query => query.from('pragma_max_page_count').select(row => ({ value: row.max_page_count }))));
+}
 
 export function databaseIdentity(database: Database.Database): { application: number; version: number } {
   const applications = executeSelect(database, metadataSchema, query => query.from('pragma_application_id').select(row => ({ value: row.application_id })));

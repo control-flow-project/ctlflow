@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { openTestStore } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -57,6 +58,6 @@ test('normalized requested and approved policies enforce principal, catalog, own
     assert.deepEqual(value(repositories.fleetPolicy.approved('ada'))!.permissions, ['room.agent.invite']);
     assert.deepEqual(executeSelect(database, schema, query => query.from('fleet_instance_permission')), [{ agent_id: 'ada', permission_code: 'room.agent.invite', grant_scope: 'agent_room' }]);
     assert(value(repositories.agentRoomPermission.find({ agentId: 'ada', roomId: '!matter:test', permissionCode: 'room.agent.invite' })), 'Retirement preserves explicitly granted room history without independent execution');
-    assert.deepEqual(database.pragma('foreign_key_check'), []);
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   } finally { database.close(); }
 });
