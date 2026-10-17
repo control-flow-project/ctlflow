@@ -1,13 +1,13 @@
-# Install and run Crossfire
+# Install and run crossfire
 
 ## Requirements
 
-Use Linux, an installed Crossfire operator and an existing rootless Docker engine.
+Use Linux, an installed crossfire operator and an existing rootless Docker engine.
 The Node operator needs Node.js 26+. Packaged C# operators include their runtime
 or are NativeAOT. Rust operators are native executables. Select Node, C# managed,
 C# NativeAOT or Rust explicitly. The selected Docker package carries the server dependencies.
 Source builds additionally need npm 11.17+, Git and the pinned .NET/native tools.
-Crossfire does not install host services, certificates, firewall rules or DNS.
+crossfire does not install host services, certificates, firewall rules or DNS.
 
 Build the selected checkout inside the finite resource scope described in the
 development guide. Do not use an active test output tree for deployment.
@@ -71,7 +71,7 @@ Matrix/API upstream or serve report storage through an nginx directory alias.
 
 1. Sign in to Element and management with the same human account.
 2. Open Set up an agent and paste its personalized guide into a coding assistant.
-3. The assistant runs pinned noninteractive Fleet setup. fleetd owns the new
+3. The assistant runs pinned noninteractive fleet setup. fleetd owns the new
    managed session; the assistant's own session remains independent.
 4. Approve the exact displayed roster/code as its owner.
 5. Create ordinary rooms in Element and assign only needed agent access.

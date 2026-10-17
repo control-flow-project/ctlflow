@@ -1,6 +1,6 @@
 # Controller operation
 
-Start through Fleet or the installed daemon:
+Start through fleet or the installed daemon:
 
 ```sh
 fleet daemon start --name workstation --root /absolute/private/controller
@@ -41,7 +41,7 @@ Idle long polls do not occupy ordinary permits.
 Accepted mentions preempt ordinary collection; unavailable immediate cold-start
 capacity fails visibly without consuming unread input.
 
-Crossfire's idle policy defaults to 1800 seconds; zero disables sleep.
+crossfire's idle policy defaults to 1800 seconds; zero disables sleep.
 Every opened/initializing/retained history must be confirmed idle.
 Pending input, decisions, receipts, cleanup or unknown activity prevents sleep.
 Eligible room/DM/scheduled/fleet input resumes the exact retained history.
@@ -75,7 +75,7 @@ Controller lease loss closes local delivery immediately when detected; request
 deadlines bound undetected loss. Old reporting failures cannot cancel a new run.
 Native-close evidence is tied to its exact current authenticated tuple.
 
-Crossfire owns durable incident notification to the member's private Crossfire DM.
+crossfire owns durable incident notification to the member's private crossfire DM.
 Intentional Stop, ordinary idle and decision waits are not crashes.
 A dead controller cannot report itself; server contact monitoring reports unknown
 execution, not a proven process exit.
@@ -96,7 +96,7 @@ external actions.
 
 ## Update and retention
 
-Use explicit installed-release update through Fleet, then restart the controller.
+Use explicit installed-release update through fleet, then restart the controller.
 Only prior desired-active targets resume. Changed instructions use native
 receipt-confirmed publication; software is not downloaded during recovery.
 
@@ -105,5 +105,5 @@ Completed operation/diagnostic history expires by age; pending/unacknowledged
 work, credentials, histories and stop selections remain protected.
 
 - [Storage and conversions](storage.md)
-- [Logging policy](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/logging.md)
-- [Fleet session controls](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/sessions.md)
+- [Logging policy](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/logging.md)
+- [Fleet session controls](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/docs/sessions.md)

@@ -2,13 +2,13 @@
 
 ## Entry
 
-Fleet validates Crossfire's personalized setup descriptor and submits
+fleet validates crossfire's personalized setup descriptor and submits
 `POST /api/setup` to the private controller API.
 An existing coding assistant may execute that command, but its process and
 conversation are never imported or attached.
 
 The descriptor identifies one active registered human, exact server origin and
-exact installed public Fleet version. Unknown fields, redirects, origin/owner
+exact installed public fleet version. Unknown fields, redirects, origin/owner
 substitution, ambiguous queries, oversized data and malformed text fail.
 Administrator instruction text grants no additional authority.
 
@@ -20,7 +20,7 @@ The initial operation, generated valid names and roster are persisted before
 submission. Retry reuses the same enrollment, identity and history.
 
 Defaults include the existing/new local controller, native model selection,
-shared history and Crossfire's instance idle/message policies.
+shared history and crossfire's instance idle/message policies.
 Codex defaults to danger-full-access/on-request with bypass disabled.
 A missing native prerequisite/login is actionable failure, not a configuration
 question or silent fallback.
@@ -51,6 +51,6 @@ It does not enroll again, overwrite human wake rules or change credentials.
 Explicit enrollment is required to propose new/renamed identities or changed
 coordination defaults. Public names cannot recover lost private authority.
 
-- [Fleet configuration](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/configuration.md)
-- [Enrollment protocol](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/onboarding/README.md)
+- [Fleet configuration](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/docs/configuration.md)
+- [Enrollment protocol](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/onboarding/README.md)
 - [Controller operation](operations.md)

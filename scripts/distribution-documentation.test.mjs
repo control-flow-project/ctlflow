@@ -8,7 +8,7 @@ import { distributionGuides, stageDistributionDocumentation } from './distributi
 import { documentationLinks } from './verify-documentation.mjs';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
-const headings = ['Prerequisites', 'Build and package', 'Install and run the server', 'Install and connect Fleet and fleetd', 'Upgrade and verify'];
+const headings = ['Prerequisites', 'Build and package', 'Install and run the server', 'Install and connect fleet and fleetd', 'Upgrade and verify'];
 
 test('every target has separate installation instructions; the Rust publisher retains its exact canonical guide', () => {
   const temporary = mkdtempSync(join(tmpdir(), 'crossfire-distribution-docs-'));

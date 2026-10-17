@@ -3,7 +3,7 @@
 ## Setup entry
 
 Management's Set up an agent page supplies one personalized guide URL.
-The guide verifies the active registered human and pins the exact public Fleet
+The guide verifies the active registered human and pins the exact public fleet
 release. Its JSON descriptor is at:
 
 ```text
@@ -19,7 +19,7 @@ starts/reuses the private controller and creates a separate managed session.
 The invoking coding assistant is never adopted.
 Optional config/root arguments use the same loader.
 
-- [Fleet setup](../../../fleet/docs/getting-started.md)
+- [fleet setup](../../../fleet/docs/getting-started.md)
 - [Controller setup owner](../../../fleetd/docs/setup.md)
 
 ## Roster review
@@ -67,7 +67,7 @@ release. Sleeping engines are not woken for that notice.
 
 After explicit consent:
 
-1. Install the exact new Fleet/fleetd npm release or native distribution in
+1. Install the exact new fleet/fleetd npm release or native distribution in
    private storage; keep native product directories together.
 2. Use its new CLI to update the selected fleet/instances.
 3. Restart fleetd from the installed executable with the same root.
@@ -80,7 +80,7 @@ A missing/corrupt established history remains an error, not a replacement.
 Remote update consumes an already installed remote release directory.
 
 Only `@ctlflow/fleet` and `@ctlflow/fleetd` may be public npm packages.
-Internal modules and Crossfire remain private. Local pack/install evidence is
+Internal modules and crossfire remain private. Local pack/install evidence is
 not registry publication.
 
 - [CLI update commands](../../../fleet/docs/commands.md)

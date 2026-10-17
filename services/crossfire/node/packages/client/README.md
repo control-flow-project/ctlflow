@@ -1,4 +1,4 @@
-# Crossfire HTTP client
+# crossfire HTTP client
 
 Private browser-safe transport for the current wire contracts.
 

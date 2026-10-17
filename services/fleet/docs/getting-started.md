@@ -2,8 +2,8 @@
 
 ## From management
 
-Open Crossfire's Set up an agent page. Paste the personalized guide into a coding
-assistant. The guide pins the public Fleet package to the instance's release and
+Open crossfire's Set up an agent page. Paste the personalized guide into a coding
+assistant. The guide pins the public fleet package to the instance's release and
 runs noninteractive setup:
 
 ```sh
@@ -22,12 +22,12 @@ is reused on repeated setup; an explicitly stopped binding stays stopped.
 
 ## Prerequisites
 
-Install the selected Fleet/fleetd implementation first. Node npm packages and
+Install the selected fleet/fleetd implementation first. Node npm packages and
 the managed, NativeAOT and Rust distributions have separate installation guides.
-The setup command and product configuration are shared; native Fleet selects
+The setup command and product configuration are shared; native fleet selects
 its sibling controller, not a different implementation on PATH.
 
-- [Installation and packaging by target](https://github.com/control-flow-project/crossfire/blob/main/docs/distributions/README.md)
+- [Installation and packaging by target](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/README.md)
 
 The host must already have the selected native runtime and provider login.
 Codex is the default. Pi requires an explicit ordinary roster and verified native

@@ -3,7 +3,7 @@
 ## Prerequisites
 
 Use Linux, Node.js 26+, npm 11.17+ and an authorized checkout of the selected
-Crossfire revision. Dependency versions and install policy come from its
+ctlflow revision. Dependency versions and install policy come from its
 lockfile and `.npmrc`; install scripts are disabled. The server operator also
 requires an existing rootless Docker engine. Public deployment requires
 operator-configured DNS, HTTPS and separate application/content hostnames.
@@ -32,9 +32,9 @@ systemd-run --user --scope --quiet \
 The two archives are `ctlflow-fleetd-<version>.tgz` and
 `ctlflow-fleet-<version>.tgz`. Use the coordinated version from this checkout's
 `package.json`. Private dependencies are bundled; do not publish their workspace
-packages. Fleet depends on the exact matching fleetd version.
+packages. fleet depends on the exact matching fleetd version.
 
-Crossfire has no public npm installation. Retain its private source checkout,
+crossfire has no public npm installation. Retain its private source checkout,
 installed workspace dependencies and built output. Do not present `npm pack`
 of an internal workspace as a standalone server distribution.
 
@@ -43,11 +43,11 @@ of an internal workspace as a standalone server distribution.
 For a new local instance:
 
 ```sh
-node /absolute/crossfire/services/crossfire/crossfire init \
+node /absolute/ctlflow/services/crossfire/crossfire init \
   --directory /absolute/private/crossfire-state --instance team \
   --origin http://127.0.0.1:8098 --content-origin http://localhost:8099 \
   --server-name team.localhost --administrator admin
-node /absolute/crossfire/services/crossfire/crossfire start \
+node /absolute/ctlflow/services/crossfire/crossfire start \
   --directory /absolute/private/crossfire-state --package /absolute/packages/node \
   --port 8098 --content-port 8099
 ```
@@ -63,15 +63,15 @@ Ctrl+C stops its owned container without deleting persistent state.
 The example serves Element at `http://127.0.0.1:8098/`, management at
 `http://127.0.0.1:8098/manage/` and report files on the separate content port.
 These are local examples, not deployment endpoints. Public use needs exact
-HTTPS origins, explicit trusted ingress and separate proxy routes. Crossfire
+HTTPS origins, explicit trusted ingress and separate proxy routes. crossfire
 does not configure the host's DNS, TLS, firewall or boot services.
 
-## Install and connect Fleet and fleetd
+## Install and connect fleet and fleetd
 
 Install both locally built archives together, using the checkout's version:
 
 ```sh
-VERSION=$(node -p "require('/absolute/crossfire/package.json').version")
+VERSION=$(node -p "require('/absolute/ctlflow/package.json').version")
 npm install --prefix /absolute/private/node-install --ignore-scripts --omit=dev \
   "/absolute/releases/node-packages/ctlflow-fleetd-$VERSION.tgz" \
   "/absolute/releases/node-packages/ctlflow-fleet-$VERSION.tgz"
@@ -127,7 +127,7 @@ or deployment evidence. Run the integrated source gate in the same finite scope:
 npm run verify:parity -- /absolute/new-evidence-directory
 ```
 
-- [Configuration and command reference](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/README.md)
-- [Server configuration and backup](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/operations.md)
-- [Verification scope and prerequisites](https://github.com/control-flow-project/crossfire/blob/main/docs/development.md)
-- [Proprietary license](https://github.com/control-flow-project/crossfire/blob/main/LICENSE)
+- [Configuration and command reference](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/docs/README.md)
+- [Server configuration and backup](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/operations.md)
+- [Verification scope and prerequisites](https://github.com/control-flow-project/ctlflow/blob/main/docs/development.md)
+- [Proprietary license](https://github.com/control-flow-project/ctlflow/blob/main/LICENSE)

@@ -34,7 +34,7 @@ try {
   await command(process.execPath, ['services/crossfire/scripts/generate-sqlite-model.mjs', '--check'], 'canonical model drift check');
   await command(process.execPath, ['services/crossfire/scripts/generate-rest-catalog.mjs', '--check'], 'canonical REST catalog drift check');
   await command(process.execPath, ['services/fleetd/scripts/generate-rest-catalog.mjs', '--check'], 'canonical daemon REST catalog drift check');
-  await command(dotnet, ['build', 'Crossfire.CSharp.slnx', '-c', 'Release'], 'managed solution build');
+  await command(dotnet, ['build', 'Ctlflow.CSharp.slnx', '-c', 'Release'], 'managed solution build');
   const controllerProject = 'services/fleetd/csharp/tests/Fleetd.Domain.Tests';
   await command(dotnet, ['run', '--project', controllerProject, '-c', 'Release', '--no-build'], 'managed controller ownership transitions');
   const controllerPublish = join(directory, 'native-controller');

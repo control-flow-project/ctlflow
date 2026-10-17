@@ -45,7 +45,7 @@ export function containerSourceDigest(source: string): string {
     else if (status.isFile()) { const bytes = readFileSync(path); hash.update(JSON.stringify([relative(source, path), bytes.length])).update(bytes); }
     else throw new Error('Container build input cannot be a symlink or special file');
   }
-  for (const file of ['.dockerignore', '.npmrc', 'LICENSE', 'package.json', 'package-lock.json', 'tsconfig.base.json', 'global.json', 'Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props', 'Crossfire.CSharp.slnx', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml']) add(join(source, file));
+  for (const file of ['.dockerignore', '.npmrc', 'LICENSE', 'package.json', 'package-lock.json', 'tsconfig.base.json', 'global.json', 'Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props', 'Ctlflow.CSharp.slnx', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml']) add(join(source, file));
   for (const directory of ['services', 'scripts']) add(join(source, directory));
   return hash.digest('hex');
 }

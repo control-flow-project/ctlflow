@@ -1,7 +1,7 @@
 # Container deployment packages
 
-Crossfire packages a selected server backend and the common Knex migration image.
-The deployment host needs rootless Docker and an installed Crossfire operator;
+crossfire packages a selected server backend and the common Knex migration image.
+The deployment host needs rootless Docker and an installed crossfire operator;
 it does not build source or install that server backend's language runtime.
 Node, C# and Rust operators consume the same format and can run any server backend.
 The operator's implementation does not select the server's implementation.
@@ -55,7 +55,7 @@ code; the archive checksum is not authentication of this helper.
 | --- | --- |
 | schemaVersion | Number 1 |
 | version | Coordinated product version |
-| sourceDigest | Lowercase SHA-256 of the Crossfire build input |
+| sourceDigest | Lowercase SHA-256 of the crossfire build input |
 | backend | Explicit backend slug, such as node or csharp-nativeaot |
 | platform | linux/amd64 |
 | archiveSha256 | Lowercase SHA-256 of images.tar |
@@ -118,7 +118,7 @@ Brand Element in a build stage with the site's own Node tooling, then copy only
 the resulting assets into the selected runtime image. Do not run `node` inside
 the final C#/Rust image, copy a Node runtime into it or hardcode an implementation
 entrypoint/health probe in site Compose. The shared Element location is /app/element.
-Preserve the base image's Crossfire release labels, entrypoint and health check;
+Preserve the base image's crossfire release labels, entrypoint and health check;
 put site-specific provenance in site-owned labels.
 
 After building the derivative image, use its immutable ID and the matching common

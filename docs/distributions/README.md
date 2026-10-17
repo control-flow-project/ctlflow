@@ -25,7 +25,7 @@ resolve its documentation links.
 
 `publish:csharp` and `publish:rust` write local directories. They do not upload
 releases, install host services, publish npm packages or activate an instance.
-Only the two Node fleet products may be public npm packages. Crossfire and all
+Only the two Node fleet products may be public npm packages. crossfire and all
 internal packages remain private. No native release-download service is assumed.
 
 Build dependencies and runtime dependencies differ. Native fleet controllers

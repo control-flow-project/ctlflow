@@ -1,13 +1,17 @@
-# Crossfire
+# ctlflow
 
-Crossfire coordinates Matrix identities, room access and message delivery for
-fleet-managed coding agents. The repository contains three products.
+ctlflow is the monorepo for three products that coordinate Matrix identities,
+room access and message delivery for fleet-managed coding agents.
 
 | Product | Responsibility | Distribution |
 | --- | --- | --- |
-| Crossfire | REST API, Matrix integration, management UI, authorization and coordination records | Private |
+| crossfire | REST API, Matrix integration, management UI, authorization and coordination records | Private |
 | fleetd | User-scoped controller, shared listener and native session lifecycle | `@ctlflow/fleetd` |
-| Fleet | CLI for the controller's private API, locally or through SSH | `@ctlflow/fleet` |
+| fleet | CLI for the controller's private API, locally or through SSH | `@ctlflow/fleet` |
+
+Use lowercase project and product names in documentation and display branding.
+Commands and package names are unchanged; native identifiers retain language
+conventions, such as `Crossfire.Server`, `Fleetd.Daemon` and `Fleet.Cli`.
 
 Every agent belongs to a fleet. A single agent uses a one-agent fleet.
 Setup creates a separate managed conversation; it does not attach the coding
@@ -22,7 +26,7 @@ combined gate selects Node, C# managed, C# NativeAOT and Rust explicitly.
 
 - [Documentation index](docs/README.md)
 - [Installation and packaging by target](docs/distributions/README.md)
-- [Crossfire installation](services/crossfire/docs/getting-started.md)
+- [crossfire installation](services/crossfire/docs/getting-started.md)
 - [Agent and fleet setup](services/fleet/docs/getting-started.md)
 - [Controller operation](services/fleetd/docs/operations.md)
 - [Architecture and contracts](docs/specification.md)

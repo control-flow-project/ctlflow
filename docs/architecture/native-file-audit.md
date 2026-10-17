@@ -1,7 +1,7 @@
 # Native implementation file audit
 
 Baseline: main `7378d12`, integrated on the isolated Rust feature branch.
-The parent review includes confirmed fixes in every affected Crossfire owner.
+The parent review includes confirmed fixes in every affected crossfire owner.
 No other repository or deployed data is changed.
 
 ## Coverage
@@ -14,9 +14,9 @@ stale maps. Association alone does not prove functional equivalence.
 
 | Product | Node files | C# files | Coverage |
 | --- | ---: | ---: | --- |
-| Crossfire | 705 | 477 | Server, domain, contracts, adapters, queries, assets, tests, operators and build |
+| crossfire | 705 | 477 | Server, domain, contracts, adapters, queries, assets, tests, operators and build |
 | fleetd | 74 | 37 | Daemon, lifecycle, execution composition, state, setup and tests |
-| Fleet | 25 | 12 | CLI, daemon client, setup, SSH, packaging and tests |
+| fleet | 25 | 12 | CLI, daemon client, setup, SSH, packaging and tests |
 | Total | 804 | 526 | 1,330 files, with no source/test/manifest/guide exclusions |
 
 These owners map to 592 Rust files or explicit shared assets. Review follows
@@ -37,7 +37,7 @@ paths. Public behavior uses one external assertion bank.
 | Steering | Predecessor settlement precedes recording a new publication; input and exact history remain recoverable | Fault/reopen recovery and installed native runtime tests |
 | History inspection | Synchronous maintenance never claims an active query slot; real unread ownership remains exclusive | Deterministic mutex/lease regression and unchanged four-target room/global history contracts |
 | Telemetry | Atomic bounded summaries; safe labels; invalid input does not poison counters or heartbeats | Cross-language collector and overflow regressions |
-| Lifecycle | Fleetd alone owns execution; saved history, explicit operation identity and native writer locks | Actual Codex/Pi inert-provider, restart, terminal, steering and process-group proofs |
+| Lifecycle | fleetd alone owns execution; saved history, explicit operation identity and native writer locks | Actual Codex/Pi inert-provider, restart, terminal, steering and process-group proofs |
 | Operator | One SQLite lifetime lock, inspect both exact container identities, ordered backup/Knex/start | Concurrent/crashed/operator-orphan and installed container assertions |
 | Removal | One finite 120-second removal budget; observe in-progress deletion; retain primary and cleanup errors | Injected dual-failure tests and real Docker/Knex scenarios |
 | Packaging | Immutable source/image/release identity, bounded manifests/archives, no source-built activation fallback | Fingerprint mutation, export/import, corrupt archive and mismatched-label tests |

@@ -1,4 +1,4 @@
-# Fleet configuration
+# fleet configuration
 
 A fleet directory contains a roster, role definitions and private instance state.
 The loader rejects unknown fields, invalid names, unsafe paths and contradictory
@@ -63,7 +63,7 @@ history_mode = "per-room"
 Fleet/definition/instance keys and registered names begin with a lowercase letter,
 then lowercase letters, digits or hyphens, maximum forty characters.
 Instance keys remain local identity selectors. Registered names are globally
-unique on the Crossfire instance. A collision rejects the entire introduction;
+unique on the crossfire instance. A collision rejects the entire introduction;
 there is no automatic suffix or name-based takeover.
 
 A definition supplies defaults. Each provided top-level native instance value
@@ -138,7 +138,7 @@ Shared is the default. Per-room retains an exact history for each immutable room
 and a private control context. Changing mode does not copy/merge/replay histories.
 Neither mode isolates tools, files or credentials.
 
-Crossfire instance policy, not the roster, owns the inline byte limit and idle
+crossfire instance policy, not the roster, owns the inline byte limit and idle
 sleep timeout. Large complete input uses private files. Native output/patches
 do not inherit that incoming-message budget.
 
@@ -165,7 +165,7 @@ Preview/apply checks exact input, revisions and current native authority.
 
 ## Secrets and activation
 
-Tracked roster/role files contain the intended public Crossfire server/owner
+Tracked roster/role files contain the intended public crossfire server/owner
 and validated native options. Do not put tokens, passwords, private provider
 endpoints, native session IDs or credentials in them. Private directories use
 0700 and state files 0600.
@@ -177,4 +177,4 @@ authorizes replacement. Inspect effective settings and each instance outcome
 after an update.
 
 - [Session controls](sessions.md)
-- [Crossfire history](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)
+- [crossfire history](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/history.md)

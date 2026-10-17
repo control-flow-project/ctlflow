@@ -55,7 +55,7 @@ export function authority(config: Config) {
     const unsigned = encode({ alg: "HS256", typ: "JWT" }) + "." + encode({ sub: id, exp: Math.floor(Date.now() / 1000) + 60 });
     const jwt = unsigned + "." + createHmac("sha256", config.jwtSecret).update(unsigned).digest("base64url");
     const response = await nativeOk(server, "POST", API + "/login", {
-      type: "m.login.token", token: jwt, device_id: "CROSSFIRE_MANAGEMENT", initial_device_display_name: "Crossfire management",
+      type: "m.login.token", token: jwt, device_id: "CROSSFIRE_MANAGEMENT", initial_device_display_name: "crossfire management",
     });
     if (!response.ok) return response;
     const result = credentials(response.value, id);

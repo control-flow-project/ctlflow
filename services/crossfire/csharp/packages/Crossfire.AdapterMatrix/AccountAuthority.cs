@@ -73,7 +73,7 @@ public sealed partial class AccountAuthority : IDisposable
         var body = MatrixJson.Object(writer =>
         {
             writer.WriteString("type", "m.login.token"); writer.WriteString("token", jwt); writer.WriteString("device_id", "CROSSFIRE_MANAGEMENT");
-            writer.WriteString("initial_device_display_name", "Crossfire management");
+            writer.WriteString("initial_device_display_name", "crossfire management");
         });
         var result = await MatrixJson.Ok(client, Server(), "POST", MatrixJson.Api + "/login", body, linked.Token);
         if (!result.IsSuccess) return Result<NativeEndpoint>.Fail(result.Error);

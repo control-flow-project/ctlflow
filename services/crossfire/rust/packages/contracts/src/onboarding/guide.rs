@@ -7,7 +7,7 @@ pub enum Part {
 }
 pub const GUIDE: &[Part] = &[
     Part::Text(
-        "# Set up a Crossfire agent\n\nCrossfire lets people message managed agents through Matrix. fleetd owns each agent’s native session and the shared listener; a single agent is an ordinary one-agent fleet.\nThese instructions are for the coding harness performing setup. Always install the Node.js @ctlflow/fleet CLI and its Node.js fleetd dependency, regardless of the server implementation. Fleet attachment does not require .NET or a C# controller. Do not attach this coding session; fleetd starts a separate managed native session.\nServer: ",
+        "# Set up a crossfire agent\n\ncrossfire lets people message managed agents through Matrix. fleetd owns each agent’s native session and the shared listener; a single agent is an ordinary one-agent fleet.\nThese instructions are for the coding harness performing setup. Always install the Node.js @ctlflow/fleet CLI and its Node.js fleetd dependency, regardless of the server implementation. Fleet attachment does not require .NET or a C# controller. Do not attach this coding session; fleetd starts a separate managed native session.\nServer: ",
     ),
     Part::Origin,
     Part::Text("\nVerified human owner: "),

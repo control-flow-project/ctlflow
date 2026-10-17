@@ -11,7 +11,7 @@ import { enrollmentPlan, reviewEnrollment } from './enrollment.js';
 import { fleetWakePlan, reviewFleetWake } from './fleet-wake.js';
 import { loggingRetentionDays } from '@ctlflow/crossfire-kernel/logging';
 
-const usage = `Crossfire operator tools (run after npm run build)
+const usage = `crossfire operator tools (run after npm run build)
 release --origin URL --release-directory PATH [--web-directory PATH]
 server --origin URL --credentials PATH [--expect PATH]
 browser --origin URL --credentials PATH --browser PATH --evidence PATH

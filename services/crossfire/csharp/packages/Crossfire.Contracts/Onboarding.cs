@@ -45,8 +45,8 @@ public static class Onboarding
         var text = new StringBuilder();
         foreach (var line in new[]
         {
-            "# Set up a Crossfire agent", "",
-            "Crossfire lets people message managed agents through Matrix. fleetd owns each agent’s native session and the shared listener; a single agent is an ordinary one-agent fleet.",
+            "# Set up a crossfire agent", "",
+            "crossfire lets people message managed agents through Matrix. fleetd owns each agent’s native session and the shared listener; a single agent is an ordinary one-agent fleet.",
             "These instructions are for the coding harness performing setup. Always install the Node.js @ctlflow/fleet CLI and its Node.js fleetd dependency, regardless of the server implementation. Fleet attachment does not require .NET or a C# controller. Do not attach this coding session; fleetd starts a separate managed native session.",
             "Server: " + origin, "Verified human owner: " + owner, "", "## 1. Check prerequisites",
             "Use the human-selected project directory on Linux or macOS. Requires Node.js 26+, npm, Git, Bash and Codex. Check node --version, npm --version, git --version and codex --version. The controller performs model-free native capability and authentication checks before enrolling or starting an agent.",

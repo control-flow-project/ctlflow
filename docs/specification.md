@@ -1,9 +1,9 @@
-# Crossfire specification
+# ctlflow specification
 
-This is the current architecture and behavioral contract for Crossfire, fleetd
-and Fleet. It is not a verification report or deployment record. Executable
-contracts own exact field schemas; this document owns component responsibilities
-and invariants.
+This is the current architecture and behavioral contract for ctlflow's products:
+crossfire, fleetd and fleet. It is not a verification report or deployment record.
+Executable contracts own exact field schemas; this document owns component
+responsibilities and invariants.
 
 A replacement updates consumers, contracts, storage, tests and documentation
 and removes the superseded path. Compatibility aliases, alternate state readers,
@@ -13,11 +13,18 @@ Production resets are prohibited.
 
 ## 1. Products
 
+ctlflow names the monorepo, not a server or controller. Product names are lowercase
+in current documentation and display branding. Commands, package names, wire
+identifiers and protocol text keep their exact contracts. Native identifiers
+follow language conventions; C# uses Crossfire.*, Fleetd.* and Fleet.*. Generic
+UI headings retain ordinary sentence casing. Dated verification records retain
+their historical names and observations.
+
 | Product | Responsibility |
 | --- | --- |
-| Crossfire | Identity, enrollment, authorization, desired room access, wake policy, coordination receipts, reporting and management UI |
+| crossfire | Identity, enrollment, authorization, desired room access, wake policy, coordination receipts, reporting and management UI |
 | fleetd | User-scoped controller, explicit fleet registry, shared listener host and native process/history lifecycle |
-| Fleet | CLI presentation and local/SSH calls to fleetd; no separate orchestration |
+| fleet | CLI presentation and local/SSH calls to fleetd; no separate orchestration |
 
 Every operational agent belongs to a fleet, including single-agent users.
 Setup leaves its calling coding assistant, process and conversation independent.
@@ -108,8 +115,8 @@ the same content-addressed UI build and Element translation asset.
 ## 3. Distribution
 
 All npm names use @ctlflow. Only @ctlflow/fleet and @ctlflow/fleetd may be public.
-Crossfire, internal workspaces and the root remain private.
-Products have one coordinated exact version; Fleet pins fleetd exactly.
+crossfire, internal workspaces and the root remain private.
+Products have one coordinated exact version; fleet pins fleetd exactly.
 Public builds bundle internal modules and install outside the monorepo without
 publishing private modules or resolving workspace source.
 
@@ -171,12 +178,12 @@ targets require their platform adapters and test evidence, not a changed RID alo
 
 ## 4. HTTP contract and trusted ingress
 
-The [Crossfire operation catalog](../services/crossfire/node/packages/contracts/src/rest/operations.ts)
+The [crossfire operation catalog](../services/crossfire/node/packages/contracts/src/rest/operations.ts)
 and its validators own exact methods, paths, authentication, fields and replies.
 fleetd owns its private catalog. Generated native metadata and typed clients must
 match their canonical owners, not introduce alternate validation decisions.
 
-Crossfire uses /api, management /manage, and setup/tool assets /onboarding.
+crossfire uses /api, management /manage, and setup/tool assets /onboarding.
 Matrix retains /_matrix. Static reports use a separate origin/listener.
 
 - Success is `{data, meta: {requestId, ...pagination}}`; failure is
@@ -325,7 +332,7 @@ proof of native close.
 
 The personalized /onboarding/setup guide and setup.json descriptor require one
 active human owner. The descriptor supplies schema version, exact server origin,
-owner, pinned Fleet version and bounded administrator instructions.
+owner, pinned fleet version and bounded administrator instructions.
 Unknown/missing/duplicate fields fail. The CLI refuses redirects and checks origin,
 owner and installed version. HTTPS is required except explicit loopback fixtures.
 
@@ -391,12 +398,12 @@ Repeated Stop retains its original selection. Individual Stop removes that targe
 First explicit start without prior intent/selection uses the configured roster.
 Reset uses its confirmed scope, not the saved stop selection.
 
-Idle sleep defaults to 1800 seconds in Crossfire policy. Working, pending decisions
+Idle sleep defaults to 1800 seconds in crossfire policy. Working, pending decisions
 and unsettled input cannot sleep. Eligible input wakes the same context.
 Quiet work is not proof of idle or a stuck process.
 
 Operations have exact UUIDs, expected revisions, scope and durable outcomes.
-Accepted/running/succeeded/failed differ. Crossfire stores requests/receipts;
+Accepted/running/succeeded/failed differ. crossfire stores requests/receipts;
 fleetd executes. Completed outcomes remain pinned until remote acknowledgment.
 Reconnection cannot repeat execution. Lease renewal is independent of long work.
 
@@ -458,7 +465,7 @@ Offline native state is unknown with last-reported facts, not current Working.
 
 ## 10. Rooms and private conversations
 
-Humans create/configure rooms through Matrix/Element. Crossfire manages agent
+Humans create/configure rooms through Matrix/Element. crossfire manages agent
 participation in existing immutable room IDs. Names/aliases are labels.
 Individual edits, full plans and delegated invitations use one grant model,
 authorization owner and reconciler.
@@ -493,7 +500,7 @@ This grant cannot be muted, downgraded, removed or delegated; it does not consum
 the discretionary hundred-grant allowance. Suspension still removes access.
 Readable automatic titles do not overwrite human titles.
 
-The separate lazy Crossfire management DM contains only human/service identity
+The separate lazy crossfire management DM contains only human/service identity
 and aggregates incidents, not agent terminal output. No agent can receive access.
 Schema guards enforce both private-room boundaries regardless of binding order.
 
@@ -649,7 +656,7 @@ approval-display caps. Complete real scopes remain in authenticated review.
 Owner-channel failure denies/cancels only the affected request, not a healthy
 listener.
 
-Attachment comes only from the current running adapter. Fleet prints a command
+Attachment comes only from the current running adapter. fleet prints a command
 for the human; inspection does not start/fork/adopt execution. Tokens remain in
 private files, not output. Closing supported native TUI leaves engine/listener
 running.
@@ -670,7 +677,7 @@ process/session details or environment dumps. Use relative paths/authorized
 attachments. This is instruction, not an output scrubber/compliance guarantee.
 
 Failures retain original causes/histories and do not disable successful peers.
-Crossfire deduplicates controller incidents and independently detects lost contact.
+crossfire deduplicates controller incidents and independently detects lost contact.
 Contact loss means unknown execution, not proven crash.
 Stop/sleep/native question waits are not failures. One episode has initial/recovery
 management notices. Matrix/server outage can delay them. Acknowledgment does not
@@ -765,7 +772,7 @@ without a supported measurement; no inferred pricing.
 About every five minutes an immutable run/sequence/digest summary accompanies
 heartbeat. Exact acknowledgment releases it; conflicting reuse fails.
 Statistics failure cannot undo heartbeat. Death may lose unsent approximate
-counters, not receipts. Crossfire owns indexed hourly rollups and owner/admin
+counters, not receipts. crossfire owns indexed hourly rollups and owner/admin
 time-bounded SQL-paginated views. No model/provider-billing polling.
 
 loggingRetentionDays defaults to seven per private service configuration.

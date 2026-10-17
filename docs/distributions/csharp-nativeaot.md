@@ -40,7 +40,7 @@ executable paths. Retain all files, including native dependency data/notices.
 
 Local publication does not upload a release, publish npm packages or activate
 an instance. No managed backend is embedded as a fallback. Only the Node
-Fleet/fleetd products may be public npm packages.
+fleet/fleetd products may be public npm packages.
 
 ## Install and run the server
 
@@ -72,7 +72,7 @@ The example serves Element at `http://127.0.0.1:8098/` and management at
 reports only. Public deployments need exact HTTPS origins, trusted ingress and
 separate proxy routes. These example addresses are not live deployments.
 
-## Install and connect Fleet and fleetd
+## Install and connect fleet and fleetd
 
 Retain the sibling `fleet` and `fleetd` directories. The CLI resolves the native
 controller and `fleetd/artifacts` from that layout, not an npm installation.
@@ -128,7 +128,7 @@ Passing fixed supported EF queries does not establish arbitrary dynamic query,
 reflection or plugin support. Linux x64 inert-provider results do not certify
 other hosts, paid models or all subprocess failure cases.
 
-- [Shared product configuration and commands](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/README.md)
-- [Server configuration and backup](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/operations.md)
-- [Dependency and verification limits](https://github.com/control-flow-project/crossfire/blob/main/docs/architecture/native-implementations.md)
-- [Proprietary license](https://github.com/control-flow-project/crossfire/blob/main/LICENSE)
+- [Shared product configuration and commands](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/docs/README.md)
+- [Server configuration and backup](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/operations.md)
+- [Dependency and verification limits](https://github.com/control-flow-project/ctlflow/blob/main/docs/architecture/native-implementations.md)
+- [Proprietary license](https://github.com/control-flow-project/ctlflow/blob/main/LICENSE)

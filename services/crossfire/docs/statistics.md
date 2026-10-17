@@ -44,7 +44,7 @@ A failed summary does not roll back a heartbeat or chat receipt.
 Acknowledged data is released locally; shutdown attempts a final flush.
 Process death may lose unsent approximate statistics.
 
-Crossfire stores indexed normalized hourly summaries under
+crossfire stores indexed normalized hourly summaries under
 `loggingRetentionDays`, default seven days. Cleanup starts at startup and runs
 hourly. A thirty-day query does not restore records already expired.
 

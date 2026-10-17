@@ -1,6 +1,6 @@
 # Remote controllers
 
-Remote Fleet commands use SSH forwarding to fleetd's private Unix socket.
+Remote fleet commands use SSH forwarding to fleetd's private Unix socket.
 The controller has no public HTTP/TCP management port.
 
 ```sh
@@ -14,7 +14,7 @@ fleet --remote office agent attach research analyst-east
 Use normal SSH authentication and host-key verification. A profile contains the
 connection description, not copied SSH/provider credentials. Do not disable host
 verification to make setup pass. Remote filesystem paths refer to the controller
-host, not the laptop running Fleet.
+host, not the laptop running fleet.
 
 Attachment wraps the runtime adapter's exact command through the verified SSH
 connection. The native endpoint remains loopback-only; its private token is read

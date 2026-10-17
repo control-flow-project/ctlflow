@@ -71,5 +71,5 @@ Unknown or blocked traffic does not call the model.
 Non-waking messages remain pending context for a later authorized trigger.
 Housekeeping, heartbeats, enrollment and policy checks are ordinary code.
 
-- [Definitions](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/configuration.md)
-- [Crossfire runtime behavior](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/runtime.md)
+- [Definitions](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/docs/configuration.md)
+- [crossfire runtime behavior](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/runtime.md)

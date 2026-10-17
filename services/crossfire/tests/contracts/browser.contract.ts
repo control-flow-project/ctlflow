@@ -14,6 +14,7 @@ export async function browserContracts(scope: TestContext, fixture: ContractStac
     await context.addCookies([{ name: fixture.owner.cookie.slice(0, cookie), value: fixture.owner.cookie.slice(cookie + 1), url: fixture.origin, httpOnly: true, secure: true, sameSite: 'Strict' }]);
     const page = await context.newPage(); const errors: string[] = []; page.on('pageerror', error => errors.push(error.message)); page.on('dialog', dialog => { errors.push('Unexpected browser confirmation popup'); void dialog.dismiss(); });
     await page.goto(fixture.origin + '/manage/fleets'); await expect(page.getByRole('heading', { name: 'Fleets', exact: true })).toBeVisible();
+    await expect(page).toHaveTitle('crossfire · Management'); await expect(page.locator('.brand')).toHaveText('crossfire↗');
     await page.goto(fixture.origin + '/manage/agents'); await expect(page.getByRole('heading', { name: 'Agents', exact: true })).toBeVisible();
     await managementBrowserContracts(page, fixture, state, viewport.width);
     assert(await page.evaluate<boolean>('document.documentElement.scrollWidth <= innerWidth'), 'Management layout remains inside its viewport'); assert.deepEqual(errors, []);

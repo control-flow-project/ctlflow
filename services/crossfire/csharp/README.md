@@ -1,6 +1,6 @@
 # C# products
 
-C# implements the same Crossfire, fleetd and Fleet contracts as Node.
+C# implements the same crossfire, fleetd and fleet contracts as Node.
 It targets .NET 11 and produces managed and NativeAOT output from the same source.
 The React UI, agent tools, Pi extension and Knex migration image are shared.
 
@@ -31,7 +31,7 @@ Parents must exist and outputs must be new. The builder stages and then renames
 completed products; failed staging does not overwrite an installation.
 A local publication writes files; it is not npm publication or deployment.
 
-Each distribution retains sibling Crossfire/Fleet/fleetd products, common tool
+Each distribution retains sibling crossfire/fleetd/fleet products, common tool
 assets, web assets, licenses and `distribution.json`.
 Managed output includes its runtime/apphosts. NativeAOT output is native.
 Keep sibling directories together so the CLI resolves its installed controller.
@@ -57,7 +57,7 @@ same as Node. Private state and backend selection are independent.
 
 - [Build, transfer and deploy Docker packages](../docs/container-packages.md)
 
-Installed Fleet and fleetd use the same commands/configuration/private API.
+Installed fleet and fleetd use the same commands/configuration/private API.
 Setup keeps the invoking coding conversation independent.
 
 ## Verification and diagnostics

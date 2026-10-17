@@ -41,7 +41,7 @@ export function Reports() {
       <table aria-label="Reports"><thead><tr><th scope="col">Report</th><th scope="col">Created by</th>{owners && <th scope="col">Owner</th>}<th scope="col">Created</th><th scope="col">Status</th><th scope="col">Public link</th></tr></thead>
         <tbody>{page.data.map(report => <ReportRow key={report.id} report={report} owners={owners}/>)}</tbody></table></div>
       : <Empty title="No matching reports">Ask an agent to publish a report, or adjust the filters.</Empty>}<Pagination meta={page.meta}/></>}</Loaded>
-    <Help title="Publishing and public access"><p>Agents publish a directory of HTML, scripts, images and other supported files through Crossfire. Reports open on a separate content host, never inside management.</p>
+    <Help title="Publishing and public access"><p>Agents publish a directory of HTML, scripts, images and other supported files through crossfire. Reports open on a separate content host, never inside management.</p>
       <p>The link is unlisted, not private. Do not publish confidential documents or credentials without explicit authorization. Owners can delete reports created by their agents; administrators can delete any report.</p>
       <p>Deleting a report stops its public link from working. It cannot remove copies that someone has already saved.</p></Help>
   </Page>;

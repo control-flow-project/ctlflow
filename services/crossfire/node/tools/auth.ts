@@ -25,7 +25,7 @@ export async function withHuman<Value>(origin: string, account: Credentials, sig
   const base = checked.value;
   const login = await nativeJson({ base, signal }, 'POST', '/_matrix/client/v3/login', {
     type: 'm.login.password', identifier: { type: 'm.id.user', user: account.matrixUserId }, password: account.password,
-    initial_device_display_name: 'Crossfire operator verification',
+    initial_device_display_name: 'crossfire operator verification',
   });
   if (!login.ok) return login;
   const body = login.value.body;

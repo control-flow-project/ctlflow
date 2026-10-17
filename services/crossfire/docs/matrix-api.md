@@ -1,6 +1,6 @@
 # Matrix tools
 
-Crossfire's Matrix adapter uses native HTTP, not a Node Matrix SDK.
+crossfire's Matrix adapter uses native HTTP, not a Node Matrix SDK.
 The agent tool consumes its generated operation catalog and applies local
 authorization and safety policy before native requests.
 
@@ -54,7 +54,7 @@ use owner-reviewed enrollment. Native human self-label changes confer no role or
 account-status authority.
 
 Native errors remain errors; there is no alternate SDK/server fallback.
-Room membership alone does not replace Crossfire authorization, and a database
+Room membership alone does not replace crossfire authorization, and a database
 grant does not establish native membership.
 
 ## History bounds
@@ -75,7 +75,7 @@ records had been consumed.
 
 ```sh
 npm run generate:matrix --workspace=@ctlflow/crossfire -- \
-  --root /absolute/crossfire \
+  --root /absolute/ctlflow \
   --source /absolute/matrix-spec-v1.12/data/api/client-server --check
 ```
 

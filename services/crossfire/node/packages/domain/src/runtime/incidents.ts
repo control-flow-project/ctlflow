@@ -90,7 +90,7 @@ export async function reconcileRuntime(services: Services, stopped: () => boolea
     const previous = services.runtime.conversation(owner.value.id);
     if (!previous.ok) return previous;
     if (!previous.value) {
-      const named = await services.matrix.setDisplayName(services.instance.serviceMatrixId, 'Crossfire');
+      const named = await services.matrix.setDisplayName(services.instance.serviceMatrixId, 'crossfire');
       if (!named.ok) continue;
     }
     const conversation = await services.matrix.ownerConversation(owner.value.matrixUserId, services.instance.serviceMatrixId, previous.value?.roomId ?? null, null);

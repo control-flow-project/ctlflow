@@ -70,7 +70,7 @@ export async function openSession(options: SessionOptions, selection: ThreadSele
   }, stop);
   async function close(): Promise<void> { engine.close(); await engine.closed; }
   try {
-    const initialized = object(await engine.request('initialize', { clientInfo: { name: 'crossfire', title: 'Crossfire listener', version: codexClientVersion },
+    const initialized = object(await engine.request('initialize', { clientInfo: { name: 'crossfire', title: 'crossfire listener', version: codexClientVersion },
       capabilities: { experimentalApi: true } }));
     const version = initialized.ok && typeof initialized.value.userAgent === 'string' ? initialized.value.userAgent : null;
     engine.notify('initialized');
