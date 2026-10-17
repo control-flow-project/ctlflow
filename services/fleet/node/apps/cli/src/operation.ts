@@ -1,6 +1,19 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { operations, type createDaemonClient } from '@ctlflow/fleet-daemon-client/client';
-import type { OperationView } from '@ctlflow/fleetd-contracts/api';
+import type { FleetView, OperationView } from '@ctlflow/fleetd-contracts/api';
+
+export async function listFleets(client: ReturnType<typeof createDaemonClient>): Promise<FleetView[]> {
+  const fleets: FleetView[] = [];
+  for (let page = 1; page <= 100000; page++) {
+    const response = await client.call(operations.fleets, {}, {}, new URLSearchParams({ page: String(page), pageSize: '100' }));
+    if (!response.ok) throw new Error(response.error.code + ': ' + response.error.message);
+    fleets.push(...response.value.data);
+    const pages = response.value.meta.totalPages;
+    if (pages === undefined) throw new Error('Fleet pagination metadata is missing');
+    if (page >= pages) return fleets;
+  }
+  throw new Error('Fleet pagination exceeded its bound');
+}
 
 export async function observeOperation(client: ReturnType<typeof createDaemonClient>, initial: OperationView,
   signal: AbortSignal, output: (value: unknown) => void): Promise<OperationView> {

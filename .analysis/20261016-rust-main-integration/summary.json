@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "platform": "Linux x64",
+  "scope": "Rust and shared external contracts; not full four-target certification",
+  "latestMain": {
+    "commit": "7378d1254bf7c82968e05c203a0fc577e9c293c9",
+    "merge": "9e90bdf",
+    "branch": "feat/rust-native-20261014"
+  },
+  "postMerge": {
+    "status": "passed",
+    "typecheck": "passed",
+    "build": "passed",
+    "rootTooling": 32,
+    "nodeOperatorUnit": 4,
+    "nodeSharedOperator": 5,
+    "format": "passed",
+    "structureAndDocumentation": "passed",
+    "protectedProductAndDependencyDiff": "empty against latest main",
+    "rustRuntimeAndSharedOperatorCorpusDiff": "empty against verified d401193 checkpoint",
+    "failures": 0,
+    "skipped": 0
+  },
+  "cleanup": {
+    "status": "complete",
+    "remainingGeneratedArtifacts": 0,
+    "initialWorktreeBytes": 11566227456,
+    "worktreeBytesAfterCleanup": 18337792,
+    "reclaimedBytes": 11547889664,
+    "reclaimedGiB": 10.754810333251953,
+    "globalCachesAndOtherWorktrees": "untouched",
+    "rawLogs": "removed; concise phase outcomes, failure details and per-file native timings retained"
+  },
+  "fullGate": {
+    "exitCode": 1,
+    "events": [
+      {
+        "label": "architecture",
+        "elapsedMs": 13766,
+        "failure": null
+      },
+      {
+        "label": "typecheck",
+        "elapsedMs": 9406,
+        "failure": null
+      },
+      {
+        "label": "rust",
+        "elapsedMs": 78293,
+        "failure": null
+      },
+      {
+        "label": "distribution",
+        "elapsedMs": 150863,
+        "failure": null
+      },
+      {
+        "label": "installed-contracts",
+        "elapsedMs": 109849,
+        "failure": null
+      },
+      {
+        "label": "container-contracts",
+        "elapsedMs": 1970688,
+        "failure": null
+      },
+      {
+        "label": "knex",
+        "elapsedMs": 440073,
+        "failure": "1"
+      }
+    ]
+  },
+  "knexRetry": {
+    "status": "passed",
+    "scope": "actual shared Knex migration container",
+    "image": "sha256:2971c0566989505eaf2e228e55d1814af30cf6da0fb88ecba4d1f63168ed71a3",
+    "outcomes": [
+      {
+        "version": 0,
+        "status": "passed"
+      },
+      {
+        "version": 13,
+        "status": "passed"
+      },
+      {
+        "version": 17,
+        "status": "passed"
+      },
+      {
+        "version": 18,
+        "status": "rejected"
+      }
+    ]
+  },
+  "followup": {
+    "typecheck": "passed",
+    "build": "passed",
+    "clippy": "passed, warnings denied",
+    "format": "passed",
+    "nativeFocused": 6,
+    "sharedOperator": 5,
+    "rootTooling": 32,
+    "currentMarkdownGuides": 65,
+    "failures": 0,
+    "skipped": 0
+  },
+  "historicalFailure": "The first Knex future-schema case rejected the schema correctly but exceeded the Node-owned exact-container cleanup deadline. The full gate stays failed. The unchanged isolated retry passed."
+}

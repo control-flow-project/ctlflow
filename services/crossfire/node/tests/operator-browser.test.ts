@@ -11,7 +11,7 @@ import { createClient } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { operatorFixture } from './support/operator.js';
 import { value } from './support/application.js';
-import { secureRouter, browserExecutable } from './support/tls.js';
+import { secureRouter, browserExecutable } from '@ctlflow/crossfire-test-support/tls';
 
 test('browser diagnostics redact complete credentials before bounding output, including a cutoff-crossing secret', () => {
   const prefix = 'x'.repeat(8100), secret = 'sensitive'.repeat(32);

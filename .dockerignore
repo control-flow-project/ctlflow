@@ -12,4 +12,5 @@ node_modules
 private
 instances
 verification
+t
 !.npmrc

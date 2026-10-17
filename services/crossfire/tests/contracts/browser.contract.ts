@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import type { TestContext } from 'node:test';
 import { chromium, expect } from '@playwright/test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
-import { browserOptions } from '../../node/tests/support/tls.js';
+import { browserOptions } from '@ctlflow/crossfire-test-support/tls';
 import type { ContractStack } from './fixture.js';
 import { managementBrowserContracts, managementBrowserFixture } from './management-browser.contract.js';
 

@@ -11,7 +11,7 @@ import { checkPaperLayout } from '../tools/browser/layout.js';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
-import { browserOptions } from './support/tls.js';
+import { browserOptions } from '@ctlflow/crossfire-test-support/tls';
 
 async function idleSeconds(page: Page, origin: string): Promise<number> {
   const response = await page.request.get(origin + operations.policy.path); assert.equal(response.status(), 200);

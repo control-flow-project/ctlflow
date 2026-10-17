@@ -52,6 +52,10 @@ public static class NativeValuesAcceptance
         Event("thread/tokenUsage/updated", "\"tokenUsage\":{\"total\":{\"inputTokens\":10,\"cachedInputTokens\":4,\"cacheWriteInputTokens\":11,\"outputTokens\":6,\"reasoningOutputTokens\":2,\"totalTokens\":16}}"); Equal(usage.Count, 1, "invalid native token subsets are not published as measurements");
         Event("item/completed", "\"item\":{\"id\":\"files\",\"type\":\"fileChange\",\"changes\":[{\"path\":\"report.txt\",\"diff\":" + ProtocolJson.Quote(new string('x', 26036)) + "}]}");
         Equal(output.OfType<NativeOutput>().Last().Text.Length > 26036, true, "ordinary native file-change output is not cut off by approval-message limits");
+        Event("turn/completed", "\"turn\":{\"status\":\"failed\",\"error\":{\"message\":" + ProtocolJson.Quote(string.Concat(Enumerable.Repeat("😀", 3000))) + "}}");
+        var bounded = output.OfType<NativeState>().Last().ErrorMessage!;
+        Equal(bounded, string.Concat(Enumerable.Repeat("😀", 1000)), "native failure retains whole Unicode scalars");
+        Equal(System.Text.Encoding.UTF8.GetByteCount(bounded), 4000, "native error bound is UTF-8 bytes, not UTF-16 units");
     }
     private static void Pi()
     {

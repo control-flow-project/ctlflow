@@ -20,9 +20,9 @@ public static class WakeQueries
     }
     public static Result<Page<WakeRule>> Page(CrossfireDbContext context, string? ownerId, string search, int page, int size)
     {
-        var offset = checked((page - 1) * size);
-        var count = Stored.Read(() => context.WakeRule.AsNoTracking().LongCount(row => (ownerId == null || row.OwnerId == ownerId) && row.Name.Contains(search))); if (!count.IsSuccess) return Result<Page<WakeRule>>.Fail(count.Error);
-        return Stored.Read(() => context.WakeRule.AsNoTracking().Where(row => (ownerId == null || row.OwnerId == ownerId) && row.Name.Contains(search)).OrderByDescending(row => row.CreatedAt).ThenBy(row => row.Id).Skip(offset).Take(size).ToArray())
+        var offset = checked((page - 1) * size); var pattern = "%" + search + "%";
+        var count = Stored.Read(() => context.WakeRule.AsNoTracking().LongCount(row => (ownerId == null || row.OwnerId == ownerId) && EF.Functions.Like(row.Name, pattern))); if (!count.IsSuccess) return Result<Page<WakeRule>>.Fail(count.Error);
+        return Stored.Read(() => context.WakeRule.AsNoTracking().Where(row => (ownerId == null || row.OwnerId == ownerId) && EF.Functions.Like(row.Name, pattern)).OrderByDescending(row => row.CreatedAt).ThenBy(row => row.Id).Skip(offset).Take(size).ToArray())
             .Map(values => new Page<WakeRule>(values.Select(Rule).ToArray(), page, size, count.Value));
     }
     public static Result<WakeDelivery?> FindDelivery(CrossfireDbContext context, string id)

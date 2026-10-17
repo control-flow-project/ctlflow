@@ -1,3 +1,4 @@
+import { truncateUtf8 } from '@ctlflow/crossfire-kernel/text';
 import { failure, success, type Result, type Failure } from '@ctlflow/crossfire-kernel/result';
 import type { Clock } from '@ctlflow/crossfire-agent-core/port';
 import type { RuntimeConnection, RuntimeHooks, RuntimeObservationEvent, NativeSessionState, RuntimeApproval, InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
@@ -166,7 +167,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         if (native !== connection || lifetime.aborted) return;
         const error: unknown = connection.signal.reason ?? nativeError('native', 'Native session disconnected');
         report(error);
-        emit('failed', contexts, (error instanceof Error ? error.message : 'Native execution failed').slice(0, 4096));
+        emit('failed', contexts, truncateUtf8(error instanceof Error ? error.message : 'Native execution failed', 4000));
         recovery ??= (async () => {
           await discard(connection);
           await preparing?.catch(() => undefined);
@@ -192,7 +193,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       if (native) await discard(native);
       observationGeneration++;
       report(error);
-      if (!lifetime.aborted) emit('failed', contexts, (error instanceof Error ? error.message : 'Native execution failed').slice(0, 4096));
+      if (!lifetime.aborted) emit('failed', contexts, truncateUtf8(error instanceof Error ? error.message : 'Native execution failed', 4000));
       throw error;
     } finally { if (opening === pending) opening = undefined; }
   }
@@ -223,7 +224,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     catch (error) {
       if (native === connection) await discard(connection);
       report(error);
-      if (!lifetime.aborted) emit('failed', contexts, (error instanceof Error ? error.message : 'Native execution failed').slice(0, 4096));
+      if (!lifetime.aborted) emit('failed', contexts, truncateUtf8(error instanceof Error ? error.message : 'Native execution failed', 4000));
       throw error;
     } finally { if (preparing === pending) preparing = undefined; }
   }
@@ -256,7 +257,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
           services.hooks.observe?.({ kind: 'state', observation: { sessionId: context.sessionId,
             roomId: context.context === 'shared' || context.context === 'control' ? null : context.context,
             runtime: services.runtime, state: 'unavailable', observedAt: services.clock.now(), settings: previous?.settings ?? services.initialSettings,
-            errorMessage: (error instanceof Error ? error.message : 'Native idle state could not be verified').slice(0, 4096) } });
+            errorMessage: truncateUtf8(error instanceof Error ? error.message : 'Native idle state could not be verified', 4000) } });
         }
       }
       touch(); return;

@@ -12,17 +12,20 @@ export async function ownedDocker(args: string[], signal: AbortSignal): Promise<
   try {
     signal.throwIfAborted(); running = runDocker(['start', '--attach', identity], attachment.signal);
     const stopped = new Promise<boolean>(resolveStop => { cancelled = () => resolveStop(true); signal.addEventListener('abort', cancelled, { once: true }); if (signal.aborted) cancelled(); });
-    if (await Promise.race([running.then(() => false), stopped])) {
-      try { await runDocker(['stop', '--timeout', '15', identity], AbortSignal.timeout(30000)); }
-      finally { attachment.abort(); }
-    }
-    await running;
+    await Promise.race([running, stopped]);
   } catch (error) { failure = error; }
   finally {
-    if (cancelled) signal.removeEventListener('abort', cancelled); attachment.abort();
-    if (running) try { await running; } catch (error) { failure ??= error; }
-    try { await removeContainer(identity); }
-    catch (error) { failure = new Error('Owned container cleanup is not confirmed', { cause: failure ?? error }); }
+    if (cancelled) signal.removeEventListener('abort', cancelled);
+    let cleanupFailure: unknown;
+    try { await removeContainer(identity); } catch (error) { cleanupFailure = error; }
+    attachment.abort();
+    if (running) try { await running; } catch (error) { if (!signal.aborted) failure ??= error; }
+    if (cleanupFailure !== undefined) {
+      const error = cleanupFailure;
+      const message = 'Owned container cleanup is not confirmed: ' + (error instanceof Error ? error.message : String(error));
+      failure = failure === undefined ? new Error(message, { cause: error })
+        : new AggregateError([failure, error], message + '; original operation failed: ' + (failure instanceof Error ? failure.message : String(failure)));
+    }
   }
   if (failure !== undefined && !(signal.aborted && failure instanceof Error && ['AbortError', 'TimeoutError'].includes(failure.name))) throw failure;
 }

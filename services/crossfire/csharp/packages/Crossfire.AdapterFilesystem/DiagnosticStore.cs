@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Crossfire.Domain;
+using Crossfire.Contracts;
 using Crossfire.Kernel;
 using Microsoft.Win32.SafeHandles;
 
@@ -95,7 +96,8 @@ public sealed partial class DiagnosticStore : PlatformDiagnostics
                         if (record.WrittenCount + length > 524288) throw new IOException("Diagnostic record exceeds its byte bound");
                         record.Write(span[..length]);
                         if (newline < 0) break;
-                        using var document = JsonDocument.Parse(record.WrittenMemory);
+                        using var document = WireJson.Document(record.WrittenMemory);
+                        if (!Validation.Json(document.RootElement)) throw new IOException("Invalid diagnostic Unicode JSON");
                         if (document.RootElement.ValueKind != JsonValueKind.Object || !document.RootElement.TryGetProperty("at", out var timestamp) || !timestamp.TryGetInt64(out var at) || at is < -9007199254740991 or > 9007199254740991) throw new IOException("Invalid diagnostic record timestamp");
                         if (at >= cutoff) { RandomAccess.Write(output, record.WrittenSpan, written); written += record.WrittenCount; RandomAccess.Write(output, "\n"u8, written++); }
                         record.Clear(); span = span[(newline + 1)..];

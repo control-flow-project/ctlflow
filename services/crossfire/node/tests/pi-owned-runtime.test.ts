@@ -18,6 +18,22 @@ import { piDelivery } from '@ctlflow/crossfire-adapter-pi/connection';
 import type { UsageSample } from '@ctlflow/crossfire-contracts/statistics';
 import { until } from '../scripts/test-support/listener.js';
 
+test('native Pi malformed UTF-8 fails the connection without delivering replacement text', async scope => {
+  mkdirSync(join(process.cwd(), '.temp'), { recursive: true, mode: 0o700 });
+  const directory = mkdtempSync(join(process.cwd(), '.temp/pi-invalid-utf8-'));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
+  const binary = join(directory, 'pi'), frames: Record<string, unknown>[] = [];
+  writeFileSync(binary, '#!' + process.execPath + '\n' + `
+if (process.argv.includes('--version')) console.log('1.0.0');
+else { process.stdin.resume(); process.stdout.write(Buffer.concat([Buffer.from('{"type":"message","body":"'), Buffer.from([0xc0, 0xaf]), Buffer.from('"}\\n')])); }
+`, { mode: 0o700 });
+  const native = await startPi({ binary, workspace: directory, stateDirectory: directory, home: join(directory, 'home'), profile: 'invalid-utf8',
+    sessionFile: join(directory, 'session.jsonl'), instructions: 'A protocol-boundary fixture.', event: event => frames.push(event) }, new AbortController().signal);
+  cleanup(scope, () => native.close());
+  await assert.rejects(native.request('get_state'), TypeError);
+  assert.equal(frames.length, 0, 'Invalid native bytes cannot become a different valid event');
+});
+
 async function fixture(scope: TestContext) {
   const directory = mkdtempSync(join(process.cwd(), '.temp/owned-pi-'));
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));

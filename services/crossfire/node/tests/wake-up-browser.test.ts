@@ -12,7 +12,7 @@ import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
-import { browserOptions } from './support/tls.js';
+import { browserOptions } from '@ctlflow/crossfire-test-support/tls';
 
 test('Wake-ups browser CRUD, calendar selection, assignments, pagination and role visibility use the real APIs', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin } = fixture;

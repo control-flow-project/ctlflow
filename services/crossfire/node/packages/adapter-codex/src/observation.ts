@@ -1,3 +1,4 @@
+import { truncateUtf8 } from '@ctlflow/crossfire-kernel/text';
 import type { RuntimeHooks } from '@ctlflow/crossfire-agent-core/runtime';
 import type { NativeEvent } from './protocol.js';
 import { codexUsage } from './usage.js';
@@ -9,7 +10,8 @@ export function nativeObservation(hooks: RuntimeHooks, session: () => string) {
   const offsets = new Map<string, number>();
   let settings: { name: string; configured: string | null; effective: string | null }[] = [];
   function state(value: 'idle' | 'working' | 'waiting-approval' | 'waiting-answer' | 'failed' | 'unavailable', errorMessage: string | null = null): void {
-    hooks.observe?.({ kind: 'state', observation: { runtime: 'codex', sessionId: session(), roomId: null, state: value, observedAt: Date.now(), settings, errorMessage } });
+    hooks.observe?.({ kind: 'state', observation: { runtime: 'codex', sessionId: session(), roomId: null, state: value, observedAt: Date.now(), settings,
+      errorMessage: errorMessage === null ? null : truncateUtf8(errorMessage, 4000) } });
   }
   function output(id: string, text: string, streamId: string | null = null): void {
     if (!text) return;
@@ -40,7 +42,7 @@ export function nativeObservation(hooks: RuntimeHooks, session: () => string) {
           : native.activeFlags.includes('waitingOnUserInput') ? 'waiting-answer' : 'working');
       } else if (observed.method === 'turn/started') state('working');
       else if (observed.method === 'turn/completed') {
-        state(observed.status === 'failed' ? 'failed' : 'idle', observed.errorMessage?.slice(0, 4000) ?? null);
+        state(observed.status === 'failed' ? 'failed' : 'idle', observed.errorMessage);
         streamed.clear(); offsets.clear();
       } else if (observed.method === 'item/started') {
         const item = observed.item;

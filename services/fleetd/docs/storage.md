@@ -24,7 +24,7 @@ retained for diagnosis, not treated as permission for a fresh context.
 
 ## Private locks
 
-Lock files have no application tables. Node and C# use the same exclusive SQLite
+Lock files have no application tables. Node, C# and Rust use the same exclusive SQLite
 transaction and in-memory rollback-journal protocol.
 A live/suspended owner retains exclusion; process exit releases it.
 Do not delete the inode, use guessed PIDs or break another writer's lock.

@@ -1,7 +1,7 @@
 # Management UI
 
 This project owns the React UI used by every server implementation.
-There is no Node-specific or C#-specific frontend.
+There is no Node-specific, C#-specific or Rust-specific frontend.
 
 The private `@ctlflow/crossfire-client` package owns browser-safe REST and
 binary clients. UI code cannot import backend applications, storage adapters or

@@ -72,6 +72,10 @@ test('current native observations use exact discriminants and never guess altern
   assert.throws(() => send('turn/completed', { turn: { status: 'unknown', error: null } }), /completion/u);
   send('turn/completed', { turn: { status: 'failed', error: { message: 'native failure' } } });
   const state = events.at(-1); assert(state?.kind === 'state'); assert.equal(state.observation.state, 'failed'); assert.equal(state.observation.errorMessage, 'native failure');
+  send('turn/completed', { turn: { status: 'failed', error: { message: '😀'.repeat(3000) } } });
+  const bounded = events.at(-1); assert(bounded?.kind === 'state');
+  assert.equal(bounded.observation.errorMessage, '😀'.repeat(1000));
+  assert.equal(Buffer.byteLength(bounded.observation.errorMessage!), 4000);
 });
 
 test('streamed unicode output uses bounded exact prefix evidence rather than retaining full native text', () => {

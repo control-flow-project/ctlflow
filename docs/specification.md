@@ -23,10 +23,11 @@ Every operational agent belongs to a fleet, including single-agent users.
 Setup leaves its calling coding assistant, process and conversation independent.
 There is no standalone-agent or existing-session-adoption path.
 
-Node and C# are independently selected implementations of all three products.
+Node, C# and Rust are independently selected implementations of all three products.
 C# targets .NET 11 and produces managed and NativeAOT builds from the same source.
 An executable never substitutes another implementation when its selected one
-fails. Rust is a separately authorized track, not covered by Node/C# results.
+fails. Rust is verified separately and in the same explicit four-target matrix;
+Node/C#-only results do not establish Rust readiness.
 
 All implementations use one shared React UI, wire contract and management SQLite
 file. Switching requires no import/export, reset or alternative schema.
@@ -45,6 +46,7 @@ services/
     apps/web/
     node/{apps/server,packages,tests,scripts,tools}/
     csharp/{apps/Crossfire.Server,packages,tests,build,scripts}/
+    rust/{apps/server,packages,tests,scripts}/
     database/management/sqlite/{migrations,seeds}/
     knexfile.management.mjs
     tests/contracts/
@@ -53,11 +55,13 @@ services/
   fleetd/
     node/{apps/daemon,packages,tests,scripts,tools}/
     csharp/{apps/Fleetd.Daemon,packages,tests}/
+    rust/{apps/daemon,packages}/
     tests/contracts/
     docs/
   fleet/
     node/{apps/cli,packages,tests,scripts}/
     csharp/{apps/Fleet.Cli,packages}/
+    rust/{apps/cli,packages}/
     tests/contracts/
     docs/
 ```
@@ -86,7 +90,8 @@ Contracts may import pure domain values; domain code does not import contracts.
 | Filesystem adapter | Private files, atomic publication, locks and path validation |
 | Management UI | Human views/actions using the canonical REST contracts |
 
-Node queries use Tinqer; C# queries use EF Core. Knex alone creates/migrates
+Node queries use Tinqer, C# queries use EF Core and Rust queries use Diesel.
+Knex alone creates/migrates
 owned SQL stores. Raw SQL is limited to schema conversion, metadata/configuration
 and query-plan inspection.
 
@@ -97,7 +102,7 @@ arbitrary predicates or driver handles. SQLite transaction callbacks are
 synchronous; expected failures and exceptions roll back. Native/network work
 stays outside transactions. Commit rechecks authority, identity and revisions.
 
-The browser-safe client cannot import backend/native modules. Both servers serve
+The browser-safe client cannot import backend/native modules. All servers serve
 the same content-addressed UI build and Element translation asset.
 
 ## 3. Distribution
@@ -117,6 +122,15 @@ Jeswin P Kumar, jeswinpk@agilehead.com. Workspace metadata/distributed licenses
 must agree; public npm availability grants no open-source rights.
 Third-party notices remain unchanged.
 
+Each selectable target has separate factual installation/packaging instructions:
+Node, C# managed, C# NativeAOT and Rust. Instructions distinguish build-time and
+installed dependencies, local packaging, publication and activation. Native
+distributions ship their selected guide as a standalone README; npm products
+ship their product guides. Installed documentation cannot rely on paths outside
+its distribution. Current documentation contains no promotional claims.
+
+- [Target installation and packaging](distributions/README.md)
+
 The immutable intentional-tool release contains README.md, SKILL.md,
 crossfire-client.mjs and matrix-spec-LICENSE.txt. One private build export
 produces the server/fleetd bytes. Activation verifies the complete local release.
@@ -124,7 +138,7 @@ Recovery and wake do not download or silently install software.
 
 Server deployment uses a transferable per-backend Docker package: bounded
 release.json plus images.tar, containing an exact runtime image and the common
-Knex image. Both operators use --package; image construction belongs to the build,
+Knex image. All three operators use --package; image construction belongs to the build,
 not a source-dependent deployment mode. Archive/image digests, platform and release
 labels are checked before touching writers. Backend selection is explicit, never
 chosen from the operator's language or substituted after failure.
@@ -137,9 +151,19 @@ Images own readiness and entrypoints; site-specific branding uses build stages,
 not language-specific commands injected into another backend's runtime.
 Container removal is complete only after the exact immutable container identity
 is absent. An already-removing container is observed, not stopped/deleted again.
-Both operators bound that observation and preserve explicit cleanup failures;
-test-process guards allow the complete native stop/cleanup budget before killing
-their owned launcher. No presence/ownership assertion is waived for slow I/O.
+All three operators bound that observation and preserve explicit cleanup failures.
+Their command adapter owns the deadline policy: lifecycle mutations (create,
+stop and remove) use 120 seconds; metadata commands use 30 seconds. Removal has
+one overall 120-second deadline, including its stop and metadata observations;
+the container's graceful-stop allowance remains 15 seconds. Cancellation and
+normal exit both delegate to that single stop/removal owner, not a separate stop
+command with a competing deadline. Callers cannot substitute a conflicting
+capture deadline. A cancelled creation returns its exact identity before cleanup.
+Primary execution and cleanup failures both remain available when they occur
+together; command failures name the operation.
+Test-process guards allow the complete creation/removal budget plus process-stream
+teardown before killing their owned launcher. No presence/ownership assertion is
+waived for slow I/O; scenario, target and bank deadlines remain unchanged.
 The current verified package platform is Linux amd64. Other native host/CPU
 targets require their platform adapters and test evidence, not a changed RID alone.
 
@@ -149,7 +173,7 @@ targets require their platform adapters and test evidence, not a changed RID alo
 
 The [Crossfire operation catalog](../services/crossfire/node/packages/contracts/src/rest/operations.ts)
 and its validators own exact methods, paths, authentication, fields and replies.
-fleetd owns its private catalog. Generated C# metadata and typed clients must
+fleetd owns its private catalog. Generated native metadata and typed clients must
 match their canonical owners, not introduce alternate validation decisions.
 
 Crossfire uses /api, management /manage, and setup/tool assets /onboarding.
@@ -161,6 +185,11 @@ Matrix retains /_matrix. Static reports use a separate origin/listener.
   job keys; immutable stored records are not rewritten to collapse those types.
 - Fields are camelCase. Application IDs are UUIDs; native Matrix/session IDs
   remain opaque and are validated by their owning adapters.
+- Wire strings and object keys must be well-formed Unicode. Unpaired UTF-16
+  surrogates and malformed UTF-8 bytes fail rather than being silently replaced;
+  valid scalar pairs, literal replacement characters and canonical escaped
+  controls retain their exact values. Private JSON/native evidence follows the
+  same decoding rule; corruption is not permission to rewrite an existing file.
 - Unknown fields, duplicate query parameters, invalid discriminants, unsupported
   methods and bounded-resource violations fail.
 - Status distinguishes invalid input, authentication, authority, absence,
@@ -394,11 +423,13 @@ overlapping replacement. Permanent configuration, authority, corrupt-state and
 protocol conflicts require action, not unlimited restarts.
 Stop completion requires exact owned-process evidence, not process-name scans.
 
-Abrupt fleetd death may leave a stock Codex process holding its writer lock;
-another writer is refused. Stock Codex's parent-lifetime limitation is not replaced
-with guessed kills, orphan adoption or watchdog emulation. Full host restart
-without surviving processes is a distinct case. Unrelated subprocess continuation
-and crash-proof cleanup are not product guarantees.
+The Rust process adapter binds its native writer and process group to an exact
+parent pidfd and private lifetime lock through its packaged native guard. Parent
+death terminates that owned group; another writer cannot overlap. Node/C# stock
+Codex parent-death coverage is separately bounded: a surviving writer lock refuses
+another writer. No target guesses process identities, adopts orphans or rewrites
+native history. Unrelated subprocess continuation and arbitrary process escape
+are not product guarantees. Actual per-target coverage is recorded in the review.
 
 ## 9. Controller admission
 
@@ -715,6 +746,12 @@ Management never embeds/executes report content.
 
 ## 16. Statistics and retention
 
+Telemetry message-type labels use at most 100 UTF-16 units without splitting
+scalar pairs; empty/control labels are summarized as `unknown`. Invalid usage
+or an overflowing counter sample is dropped without partially changing counters
+or poisoning listener heartbeats. Runtime/session labels use the shared bounded
+text contract, not a separate runtime activation whitelist.
+
 Listeners collect bounded approximate traffic counters, not analytics bodies:
 observed/delivered messages, UTF-8 bytes, declared attachment bytes, largest size
 and sender/room/type flows. Multi-recipient messages count per recipient.
@@ -770,8 +807,7 @@ Inventoried schema-17 stores lacking history may be adopted without business
 changes. Unsupported/foreign/future stores fail without mutation.
 Conversion preserves identities, credentials, grants, receipts, usage, audit and
 publication attribution transactionally, checking foreign keys. Failure restores
-original schema/data/version. Runtime adapters validate only; neither EF nor Node
-creates/migrates schema.
+original schema/data/version. Runtime adapters validate only; Node, C# and Rust never create/migrate schema.
 
 Tables are STRICT with enabled FKs, singular snake_case fields, integer UTC times
 and checked revisions/counters. Relations own permissions, selections, rosters,
@@ -782,6 +818,13 @@ Indexes serve concrete queries/FKs. Scope/filter/count/order/page precedes
 hydration; batch labels/settings. Owner shapes do not use administrator-OR-owner
 predicates that prevent seeks. Query-plan/count tests verify actual behavior.
 Substring search is not constant-time; offsets may scan skipped matches.
+
+Directory, fleet, wake-rule and publication searches use bound SQLite LIKE
+substring patterns across all implementations. ASCII case is insensitive;
+non-ASCII scalars retain exact case. `%` matches a sequence and `_` matches one
+character. No host-language Unicode lowercasing adds a second normalization
+rule. Scope, count, order and page use the identical predicate; search never
+changes authority or interpolates SQL text.
 
 There is no application database-size ceiling. Native SQLITE_FULL rolls back
 the affected operation as storage-unavailable; it never authorizes data deletion
@@ -866,7 +909,7 @@ actions without promotional claims. Deployment branding grants no authority.
 ## 20. Verification
 
 External behavior has one product-owned assertion bank selected by executable
-matrix. Node, C# managed and actual NativeAOT execute identical assertions.
+matrix. Node, C# managed, actual NativeAOT and Rust execute identical assertions.
 Configured failures/missing targets cannot be skipped. Internal algorithm,
 compiler and injected-failure tests remain language-owned.
 
@@ -884,7 +927,7 @@ require explicit disposition, not suppression or claims of arbitrary reflection
 safety.
 
 Combined sign-off requires build/typecheck, architecture/package/install,
-applicable unit/native suites, managed/AOT publication, shared contracts,
+applicable unit/native suites, managed/AOT/Rust publication, shared contracts,
 real containers and migration/rollback tests. Coverage inventory distinguishes
 authentication, successful behavior, malformed input, recovery and UI evidence;
 counts alone establish none of them.

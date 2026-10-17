@@ -9,10 +9,10 @@ public static class DiscoveryQueries
     public static Result<Page<PrincipalSummary>> Principals(CrossfireDbContext context, DiscoveryRequest input)
         => Stored.Read(() =>
         {
-            var search = input.Search.ToLowerInvariant(); var exclude = input.ExcludeId ?? "";
+            var search = "%" + input.Search + "%"; var exclude = input.ExcludeId ?? "";
             var humans = input.Kind == "agent" ? 0 : context.Member.AsNoTracking()
                 .Join(context.Principal.Where(row => row.Status == "active"), member => member.PrincipalId, principal => principal.Id, (member, principal) => new { member, principal })
-                .LongCount(joined => joined.principal.Id != exclude && (joined.principal.MatrixUserId.ToLower().Contains(search) || joined.member.DisplayName.ToLower().Contains(search)));
+                .LongCount(joined => joined.principal.Id != exclude && (EF.Functions.Like(joined.principal.MatrixUserId, search) || EF.Functions.Like(joined.member.DisplayName, search)));
             var agents = input.Kind == "human" ? 0 : context.Agent.AsNoTracking()
                 .Join(context.Principal.Where(row => row.Status == "active"), agent => agent.PrincipalId, principal => principal.Id, (agent, principal) => new { agent, principal })
                 .Join(context.FleetInstance.Where(row => row.RetiredAt == null), joined => joined.agent.PrincipalId, instance => instance.AgentId, (joined, instance) => new { joined.agent, joined.principal, instance })
@@ -20,12 +20,12 @@ public static class DiscoveryQueries
                 .Join(context.AgentName, joined => joined.agent.PrincipalId, name => name.AgentId, (joined, name) => new { joined.agent, joined.principal, joined.instance, joined.fleet, name })
                 .Join(context.Principal.Where(row => row.Status == "active"), joined => joined.agent.OwnerId, owner => owner.Id, (joined, owner) => new { joined.agent, joined.principal, joined.instance, joined.fleet, joined.name, owner })
                 .LongCount(joined => joined.instance.FleetKey == joined.fleet.FleetKey && joined.principal.Id != exclude
-                    && (joined.principal.MatrixUserId.ToLower().Contains(search) || joined.name.Name.ToLower().Contains(search)));
+                    && (EF.Functions.Like(joined.principal.MatrixUserId, search) || EF.Functions.Like(joined.name.Name, search)));
             var offset = checked((input.Page - 1) * input.PageSize); var humanLimit = (int)Math.Min(input.PageSize, Math.Max(0, humans - offset));
             var entries = new List<PrincipalSummary>();
             if (humanLimit != 0) entries.AddRange(context.Member.AsNoTracking()
                 .Join(context.Principal.Where(row => row.Status == "active"), member => member.PrincipalId, principal => principal.Id, (member, principal) => new { member, principal })
-                .Where(joined => joined.principal.Id != exclude && (joined.principal.MatrixUserId.ToLower().Contains(search) || joined.member.DisplayName.ToLower().Contains(search)))
+                .Where(joined => joined.principal.Id != exclude && (EF.Functions.Like(joined.principal.MatrixUserId, search) || EF.Functions.Like(joined.member.DisplayName, search)))
                 .OrderBy(joined => joined.member.DisplayName).ThenBy(joined => joined.principal.Id).Skip(offset).Take(humanLimit)
                 .Select(joined => new PrincipalSummary(joined.principal.Id, joined.principal.MatrixUserId, joined.principal.Kind, joined.member.DisplayName, joined.principal.Id, joined.principal.MatrixUserId)).ToArray());
             if (input.Kind != "human" && entries.Count < input.PageSize)
@@ -39,7 +39,7 @@ public static class DiscoveryQueries
                     .Join(context.Principal.Where(row => row.Status == "active"), joined => joined.agent.OwnerId, owner => owner.Id, (joined, owner) => new { joined.agent, joined.principal, joined.instance, joined.fleet, joined.name, owner })
                     .Join(context.Member, joined => joined.agent.OwnerId, member => member.PrincipalId, (joined, member) => new { joined.agent, joined.principal, joined.instance, joined.fleet, joined.name, joined.owner, member })
                     .Where(joined => joined.instance.FleetKey == joined.fleet.FleetKey && joined.principal.Id != exclude
-                        && (joined.principal.MatrixUserId.ToLower().Contains(search) || joined.name.Name.ToLower().Contains(search)))
+                        && (EF.Functions.Like(joined.principal.MatrixUserId, search) || EF.Functions.Like(joined.name.Name, search)))
                     .OrderBy(joined => joined.name.Name).ThenBy(joined => joined.principal.Id).Skip(agentOffset).Take(agentLimit)
                     .Select(joined => new PrincipalSummary(joined.principal.Id, joined.principal.MatrixUserId, joined.principal.Kind,
                         joined.name.Name + " (" + joined.member.DisplayName + ")", joined.agent.OwnerId, joined.owner.MatrixUserId)).ToArray());

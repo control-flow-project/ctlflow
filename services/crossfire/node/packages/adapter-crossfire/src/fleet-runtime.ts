@@ -1,3 +1,4 @@
+import { truncateUtf16 } from '@ctlflow/crossfire-kernel/text';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import type { FleetRuntimeOperation } from '@ctlflow/crossfire-contracts/fleet-runtime';
 import type { Result } from '@ctlflow/crossfire-kernel/result';
@@ -22,7 +23,7 @@ export function createFleetRuntimeWorker(options: { client: Client; fleetId: str
       const result = await options.execute(claim.value.data);
       const outcome = result.ok ? result.value : { status: 'failed' as const, errorMessage: result.error.message };
       const receipt = await options.client.call(operations.receiptFleetRuntime, { fleetId: options.fleetId, operationId: operation.operationId },
-        { connectionId: generation, status: outcome.status, errorMessage: outcome.errorMessage?.replace(/[\u0000-\u001f\u007f]/gu, ' ').slice(0, 4096) ?? null });
+        { connectionId: generation, status: outcome.status, errorMessage: outcome.errorMessage === null ? null : truncateUtf16(outcome.errorMessage.replace(/[\u0000-\u001f\u007f]/gu, ' '), 4096) });
       if (!receipt.ok) throw new Error(receipt.error.message);
       const acknowledged = options.acknowledged(operation.operationId); if (!acknowledged.ok) throw new Error(acknowledged.error.message);
     })().catch(error => options.fail(error instanceof Error ? error.message : 'Session control failed')).finally(() => { running = undefined; });

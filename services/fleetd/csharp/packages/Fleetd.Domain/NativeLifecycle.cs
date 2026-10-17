@@ -51,7 +51,7 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
     private void Touch() { lock (gate) { lastActivity = Now; Schedule(); } }
     private void Emit(string state, string? message = null)
     {
-        NativeState[] events; lock (gate) events = contexts.Select(context => new NativeState(services.Runtime, context.SessionId, context.Context is "shared" or "control" ? null : context.Context, state, Now, observations.GetValueOrDefault(context.SessionId)?.Settings ?? services.Settings, message)).ToArray();
+        NativeState[] events; lock (gate) events = contexts.Select(context => new NativeState(services.Runtime, context.SessionId, context.Context is "shared" or "control" ? null : context.Context, state, Now, observations.GetValueOrDefault(context.SessionId)?.Settings ?? services.Settings, message is null ? null : TextRules.TruncateUtf8(message, 4000))).ToArray();
         foreach (var value in events) { lock (gate) observations[value.SessionId] = value; services.Hooks.Observe?.Invoke(value); }
     }
     private void Report(Failure error)

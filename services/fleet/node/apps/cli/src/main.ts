@@ -7,14 +7,14 @@ import { realpathSync } from 'node:fs';
 import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/client';
 import type { OperationInput } from '@ctlflow/fleetd-contracts/api';
 import { openTunnel } from '@ctlflow/fleet-ssh-transport/tunnel';
-import { name as nameParser, identifier } from '@ctlflow/crossfire-contracts/schema/validation';
+import { name as nameParser, identifier, text as textParser } from '@ctlflow/crossfire-contracts/schema/validation';
 import type { Result } from '@ctlflow/crossfire-kernel/result';
 import { codexTerminal } from '@ctlflow/crossfire-adapter-codex/terminal';
 import { loadConnections, saveConnections } from './configuration.js';
 import { launchDaemon, restartDaemon } from './daemon.js';
 import { terminalPointer } from './attachment.js';
 import { setup } from './setup.js';
-import { observeOperation } from './operation.js';
+import { listFleets, observeOperation } from './operation.js';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) throw new Error(result.error.code + ': ' + result.error.message); return result.value; }
 function output(value: unknown): void { process.stdout.write(JSON.stringify(value, null, 2) + '\n'); }
@@ -44,10 +44,15 @@ Contexts lists saved histories even when sleeping or stopped, without waking the
 Attach only returns a live terminal pointer; resume a sleeping agent first.
 Status separates native phase, listener delivery, desired activation and saved history.`;
 export async function run(argv: string[], signal: AbortSignal): Promise<void> {
-  const { values, positionals } = parseArgs({ args: argv, allowPositionals: true, options: { root: { type: 'string' }, remote: { type: 'string' },
+  const { values, positionals, tokens } = parseArgs({ args: argv, allowPositionals: true, tokens: true, options: { root: { type: 'string' }, remote: { type: 'string' },
     name: { type: 'string' }, descriptor: { type: 'string' }, config: { type: 'string' }, ssh: { type: 'string' }, definition: { type: 'string' }, context: { type: 'string' }, text: { type: 'string' }, 'message-id': { type: 'string' }, 'operation-id': { type: 'string' }, 'release-directory': { type: 'string' }, 'fresh-history': { type: 'boolean' }, help: { type: 'boolean' } } });
-  if (values.help || !positionals.length) { console.log(usage); return; }
-  const allowed = new Set(['root', 'remote', ...(positionals[0] === 'remote' ? ['ssh'] : []),
+  const seen = new Set<string>();
+  for (const token of tokens) if (token.kind === 'option') {
+    if (seen.has(token.name)) throw new Error('Duplicated option --' + token.name);
+    seen.add(token.name);
+    if (token.value === '') throw new Error('Empty option --' + token.name);
+  }
+  const allowed = new Set(['root', 'remote', 'help', ...(positionals[0] === 'remote' ? ['ssh'] : []),
     ...(positionals[0] === 'setup' ? ['descriptor', 'config'] : []),
     ...(positionals[0] === 'daemon' && positionals[1] === 'start' ? ['name'] : []),
     ...(positionals[0] === 'agent' && positionals[1] === 'add' ? ['definition'] : []),
@@ -57,6 +62,17 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
     ...((positionals[0] === 'start' || positionals[0] === 'agent' && positionals[1] === 'start') ? ['fresh-history'] : []),
     ...(positionals[0] === 'message' ? ['text', 'message-id'] : [])]);
   for (const option of Object.keys(values)) if (!allowed.has(option)) throw new Error('Option is not valid for this command: --' + option);
+  if (values.help || !positionals.length) { console.log(usage); return; }
+  if (values['operation-id'] !== undefined) value(identifier(values['operation-id']));
+  if (values.name !== undefined) value(textParser(100)(values.name));
+  const agentStart = positionals[0] === 'agent' && positionals[1] === 'start';
+  if (positionals[0] === 'start' || agentStart) {
+    if (positionals.length !== (agentStart ? 4 : 2)) throw new Error(usage);
+    const fleetKey = positionals[agentStart ? 2 : 1];
+    if (!nameParser(fleetKey).ok && !identifier(fleetKey).ok) throw new Error('Use a configured fleet key or UUID');
+    if (agentStart) value(nameParser(positionals[3]));
+  }
+  if (positionals[0] === 'daemon' && positionals[1] === 'start' && positionals.length !== 2) throw new Error(usage);
   if (positionals[0] === 'setup') {
     if (positionals.length !== 1 || values.remote) throw new Error('Setup runs locally on the computer that will own the fleet');
     await setup(values, signal, output); return;
@@ -79,7 +95,6 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
     const status = await launchDaemon(root, values.name, signal);
     connections.localRoot = root; saveConnections(connections); output(status); return;
   }
-  if (positionals[0] === 'start' && positionals.length !== 2 || positionals[0] === 'agent' && positionals[1] === 'start' && positionals.length !== 4) throw new Error(usage);
   if (!remote && (positionals[0] === 'start' || positionals[0] === 'agent' && positionals[1] === 'start')) await launchDaemon(root, undefined, signal);
   const tunnel = remote ? await openTunnel(remote.ssh, root, signal) : undefined;
   try {
@@ -98,7 +113,7 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
       const directory = remote ? positionals[1]! : resolve(positionals[1]!);
       output(value(await client.call(operations.addFleet, {}, { directory })).data); return;
     }
-    const listed = value(await client.call(operations.fleets, {}, {}, new URLSearchParams({ pageSize: '100' }))).data;
+    const listed = await listFleets(client);
     if (positionals[0] === 'list' && positionals.length === 1) { output(listed); return; }
     const agentCommand = positionals[0] === 'agent', command = positionals[agentCommand ? 1 : 0], fleetKey = positionals[agentCommand ? 2 : 1];
     const fleet = listed.find(fleet => fleet.fleetKey === fleetKey || fleet.fleetId === fleetKey);

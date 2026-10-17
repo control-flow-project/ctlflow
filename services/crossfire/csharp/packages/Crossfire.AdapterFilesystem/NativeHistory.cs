@@ -2,6 +2,8 @@ using System.Buffers;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Crossfire.Contracts;
+using Crossfire.Kernel;
 using Microsoft.Win32.SafeHandles;
 
 namespace Crossfire.AdapterFilesystem;
@@ -52,7 +54,7 @@ public static class NativeHistory
         return Convert.ToHexStringLower(SHA256.HashData(bytes));
     }
     private static JsonElement Parse(ReadOnlyMemory<byte> bytes)
-    { using var document = JsonDocument.Parse(bytes); return document.RootElement.Clone(); }
+    { var value = WireJson.Parse(bytes); if (!Validation.Json(value)) throw new JsonException("Invalid native Unicode JSON"); return value; }
     public static long Length(string home, string path)
     { using var handle = Open(home, path); return checked((long)Posix.Metadata(handle).Size); }
     public static void MakePrivateAndFlush(string home, string path)

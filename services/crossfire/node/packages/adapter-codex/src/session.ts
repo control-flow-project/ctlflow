@@ -1,3 +1,4 @@
+import { truncateUtf16 } from '@ctlflow/crossfire-kernel/text';
 import { realpathSync } from 'node:fs';
 import type { Json } from '@ctlflow/crossfire-contracts/json';
 import type { RuntimeApproval, RuntimeHooks, RuntimeDecision } from '@ctlflow/crossfire-agent-core/runtime';
@@ -98,8 +99,8 @@ export async function openSession(options: SessionOptions, selection: ThreadSele
           || selected.value.model !== admitted.value.model
           || selected.value.reasoningEffort !== admitted.value.effort) {
           throw failureError({ code: 'invalid', message: 'Codex did not apply the selected model, reasoning, sandbox and approval settings: requested '
-            + admitted.value.model + '/' + admitted.value.effort + ', reported ' + String(selected.value.model).slice(0, 200)
-            + '/' + String(selected.value.reasoningEffort).slice(0, 100) });
+            + admitted.value.model + '/' + admitted.value.effort + ', reported ' + truncateUtf16(String(selected.value.model), 200)
+            + '/' + truncateUtf16(String(selected.value.reasoningEffort), 100) });
         }
       }
       if (selection.kind === 'create') await engine.request('thread/name/set', { threadId: sessionId, name: selection.name });
@@ -113,7 +114,7 @@ export async function openSession(options: SessionOptions, selection: ThreadSele
     if (!approval) throw new Error('Native approval policy was not selected');
     observer.state(state.value.type === 'idle' ? 'idle' : 'working');
     engine.signal.addEventListener('abort', () => {
-      if (!stop.aborted) observer.state('failed', engine.signal.reason instanceof Error ? engine.signal.reason.message.slice(0, 4000) : 'Native connection ended unexpectedly');
+      if (!stop.aborted) observer.state('failed', engine.signal.reason instanceof Error ? engine.signal.reason.message : 'Native connection ended unexpectedly');
     }, { once: true });
     return { sessionId, workspace, approval, signal: engine.signal, request: engine.request, close };
   } catch (error) { await close(); throw error; }

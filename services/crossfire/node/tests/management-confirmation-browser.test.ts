@@ -8,7 +8,7 @@ import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
-import { browserOptions } from './support/tls.js';
+import { browserOptions } from '@ctlflow/crossfire-test-support/tls';
 import { value } from './support/application.js';
 import { mapFleet } from './support/map-fleet.js';
 import { browserController } from './support/browser-controller.js';

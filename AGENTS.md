@@ -25,6 +25,11 @@ parallel Rust track in its own worktree. Both tracks retain the same shared UI,
 API and SQLite guarantees and their own complete verification requirements.
 Native implementation readiness and outstanding dependency decisions are
 recorded in docs/architecture/native-implementations.md.
+Native targets must retain equivalent service, application, package and test
+ownership, following docs/architecture/native-layout.md. Use idiomatic target
+patterns inside those boundaries. Knex alone creates/migrates all databases;
+the SQLite adapter owns connections, query metadata and transactions in every
+target. Do not add another database runtime package or a target-specific UI.
 
 On 2026-10-14 the owner approved producing managed and NativeAOT .NET 11 builds
 from the same C# source and initially deploying the managed build. EF remains the
@@ -47,7 +52,7 @@ implementation. Database assets use the Lesser/Snapped structure under their
 service: database/<database>/<backend>/migrations and seeds, with a per-database
 knexfile and one-shot migration container. Deployment verifies a backup, stops
 writers, runs the migration container and starts the selected implementation only
-after success. Node and C# validate existing databases; neither creates schemas,
+after success. Node, C# and Rust validate existing databases; none creates schemas,
 runs ORM migrations or silently migrates at startup. New databases follow the
 same nesting and owner. File state and Conduit's externally owned RocksDB are
 not SQL databases and are not converted into artificial Knex stores.
@@ -78,7 +83,7 @@ relative imports, Result for expected failures and boundary validation. Split
 modules by responsibility near 600 lines. Domain code imports neither transport
 nor concrete storage/adapter/UI modules. Composition roots wire implementations.
 SQL tables/columns are singular snake_case; normalized domain state uses indexed
-relations. Tinqer owns Node application queries; EF Core owns C# queries.
+relations. Tinqer owns Node queries, EF Core C# queries and Diesel Rust queries.
 Raw SQL is schema/metadata only.
 Expected transaction failures roll back. Native operations stay outside transactions.
 
@@ -123,6 +128,11 @@ Do not stop at intermediate milestones when completion is authorized. Never
 weaken tests/gates or claim fixture-only evidence as real-provider certification.
 Root commands coordinate typecheck, build, tests and architecture verification.
 
+Documentation uses factual language, not promotional claims. Describe exact
+behavior, prerequisites, measured verification and limitations. Keep separate
+installation/packaging instructions for Node, C# managed, C# NativeAOT and Rust;
+installed guides must not depend on checkout-relative documentation links.
+
 ## Test execution
 Runtime verification includes Codex and Pi. Claude remains unimplemented and has
 no product test suite or retained legacy adapter. Prepare pinned native assets
@@ -138,7 +148,7 @@ build output and verification caches after their last required use. Check disk
 use periodically during long verification runs and retain concise evidence, not
 accumulated fixture trees. Never remove active resources, source worktrees,
 credentials, production state, research originals or saved user/native histories.
-Node and C# must keep symmetric service ownership and semantic source structure;
+Node, C# and Rust keep symmetric service ownership and semantic source structure;
 language/framework differences must be explicit and justified, not hidden paths.
 
 ## Git

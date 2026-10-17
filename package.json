@@ -20,6 +20,8 @@
     "typecheck": "node scripts/workspaces.mjs typecheck",
     "build": "node scripts/workspaces.mjs build",
     "test": "node scripts/workspaces.mjs test",
+    "test:rust": "node scripts/verify-rust.mjs",
+    "verify:rust": "node scripts/verify-rust-release.mjs",
     "test:browser": "node scripts/test.mjs crossfire browser",
     "verify:structure": "node scripts/verify-structure.mjs",
     "verify:architecture": "npm run verify:structure && npm run verify:architecture --workspace=@ctlflow/crossfire",
@@ -29,7 +31,8 @@
     "verify:csharp:core": "node services/crossfire/csharp/scripts/verify.mjs",
     "verify:csharp:runtime": "node services/crossfire/csharp/scripts/verify-runtime.mjs",
     "publish:csharp": "node scripts/publish-csharp.mjs",
-    "package:containers": "npm run package:containers --workspace=@ctlflow/crossfire --",
+    "publish:rust": "node scripts/publish-rust.mjs",
+    "package:containers": "node scripts/container-packages.mjs",
     "verify:contracts": "node scripts/verify-contracts.mjs",
     "verify:parity": "node scripts/verify-parity.mjs"
   },

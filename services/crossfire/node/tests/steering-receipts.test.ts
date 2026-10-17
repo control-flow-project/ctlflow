@@ -20,3 +20,15 @@ test('steering receipts retain exact source, deterministic stage identity and ac
   const recovered = JSON.parse(notices[3]!.text.split('\n')[1]!) as { receivedAt: string | null; sinceReceiptMs: number | null };
   assert.equal(notices[3]!.id, notices[2]!.id); assert.equal(recovered.receivedAt, null); assert.equal(recovered.sinceReceiptMs, null);
 });
+
+test('steering receipt excerpts retain whole Unicode characters at the common UTF-16 bound', () => {
+  const notices: string[] = [];
+  const receipts = steeringReceipts(() => 1000, (_id, text) => notices.push(text));
+  const text = 'a'.repeat(2999) + '🚀tail';
+  const event = { ...eventView({ ...message('$unicode'), content: { body: text } }, ROOM), origin: { kind: 'room' as const, name: 'Review', alias: null } };
+  receipts.publish(event, 'received', text);
+  const fields = JSON.parse(notices[0]!.split('\n')[1]!) as { message: string; detail: string };
+  assert.equal(fields.message, 'a'.repeat(2999));
+  assert.equal(fields.detail, fields.message);
+  assert(fields.message.isWellFormed());
+});

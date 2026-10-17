@@ -1,8 +1,8 @@
 # Implementation ownership and verification limits
 
-The repository has Node and C# implementations of Crossfire, fleetd and Fleet.
+The repository has Node, C# and Rust implementations of Crossfire, fleetd and Fleet.
 C# targets .NET 11 and produces managed and NativeAOT distributions from the same
-source. Rust is a separate development track. An executable matrix must identify
+source. Rust uses native Cargo distributions. An executable matrix must identify
 the exact distributions tested.
 
 ## Source layout
@@ -12,6 +12,7 @@ services/
   crossfire/
     node/{apps/server,packages,tests,scripts,tools,Dockerfile}
     csharp/{apps/Crossfire.Server,packages,tests,build,scripts,Dockerfile}
+    rust/{apps/server,packages,tests,scripts,Dockerfile}
     apps/web/
     database/management/sqlite/
     knexfile.management.mjs
@@ -21,10 +22,12 @@ services/
   fleetd/
     node/{apps/daemon,packages,tests,scripts,tools}
     csharp/{apps/Fleetd.Daemon,packages,tests}
+    rust/{apps/daemon,packages}
     tests/contracts/
   fleet/
     node/{apps/cli,packages,tests,scripts}
     csharp/{apps/Fleet.Cli,packages}
+    rust/{apps/cli,packages}
     tests/contracts/
 scripts/
 ```
@@ -33,14 +36,14 @@ The tree lists owners, not mandatory empty directories.
 
 | Concern | Shared contract | Implementation difference |
 | --- | --- | --- |
-| API | Same routes, input validation, errors and response fields | Node HTTP / ASP.NET |
-| Domain | Functional operations, explicit ports, expected failure values | TypeScript modules / C# static modules and records |
-| Data | Same SQLite file and normalized schema | Tinqer / EF |
+| API | Same routes, input validation, errors and response fields | Node HTTP / ASP.NET / Axum |
+| Domain | Functional operations, explicit ports, expected failure values | TypeScript modules / C# static modules and records / Rust modules and values |
+| Data | Same SQLite file and normalized schema | Tinqer / EF / Diesel |
 | Migrations | One service-owned Knex image | No runtime or EF migrations |
 | UI | One React project and built assets | None |
 | Native sessions | fleetd-owned Codex/Pi adapters | Native process and transport libraries |
 | Execution composition | fleetd execution adapter, not daemon-domain code | Language-local adapter projects |
-| Distribution | Standalone products and shared tool bytes | npm archives / managed or NativeAOT trees |
+| Distribution | Standalone products and shared tool bytes | npm archives / managed or NativeAOT trees / native Cargo trees |
 | Server deployment | One Docker package format, shared migration image and image-owned readiness | Backend-specific runtime image, never language-specific site activation |
 | Verification | One external scenario bank | Separate internal unit/compiler tests |
 
@@ -50,16 +53,16 @@ the common Knex image is an explicit migration dependency.
 
 ## Server operator
 
-Both implementations reject repeated options, including identical values, and
+All three implementations reject repeated options, including identical values, and
 accept explicit ports only as canonical ASCII decimal integers in 1024..65535.
 Argument rejection precedes state-lock creation and native engine operations.
 Operator failures use a standard-error diagnostic and normal exit code 1, not a
 native abort or crash dump.
-The same external operator scenarios exercise both boundaries.
+The same external operator scenarios exercise all three boundaries.
 
 One cross-language private SQLite lock owns an instance's entire operator
 lifetime. A competing live start fails before touching containers or data.
-Both operator implementations consume --package. The package selects the runtime
+All three operator implementations consume --package. The package selects the runtime
 independently of the operator language. Source compilation is a build step, not
 another deployment path. Exact archive/image/source identities and release labels
 are verified before stopping writers. Current packages target Linux amd64 only.
@@ -122,6 +125,8 @@ new native verification. Build-time compiler changes belong to the compiler
 owner, with its upstream notices retained; they are not runtime query fallbacks.
 
 ## Evidence
+
+- [Rust implementation review and verification boundaries](rust-review.md)
 
 - [Current correction record and issue IDs](../verification/20261015-outside-review-fixes.md)
 - [Shared contract execution](../verification/shared-contracts.md)

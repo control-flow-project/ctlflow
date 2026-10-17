@@ -1,8 +1,10 @@
+import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
 import { mkdirSync, openSync, closeSync, writeFileSync, renameSync, unlinkSync, chmodSync, fsyncSync,
   existsSync, lstatSync, realpathSync, constants, fstatSync, readSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { MAX_JSON_BYTES } from "@ctlflow/crossfire-contracts/limits";
+import { json } from '@ctlflow/crossfire-contracts/matrix';
 
 export function privateDir(path: string): string {
   if (!existsSync(path)) {
@@ -40,11 +42,15 @@ export function readPrivateBytes(path: string, maximum: number): Buffer {
   } finally { closeSync(descriptor); }
 }
 export function readJson<T>(path: string, maximumBytes = MAX_JSON_BYTES): T {
-  return JSON.parse(readPrivateBytes(path, maximumBytes).toString('utf8')) as T;
+  const value: unknown = JSON.parse(decodeUtf8(readPrivateBytes(path, maximumBytes)));
+  if (!json(value)) throw new Error('Private state contains invalid Unicode JSON');
+  return value as T;
 }
 
 export function writeJson(path: string, value: unknown, maximumBytes = MAX_JSON_BYTES): void {
-  const bytes = Buffer.from(JSON.stringify(value, null, 2) + "\n");
+  const serialized = JSON.stringify(value, null, 2);
+  if (typeof serialized !== 'string' || !json(JSON.parse(serialized))) throw new Error('Private state contains invalid Unicode JSON');
+  const bytes = Buffer.from(serialized + "\n");
   if (lstatSync(path, { throwIfNoEntry: false })) readJson<unknown>(path, maximumBytes);
   writePrivateBytes(path, bytes, maximumBytes);
 }

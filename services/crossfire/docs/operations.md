@@ -24,7 +24,7 @@ Website deployment, npm publication and starting fleets are separate actions.
 
 ## Operator ownership
 
-The Node and C# operators share the private `operator.lock` inode and exclusive
+The Node, C# and Rust operators share the private `operator.lock` inode and exclusive
 SQLite locking protocol. The lock spans package verification/import, reconciliation, backup, migration,
 runtime execution and cleanup. It is not an expiring PID lease; process death
 releases the lock. Never delete its inode to bypass a live owner.

@@ -1,0 +1,35 @@
+[package]
+name = "fleetd-adapter-execution"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+publish.workspace = true
+
+[dependencies]
+crossfire-kernel.workspace = true
+crossfire-domain.workspace = true
+crossfire-contracts.workspace = true
+crossfire-agent-core.workspace = true
+crossfire-adapter-codex.workspace = true
+crossfire-adapter-pi.workspace = true
+crossfire-adapter-runtime.workspace = true
+crossfire-adapter-crossfire.workspace = true
+crossfire-adapter-filesystem.workspace = true
+crossfire-adapter-http.workspace = true
+crossfire-adapter-process.workspace = true
+crossfire-adapter-matrix.workspace = true
+fleetd-domain.workspace = true
+fleetd-contracts.workspace = true
+fleetd-storage.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

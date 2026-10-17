@@ -1,0 +1,99 @@
+import assert from 'node:assert/strict';
+import { execute } from './rust-process.mjs';
+import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
+import { availableParallelism } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { performance } from 'node:perf_hooks';
+import { prepareTimezones } from '../services/crossfire/scripts/timezones.mjs';
+
+const root = fileURLToPath(new URL('../', import.meta.url));
+assert.equal(process.argv.length, 2, 'Rust verification has no runtime-selection or skip flags');
+const cgroup = readFileSync('/proc/self/cgroup', 'utf8').split('\n').find(line => line.startsWith('0::'))?.slice(3);
+assert(cgroup && !cgroup.split('/').includes('..'), 'A bounded unified process resource scope is required');
+const memory = readFileSync(join('/sys/fs/cgroup', cgroup, 'memory.max'), 'utf8').trim();
+const swap = readFileSync(join('/sys/fs/cgroup', cgroup, 'memory.swap.max'), 'utf8').trim();
+const tasks = readFileSync(join('/sys/fs/cgroup', cgroup, 'pids.max'), 'utf8').trim();
+assert(memory !== 'max' && BigInt(memory) > 0n && BigInt(memory) <= 16n * 1024n ** 3n, 'Run verification in a process scope bounded to at most 16 GiB');
+assert.equal(swap, '0', 'Verification must not consume swap');
+assert(tasks !== 'max' && Number(tasks) <= 2048, 'Verification must have a finite 2048-task aggregate bound');
+const temporary = join(root, '.temp'); mkdirSync(temporary, {recursive:true, mode:0o700});
+const prepared = mkdtempSync(join(temporary, 'crossfire-rust-knex-')); chmodSync(prepared, 0o700);
+const template = join(prepared, 'management.sqlite');
+process.on('exit', () => rmSync(prepared, {recursive:true, force:true}));
+await migrateDatabase(template);
+process.env.CROSSFIRE_TEST_DATABASE_TEMPLATE = template;
+
+
+await execute('node', ['--test','scripts/native-architecture.test.mjs']);
+await execute('node', ['scripts/native-architecture.mjs']);
+await execute('cargo', ['fmt','--all','--','--check']);
+await execute('cargo', ['clippy','--workspace','--all-targets','--locked','--','-D','warnings']);
+await execute('npm', ['run','build']);
+const piBinary = JSON.parse(await execute('node', ['--input-type=module','-e', 'import {preparePi,piBinary} from "@ctlflow/crossfire-test-support/pi"; preparePi(); process.stdout.write(JSON.stringify(piBinary()));'], {timeout:360_000}));
+assert(typeof piBinary === 'string' && piBinary.startsWith('/'), 'Verified native Pi asset must have an exact absolute executable path');
+process.env.TZDIR=await prepareTimezones();
+const nativeEnvironment = {...process.env, CROSSFIRE_TEST_PI_BINARY:piBinary, CROSSFIRE_NATIVE_GUARD:join(prepared,'crossfire-native-guard')};
+await execute('node', ['services/crossfire/scripts/generate-rust-schema.mjs','--database',template,'--check']);
+await execute('node', ['services/crossfire/scripts/generate-rust-catalog.mjs','--check']);
+await execute('node', ['services/crossfire/scripts/generate-rust-operations.mjs','--check']);
+await execute('node', ['services/crossfire/scripts/generate-rust-onboarding.mjs','--check']);
+await execute('node', ['services/fleetd/scripts/generate-rust-operations.mjs','--check']);
+await execute('node', ['services/crossfire/scripts/generate-rust-timezones.mjs','--check']);
+await execute('node', ['services/crossfire/scripts/generate-native-pi-extension.mjs', '--check']);
+const examples = new Map();
+await execute('cargo', ['build','--workspace','--bins','--examples','--locked','--message-format=json'], {line:text => {
+  const event = JSON.parse(text);
+  if (event.reason === 'compiler-artifact' && event.target.kind.includes('example') && event.executable) examples.set(event.target.name,event.executable);
+}});
+const executables = new Map();
+copyFileSync(join(root,'target/debug/crossfire-native-guard'),nativeEnvironment.CROSSFIRE_NATIVE_GUARD); chmodSync(nativeEnvironment.CROSSFIRE_NATIVE_GUARD,0o755);
+await execute('cargo', ['test','--workspace','--all-targets','--locked','--no-run','--message-format=json'], {line:text => {
+  const event = JSON.parse(text);
+  if (event.reason === 'compiler-artifact' && event.profile?.test && event.executable) {
+    executables.set(event.executable, {name:event.target.name, source:event.target.src_path});
+  }
+}});
+assert(executables.size > 0, 'No compiled Rust test artifacts were found');
+const directory = mkdtempSync(join(temporary, 'crossfire-rust-verification-')); chmodSync(directory, 0o700);
+const pending = [...executables.entries()], results = [], failures = [];
+try {
+  const workers = Array.from({length:Math.min(availableParallelism(), pending.length)}, async () => {
+    while (pending.length) {
+      const selected = pending.shift(); if (!selected) return;
+      const [binary, target] = selected;
+      const privateDirectory = mkdtempSync(join(directory, 'test-')); chmodSync(privateDirectory, 0o700);
+      const started = performance.now();
+      try {
+        const output = await execute(binary, ['--test-threads=1'], {environment:{...nativeEnvironment, TMPDIR:privateDirectory, TMP:privateDirectory, TEMP:privateDirectory}, timeout:120_000});
+        const summary = /test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;/u.exec(output);
+        assert(summary && summary[2] === '0' && summary[3] === '0', 'Every compiled test must pass without ignored cases');
+        results.push({...target, milliseconds:Math.round(performance.now() - started), passed:Number(summary[1])});
+      } catch (error) { failures.push({source:target.source, message:error instanceof Error ? error.message : String(error)}); }
+      finally { rmSync(privateDirectory, {recursive:true, force:true}); }
+    }
+  });
+  await Promise.all(workers);
+} finally { rmSync(directory, {recursive:true, force:true}); }
+for (const result of results.sort((first, second) => first.source.localeCompare(second.source))) console.log(JSON.stringify(result));
+for (const failure of failures) console.error(JSON.stringify(failure));
+assert.equal(failures.length, 0, 'Rust verification failures remain');
+assert(examples.has('interchange') && examples.has('activity_interchange'), 'Both native interchange proofs must be built');
+assert(examples.has('calendar_interchange'), 'The native calendar parity proof must be built');
+const calendar = await execute('node', ['services/crossfire/rust/tests/calendar-parity.mjs',examples.get('calendar_interchange')]);
+console.log(calendar.trim());
+const interchange = await execute('node', ['services/crossfire/rust/tests/sqlite-parity.mjs',examples.get('interchange'),examples.get('activity_interchange')]);
+console.log(interchange.trim());
+assert(examples.has('journal_interchange'), 'The native delivery journal interchange proof must be built');
+const journal = await execute('node', ['services/crossfire/rust/tests/journal-parity.mjs',examples.get('journal_interchange')]);
+console.log(journal.trim());
+assert(examples.has('matrix_acceptance'), 'Actual native Matrix authority acceptance must be built');
+const service = join(root, 'services/crossfire');
+await execute('node', [join(service, 'dist/scripts/architecture-proof/conduit-assets.js')], {workingDirectory:service});
+const nativeMatrix = await execute('node', [join(service, 'rust/tests/matrix-parity.mjs'),examples.get('matrix_acceptance')], {workingDirectory:service, timeout:120_000});
+console.log(nativeMatrix.trim());
+assert(examples.has('enrollment_acceptance'), 'Actual native enrollment lifecycle acceptance must be built');
+const enrollment = await execute('node', [join(service, 'rust/tests/enrollment-parity.mjs'),examples.get('enrollment_acceptance')], {workingDirectory:service,timeout:150000});
+console.log(enrollment.trim());
+console.log(JSON.stringify({status:'passed', binaries:results.length, tests:results.reduce((total,result) => total + result.passed, 0), availableCores:availableParallelism(), scope:'implemented Rust sources; not full-product certification'}));

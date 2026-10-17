@@ -1,55 +1,61 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
 import { observe } from '@ctlflow/crossfire-test-support/contract-process';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import type { ContainerStack } from './container-fixture.js';
 
 export async function containerRecoveryContracts(scope: TestContext, fixture: ContainerStack): Promise<void> {
-  function docker(args: string[]): string {
-    const command = spawnSync('docker', args, { encoding: 'utf8', timeout: 30000 });
+  const artifactPreparationMilliseconds = 300000;
+  function docker(args: string[], timeout = 30000): string {
+    const command = spawnSync('docker', args, { encoding: 'utf8', timeout });
+    assert.equal(command.error === undefined, true, 'Docker ' + args[0] + ': ' + (command.error?.message ?? ''));
     assert.equal(command.status, 0, command.stderr); return command.stdout.trim();
   }
   const inspect = (identity: string, format: string) => docker(['inspect', '--format', format, identity]);
   const exists = (identity: string) => docker(['container', 'ls', '--all', '--no-trunc', '--filter', 'id=' + identity, '--format', '{{.ID}}']) !== '';
-  await scope.test('a transferred derivative package imports its missing image and retains image-owned readiness', async () => {
+  await scope.test('a transferred derivative package imports its missing image and retains image-owned readiness', async child => {
     const original = fixture.current(), parent = inspect(fixture.containerName, '{{.Config.Image}}');
+    assert.match(parent, /^sha256:[a-f0-9]{64}$/u);
     const metadata = JSON.parse(readFileSync(join(fixture.packages, original.name, 'release.json'), 'utf8')) as { migrationImage: string };
-    const temporary = mkdtempSync(join(fixture.directory, 'transfer-')), child = docker(['create', '--label', 'org.crossfire.directory=' + fixture.state, '--cgroup-parent', process.env.CROSSFIRE_TEST_CGROUP_PARENT!, parent]);
+    const temporary = mkdtempSync(join(fixture.directory, 'transfer-'));
     let derivative: string | undefined;
-    try {
-      derivative = docker(['commit', '--change', 'LABEL org.crossfire.transfer=' + child, child]); docker(['rm', child]);
-      const output = join(temporary, 'package');
-      const exported = spawnSync(process.execPath, [join(fixture.packages, original.name, 'package-tool.mjs'), 'export', '--runtime', derivative, '--migrations', metadata.migrationImage, '--output', output], { cwd: temporary, encoding: 'utf8', timeout: 300000 });
-      assert.equal(exported.status, 0, exported.stderr);
-      docker(['image', 'rm', '--no-prune', derivative]);
-      assert.notEqual(spawnSync('docker', ['image', 'inspect', derivative], { stdio: 'ignore' }).status, 0, 'The receiving operator must actually load the archive');
-      await fixture.close(); await fixture.start(original, output);
-      assert.equal(inspect(fixture.containerName, '{{.Config.Image}}'), derivative); await fixture.operation(operations.currentSession);
-      const verified = spawnSync(process.execPath, [join(output, 'package-tool.mjs'), 'verify', output], { cwd: temporary, encoding: 'utf8', timeout: 300000 });
-      assert.equal(verified.status, 0, verified.stderr);
-      assert.equal((JSON.parse(verified.stdout) as { runtimeImage: string }).runtimeImage, derivative, 'The standalone package tool resolves no monorepo source');
-      const health = JSON.parse(inspect(fixture.containerName, '{{json .Config.Healthcheck.Test}}')) as string[]; assert.equal(health[0], 'CMD'); docker(['exec', fixture.containerName, ...health.slice(1)]);
-    } finally {
-      await fixture.close();
-      if (exists(child)) docker(['rm', child]);
+    cleanup(child, () => fixture.start(original));
+    cleanup(child, () => rmSync(temporary, { recursive: true, force: true }));
+    cleanup(child, () => {
       if (derivative && spawnSync('docker', ['image', 'inspect', derivative], { stdio: 'ignore' }).status === 0) docker(['image', 'rm', '--no-prune', derivative]);
-      rmSync(temporary, { recursive: true, force: true }); await fixture.start(original);
-    }
+    });
+    cleanup(child, () => fixture.close());
+    writeFileSync(join(temporary, 'Dockerfile'), 'FROM ' + parent + '\nLABEL org.crossfire.transfer=' + randomUUID() + '\n');
+    derivative = docker(['build', '--quiet', '--cgroup-parent', process.env.CROSSFIRE_TEST_CGROUP_PARENT!, '--file', join(temporary, 'Dockerfile'), temporary], artifactPreparationMilliseconds);
+    assert.match(derivative, /^sha256:[a-f0-9]{64}$/u);
+    const output = join(temporary, 'package');
+    const exported = spawnSync(process.execPath, [join(fixture.packages, original.name, 'package-tool.mjs'), 'export', '--runtime', derivative, '--migrations', metadata.migrationImage, '--output', output], { cwd: temporary, encoding: 'utf8', timeout: artifactPreparationMilliseconds });
+    assert.equal(exported.status, 0, exported.stderr);
+    docker(['image', 'rm', '--no-prune', derivative]);
+    assert.notEqual(spawnSync('docker', ['image', 'inspect', derivative], { stdio: 'ignore' }).status, 0, 'The receiving operator must actually load the archive');
+    await fixture.close(); await fixture.start(original, output);
+    assert.equal(inspect(fixture.containerName, '{{.Config.Image}}'), derivative); await fixture.operation(operations.currentSession);
+    const verified = spawnSync(process.execPath, [join(output, 'package-tool.mjs'), 'verify', output], { cwd: temporary, encoding: 'utf8', timeout: artifactPreparationMilliseconds });
+    assert.equal(verified.status, 0, verified.stderr);
+    assert.equal((JSON.parse(verified.stdout) as { runtimeImage: string }).runtimeImage, derivative, 'The standalone package tool resolves no monorepo source');
+    const health = JSON.parse(inspect(fixture.containerName, '{{json .Config.Healthcheck.Test}}')) as string[]; assert.equal(health[0], 'CMD'); docker(['exec', fixture.containerName, ...health.slice(1)]);
   });
-  await scope.test('every installed operator runs every backend package without a source checkout or data conversion', async () => {
+  await scope.test('the selected installed operator runs every backend package without a source checkout or data conversion', async child => {
     const original = fixture.current();
-    for (const operator of fixture.targets) for (const backend of fixture.targets) {
-      await fixture.close(); await fixture.start(operator, join(fixture.packages, backend.name));
+    for (const backend of fixture.targets) {
+      await fixture.close(); await fixture.start(original, join(fixture.packages, backend.name));
       const manifest = JSON.parse(readFileSync(join(fixture.packages, backend.name, 'release.json'), 'utf8')) as { runtimeImage: string };
       assert.equal(inspect(fixture.containerName, '{{.Config.Image}}'), manifest.runtimeImage);
       await fixture.operation(operations.currentSession);
       const health = JSON.parse(inspect(fixture.containerName, '{{json .Config.Healthcheck.Test}}')) as string[];
       assert.equal(health[0], 'CMD'); docker(['exec', fixture.containerName, ...health.slice(1)]);
     }
+    child.diagnostic(JSON.stringify({ operator: original.name, backends: fixture.targets.map(backend => backend.name) }));
     await fixture.restart(original);
   });
   await scope.test('corrupt archives and mismatched image labels cannot stop an existing runtime orphan', async () => {

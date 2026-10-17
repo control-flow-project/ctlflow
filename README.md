@@ -13,19 +13,23 @@ Every agent belongs to a fleet. A single agent uses a one-agent fleet.
 Setup creates a separate managed conversation; it does not attach the coding
 assistant that runs setup.
 
-Node and C# implement the same products. C# targets .NET 11 with managed and
+Node, C# and Rust implement the same products. C# targets .NET 11 with managed and
 NativeAOT outputs. They share the React UI, wire contracts and SQLite database.
-Knex owns database creation and migrations for both. Rust development is separate;
-its presence in a contract matrix must be explicit.
+Knex alone owns database creation and migrations for all implementations. The
+combined gate selects Node, C# managed, C# NativeAOT and Rust explicitly.
 
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [Installation and packaging by target](docs/distributions/README.md)
 - [Crossfire installation](services/crossfire/docs/getting-started.md)
 - [Agent and fleet setup](services/fleet/docs/getting-started.md)
 - [Controller operation](services/fleetd/docs/operations.md)
 - [Architecture and contracts](docs/specification.md)
 - [C# build and distribution](services/crossfire/csharp/README.md)
+- [Rust build and distribution](services/crossfire/rust/README.md)
+- [Native ownership layout](docs/architecture/native-layout.md)
+- [Rust integration review](docs/architecture/rust-review.md)
 - [Development and verification](docs/development.md)
 - [Shared executable tests](docs/verification/shared-contracts.md)
 - [Implementation boundaries](docs/architecture/native-implementations.md)
@@ -34,18 +38,18 @@ its presence in a contract matrix must be explicit.
 
 Use Linux, Node.js 26+, npm 11.17+ and the versions pinned in this checkout.
 The combined gate also requires the pinned .NET SDK, native compilation tools,
-rootless Docker, Chrome, Codex and the test runner's pinned Pi assets.
+the pinned Rust toolchain, rootless Docker, Chrome, Codex and pinned Pi assets.
 
 Run installation and verification inside a finite process-group resource scope:
 
 ```sh
 systemd-run --user --scope --quiet \
-  --property=MemoryMax=34359738368 --property=MemorySwapMax=0 \
-  --property=TasksMax=8192 /bin/bash -c \
+  --property=MemoryMax=17179869184 --property=MemorySwapMax=0 \
+  --property=TasksMax=2048 /bin/bash -c \
   'npm ci --ignore-scripts && npm run verify:parity -- /absolute/new-evidence-directory'
 ```
 
-Size the finite limits for the host. Heap limits alone do not bound child
+This scope uses 16 GiB, zero swap and 2048 tasks. Heap limits alone do not bound child
 processes. Do not rebuild a checkout while tests consume its generated output.
 Fixtures use separate state and inert providers, not production accounts.
 

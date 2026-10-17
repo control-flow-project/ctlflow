@@ -1,3 +1,4 @@
+import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
 import { lstatSync, realpathSync, unlinkSync, openSync, fsyncSync, closeSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, isAbsolute, resolve } from 'node:path';
@@ -24,7 +25,7 @@ export function refreshPiAuthentication(home: string): void {
     if (lstatSync(file, { throwIfNoEntry: false })) {
       const bytes = readPrivateBytes(file, 1024 * 1024);
       let parsed: unknown;
-      try { parsed = JSON.parse(bytes.toString('utf8')) as unknown; }
+      try { parsed = JSON.parse(decodeUtf8(bytes)) as unknown; }
       catch { throw failureError({ code: 'unauthorized', message: 'Invalid private Pi ' + name + '; configure it on the host, never in chat' }); }
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw failureError({ code: 'unauthorized', message: 'Invalid private Pi ' + name + '; configure it on the host, never in chat' });
       writePrivateBytes(target, bytes, 1024 * 1024);

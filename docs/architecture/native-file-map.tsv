@@ -1,0 +1,1331 @@
+file	counterpart	disposition
+services/crossfire/csharp/Dockerfile	services/crossfire/rust/Dockerfile	native container definition
+services/crossfire/csharp/README.md	services/crossfire/rust/README.md	implementation guide
+services/crossfire/csharp/apps/Crossfire.Server/ApiApplication.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/ApiWorker.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Bootstrap.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/ContainerCommands.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/ContainerHealth.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/ContainerLifecycle.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/ContainerPackage.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/ContentApplication.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Crossfire.Server.csproj	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/ElementPresentation.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/HomeserverProcess.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/AgentRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/AgentViews.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/ApiAuthentication.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/ApiPipeline.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/ApiValues.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/AuditRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/DiscoveryRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/DiscoveryViews.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/EnrollmentRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/EnrollmentViews.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/FleetChanges.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/FleetControlRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/FleetControlViews.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/FleetMapRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/FleetReadRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/Inputs.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/InstanceRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/InvitationCookies.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/InvitationRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/JsonValues.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/ListenerRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/MatrixRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/MemberRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/NativeResponses.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/PlatformRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/PublicRequestBudget.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/PublicationRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/RegistrationPage.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/RegistrationTransport.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/RequestTargets.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/RoomPlanRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/RoomRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/RoomViews.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/RuntimeInputs.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/RuntimeRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/RuntimeViews.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/SessionRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/StatisticsInputs.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/StatisticsViews.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/Transport.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/WakeNoticeRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Http/WakeRoutes.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/LoggingMaintenance.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/MatrixProxy.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/Program.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/PublicApplication.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/ServerConfiguration.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/ServerHost.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/apps/Crossfire.Server/ServerOperator.cs	services/crossfire/rust/apps/server	application
+services/crossfire/csharp/build/Crossfire.EfCompiler/BidirectionalDictionary.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/CSharpToLinqTranslator.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/Check.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/CodeAnnotations.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/Crossfire.EfCompiler.csproj	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/CrossfireFuncletizer.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/EnumerableMethods.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/IDictionaryDebugView.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/NativeModelTranslator.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/PrecompiledQueryCodeGenerator.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/QueryLocator.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/QuerySource.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/README.md	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfCompiler/SharedTypeExtensions.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfHost/ContextFactory.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfHost/Crossfire.EfHost.csproj	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfHost/DesignServices.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/Crossfire.EfHost/Program.cs	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/build/NativeQueries.targets	services/crossfire/scripts/generate-rust-schema.mjs	EF design-time generation; Diesel has no EF compiler
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/CodexConnection.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/CodexHistories.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/CodexInput.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/CodexJson.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/CodexProtocol.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/CodexRuntime.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/CodexSession.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/CodexSettings.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/CodexTerminal.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/CodexTimeline.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/ContextMigration.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/ContextRegistry.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/Crossfire.AdapterCodex.csproj	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/InstructionCapability.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/ManagedHome.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/ModelAdmission.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/NativeDecisions.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/NativeInstructions.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/NativeObservation.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/OwnedProcess.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCodex/WebSocketProtocol.cs	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCrossfire/AgentInvitations.cs	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCrossfire/AgentSoftware.cs	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCrossfire/AgentState.cs	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCrossfire/CoordinationTransport.cs	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCrossfire/Crossfire.AdapterCrossfire.csproj	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCrossfire/FleetConnection.cs	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCrossfire/ListenerControlClient.cs	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCrossfire/ListenerHost.cs	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/csharp/packages/Crossfire.AdapterCrossfire/ListenerRunner.cs	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/AgentProjects.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/AssetFiles.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/AtomicFile.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/DiagnosticMigration.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/DiagnosticStore.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/ManagedLinks.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/NativeHistory.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/Posix.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/PrivateFiles.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/PrivateSockets.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/PublicationStore.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/Releases.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/StateArchive.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterFilesystem/StateLock.cs	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/csharp/packages/Crossfire.AdapterHttp/Crossfire.AdapterHttp.csproj	services/crossfire/rust/packages/adapter-http	native library
+services/crossfire/csharp/packages/Crossfire.AdapterHttp/NativeHttp.cs	services/crossfire/rust/packages/adapter-http	native library
+services/crossfire/csharp/packages/Crossfire.AdapterHttp/OperationClient.cs	services/crossfire/rust/packages/adapter-http	native library
+services/crossfire/csharp/packages/Crossfire.AdapterMatrix/AccountAuthority.cs	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/csharp/packages/Crossfire.AdapterMatrix/Crossfire.AdapterMatrix.csproj	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/csharp/packages/Crossfire.AdapterMatrix/Deactivation.cs	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/csharp/packages/Crossfire.AdapterMatrix/Events.cs	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/csharp/packages/Crossfire.AdapterMatrix/Invitations.cs	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/csharp/packages/Crossfire.AdapterMatrix/MatrixJson.cs	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/csharp/packages/Crossfire.AdapterMatrix/OwnerConversations.cs	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/csharp/packages/Crossfire.AdapterMatrix/Ports.cs	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/csharp/packages/Crossfire.AdapterMatrix/RoomAccess.cs	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/csharp/packages/Crossfire.AdapterMatrix/Rooms.cs	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/Crossfire.AdapterPi.csproj	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiAdmission.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiConnection.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiContext.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiHistories.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiInput.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiObservation.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiProtocol.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiQuestions.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiReceipt.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiRuntime.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiState.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiUsage.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterPi/PiValues.cs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/csharp/packages/Crossfire.AdapterProcess/BackgroundStdio.cs	services/crossfire/rust/packages/adapter-process	native library
+services/crossfire/csharp/packages/Crossfire.AdapterProcess/Crossfire.AdapterProcess.csproj	services/crossfire/rust/packages/adapter-process	native library
+services/crossfire/csharp/packages/Crossfire.AdapterProcess/NativeProcess.cs	services/crossfire/rust/packages/adapter-process	native library
+services/crossfire/csharp/packages/Crossfire.AdapterRuntime/Crossfire.AdapterRuntime.csproj	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/csharp/packages/Crossfire.AdapterRuntime/NativeDelivery.cs	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/csharp/packages/Crossfire.AdapterRuntime/NativeJournal.cs	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/csharp/packages/Crossfire.AdapterRuntime/ResumptionInput.cs	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSchedule/CalendarSchedule.cs	services/crossfire/rust/packages/adapter-schedule	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSchedule/Crossfire.AdapterSchedule.csproj	services/crossfire/rust/packages/adapter-schedule	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/AgentCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/AgentDirectoryQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/AgentReadQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/AgentRoutingQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/AuditQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/AuthorizationQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/ContactQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Crossfire.AdapterSqlite.csproj	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/CrossfireDbContext.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/DatabaseUpgrade.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/DecisionCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/DecisionQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/DiscoveryQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/EnrollmentAdmissionQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/EnrollmentCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/EnrollmentFleetCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/EnrollmentQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/AgentCredentialRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/AgentNameRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/AgentOwnerConversationRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/AgentRoomGrantRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/AgentRoomPermissionRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/AgentRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/AgentWakeSenderRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/AuditEventRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentArchiveItemRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentArchiveMetadataRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentArchivePermissionRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentArchivePolicyRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentArchiveRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentArchiveWakeSenderRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentControllerMetadataRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentItemPermissionRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentItemPolicyRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentItemRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentItemWakeSenderRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/EnrollmentRequestRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/FleetConnectionRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/FleetControllerMetadataRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/FleetCredentialRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/FleetInstancePermissionRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/FleetInstancePolicyRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/FleetInstanceRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/FleetMessageDeliveryRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/FleetMessageRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/FleetNativeStopRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/FleetRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/FleetRuntimeOperationRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/IncidentNotificationRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/InstancePolicyRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/ListenerRunRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/ListenerStatCheckpointRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/ListenerStatFlowRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/ListenerStatIntervalRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/ListenerStatUsageRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/ManagementConversationRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/MemberInvitationRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/MemberRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/MemberSessionRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/PermissionRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/PrincipalApplicationRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/PrincipalRoleRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/PrincipalRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/PublicationFileRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/PublicationRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/RolePermissionRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/RoleRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/RoomGrantApplicationRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/RuntimeDecisionAnswerRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/RuntimeDecisionOptionRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/RuntimeDecisionQuestionRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/RuntimeDecisionRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/RuntimeIncidentRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/RuntimeObservationRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/RuntimeSettingRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/RuntimeUsageCheckpointRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/WakeDeliveryRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/WakeNoticeRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/WakeRuleAgentRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Entities/WakeRuleRow.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/FleetCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/FleetMapQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/FleetMessageCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/FleetMessageQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/FleetQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/FleetReadQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/ForeignKeys.g.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/IncidentCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/InvitationCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/InvitationQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/ListenerBatchQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/ListenerCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/ListenerQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/LoggingRetention.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/MemberCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/MemberQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/OwnerConversationCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/PolicyCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/PolicyQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/PrincipalApplicationCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/PublicationCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/PublicationQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/RegistrationQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/RetirementCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/RetirementQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/RoomGrantCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/RoomGrantQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/RoomGrantReadQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/RuntimeCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/RuntimeQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Schema.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/SchemaContract.g.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/SessionCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/StatisticsCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/StatisticsQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Stored.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Tables0.g.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Tables1.g.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Tables2.g.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Tables3.g.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Tables4.g.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Tables5.g.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Tables6.g.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Transactions.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/WakeCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/WakeNoticeQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/WakeQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/WakeRuleCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterToml/ConfigurationToml.cs	services/crossfire/rust/packages/adapter-toml	native library
+services/crossfire/csharp/packages/Crossfire.AdapterToml/Crossfire.AdapterToml.csproj	services/crossfire/rust/packages/adapter-toml	native library
+services/crossfire/csharp/packages/Crossfire.AdapterToml/TomlJson.cs	services/crossfire/rust/packages/adapter-toml	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/AgentPorts.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/AgentProfiles.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/AgentWire.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ChatBatches.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ChatPublication.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/Coordination.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/Crossfire.AgentCore.csproj	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/DecisionBroker.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/HistoryQueries.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ListenerAcquisition.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ListenerActivity.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ListenerBudget.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ListenerControl.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ListenerDiagnostics.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ListenerMaintenance.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ListenerPublication.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ListenerReceiver.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ListenerReporting.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ListenerStatistics.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/MessageArtifacts.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/OwnedRuntime.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/OwnerAuthority.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/OwnerNotices.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/OwnerObservation.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ReceivePages.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ReceiveSnapshots.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ReceiveState.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ReceivedEvents.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ReleaseNotices.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ResetHistory.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/Runtime.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/ScheduledPublication.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/SteeringControl.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/SyncEvents.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.AgentCore/UnreadMessages.cs	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/csharp/packages/Crossfire.Contracts/Crossfire.Contracts.csproj	services/crossfire/rust/packages/contracts	native library
+services/crossfire/csharp/packages/Crossfire.Contracts/Envelope.cs	services/crossfire/rust/packages/contracts	native library
+services/crossfire/csharp/packages/Crossfire.Contracts/InvitationSynchronization.cs	services/crossfire/rust/packages/contracts	native library
+services/crossfire/csharp/packages/Crossfire.Contracts/Onboarding.cs	services/crossfire/rust/packages/contracts	native library
+services/crossfire/csharp/packages/Crossfire.Contracts/Pagination.cs	services/crossfire/rust/packages/contracts	native library
+services/crossfire/csharp/packages/Crossfire.Contracts/ReleaseValues.cs	services/crossfire/rust/packages/contracts	native library
+services/crossfire/csharp/packages/Crossfire.Contracts/RestOperations.g.cs	services/crossfire/rust/packages/contracts	native library
+services/crossfire/csharp/packages/Crossfire.Contracts/RoomState.cs	services/crossfire/rust/packages/contracts	native library
+services/crossfire/csharp/packages/Crossfire.Contracts/Validation.cs	services/crossfire/rust/packages/contracts	native library
+services/crossfire/csharp/packages/Crossfire.Domain/AgentReads.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/AgentRouting.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Agents.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/AuditReads.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Authorization.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Crossfire.Domain.csproj	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Decisions.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Discovery.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/EnrollmentAdmission.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/EnrollmentAdmissionValues.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/EnrollmentClaims.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/EnrollmentCoordination.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/EnrollmentDecisions.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/EnrollmentFleets.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/EnrollmentLifecycleValues.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/EnrollmentRequests.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/EnrollmentValues.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/FleetAuthority.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/FleetControl.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/FleetMaps.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/FleetMessageValues.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/FleetMessages.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/FleetOperations.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/FleetReads.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/FleetRetirement.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/FleetStatistics.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/FleetValues.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Identity.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Invitations.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/ListenerReporting.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/MatrixPorts.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/MatrixValues.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/MemberRegistration.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/MemberValues.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Members.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/NativeActors.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/OnboardingValues.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/OwnerConversations.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/PlatformDiagnostics.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Policies.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/PrincipalApplications.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/PublicationValues.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Publications.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RoomGrantAuthorization.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RoomGrantChanges.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RoomGrantReads.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RoomGrantValues.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RoomInvitations.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RoomPermissions.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RoomPlanDigest.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RoomPlans.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RoomReads.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RoomReconciliation.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RuntimeContact.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RuntimeIncidents.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RuntimeObservations.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/RuntimeValues.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Sessions.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/Statistics.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/WakeChanges.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/WakeDeliveries.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/WakeNotices.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/WakePolicy.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Domain/WakeRules.cs	services/crossfire/rust/packages/domain	native library
+services/crossfire/csharp/packages/Crossfire.Kernel/Crossfire.Kernel.csproj	services/crossfire/rust/packages/kernel	native library
+services/crossfire/csharp/packages/Crossfire.Kernel/Identity.cs	services/crossfire/rust/packages/kernel	native library
+services/crossfire/csharp/packages/Crossfire.Kernel/IdentitySyntax.cs	services/crossfire/rust/packages/kernel	native library
+services/crossfire/csharp/packages/Crossfire.Kernel/ProtocolJson.cs	services/crossfire/rust/packages/kernel	native library
+services/crossfire/csharp/packages/Crossfire.Kernel/ProtocolWriter.cs	services/crossfire/rust/packages/kernel	native library
+services/crossfire/csharp/packages/Crossfire.Kernel/Result.cs	services/crossfire/rust/packages/kernel	native library
+services/crossfire/csharp/packages/Crossfire.Kernel/TextRules.cs	services/crossfire/rust/packages/kernel	native library
+services/crossfire/csharp/packages/Crossfire.Kernel/WireJson.cs	services/crossfire/rust/packages/kernel	native library
+services/crossfire/csharp/scripts/verify-runtime.mjs	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/csharp/scripts/verify.mjs	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ChatPublicationAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/Checks.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/CodexAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ConfigurationAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/Crossfire.Runtime.Tests.csproj	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/DeliveryAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/HistoryAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ListenerReportingAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ManualTime.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ModelAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/NativeValuesAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/OwnedCodexAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/OwnedPiAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/PiAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/PiProtocolAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/PiProvider.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ProcessAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/Program.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ProtocolAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ProtocolFixture.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/SignalAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/StatisticsAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/AgentAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/AuthenticationAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/CalendarAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/Checks.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/ContactAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/ContainerCommandAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/Crossfire.Storage.Tests.csproj	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/DbContext.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/DecisionAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/DiagnosticAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/DirectoryAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/DomainAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/EnrollmentAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/EnrollmentLifecycleAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/FilesystemAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/FleetAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/FleetChangesAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/FleetFixture.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/HttpAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/LoggingAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/MatrixAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/NativeEnrollmentAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/NativeServerAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/Program.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/PublicAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/PublicRequestBudgetAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/PublicationAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/ReconciliationAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/RoomAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/RoomGrantAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/RuntimeLifecycleAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/SchemaAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/ServerAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/StateLockAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/StatisticsAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/WakeAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/WireAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/calendar-cases.mjs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/calendar-parity.mjs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/matrix-parity.mjs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/native-time-zones.mjs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/schema-parity.mjs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/sqlite-parity.mjs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/state-lock-parity.mjs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/Dockerfile	services/crossfire/rust/Dockerfile	native container definition
+services/crossfire/node/apps/server/LICENSE	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/package.json	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/artifacts.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/bootstrap.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/composition.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/config.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/container-commands.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/container-health.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/container-lifecycle.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/container-package.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/container.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/content-server.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/database-upgrade.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/element-configuration.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/binary.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/bind.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/create-server.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/fleet-changes.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/matrix-directory.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/matrix-profile.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/public-request-budget.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/registration-page.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/registration.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/representation/enrollment.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/representation/fleet-map.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/representation/identity.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/representation/instance.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/representation/room.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/routes/agent.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/routes/enrollment.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/routes/fleet.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/routes/instance.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/routes/member.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/routes/publication.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/routes/room.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/routes/runtime.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/routes/session.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/routes/wake-up.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/http/transport.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/main.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/operator.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/router.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/standalone.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/apps/server/src/worker.ts	services/crossfire/rust/apps/server	application
+services/crossfire/node/packages/adapter-codex/LICENSE	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/package.json	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/admission.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/approval.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/authentication.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/capability.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/connection.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/context-migration.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/context-state.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/histories.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/home.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/input.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/instructions.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/observation.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/observed-event.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/owned-options.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/owned-process.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/owned.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/permission-policy.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/prerequisites.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/protocol.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/questions.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/reset.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/session.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/terminal.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/usage.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-codex/src/version.ts	services/crossfire/rust/packages/adapter-codex	native library
+services/crossfire/node/packages/adapter-crossfire/LICENSE	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/node/packages/adapter-crossfire/package.json	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/node/packages/adapter-crossfire/src/coordination.ts	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/node/packages/adapter-crossfire/src/fleet-control.ts	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/node/packages/adapter-crossfire/src/fleet-runtime.ts	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/node/packages/adapter-crossfire/src/listener-client.ts	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/node/packages/adapter-crossfire/src/listener-host.ts	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/node/packages/adapter-crossfire/src/listener-protocol.ts	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/node/packages/adapter-crossfire/src/listener.ts	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/node/packages/adapter-crossfire/src/room-access.ts	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/node/packages/adapter-crossfire/src/software.ts	services/crossfire/rust/packages/adapter-crossfire	native library
+services/crossfire/node/packages/adapter-filesystem/LICENSE	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/node/packages/adapter-filesystem/package.json	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/node/packages/adapter-filesystem/src/archive.ts	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/node/packages/adapter-filesystem/src/index.ts	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/node/packages/adapter-filesystem/src/lock.ts	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/node/packages/adapter-filesystem/src/logging.ts	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/node/packages/adapter-filesystem/src/project.ts	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/node/packages/adapter-filesystem/src/publication/source.ts	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/node/packages/adapter-filesystem/src/publication/store.ts	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/node/packages/adapter-filesystem/src/release.ts	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/node/packages/adapter-filesystem/src/state.ts	services/crossfire/rust/packages/adapter-filesystem	native library
+services/crossfire/node/packages/adapter-matrix/LICENSE	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/package.json	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/src/account/authority.ts	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/src/commands.ts	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/src/create-authority.ts	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/src/files.ts	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/src/http.ts	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/src/message.ts	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/src/operations.json	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/src/room/facts.ts	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/src/room/invitation.ts	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/src/room/owner-conversation.ts	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-matrix/src/schema.ts	services/crossfire/rust/packages/adapter-matrix	native library
+services/crossfire/node/packages/adapter-pi/LICENSE	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/native/owned-extension.mjs	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/package.json	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/admission.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/connection.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/errors.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/extension.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/histories.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/home.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/input.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/observation.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/options.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/owned.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/protocol.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/questions.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/receipt.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/state.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-pi/src/usage.ts	services/crossfire/rust/packages/adapter-pi	native library
+services/crossfire/node/packages/adapter-runtime/LICENSE	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/node/packages/adapter-runtime/package.json	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/node/packages/adapter-runtime/src/clock.ts	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/node/packages/adapter-runtime/src/delivery.ts	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/node/packages/adapter-runtime/src/journal.ts	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/node/packages/adapter-runtime/src/native-file.ts	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/node/packages/adapter-runtime/src/resumption.ts	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/node/packages/adapter-schedule/LICENSE	services/crossfire/rust/packages/adapter-schedule	native library
+services/crossfire/node/packages/adapter-schedule/package.json	services/crossfire/rust/packages/adapter-schedule	native library
+services/crossfire/node/packages/adapter-schedule/src/create-calculator.ts	services/crossfire/rust/packages/adapter-schedule	native library
+services/crossfire/node/packages/adapter-sqlite/LICENSE	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/package.json	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/create-repositories.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/open-store.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent-credential/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent-credential/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent-name/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent-name/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent-room-grant/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent-room-grant/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent-room-permission/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent-room-permission/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent-wake-sender/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent-wake-sender/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/agent/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/audit-event/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/audit-event/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/collection/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/directory/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/discovery/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/enrollment-controller-metadata/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/enrollment-controller-metadata/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/enrollment-item/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/enrollment-item/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/enrollment-request/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/enrollment-request/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet-connection/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet-controller-metadata/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet-controller-metadata/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet-credential/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet-credential/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet-instance/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet-instance/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet-message-delivery/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet-message/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet-policy/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet-runtime-operation/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/fleet/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/instance-policy/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/instance-policy/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/listener-read/admission.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/listener-read/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/listener-read/retirement.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/listener-run/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/listener-run/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/logging/cursor.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/logging/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/logging/operations.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/logging/runtime.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/logging/statistics.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/logging/workflows.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/member-invitation/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/member-invitation/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/member-session/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/member-session/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/member/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/member/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/native-stop/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/owner-conversation/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/permission/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/permission/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/principal-application/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/principal-application/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/principal-role/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/principal-role/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/principal/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/principal/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/publication/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/publication/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/role-permission/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/role-permission/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/role/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/role/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/room-grant-application/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/room-grant-application/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/room-grant-read/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/runtime/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/runtime/summaries.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/statistics/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/statistics/read.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/statistics/record.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/stored.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/wake-delivery/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/wake-notice/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/wake-notice/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/wake-rule-agent/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/wake-rule/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/repository/wake-rule/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/schema/tables.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/schema/validate-schema.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/unit-of-work.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/agent-core/LICENSE	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/package.json	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/activity.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/budget.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/chat-batches.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/chat-publication.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/control.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/coordination.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/decisions.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/delivery.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/diagnostic.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/history-page.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/history-query.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/listen.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/listener-activity.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/listener-control-port.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/listener-control.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/listener-maintenance.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/logging-maintenance.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/message-artifacts.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/origins.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/owned-runtime.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/owner-notices.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/owner-observation.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/port.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/receive.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/release.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/reset-history.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/runtime.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/scheduled.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/senders.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/statistics.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/steering-receipts.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/terminal.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-core/src/updates.ts	services/crossfire/rust/packages/agent-core	native library
+services/crossfire/node/packages/agent-tools/LICENSE	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/agent-tools/assets/README.md	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/agent-tools/assets/SKILL.md	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/agent-tools/assets/matrix-spec-LICENSE.txt	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/agent-tools/package.json	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/agent-tools/src/build.ts	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/agent-tools/src/entry.ts	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/agent-tools/src/history.ts	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/agent-tools/src/main.ts	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/agent-tools/src/output.ts	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/agent-tools/src/publish.ts	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/agent-tools/src/room-access.ts	services/crossfire/node/packages/agent-tools	intentional tool/library asset shared by all native targets
+services/crossfire/node/packages/client/LICENSE	services/crossfire/rust/packages/adapter-http	native library
+services/crossfire/node/packages/client/README.md	services/crossfire/rust/packages/adapter-http	native library
+services/crossfire/node/packages/client/package.json	services/crossfire/rust/packages/adapter-http	native library
+services/crossfire/node/packages/client/src/binary-request.ts	services/crossfire/rust/packages/adapter-http	native library
+services/crossfire/node/packages/client/src/client.ts	services/crossfire/rust/packages/adapter-http	native library
+services/crossfire/node/packages/client/src/matrix-login.ts	services/crossfire/rust/packages/adapter-http	native library
+services/crossfire/node/packages/contracts/LICENSE	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/package.json	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/activity.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/client.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/coordination-policy.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/fleet-control.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/fleet-runtime.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/json.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/limits.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/matrix-directory.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/matrix-room.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/matrix.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/notices.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/onboarding.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/origin.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/policy.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/publication.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/release.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/rest/binary.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/rest/envelope.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/rest/limits.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/rest/operation.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/rest/operations.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/room-plan.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/runtime.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/schema/controller.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/schema/fleet-map.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/schema/plan.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/schema/query.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/schema/request.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/schema/response.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/schema/validation.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/statistics.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/validation.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/wake-up.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/contracts/src/wake.ts	services/crossfire/rust/packages/contracts	native library
+services/crossfire/node/packages/domain/LICENSE	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/package.json	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/activity/types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/agent/change-agent.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/agent/delivery-policy.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/agent/read-agent.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/audit/read-events.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/audit/record-event.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/audit/types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/authorization/authorize.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/authorization/catalog.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/authorization/discover.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/authorization/read-scope.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/authorization/types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/coordination/values.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/capacity.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/decide.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/exchange.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/expire.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/input.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/introduce.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/item-view.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/overview.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/preflight.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/read-enrollment.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/rename.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/roster-digest.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/enrollment/types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/approve-fleet.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/authority.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/bind-roster.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/change-fleet.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/control-types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/control.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/coordination-policy.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/message.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/native-stop.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/policy.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/read-fleet.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/read-map.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/read-statistics.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/retire.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/runtime-types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/fleet/runtime.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/identity/display-name.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/identity/resolve-principals.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/identity/types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/listener/activity.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/listener/admission.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/listener/controller.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/listener/read-runs.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/listener/report.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/maintenance/logging.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/maintenance/reconcile.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/member/accept-invitation.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/member/change-member.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/member/invitation-authority.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/member/invitation.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/member/read-member.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/member/registration.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/notice/publish-notice.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/notice/request-notice.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/onboarding/values.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/owner-conversation/connect.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/owner-conversation/ensure.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/owner-conversation/protect.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/owner-conversation/types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/policy/change-policy.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/policy/read-policy.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/collection.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/directory.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/discovery.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/fleet-policy.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/listener-read.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/logging.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/matrix-authority.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/repositories.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/room-grant-read.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/room-operations.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/schedule.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/services.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/port/unit-of-work.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/principal/reconcile.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/principal/register.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/publication/authority.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/publication/commit.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/publication/create.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/publication/delete.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/publication/maintenance.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/publication/port.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/publication/read.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/publication/upload.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/publication/validation.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/publication/values.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room-access/accept-invitation.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room-access/assign-permissions.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room-access/authorize-change.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room-access/change-grant.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room-access/commit-change.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room-access/create-operations.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room-access/grant-plan.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room-access/read-grants.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room-access/reconcile-grant.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room-access/set-permission.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room-access/types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/room/read-room.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/runtime/decisions.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/runtime/fleet-failure.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/runtime/incidents.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/runtime/observations.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/runtime/summary.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/runtime/types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/runtime/values.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/session/authenticate.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/session/create-session.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/statistics/types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/wake-up/authority.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/wake-up/delivery.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/wake-up/manage.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/wake-up/read.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/wake-up/types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/wake/change-policy.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/wake/read-policy.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/wake/replace-policy.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/wake/resolve-policy.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/domain/src/wake/types.ts	services/crossfire/rust/packages/domain	native library
+services/crossfire/node/packages/kernel/LICENSE	services/crossfire/rust/packages/kernel	native library
+services/crossfire/node/packages/kernel/package.json	services/crossfire/rust/packages/kernel	native library
+services/crossfire/node/packages/kernel/src/bytes.ts	services/crossfire/rust/packages/kernel	native library
+services/crossfire/node/packages/kernel/src/fleet-map.ts	services/crossfire/rust/packages/kernel	native library
+services/crossfire/node/packages/kernel/src/lifecycle.ts	services/crossfire/rust/packages/kernel	native library
+services/crossfire/node/packages/kernel/src/logging.ts	services/crossfire/rust/packages/kernel	native library
+services/crossfire/node/packages/kernel/src/result.ts	services/crossfire/rust/packages/kernel	native library
+services/crossfire/node/packages/kernel/src/text.ts	services/crossfire/rust/packages/kernel	native library
+services/crossfire/node/packages/operator-support/LICENSE	services/crossfire/node/packages/operator-support	shared optional operator library; no native backend fallback
+services/crossfire/node/packages/operator-support/package.json	services/crossfire/node/packages/operator-support	shared optional operator library; no native backend fallback
+services/crossfire/node/packages/operator-support/src/collections.ts	services/crossfire/node/packages/operator-support	shared optional operator library; no native backend fallback
+services/crossfire/node/packages/operator-support/src/command.ts	services/crossfire/node/packages/operator-support	shared optional operator library; no native backend fallback
+services/crossfire/node/packages/operator-support/src/files.ts	services/crossfire/node/packages/operator-support	shared optional operator library; no native backend fallback
+services/crossfire/node/packages/operator-support/src/http.ts	services/crossfire/node/packages/operator-support	shared optional operator library; no native backend fallback
+services/crossfire/node/packages/operator-support/src/process.ts	services/crossfire/node/packages/operator-support	shared optional operator library; no native backend fallback
+services/crossfire/node/packages/test-support/LICENSE	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/package.json	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/cleanup.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/codex.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/contract-http.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/contract-pagination.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/contract-platform.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/contract-process.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/native-models.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/native-provider.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/pi-provider.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/pi.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/result.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/packages/test-support/src/tls.ts	services/crossfire/tests/contracts	shared executable-contract fixture; native internal fixtures remain target-owned
+services/crossfire/node/scripts/architecture-proof/access.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/codex-fixture.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/codex-rpc.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/codex-rpc.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/codex.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/conduit-assets.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/conduit-fixture.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/data-fixture.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/data.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/homeserver.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/installation.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/native-http.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/pi-assets.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/architecture-proof/runtime.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/build-release.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/build-web.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/codex-history.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/codex.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/container-configuration.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/container-package-tool.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/container-packages.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/control.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/generate-matrix-api.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/listen-batching.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/listen.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/listener-activity.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/listener-permissions.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/listener-recovery.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/listener-senders.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/matrix-api.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/message.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/native-tests/codex.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/native-tests/permissions.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/package-containers.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/receive.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/test-clock.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/test-support/clock.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/test-support/codex-runtime.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/test-support/listener.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/test-support/native-codex.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/test-support/native-engine.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/test-support/release.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/test-support/terminal.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/time-zones.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/verify-architecture.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/tests/activity.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/agent-directory.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/agent-name-migration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/architecture.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/artifacts.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/bootstrap.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/canonical-domain.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/canonical-http.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/canonical-schema.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/catalog.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/chat-publication.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/cleanup.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/client-build.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/client-state.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/clock.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/codex-fixture.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/codex-owned-options.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/codex-permissions.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/codex-process-restart.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/codex-resumption-files.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/codex-resumption-retry.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/codex-resumption.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/codex-version.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/connection-flow.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/container-health.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/container-package.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/container-removal.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/context-migration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/contract-process.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/contracts.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/controller-authority.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/controller-software.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/cookie-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/cookie-security.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/data.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/delivery-journal.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/editable-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/editable.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/element-assets.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/element-configuration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/element-thinking.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/enrollment-capacity.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/enrollment-migration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/enrollment-rename.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet-control-connection.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet-control.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet-coordination.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet-directory.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet-domain.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet-map.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet-policy-migration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet-runtime-migration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet-runtime-worker.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet-stop.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/fleet.integration.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/history-files.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/http.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/knex-migration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/lifecycle.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/listener-admission.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/listener-diagnostic.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/listener-fleet-control.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/listener-host.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/listener-invitation.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/listener-maintenance.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/listener-priority.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/listener-updates.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/logging-files.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/logging-retention.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/management-confirmation-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/management-policy-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/management-read-models.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/management-runtime-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/management-sleep-duration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/management.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/matrix-directory.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/matrix-profile.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/mention-steering-native.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-admission.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-attachment.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-authentication.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-core.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-delivery.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-instructions.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-owned-runtime.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-owner-conversation.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-prerequisites.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-protocol.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-publication.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-settings.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/native-unix-attachment.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/onboarding.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/operator-api.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/operator-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/operator-database.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/operator-fleet-wake.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/operator-support.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/operator.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/owner-conversation.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/pi-codecs.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/pi-owned-runtime.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/process-lock.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/public-request-budget.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/publication-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/publication-client.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/publication-config.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/publication-filesystem.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/publication-http.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/publication.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/query-plans.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/registration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/release-awareness.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/release-fixture.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/reports-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/retirement.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/room-invitation-authority.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/room-invitation.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/room-operations.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/room-scope.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/router.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/runtime-context-state.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/runtime-decisions.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/runtime-history.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/runtime-observation.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/schedule.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/scheduled-publisher.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/schema-assets.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/schema-migration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/sender-identities.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/service-lifecycle.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/statistics.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/steering-receipts.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/storage-capacity.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/application.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/architecture.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/browser-controller.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/confirmation.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/connect-browser.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/deployed-migration.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/element.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/http.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/lock-owner.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/map-fleet.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/matrix-authority.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/native-application.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/native-server.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/onboarding-browser.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/operator.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/owner-session.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/public-fleet.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/publication.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/release.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/schema13.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/schema14.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/schema15.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/schema16.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/storage.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/terminal-pointer.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/time-zone-assets.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/transport.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/usage-migration.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/wake-people.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/wake-picker-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/wake-query-plans.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/wake-state.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/wake-up-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/wake-up-native.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/wake-up.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/web-build.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tools/README.md	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/auth.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/browser/content.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/browser/layout.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/browser/verify.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/browser/views.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/browser/wake-picker.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/database-retention.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/database.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/enrollment.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/fleet-wake.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/host.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/main.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/release.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tools/server.ts	services/crossfire/node/tools	shared optional operator CLI; no duplicated native implementation
+services/crossfire/node/tsconfig.architecture.json	Cargo.toml	target compiler configuration
+services/crossfire/node/tsconfig.json	Cargo.toml	target compiler configuration
+services/fleet/csharp/apps/Fleet.Cli/CommandValues.cs	services/fleet/rust/apps/cli	application
+services/fleet/csharp/apps/Fleet.Cli/Commands.cs	services/fleet/rust/apps/cli	application
+services/fleet/csharp/apps/Fleet.Cli/Connections.cs	services/fleet/rust/apps/cli	application
+services/fleet/csharp/apps/Fleet.Cli/DaemonLauncher.cs	services/fleet/rust/apps/cli	application
+services/fleet/csharp/apps/Fleet.Cli/Fleet.Cli.csproj	services/fleet/rust/apps/cli	application
+services/fleet/csharp/apps/Fleet.Cli/Operations.cs	services/fleet/rust/apps/cli	application
+services/fleet/csharp/apps/Fleet.Cli/Program.cs	services/fleet/rust/apps/cli	application
+services/fleet/csharp/apps/Fleet.Cli/Setup.cs	services/fleet/rust/apps/cli	application
+services/fleet/csharp/packages/Fleet.DaemonClient/DaemonClient.cs	services/fleet/rust/packages/daemon-client	native library
+services/fleet/csharp/packages/Fleet.DaemonClient/Fleet.DaemonClient.csproj	services/fleet/rust/packages/daemon-client	native library
+services/fleet/csharp/packages/Fleet.SshTransport/Fleet.SshTransport.csproj	services/fleet/rust/packages/ssh-transport	native library
+services/fleet/csharp/packages/Fleet.SshTransport/SshTunnel.cs	services/fleet/rust/packages/ssh-transport	native library
+services/fleet/node/apps/cli/LICENSE	services/fleet/rust/apps/cli	application
+services/fleet/node/apps/cli/package.json	services/fleet/rust/apps/cli	application
+services/fleet/node/apps/cli/src/attachment.ts	services/fleet/rust/apps/cli	application
+services/fleet/node/apps/cli/src/configuration.ts	services/fleet/rust/apps/cli	application
+services/fleet/node/apps/cli/src/daemon.ts	services/fleet/rust/apps/cli	application
+services/fleet/node/apps/cli/src/main.ts	services/fleet/rust/apps/cli	application
+services/fleet/node/apps/cli/src/operation.ts	services/fleet/rust/apps/cli	application
+services/fleet/node/apps/cli/src/setup-descriptor.ts	services/fleet/rust/apps/cli	application
+services/fleet/node/apps/cli/src/setup.ts	services/fleet/rust/apps/cli	application
+services/fleet/node/packages/daemon-client/LICENSE	services/fleet/rust/packages/daemon-client	native library
+services/fleet/node/packages/daemon-client/package.json	services/fleet/rust/packages/daemon-client	native library
+services/fleet/node/packages/daemon-client/src/client.ts	services/fleet/rust/packages/daemon-client	native library
+services/fleet/node/packages/ssh-transport/LICENSE	services/fleet/rust/packages/ssh-transport	native library
+services/fleet/node/packages/ssh-transport/package.json	services/fleet/rust/packages/ssh-transport	native library
+services/fleet/node/packages/ssh-transport/src/host.ts	services/fleet/rust/packages/ssh-transport	native library
+services/fleet/node/packages/ssh-transport/src/terminal.ts	services/fleet/rust/packages/ssh-transport	native library
+services/fleet/node/packages/ssh-transport/src/tunnel.ts	services/fleet/rust/packages/ssh-transport	native library
+services/fleet/node/scripts/build-package.mjs	scripts/publish-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/fleet/node/tests/attachment.test.ts	services/fleet/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleet/node/tests/cli.test.ts	services/fleet/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleet/node/tests/installed-entrypoints.test.ts	services/fleet/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleet/node/tests/session-commands.test.ts	services/fleet/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleet/node/tests/setup-descriptor.test.ts	services/fleet/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleet/node/tests/ssh.test.ts	services/fleet/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleet/node/tsconfig.json	Cargo.toml	target compiler configuration
+services/fleetd/csharp/apps/Fleetd.Daemon/ControllerContextMigration.cs	services/fleetd/rust/apps/daemon	application
+services/fleetd/csharp/apps/Fleetd.Daemon/DaemonApi.cs	services/fleetd/rust/apps/daemon	application
+services/fleetd/csharp/apps/Fleetd.Daemon/DaemonHost.cs	services/fleetd/rust/apps/daemon	application
+services/fleetd/csharp/apps/Fleetd.Daemon/Fleetd.Daemon.csproj	services/fleetd/rust/apps/daemon	application
+services/fleetd/csharp/apps/Fleetd.Daemon/Program.cs	services/fleetd/rust/apps/daemon	application
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Enrollment.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/ExecutionHost.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/FleetReports.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Fleetd.AdapterExecution.csproj	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/InstanceReset.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/ProjectFiles.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/RunningInstance.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/RuntimeStartScope.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.Contracts/DaemonOperations.g.cs	services/fleetd/rust/packages/contracts	native library
+services/fleetd/csharp/packages/Fleetd.Contracts/FleetConfigurationContract.cs	services/fleetd/rust/packages/contracts	native library
+services/fleetd/csharp/packages/Fleetd.Contracts/FleetWire.cs	services/fleetd/rust/packages/contracts	native library
+services/fleetd/csharp/packages/Fleetd.Contracts/Fleetd.Contracts.csproj	services/fleetd/rust/packages/contracts	native library
+services/fleetd/csharp/packages/Fleetd.Contracts/OperationContract.cs	services/fleetd/rust/packages/contracts	native library
+services/fleetd/csharp/packages/Fleetd.Domain/ControllerOperations.cs	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Domain/ControllerRecovery.cs	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Domain/ControllerSetup.cs	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Domain/FleetController.cs	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Domain/Fleetd.Domain.csproj	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Domain/Models.cs	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Domain/NativeLifecycle.cs	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Domain/NativeLogicalConnection.cs	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Domain/ResumeTasks.cs	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Storage/ConfigurationFiles.cs	services/fleetd/rust/packages/storage	native library
+services/fleetd/csharp/packages/Fleetd.Storage/FleetBinding.cs	services/fleetd/rust/packages/storage	native library
+services/fleetd/csharp/packages/Fleetd.Storage/Fleetd.Storage.csproj	services/fleetd/rust/packages/storage	native library
+services/fleetd/csharp/packages/Fleetd.Storage/ProfileMigration.cs	services/fleetd/rust/packages/storage	native library
+services/fleetd/csharp/packages/Fleetd.Storage/RegistryFiles.cs	services/fleetd/rust/packages/storage	native library
+services/fleetd/csharp/packages/Fleetd.Storage/ResumeFiles.cs	services/fleetd/rust/packages/storage	native library
+services/fleetd/csharp/packages/Fleetd.Storage/SetupFiles.cs	services/fleetd/rust/packages/storage	native library
+services/fleetd/csharp/tests/Fleetd.Domain.Tests/ControllerFixture.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Domain.Tests/Fleetd.Domain.Tests.csproj	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Domain.Tests/Program.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/apps/daemon/LICENSE	services/fleetd/rust/apps/daemon	application
+services/fleetd/node/apps/daemon/package.json	services/fleetd/rust/apps/daemon	application
+services/fleetd/node/apps/daemon/src/context-migration.ts	services/fleetd/rust/apps/daemon	application
+services/fleetd/node/apps/daemon/src/http.ts	services/fleetd/rust/apps/daemon	application
+services/fleetd/node/apps/daemon/src/main.ts	services/fleetd/rust/apps/daemon	application
+services/fleetd/node/packages/adapter-execution/LICENSE	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/node/packages/adapter-execution/package.json	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/node/packages/adapter-execution/src/enrollment.ts	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/node/packages/adapter-execution/src/execution.ts	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/node/packages/adapter-execution/src/failures.ts	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/node/packages/adapter-execution/src/native-stops.ts	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/node/packages/adapter-execution/src/reset.ts	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/node/packages/contracts/LICENSE	services/fleetd/rust/packages/contracts	native library
+services/fleetd/node/packages/contracts/package.json	services/fleetd/rust/packages/contracts	native library
+services/fleetd/node/packages/contracts/src/api.ts	services/fleetd/rust/packages/contracts	native library
+services/fleetd/node/packages/contracts/src/attachment.ts	services/fleetd/rust/packages/contracts	native library
+services/fleetd/node/packages/contracts/src/configuration.ts	services/fleetd/rust/packages/contracts	native library
+services/fleetd/node/packages/contracts/src/setup.ts	services/fleetd/rust/packages/contracts	native library
+services/fleetd/node/packages/domain/LICENSE	services/fleetd/rust/packages/domain	native library
+services/fleetd/node/packages/domain/package.json	services/fleetd/rust/packages/domain	native library
+services/fleetd/node/packages/domain/src/controller.ts	services/fleetd/rust/packages/domain	native library
+services/fleetd/node/packages/domain/src/model.ts	services/fleetd/rust/packages/domain	native library
+services/fleetd/node/packages/domain/src/native-lifecycle.ts	services/fleetd/rust/packages/domain	native library
+services/fleetd/node/packages/domain/src/operation-history.ts	services/fleetd/rust/packages/domain	native library
+services/fleetd/node/packages/domain/src/port.ts	services/fleetd/rust/packages/domain	native library
+services/fleetd/node/packages/domain/src/resume-selection.ts	services/fleetd/rust/packages/domain	native library
+services/fleetd/node/packages/domain/src/resume-work.ts	services/fleetd/rust/packages/domain	native library
+services/fleetd/node/packages/domain/src/setup.ts	services/fleetd/rust/packages/domain	native library
+services/fleetd/node/packages/storage/LICENSE	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/package.json	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/binding.ts	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/configuration.ts	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/controller-root.ts	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/history.ts	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/logging.ts	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/operation.ts	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/profile-migration.ts	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/registry.ts	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/resume-selection.ts	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/resume-work.ts	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/packages/storage/src/setup.ts	services/fleetd/rust/packages/storage	native library
+services/fleetd/node/scripts/build-package.mjs	scripts/publish-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/fleetd/node/tests/context-migration.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/controller.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/coordination.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/enrollment-recovery.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/execution-validation.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/failures.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/history-initialization.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/logging-retention.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/native-lifecycle-integration.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/native-lifecycle.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/native-recovery-order.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/native-stops.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/observation-migration.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/operator-tools.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/pi-lifecycle-integration.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/pi-provider-acceptance.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/profile-migration.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/registry-intent.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/resume-authority.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/resume-work.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/setup-controller.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/setup-storage.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tests/toml.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/node/tools/README.md	services/fleetd/node/tools	shared optional operator CLI; no duplicated native implementation
+services/fleetd/node/tools/main.ts	services/fleetd/node/tools	shared optional operator CLI; no duplicated native implementation
+services/fleetd/node/tools/observation-migration.ts	services/fleetd/node/tools	shared optional operator CLI; no duplicated native implementation
+services/fleetd/node/tools/pi-provider-acceptance.ts	services/fleetd/node/tools	shared optional operator CLI; no duplicated native implementation
+services/fleetd/node/tools/runtime/codex.ts	services/fleetd/node/tools	shared optional operator CLI; no duplicated native implementation
+services/fleetd/node/tools/runtime/inspect.ts	services/fleetd/node/tools	shared optional operator CLI; no duplicated native implementation
+services/fleetd/node/tools/runtime/types.ts	services/fleetd/node/tools	shared optional operator CLI; no duplicated native implementation
+services/fleetd/node/tools/verify.ts	services/fleetd/node/tools	shared optional operator CLI; no duplicated native implementation
+services/fleetd/node/tsconfig.json	Cargo.toml	target compiler configuration

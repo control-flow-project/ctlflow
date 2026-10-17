@@ -22,6 +22,13 @@ is reused on repeated setup; an explicitly stopped binding stays stopped.
 
 ## Prerequisites
 
+Install the selected Fleet/fleetd implementation first. Node npm packages and
+the managed, NativeAOT and Rust distributions have separate installation guides.
+The setup command and product configuration are shared; native Fleet selects
+its sibling controller, not a different implementation on PATH.
+
+- [Installation and packaging by target](https://github.com/control-flow-project/crossfire/blob/main/docs/distributions/README.md)
+
 The host must already have the selected native runtime and provider login.
 Codex is the default. Pi requires an explicit ordinary roster and verified native
 1.0.0. Setup reports missing prerequisites; it does not silently upgrade a runtime,

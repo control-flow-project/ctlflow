@@ -14,8 +14,12 @@ Crossfire owns remote authorization and coordination, not local process control.
 - [Private storage and conversions](docs/storage.md)
 - [Operator inspection](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/node/tools/README.md)
 - [Fleet CLI](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/README.md)
+- [Node package installation](https://github.com/control-flow-project/crossfire/blob/main/docs/distributions/node.md)
+- [C# managed installation](https://github.com/control-flow-project/crossfire/blob/main/docs/distributions/csharp-managed.md)
+- [C# NativeAOT installation](https://github.com/control-flow-project/crossfire/blob/main/docs/distributions/csharp-nativeaot.md)
+- [Rust installation](https://github.com/control-flow-project/crossfire/blob/main/docs/distributions/rust.md)
 
-Node source is under `node/`; C# source under `csharp/`.
+Node source is under `node/`, C# under `csharp/` and Rust under `rust/`.
 The shared external bank is under `tests/contracts/`.
 Only this product and Fleet may be publicly distributed through npm;
 internal workspaces remain private.

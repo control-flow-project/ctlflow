@@ -22,7 +22,22 @@ public static class WireAcceptance
         Equal(ProtocolJson.Quote("\ud800"), "\"\\ud800\"", "unpaired high surrogate uses JSON escape");
         Equal(ProtocolJson.Quote("\udfff"), "\"\\udfff\"", "unpaired low surrogate uses JSON escape");
         using var surrogate = JsonDocument.Parse("\"\\ud800\\udfff\\ud800 x\\udfff\"");
-        Equal(Validation.Text(surrogate.RootElement).Value, "\ud800\udfff\ud800 x\udfff", "JSON input preserves paired and unpaired UTF-16 exactly for canonical digests");
+        Equal(Validation.Text(surrogate.RootElement).Error.Code, "invalid", "wire admission rejects unpaired UTF-16 instead of silently substituting another value");
+        Equal(Validation.Json(surrogate.RootElement), false, "malformed native strings cannot enter canonical JSON inputs");
+        using var paired = JsonDocument.Parse("\"\\ud83d\\ude00\"");
+        Equal(Validation.Text(paired.RootElement).Value, "😀", "paired Unicode remains valid wire text");
+        foreach (var (value, maximum, expected) in new[] { ("a🚀b", 2, "a"), ("a🚀b", 3, "a🚀"), ("🚀", 0, ""), ("🚀", 1, ""), ("🚀", 2, "🚀") })
+            Equal(TextRules.TruncateUtf16(value, maximum), expected, "UTF-16 bounds preserve whole Unicode scalars");
+        foreach (var (value, maximum, expected) in new[] { ("a🚀b", 4, "a"), ("a🚀b", 5, "a🚀"), ("éé", 3, "é"), ("東京", 5, "東"), ("🚀", 0, ""), ("🚀", 4, "🚀") })
+            Equal(TextRules.TruncateUtf8(value, maximum), expected, "byte bounds preserve whole UTF-8 scalars");
+        foreach (var malformed in new byte[][] { [0x80], [0xc0, 0xaf], [0xe2, 0x82], [0xed, 0xa0, 0x80], [0xf4, 0x90, 0x80, 0x80] })
+        {
+            byte[] bytes = [.. System.Text.Encoding.UTF8.GetBytes("{\"text\":\""), .. malformed, .. System.Text.Encoding.UTF8.GetBytes("\"}")];
+            var rejected = false;
+            try { rejected = !Validation.Json(WireJson.Parse(bytes)); }
+            catch (Exception error) when (error is JsonException or InvalidOperationException or ArgumentException) { rejected = true; }
+            Equal(rejected, true, "malformed UTF-8 cannot become replacement text in native JSON");
+        }
         Equal(ProtocolJson.Unquote("\"\\uD800\\n\\t\\\"\\\\\\/\"").Value, "\ud800\n\t\"\\/", "JSON string decoding owns every escape without surrogate substitution");
         Equal(ProtocolJson.Unquote("\"\\uQQQQ\"").Error.Code, "invalid", "malformed Unicode escape is a typed failure");
         Equal(ProtocolJson.Unquote("\"\\x\"").Error.Code, "invalid", "non-JSON escape is a typed failure");

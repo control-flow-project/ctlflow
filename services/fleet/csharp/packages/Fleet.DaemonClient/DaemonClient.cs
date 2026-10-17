@@ -15,13 +15,13 @@ public sealed class DaemonClient : IDisposable
     private readonly OperationClient client;
     public DaemonClient(string socket)
     {
-        var handler = new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false, AutomaticDecompression = DecompressionMethods.None, ConnectTimeout = TimeSpan.FromSeconds(15),
+        var handler = new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false, UseProxy = false, AutomaticDecompression = DecompressionMethods.None, ConnectTimeout = TimeSpan.FromSeconds(15),
             ConnectCallback = async (_, cancellation) =>
             {
                 PrivateFiles.UnixSocket(socket); var connection = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
                 try { await connection.ConnectAsync(new UnixDomainSocketEndPoint(socket), cancellation); return new NetworkStream(connection, true); } catch { connection.Dispose(); throw; }
             } };
-        http = new(handler) { Timeout = Timeout.InfiniteTimeSpan }; client = new(http, "http://localhost", () => null, DaemonOperations.All, 120000);
+        http = new(handler) { Timeout = Timeout.InfiniteTimeSpan }; client = new(http, "http://localhost", () => null, DaemonOperations.All, 120000, 16777216);
     }
     public async ValueTask<Result<JsonElement>> Call(string operation, IReadOnlyDictionary<string, string>? parameters, JsonElement? input, CancellationToken cancellation, IReadOnlyDictionary<string, string>? query = null)
     {

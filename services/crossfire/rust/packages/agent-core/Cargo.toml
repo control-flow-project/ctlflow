@@ -1,0 +1,24 @@
+[package]
+name = "crossfire-agent-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+publish.workspace = true
+
+[dependencies]
+crossfire-kernel.workspace = true
+crossfire-domain.workspace = true
+crossfire-contracts.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true

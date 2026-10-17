@@ -1,0 +1,50 @@
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, renameSync, rmSync, cpSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { timeZoneSource, prepareTimeZones } from '../node/scripts/time-zones.ts';
+
+const pin=timeZoneSource();
+const sourceNames=['africa','antarctica','asia','australasia','europe','northamerica','southamerica','etcetera','factory','backward'];
+export function timezoneCatalogue(version,sources) {
+  const zones=new Map(),links=new Map();
+  for(const source of sources)for(const line of source.split('\n')){
+    const fields=line.trim().split(/\s+/u);
+    if(fields[0]==='Zone'){
+      assert(fields[1]&&!zones.has(fields[1])&&!links.has(fields[1]),'Distinct IANA zone names');
+      zones.set(fields[1],fields[1]);
+    }
+    if(fields[0]==='Link'){
+      assert(fields[1]&&fields[2]&&!zones.has(fields[2])&&!links.has(fields[2]),'Distinct IANA link names');
+      links.set(fields[2],fields[1]);
+    }
+  }
+  assert(zones.size>0,'The IANA catalogue must contain canonical zones');
+  for(const [alias,target] of links){
+    let current=target;const seen=new Set([alias]);
+    while(links.has(current)){assert(!seen.has(current),'IANA link cycle');seen.add(current);current=links.get(current);}
+    assert(zones.has(current),'Unknown IANA canonical link target');zones.set(alias,current);
+  }
+  return {version,zones:[...zones].sort((first,second)=>first[0].toLowerCase()<second[0].toLowerCase()?-1:1)};
+}
+export async function prepareTimezones() {
+  assert.equal(pin.version,process.versions.tz,'Native timezones match the selected common Node ICU');
+  const root=fileURLToPath(new URL('../../../',import.meta.url)),parent=join(root,'.temp');mkdirSync(parent,{recursive:true,mode:0o700});
+  const output=join(parent,'native-timezones-'+pin.version);
+  if(existsSync(output)){assert.equal(readFileSync(join(output,'version'),'utf8').trim(),pin.version);assert.equal(readFileSync(join(output,'source.sha256'),'utf8').trim(),pin.sha256);assert.equal(JSON.parse(readFileSync(join(output,'catalogue.json'),'utf8')).version,pin.version);return output;}
+  const stage=mkdtempSync(join(parent,'tz-'));
+  try {
+    const response=await fetch(pin.url,{redirect:'error',signal:AbortSignal.timeout(30000)});assert(response.ok&&response.body,'Pinned IANA archive must be available');
+    const chunks=[];let count=0;for await(const bytes of response.body){count+=bytes.length;assert(count<=8*1024*1024,'Bounded IANA archive');chunks.push(bytes);}
+    const archive=Buffer.concat(chunks);assert.equal(createHash('sha256').update(archive).digest('hex'),pin.sha256,'Exact pinned IANA archive');writeFileSync(join(stage,'source.tar.gz'),archive);
+    const source=join(stage,'source'),compiled=join(stage,'compiled');mkdirSync(source);
+    execFileSync('tar',['-xzf',join(stage,'source.tar.gz'),'--no-same-owner','--no-same-permissions','-C',source],{timeout:10000,stdio:'pipe'});
+    assert.equal(readFileSync(join(source,'version'),'utf8').trim(),pin.version);
+    await prepareTimeZones(compiled,async()=>new Response(archive));
+    writeFileSync(join(compiled,'catalogue.json'),JSON.stringify(timezoneCatalogue(pin.version,sourceNames.map(name=>readFileSync(join(source,name),'utf8'))))+'\n');
+    cpSync(join(source,'version'),join(compiled,'version'));writeFileSync(join(compiled,'source.sha256'),pin.sha256+'\n');
+    assert(existsSync(join(compiled,'Asia/Calcutta'))&&existsSync(join(compiled,'Etc/UTC')),'Historical and canonical aliases are compiled');renameSync(compiled,output);return output;
+  } finally {rmSync(stage,{recursive:true,force:true});}
+}

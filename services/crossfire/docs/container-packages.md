@@ -3,12 +3,11 @@
 Crossfire packages a selected server backend and the common Knex migration image.
 The deployment host needs rootless Docker and an installed Crossfire operator;
 it does not build source or install that server backend's language runtime.
-Node and C# operators consume the same format and can run either server backend.
+Node, C# and Rust operators consume the same format and can run any server backend.
 The operator's implementation does not select the server's implementation.
 
-Current build targets are Node, C# managed and C# NativeAOT on Linux amd64.
-Rust's separate implementation must adopt this format and the shared test bank
-before its image is advertised. There is no placeholder Rust image.
+Build targets are Node, C# managed, C# NativeAOT and Rust on Linux amd64.
+The Rust image contains its native server, not a substituted Node process.
 These packages do not provide native macOS/Windows fleetd or ARM64 images.
 C# fleetd currently has Linux-specific process/filesystem adapters.
 Image construction and native calendar verification compile the same pinned IANA
@@ -24,13 +23,14 @@ npm run package:containers -- --output /absolute/new-packages
 
 An optional `--cgroup-parent EXISTING.slice` selects an existing bounded Docker
 slice. Verification always supplies its verified finite resource slice. The build
-constructs common assets/migrations once, then the three runtime images:
+constructs cached common assets/migrations, then the four runtime images:
 
 ```text
 new-packages/
   node/{release.json,images.tar,package-tool.mjs}
   csharp-managed/{release.json,images.tar,package-tool.mjs}
   csharp-nativeaot/{release.json,images.tar,package-tool.mjs}
+  rust/{release.json,images.tar,package-tool.mjs}
 ```
 
 Each directory transfers independently. The archive contains one runtime image
@@ -63,7 +63,7 @@ code; the archive checksum is not authentication of this helper.
 | migrationImage | Different exact Docker sha256 image ID |
 
 `images.tar` is a regular Docker-save archive, nonempty and at most 16 GiB.
-Both operators verify the archive even when images are cached, load it when
+All three operators verify the archive even when images are cached, load it when
 required, and inspect exact image IDs/platform/labels before stopping any writer.
 Required labels are org.crossfire.package=1, org.opencontainers.image.version,
 org.crossfire.source and org.crossfire.backend. The migration backend is migrations;
@@ -92,7 +92,7 @@ Retain the existing private state and configuration. For an initialized instance
   --port 8080 --content-port 8082
 ```
 
-The Node operator accepts the identical start options. Select another package
+The Node and Rust operators accept the identical start options. Select another package
 directory to select another backend. The same directory lock, exact container
 ownership checks, writer shutdown, verified pre-migration backup and one-shot Knex
 migration run before activation. A failed phase blocks subsequent phases.
@@ -102,7 +102,7 @@ Switching backends never authorizes a schema downgrade or production reset.
 
 Shutdown confirms the absence of each exact owned container ID. If Docker is
 already removing it, the operator observes completion rather than issuing
-competing stop/delete requests. Both implementations use a two-minute complete
+competing stop/delete requests. All three implementations use a two-minute complete
 cleanup bound and retain failures when absence cannot be established. The shared
 container harness gives operators three minutes to finish stop, detach and cleanup;
 the ordinary process default remains ten seconds. This is not a cleanup waiver.
@@ -171,8 +171,13 @@ selection, runs image-owned readiness probes, tests transfer/import and rejects
 corrupt archives/mismatched labels before touching a running instance.
 The ordinary installed-products and historical migration banks remain required.
 
-The Rust owner must provide a service-owned Dockerfile using the same common asset
-image, produce the required labels/health/entrypoint/filesystem surface, add the
-real build target to containerBackends and execute this existing matrix with the
-actual Rust distribution. Do not add a Node process as Rust's server, a second UI,
-a second schema or an unverified advertised package.
+The root packaging coordinator composes the unchanged Node/C# builder with the
+Rust-owned image producer. Rust reuses the common asset/migration Dockerfile,
+package exporter and label validation; only its runtime build is target-owned.
+The same container assertion bank covers all selected distributions. Rust's
+separate release gate runs its actual image through this bank; the full matrix
+also crosses all installed operators and backend packages. A passing build is not
+an end-to-end certification; current evidence and unresolved owner findings are
+recorded in the native review.
+
+- [Rust integration review](../../../docs/architecture/rust-review.md)

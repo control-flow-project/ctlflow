@@ -117,8 +117,8 @@ public sealed class ChatPublication
                 if (received.Value) { plan.Steps[index] = step with { Status = "delivered" }; Save(); count(events.Count(value => value.Type == "m.room.message")); traffic(events); continue; }
             }
             remaining = events.Where(value => allowed.Contains(value.RoomId) && admit(value)).ToArray(); if (remaining.Length != events.Count) { Replace(index, step, remaining); index--; continue; }
-            step = step with { Session = target.SessionId, Status = "publishing" }; plan.Steps[index] = step; Save();
             if (priority is not null) { var settled = await target.Settle(cancellation); if (!settled.IsSuccess) return Result<PublicationOutcome?>.Fail(settled.Error); }
+            step = step with { Session = target.SessionId, Status = "publishing" }; plan.Steps[index] = step; Save();
             var published = await target.Deliver(step.Text, step.Id, cancellation, priority); if (!published.IsSuccess) return Result<PublicationOutcome?>.Fail(published.Error);
             plan.Steps[index] = step with { Status = "delivered" }; Save(); count(events.Count(value => value.Type == "m.room.message")); traffic(events);
             var room = events.LastOrDefault(value => value.Type == "m.room.message")?.RoomId; if (room is not null) { var noted = await delivered(room, target.SessionId); if (!noted.IsSuccess) return Result<PublicationOutcome?>.Fail(noted.Error); }

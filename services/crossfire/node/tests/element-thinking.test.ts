@@ -10,7 +10,7 @@ import { value } from './support/application.js';
 import { elementAssets } from './support/element.js';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
-import { browserOptions } from './support/tls.js';
+import { browserOptions } from '@ctlflow/crossfire-test-support/tls';
 
 test('stock Element uses Crossfire English activity wording', { timeout: 120000 }, async scope => {
   const { origin, native, member } = await nativeServer(scope, await releaseFixture(), {}, elementAssets());

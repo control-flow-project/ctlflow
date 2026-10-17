@@ -4,7 +4,8 @@
 
 Use Linux, an installed Crossfire operator and an existing rootless Docker engine.
 The Node operator needs Node.js 26+. Packaged C# operators include their runtime
-or are NativeAOT. The selected Docker package carries the server dependencies.
+or are NativeAOT. Rust operators are native executables. Select Node, C# managed,
+C# NativeAOT or Rust explicitly. The selected Docker package carries the server dependencies.
 Source builds additionally need npm 11.17+, Git and the pinned .NET/native tools.
 Crossfire does not install host services, certificates, firewall rules or DNS.
 
@@ -12,12 +13,16 @@ Build the selected checkout inside the finite resource scope described in the
 development guide. Do not use an active test output tree for deployment.
 
 - [Development prerequisites](../../../docs/development.md)
+- [Node installation and packaging](../../../docs/distributions/node.md)
+- [C# managed installation and packaging](../../../docs/distributions/csharp-managed.md)
+- [C# NativeAOT installation and packaging](../../../docs/distributions/csharp-nativeaot.md)
+- [Rust installation and packaging](../../../docs/distributions/rust.md)
 - [C# operator](../csharp/README.md)
 - [Build and transfer Docker packages](container-packages.md)
 
 ## Initialize a local instance
 
-From `services/crossfire`:
+For the Node source installation, from `services/crossfire`:
 
 ```sh
 node crossfire init --directory /absolute/private/crossfire-state \
@@ -27,6 +32,10 @@ node crossfire init --directory /absolute/private/crossfire-state \
 ./start.sh --directory /absolute/private/crossfire-state \
   --package /absolute/packages/node --port 8098 --content-port 8099
 ```
+
+The other guides use their installed native operator with an explicit package.
+The package selects the runtime backend independently of the operator's language.
+The deployment host does not need a source checkout or build toolchain.
 
 Initialization refuses a nonempty directory. The initial password is the
 `administratorPassword` value in private `bootstrap.json`.

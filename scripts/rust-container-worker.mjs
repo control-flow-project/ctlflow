@@ -1,0 +1,30 @@
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { isAbsolute, join } from 'node:path';
+import { verifyTestResources } from './test-resources.mjs';
+import { containerStack } from '../services/crossfire/dist/tests/contracts/container-fixture.js';
+import { serverContracts } from '../services/crossfire/dist/tests/contracts/server.contract.js';
+import { browserContracts } from '../services/crossfire/dist/tests/contracts/browser.contract.js';
+import { containerContracts } from '../services/crossfire/dist/tests/contracts/container.contract.js';
+import { containerRecoveryContracts } from '../services/crossfire/dist/tests/contracts/container-recovery.contract.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { buildRustContainerPackage } from '../services/crossfire/rust/scripts/container-packages.mjs';
+
+verifyTestResources();
+const distribution = process.env.CROSSFIRE_RUST_DISTRIBUTION;
+if (!distribution || !isAbsolute(distribution) || !process.env.CROSSFIRE_TEST_CGROUP_PARENT) throw new Error('Use the bounded Rust container coordinator');
+const command = product => ({ binary: join(distribution, product === 'server' ? 'crossfire/crossfire' : product === 'daemon' ? 'fleetd/fleetd' : 'fleet/fleet'), arguments: [] });
+const target = { name: 'rust', implementation: 'rust', server: command('server'), daemon: command('daemon'), cli: command('cli') };
+process.chdir(fileURLToPath(new URL('../services/crossfire/', import.meta.url)));
+test('Rust container: shared assertion bank', { timeout: 3600000 }, async scope => {
+  const temporary = mkdtempSync(join(tmpdir(), 'crossfire-rust-packages-'));
+  scope.after(() => rmSync(temporary, { recursive: true, force: true }));
+  await buildRustContainerPackage(fileURLToPath(new URL('../', import.meta.url)), join(temporary, 'rust'), process.env.CROSSFIRE_TEST_CGROUP_PARENT);
+  const fixture = await containerStack(scope, target, [target], temporary);
+  await scope.test('Actual Element, artifacts and container', child => containerContracts(child, fixture));
+  await scope.test('HTTP, Matrix, security and persisted data', child => serverContracts(child, fixture));
+  await scope.test('Shared React browser', child => browserContracts(child, fixture));
+  await scope.test('Exclusive operator and abandoned container recovery', child => containerRecoveryContracts(child, fixture));
+  await fixture.close();
+});

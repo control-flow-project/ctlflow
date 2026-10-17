@@ -10,13 +10,14 @@ export async function resourceContracts(scope: TestContext, fixture: ContractSta
   const member = await fixture.member('resource-member'), agent = await fixture.agent('resource-analyst');
   const params = { agentId: agent.id }, fleetParams = { fleetId: agent.fleetId };
   const controller = { fleetId: agent.fleetId, connectionId: agent.connectionId, credential: agent.credential };
-  const runId = randomUUID(), sessionId = randomUUID();
+  let runId = randomUUID(); const sessionId = randomUUID();
   const report = (stopped: boolean) => fixture.operation(operations.reportListener, { ...params, runId }, { release: fixture.release.release.manifest.release, messagesDelivered: 0, stopped, statistics: null, controller }, agent.token);
   const fleet = () => fixture.data(operations.fleet, fleetParams, undefined, agent.credential);
   await fixture.operation(operations.reportFleetConnection, { ...fleetParams, connectionId: agent.connectionId }, { stopped: false }, agent.credential);
   await report(false);
-  await fixture.operation(operations.reportRuntime, { ...params, runId }, { sessionId, roomId: null, runtime: 'codex', state: 'idle', observedAt: Date.now(), lastActivityAt: null,
+  const runtime = () => fixture.operation(operations.reportRuntime, { ...params, runId }, { sessionId, roomId: null, runtime: 'codex', state: 'idle', observedAt: Date.now(), lastActivityAt: null,
     historyAvailable: true, historyMode: 'shared', maxInputBytes: 65536, settings: [], errorMessage: null }, agent.token);
+  await runtime();
   await scope.test('every operation rejects unknown query fields before resource mutation', async () => {
     for (const [name, operation] of Object.entries(operations)) {
       const values: Record<string, string> = { agentId: agent.id, fleetId: agent.fleetId, runId, memberId: fixture.owner.memberId, enrollmentId: agent.enrollmentId };
@@ -29,18 +30,72 @@ export async function resourceContracts(scope: TestContext, fixture: ContractSta
   await scope.test('identity directories, member revisions, role authority and invitation lifecycle', async () => {
     for (const operation of [operations.principals, operations.roles, operations.permissions, operations.members, operations.invitations, operations.enrollments, operations.registrationPolicy]) await fixture.operation(operation);
     const memberParams = { memberId: member.memberId }, original = await fixture.data(operations.member, memberParams);
-    const changed = await fixture.data(operations.changeMember, memberParams, { expectedRevision: integer(original.revision), displayName: 'Resource member' }); assert.equal(changed.displayName, 'Resource member');
+    const changed = await fixture.data(operations.changeMember, memberParams, { expectedRevision: integer(original.revision), displayName: 'Resource member É' }); assert.equal(changed.displayName, 'Resource member É');
     contractError(await fixture.raw('/api/members/' + member.memberId, 'PATCH', { expectedRevision: integer(original.revision), displayName: 'Stale' }, fixture.headers()), 409, 'conflict');
     const promoted = await fixture.data(operations.memberRole, memberParams, { expectedRevision: integer(changed.revision), roleCode: 'administrator' }); assert.equal(promoted.roleCode, 'administrator');
     await fixture.operation(operations.memberRole, memberParams, { expectedRevision: integer(promoted.revision), roleCode: 'member' });
     const invitation = await fixture.data(operations.createInvitation, {}, { roleCode: 'member', expiresSeconds: 600 }); const invitationId = text(invitation.invitationId);
     await fixture.operation(operations.invitation, { invitationId }); await fixture.operation(operations.revokeInvitation, { invitationId });
-    const session = await fixture.data(operations.currentSession, {}, undefined, member); assert.equal(record(session.member).displayName, 'Resource member');
+    const session = await fixture.data(operations.currentSession, {}, undefined, member); assert.equal(record(session.member).displayName, 'Resource member É');
     await fixture.operation(operations.endSession, {}, {}, member); contractError(await fixture.raw('/api/sessions/current', 'GET', undefined, fixture.headers(member)), 401, 'unauthorized');
     const enrollment = await fixture.data(operations.enrollment, { enrollmentId: agent.enrollmentId }); assert.equal(record(enrollment.enrollment).status, 'approved');
     await fixture.operation(operations.preflight, {}, { ownerMatrixId: fixture.owner.matrixUserId, fleetKey: 'availability-only', controller: { name: 'Availability only' }, instances: [{ instanceKey: 'available-name', name: 'available-name', coordinationPolicy: { wakeMode: 'selected', senders: [], permissions: [] } }] });
     const policy = await fixture.data(operations.policy), { revision, ...values } = policy;
     await fixture.operation(operations.changePolicy, {}, { expectedRevision: integer(revision), ...values }); await fixture.operation(operations.audit);
+  });
+  await scope.test('same-file directories retain ordering, case rules and empty-page counts across every backend', async () => {
+    await report(true);
+    await fixture.operation(operations.reportFleetConnection, { ...fleetParams, connectionId: agent.connectionId }, { stopped: true }, agent.credential);
+    const later = await fixture.agent('aaa-resource-order');
+    const laterFleet = await fixture.data(operations.fleet, { fleetId: later.fleetId });
+    await fixture.operation(operations.changeFleet, { fleetId: later.fleetId }, { expectedRevision: integer(laterFleet.revision), label: 'Audit É fleet', controller: { name: 'Shared contracts', metadata: {} } });
+    const agents = [await fixture.data(operations.agent, params), await fixture.data(operations.agent, { agentId: later.id })];
+    const expectedAgents = agents.sort((first, second) => integer(first.createdAt) - integer(second.createdAt) || text(first.agentId).localeCompare(text(second.agentId))).map(value => text(value.agentId));
+    const rules: Record<string, unknown>[] = [];
+    for (const name of ['audit-order-a', 'audit-order-z', 'audit-order-É']) rules.push(await fixture.data(operations.createWakeRule, {}, { ruleId: randomUUID(), name,
+      message: 'Disabled directory fixture', schedule: { kind: 'interval', seconds: 3600 }, enabled: false, agentIds: [] }));
+    const expectedRules = rules.sort((first, second) => integer(second.createdAt) - integer(first.createdAt) || text(first.ruleId).localeCompare(text(second.ruleId))).map(value => text(value.ruleId));
+    const original = fixture.current();
+    try {
+      for (const target of fixture.targets) {
+        await fixture.restart(target);
+        const directory = await fixture.operation(operations.agents, {}, undefined, fixture.owner, '?search=resource&pageSize=100');
+        assert.deepEqual(list(directory.data).map(value => text(record(value).agentId)), expectedAgents, target.name);
+        const first = await fixture.operation(operations.agents, {}, undefined, fixture.owner, '?search=resource&pageSize=1');
+        assert.equal(text(record(list(first.data)[0]).agentId), expectedAgents[0], target.name);
+        const matching = await fixture.operation(operations.agents, {}, undefined, fixture.owner, '?search=RESOURCE_ANALYST');
+        assert.deepEqual(list(matching.data).map(value => text(record(value).agentId)), [agent.id], target.name + ': ASCII case and LIKE wildcard');
+        const none = await fixture.operation(operations.agents, {}, undefined, fixture.owner, '?search=unmatched-directory-search');
+        assert.deepEqual(none.data, [], target.name); assert.equal(none.meta.totalPages, 1, target.name);
+        const principals = await fixture.operation(operations.principals, {}, undefined, fixture.owner, '?kind=agent&search=RESOURCE_ANALYST');
+        assert.deepEqual(list(principals.data).map(value => text(record(value).principalId)), [agent.id], target.name + ': discovery uses the same SQL search');
+        const exactHuman = await fixture.operation(operations.principals, {}, undefined, fixture.owner, '?kind=human&search=%C3%89');
+        assert.deepEqual(list(exactHuman.data).map(value => text(record(value).principalId)), [member.memberId], target.name + ': discovery retains non-ASCII case');
+        const unmatchedHuman = await fixture.operation(operations.principals, {}, undefined, fixture.owner, '?kind=human&search=%C3%A9');
+        assert.deepEqual(unmatchedHuman.data, [], target.name + ': discovery has no host-specific case normalization');
+        const fleets = await fixture.operation(operations.fleets, {}, undefined, fixture.owner, '?search=RESOURCE_ANALYST');
+        assert.deepEqual(list(fleets.data).map(value => text(record(value).fleetId)), [agent.fleetId], target.name + ': fleet search');
+        const exactFleet = await fixture.operation(operations.fleets, {}, undefined, fixture.owner, '?search=%C3%89');
+        assert.deepEqual(list(exactFleet.data).map(value => text(record(value).fleetId)), [later.fleetId], target.name + ': fleet retains non-ASCII case');
+        const unmatchedFleet = await fixture.operation(operations.fleets, {}, undefined, fixture.owner, '?search=%C3%A9');
+        assert.deepEqual(unmatchedFleet.data, [], target.name + ': fleet has no host-specific case normalization');
+        const reports = await fixture.operation(operations.publications, {}, undefined, fixture.owner, '?search=SHARED_REP_RT');
+        assert.deepEqual(list(reports.data).map(value => text(record(value).title)), ['Shared report'], target.name + ': report search');
+        const waking = await fixture.operation(operations.wakeRules, {}, undefined, fixture.owner, '?search=audit-order');
+        assert.deepEqual(list(waking.data).map(value => text(record(value).ruleId)), expectedRules, target.name);
+        const matchingRules = await fixture.operation(operations.wakeRules, {}, undefined, fixture.owner, '?search=AUDIT%25ORDER');
+        assert.deepEqual(list(matchingRules.data).map(value => text(record(value).ruleId)), expectedRules, target.name + ': wake search');
+        const exactUnicode = await fixture.operation(operations.wakeRules, {}, undefined, fixture.owner, '?search=audit-order-%C3%89');
+        assert.equal(list(exactUnicode.data).length, 1, target.name + ': exact non-ASCII scalar');
+        const missing = await fixture.operation(operations.wakeRules, {}, undefined, fixture.owner, '?search=audit-order-%C3%A9');
+        assert.deepEqual(missing.data, [], target.name); assert.equal(missing.meta.totalPages, 1, target.name);
+      }
+    } finally { await fixture.restart(original); }
+    for (const rule of rules) await fixture.operation(operations.deleteWakeRule, { ruleId: text(rule.ruleId) }, { expectedRevision: integer(rule.revision) });
+    agent.connectionId = randomUUID(); controller.connectionId = agent.connectionId; runId = randomUUID();
+    await fixture.operation(operations.reportFleetConnection, { ...fleetParams, connectionId: agent.connectionId }, { stopped: false }, agent.credential);
+    await report(false);
+    await runtime();
   });
   const nativeHeaders = { Authorization: 'Bearer ' + fixture.owner.nativeToken };
   const created = await contractHttp(fixture.native.base, 'POST', '/_matrix/client/v3/createRoom', { name: 'Resource contracts' }, nativeHeaders); assert.equal(created.status, 200); const roomId = text(record(created.body).room_id), roomParams = { ...params, roomId };

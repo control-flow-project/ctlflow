@@ -82,11 +82,12 @@ execution, not a proven process exit.
 
 ## Abrupt controller death
 
-Killing fleetd can leave a native app-server or detached shell tool alive.
-The native history writer lock rejects a competing writer.
-The audited native protocol has no supported parent-lifetime control that also
-retains the required native TUI attachment. No process-name scan, orphan adoption,
-proxy or copied history substitutes for that limitation.
+Killing Node/C# fleetd can leave a native app-server alive. Its history writer
+lock rejects a competing writer; those adapters do not enforce the controller's
+lifetime after SIGKILL. Rust's Linux process adapter instead uses its packaged
+guard, exact parent pidfd and native-group lock to terminate the owned engine
+group after controller death. It does not contain tools that escape that group.
+No implementation uses process-name scanning, orphan adoption or copied history.
 
 A full host restart removes old processes, but retained bindings still require
 successful native resume and available provider/native services.

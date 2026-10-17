@@ -86,7 +86,7 @@ public sealed class ListenerHost : IAsyncDisposable
         }
         catch (Exception error) when (error is JsonException or IOException or InvalidDataException or InvalidOperationException or OperationCanceledException or ArgumentException)
         {
-            if (!context.Response.HasStarted && !context.RequestAborted.IsCancellationRequested) { context.Response.StatusCode = 400; var message = error.Message[..Math.Min(1024, error.Message.Length)]; await Write(context, query ? Result(Results.Fail<JsonElement>("unavailable", message)) : WireJson.Object(writer => writer.WriteString("error", message))); }
+            if (!context.Response.HasStarted && !context.RequestAborted.IsCancellationRequested) { context.Response.StatusCode = 400; var message = TextRules.TruncateUtf16(error.Message, 1024); await Write(context, query ? Result(Results.Fail<JsonElement>("unavailable", message)) : WireJson.Object(writer => writer.WriteString("error", message))); }
         }
         finally { requests.Release(); }
     }

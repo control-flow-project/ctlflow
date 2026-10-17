@@ -19,7 +19,7 @@ import { paginationContracts } from '@ctlflow/crossfire-test-support/contract-pa
 
 type Declaration = { method: string; path: string; status: number; collection: boolean; output: Parser<unknown> };
 export async function daemonContracts(scope: TestContext, platform: ContractPlatform, selected: ContractTarget, runtime: 'codex' | 'pi'): Promise<void> {
-  const directory = join(platform.directory, 'daemon-' + runtime); mkdirSync(directory, { mode: 0o700 }); const root = join(directory, 'controller'), home = join(directory, 'home'), fleetDirectory = join(directory, 'fleet'); mkdirSync(home, { mode: 0o700 });
+  const directory = join(platform.directory, 'd-' + runtime); mkdirSync(directory, { mode: 0o700 }); const root = join(directory, 'c'), home = join(directory, 'home'), fleetDirectory = join(directory, 'fleet'); mkdirSync(home, { mode: 0o700 });
   const provider = runtime === 'codex' ? await nativeProvider(scope, home) : await piProvider(scope); const binaryDirectory = join(directory, 'bin'); mkdirSync(binaryDirectory, { mode: 0o700 }); symlinkSync(piBinary(), join(binaryDirectory, 'pi')); const environment = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(home, '.config'), PATH: binaryDirectory + delimiter + (process.env.PATH ?? '') }; const socket = join(root, 'fleetd.sock'); let daemon = contractProcess(scope, selected.daemon, ['--root', root, '--name', 'shared-contract'], directory, environment);
   const raw = (path: string, method = 'GET', body?: unknown, headers: Record<string, string> = {}) => contractHttp('http://localhost', method, path, body, headers, socket);
   async function call(operation: Declaration, parameters: Record<string, string> = {}, body?: unknown, query = '') {
@@ -40,6 +40,17 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     contractError(await raw('/api/fleets/not-a-uuid'), 400, 'invalid'); contractError(await raw('/api/operations', 'POST', { operationId: randomUUID(), action: 'stop', target: { kind: 'daemon', fleetId: null }, expectedRevision: 0 }), 400, 'invalid');
     const added = record((await call(operations.addFleet, {}, { directory: fleetDirectory })).data); fleetId = text(added.fleetId); revision = integer(added.revision); contractError(await raw('/api/fleets/' + fleetId, 'PATCH', { expectedRevision: revision + 1, label: 'Wrong' }), 409, 'stale_revision');
     const page = await call(operations.fleets, {}, undefined, '?pageSize=1'); assert.equal(page.meta.totalItems, 1); assert.equal(list(page.data).length, 1); assert.equal((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data instanceof Array, true); assert.equal(provider.requests.length, 0, 'Inspection and contexts make no model call');
+  });
+  await scope.test('fleet labels retain canonical Unicode and UTF-16 length limits', async () => {
+    let current = record((await call(operations.fleet, { fleetId })).data);
+    const exact = '😀'.repeat(50);
+    current = record((await call(operations.changeFleet, { fleetId }, { expectedRevision: integer(current.revision), label: exact })).data);
+    assert.equal(current.label, exact);
+    contractError(await raw('/api/fleets/' + fleetId, 'PATCH', { expectedRevision: integer(current.revision), label: exact + '😀' }), 400, 'invalid');
+    current = record((await call(operations.changeFleet, { fleetId }, { expectedRevision: integer(current.revision), label: 'Valid\u0080label' })).data);
+    assert.equal(current.label, 'Valid\u0080label');
+    revision = integer(current.revision);
+    assert.equal(provider.requests.length, 0);
   });
   await scope.test('inspection is read-only and refuses unsafe or dangling work-area ancestors', async () => {
     const workarea = join(role, 'workarea'); assert(!existsSync(workarea), 'Inspecting an unstarted instance does not create private runtime state');
@@ -70,6 +81,17 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   await scope.test('real native chat, steering and bounded history contracts', child => messageContracts(child, { platform, fleetDirectory, agent: { id: agentId, matrixUserId, token }, provider,
     async idle() { const file = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/listener.json'); const endpoint = record(JSON.parse(readFileSync(file, 'utf8')) as unknown); const response = await contractHttp('http://127.0.0.1:' + String(endpoint.port), 'POST', '/bindings/' + text(endpoint.binding) + '/control', { action: 'test' }, { Authorization: 'Bearer ' + text(endpoint.secret) }); return response.status === 200 && record(record(response.body).test).busy === false; },
     async delivery(enabled) { const fleet = record((await call(operations.fleet, { fleetId })).data); await call(operations.changeFleetDelivery, { fleetId }, { expectedRevision: integer(record(fleet.connection).revision), enabled }); await observe(async () => record(list(record((await call(operations.fleet, { fleetId })).data).instances)[0]).listenerActive === enabled, 'Controller applies delivery intent'); } }));
+  await scope.test('explicit fresh-history reset retains enrolled identity and makes no housekeeping model call', async () => {
+    const original = saved, requests = provider.requests.length;
+    const binding = readFileSync(join(fleetDirectory, '.fleet/binding.json'), 'utf8');
+    await operate('reset');
+    saved = (await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data;
+    assert.equal(list(saved).length, 1);
+    assert.equal(record(list(saved)[0]).runtime, runtime);
+    assert.notDeepEqual(saved, original, 'Only an explicit reset replaces the native history');
+    assert.equal(readFileSync(join(fleetDirectory, '.fleet/binding.json'), 'utf8'), binding, 'Reset never reenrolls or replaces accounts and credentials');
+    assert.equal(provider.requests.length, requests, 'Reset exports context and instructions without model housekeeping');
+  });
   await scope.test('stop, daemon restart and explicit resume retain history and stop intent', async () => {
     const completedRequests = provider.requests.length;
     await operate('stop'); const stopped = record((await call(operations.fleet, { fleetId })).data); assert.equal(record(list(stopped.instances)[0]).desiredActive, false); assert.equal(record(list(stopped.instances)[0]).phase, 'stopped'); assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);

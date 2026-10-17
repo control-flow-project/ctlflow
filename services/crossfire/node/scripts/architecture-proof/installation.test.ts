@@ -101,7 +101,7 @@ test("an actual pre-exemption npm is rejected before installation even with scri
 
 test("changing only policy bytes invalidates the real runtime image fingerprint", async context => {
   const { directory } = fixture(context);
-  for (const file of [".dockerignore", ".npmrc", "LICENSE", "package.json", "package-lock.json", "tsconfig.base.json", "global.json", "Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "Crossfire.CSharp.slnx"]) {
+  for (const file of [".dockerignore", ".npmrc", "LICENSE", "package.json", "package-lock.json", "tsconfig.base.json", "global.json", "Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "Crossfire.CSharp.slnx", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"]) {
     copyFileSync(join(root, file), join(directory, file));
   }
   for (const folder of ["scripts", "services"]) cpSync(join(root, folder), join(directory, folder), { recursive: true,

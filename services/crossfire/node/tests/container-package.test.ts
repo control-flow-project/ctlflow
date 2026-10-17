@@ -1,13 +1,33 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, symlinkSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { containerPackage, fileDigest, packageLabels, prepareContainerPackage } from '../apps/server/src/container-package.js';
-import { auditContainerDependencies } from '../scripts/container-packages.js';
+import { auditContainerDependencies, containerSourceDigest } from '../scripts/container-packages.js';
 
 const value = { schemaVersion: 1, version: '0.1.20', sourceDigest: 'a'.repeat(64), backend: 'csharp-nativeaot', platform: 'linux/amd64', archiveSha256: 'b'.repeat(64), runtimeImage: 'sha256:' + 'c'.repeat(64), migrationImage: 'sha256:' + 'd'.repeat(64) };
+
+test('container source identity covers all selected Rust workspace and toolchain inputs', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'crossfire-source-'));
+  const inputs = ['.dockerignore', '.npmrc', 'LICENSE', 'package.json', 'package-lock.json', 'tsconfig.base.json', 'global.json', 'Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props', 'Crossfire.CSharp.slnx', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml'];
+  try {
+    for (const name of inputs) writeFileSync(join(directory, name), name);
+    for (const name of ['services', 'scripts']) mkdirSync(join(directory, name));
+    const baseline = containerSourceDigest(directory);
+    for (const name of ['Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml']) {
+      writeFileSync(join(directory, name), name + '-changed');
+      assert.notEqual(containerSourceDigest(directory), baseline, name + ' must affect release identity');
+      writeFileSync(join(directory, name), name);
+      assert.equal(containerSourceDigest(directory), baseline);
+    }
+    mkdirSync(join(directory, 'services/target')); writeFileSync(join(directory, 'services/target/generated'), 'regenerable');
+    assert.equal(containerSourceDigest(directory), baseline, 'Regenerated build output is not source');
+    symlinkSync(join(directory, 'Cargo.toml'), join(directory, 'services/linked'));
+    assert.throws(() => containerSourceDigest(directory), /symlink or special/u);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 
 test('package construction rejects an unsafe dependency audit before image construction', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-package-audit-')), previous = process.env.PATH;

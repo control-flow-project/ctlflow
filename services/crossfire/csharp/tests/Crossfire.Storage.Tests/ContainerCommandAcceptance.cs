@@ -8,6 +8,9 @@ public static class ContainerCommandAcceptance
 {
     public static async Task Verify()
     {
+        foreach (var command in new[] { "create", "stop", "rm" }) Equal(ContainerCommands.CaptureTimeout([command, "fixture"]), 120000, "Docker lifecycle mutation has a finite creation/removal budget");
+        string[][] probes = [["info"], ["image", "inspect"], ["container", "ls"], ["container", "inspect"]];
+        foreach (var command in probes) Equal(ContainerCommands.CaptureTimeout(command), 30000, "Docker metadata probes retain their finite short budget");
         foreach (var option in new[] { "--source", "--runtime", "--compile" })
         {
             var rejected = false; try { await ServerOperator.Run(["start", option, "old"]); } catch (ArgumentException) { rejected = true; }
@@ -52,6 +55,8 @@ public static class ContainerCommandAcceptance
 phase=$(/bin/cat '{{state}}')
 printf '%s\n' "$*" >> '{{calls}}'
 case "$1 $2" in
+  'create --name') printf '%s\n' '{{identity}}'; exit 0 ;;
+  'start --attach') echo 'primary operation failed' >&2; exit 17 ;;
   'stop --timeout') phase=exited ;;
   'rm {{identity}}')
     selected=$(/bin/cat '{{mode}}')
@@ -85,6 +90,12 @@ printf '%s' "$phase" > '{{state}}'
             File.WriteAllText(state, "running"); File.WriteAllText(mode, "denied"); File.WriteAllText(observations, "0"); File.WriteAllText(calls, "");
             var rejected = false; try { await ContainerLifecycle.Remove(identity, directory, CancellationToken.None); } catch (IOException error) { rejected = error.Message.Contains("permission denied", StringComparison.Ordinal); }
             Equal(rejected, true, "an actual deletion failure cannot be reported as successful cleanup");
+            rejected = false;
+            try { await ContainerLifecycle.Owned(["run", "--name", "fixture"], directory, CancellationToken.None); }
+            catch (IOException error) { rejected = error.InnerException is AggregateException both && both.InnerExceptions.Count == 2
+                && both.InnerExceptions[0].Message.Contains("exit 17", StringComparison.Ordinal)
+                && both.InnerExceptions[1].Message.Contains("permission denied", StringComparison.Ordinal); }
+            Equal(rejected, true, "container cleanup retains both the primary operation and cleanup failures");
         }
         finally { Environment.SetEnvironmentVariable("PATH", previous); Directory.Delete(directory, true); }
     }

@@ -1,0 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { operations } from '@ctlflow/fleetd-contracts/api';
+const variant = value => value[0].toUpperCase() + value.slice(1);
+const definitions = Object.entries(operations);
+if (process.argv.length > 3 || process.argv[2] !== undefined && process.argv[2] !== '--check') throw new Error('Use --check or print the canonical Rust daemon catalog');
+const source = "use crossfire_contracts::{call::Key, operations::{Authentication, Method, Operation}, validation};\nuse crossfire_kernel::{Failure, Result, failure::ErrorCode};\nuse serde_json::Value;\n\n#[derive(Debug, Clone, Copy, PartialEq, Eq)]\npub enum OperationId {" + '\n' + definitions.map(([name]) => '    ' + variant(name) + ',').join('\n') + '\n}\npub const OPERATIONS: &[Operation<OperationId>] = &[\n'
+    + definitions.map(([name, value]) => '    Operation { id: OperationId::' + variant(name) + ', name: ' + JSON.stringify(name) + ', method: Method::' + variant(value.method.toLowerCase()) + ', path: ' + JSON.stringify(value.path) + ', auth: Authentication::' + variant(value.auth) + ', status: ' + value.status + ', collection: ' + value.collection + ', request_bytes: 1048576, binary: false, permissions: &[] },').join('\n') + '\n];\n' + "impl Key for OperationId {\n    fn definition(self) -> Result<&'static Operation<Self>> {\n        OPERATIONS.iter().find(|operation| operation.id == self).ok_or_else(|| Failure::new(ErrorCode::Invalid, \"Daemon operation is not declared\"))\n    }\n    fn validate_parameter(self, name: &str, value: &Value) -> Result<()> {\n        if name == \"instanceKey\" { validation::name(value)?; } else { validation::identifier(value)?; }\n        Ok(())\n    }\n    fn query_fields(self) -> &'static [&'static str] {\n        match self {\n            Self::Fleets | Self::Agents => &[\"page\", \"pageSize\"],\n            Self::Attachment => &[\"context\"],\n            Self::Operation => &[\"wait\"],\n            _ => &[],\n        }\n    }\n}\n";
+const formatted = spawnSync('rustfmt', ['--edition', '2024', '--emit', 'stdout'], { input:source, encoding:'utf8', maxBuffer:1048576 });
+if (formatted.status !== 0) throw new Error('Canonical daemon catalog formatting failed');
+if (process.argv[2] === '--check') {
+    if (readFileSync(new URL('../rust/packages/contracts/src/operations.rs', import.meta.url), 'utf8') !== formatted.stdout) throw new Error('Rust daemon catalog differs from its canonical API');
+} else process.stdout.write(formatted.stdout);

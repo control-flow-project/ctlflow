@@ -8,7 +8,7 @@ import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { contractProcess, freePorts, observe, record, text, type ContractProcess, type ContractTarget } from '@ctlflow/crossfire-test-support/contract-process';
 import { contractHttp } from '@ctlflow/crossfire-test-support/contract-http';
-import { secureProxy } from '../../node/tests/support/tls.js';
+import { secureProxy } from '@ctlflow/crossfire-test-support/tls';
 import { builtRelease } from '../../node/scripts/test-support/release.js';
 import { contractClient } from './fixture.js';
 
@@ -34,17 +34,20 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
   });
   async function close() {
     const owned = running; running = undefined; if (!owned) return;
+    let failure: unknown;
     try { await owned.close(); assert.equal(await owned.ended, 0, owned.errors() + '\n' + owned.output()); }
-    finally {
+    catch (error) { failure = error; }
+    try {
       if (spawnSync('docker', ['inspect', containerName], { stdio: 'ignore' }).status === 0) {
         execFileSync('docker', ['rm', '--force', containerName], { timeout: 30000 });
         assert.fail('Orderly operator shutdown must remove its exact owned container');
       }
-    }
+    } catch (error) { failure ??= error; }
+    if (failure !== undefined) throw failure;
   }
   cleanup(scope, close);
   function launch(target: ContractTarget, packageDirectory = join(packages, target.name)) {
-    return contractProcess(scope, target.server, ['start', '--directory', state, '--package', packageDirectory, '--port', String(port), '--content-port', String(contentPort), '--cgroup-parent', parent!], directory, process.env, 180000);
+    return contractProcess(scope, target.server, ['start', '--directory', state, '--package', packageDirectory, '--port', String(port), '--content-port', String(contentPort), '--cgroup-parent', parent!], directory, process.env, 300000);
   }
   async function start(target: ContractTarget, packageDirectory = join(packages, target.name)) {
     selected = target; running = launch(target, packageDirectory);

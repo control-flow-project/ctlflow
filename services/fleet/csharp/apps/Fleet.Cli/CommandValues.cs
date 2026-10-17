@@ -42,7 +42,22 @@ public static class CommandValues
         if (command == "agent" && action == "add") allowed.Add("definition"); if (command == "agent" && action == "attach") allowed.Add("context");
         if (command is "enroll" or "start" or "stop" or "update" || command == "agent" && action is "start" or "stop" or "update") allowed.Add("operation-id");
         if (command == "update" || command == "agent" && action == "update") allowed.Add("release-directory"); if (command == "start" || command == "agent" && action == "start") allowed.Add("fresh-history"); if (command == "message") allowed.UnionWith(["text", "message-id"]);
-        if (options.Keys.Any(key => !allowed.Contains(key))) throw new CommandFailure("An option is not valid for this command"); return new(positionals, options);
+        if (options.Keys.Any(key => !allowed.Contains(key))) throw new CommandFailure("An option is not valid for this command");
+        if (!options.ContainsKey("help") && positionals.Count != 0)
+        {
+            if (options.TryGetValue("operation-id", out var operation)) Identifier(operation);
+            if (options.TryGetValue("name", out var label) && !Validation.Text(WireJson.Build(writer => writer.WriteStringValue(label)), 100).IsSuccess) throw new CommandFailure("Invalid controller name");
+            var agentStart = command == "agent" && action == "start";
+            if (command == "start" || agentStart)
+            {
+                if (positionals.Count != (agentStart ? 4 : 2)) throw new CommandFailure(Usage);
+                var fleet = positionals[agentStart ? 2 : 1];
+                if (!IdentitySyntax.Name(fleet) && !IdentitySyntax.Identifier(fleet)) throw new CommandFailure("Use a configured fleet key or UUID");
+                if (agentStart) Name(positionals[3]);
+            }
+            if (command == "daemon" && action == "start" && positionals.Count != 2) throw new CommandFailure(Usage);
+        }
+        return new(positionals, options);
     }
     public const string Usage = """
 fleet setup [--descriptor PERSONALIZED_SETUP_URL] [--config /absolute/runtime.toml] [--root DIRECTORY]

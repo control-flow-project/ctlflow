@@ -11,7 +11,7 @@ import { changeFleet } from '@ctlflow/crossfire-domain/fleet/change-fleet';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { value } from './support/application.js';
-import { browserOptions } from './support/tls.js';
+import { browserOptions } from '@ctlflow/crossfire-test-support/tls';
 import { COOKIE_NAME } from '../apps/server/src/http/transport.js';
 
 test('real room refresh updates pristine edits and explicitly fences dirty edits after another authorized writer', { timeout: 60000 }, async scope => {

@@ -1,3 +1,4 @@
+import { truncateUtf16 } from '@ctlflow/crossfire-kernel/text';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { existsSync, lstatSync, mkdirSync, realpathSync, renameSync, rmSync, writeFileSync, openSync, closeSync, fsyncSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
@@ -50,7 +51,7 @@ export function createSetupStorage(root: string) {
           const name = generatedName(basename(selected.value), digest), role = privateDir(join(staging, 'agents', 'project'));
           writeFileSync(join(staging, 'runtime.toml'), stringify({ fleet: name, coordination: { adapter: 'crossfire', server: input.descriptor.server, owner: input.descriptor.ownerMatrixId },
             instances: [{ key: name, name, definition: 'project', workarea: 'agents/project/workarea/' + name, workspace: selected.value }] }), { mode: 0o600, flag: 'wx', flush: true });
-          writeFileSync(join(role, 'agent.toml'), stringify({ name: basename(selected.value).slice(0, 100) || 'Project', runtime: 'codex',
+          writeFileSync(join(role, 'agent.toml'), stringify({ name: truncateUtf16(basename(selected.value), 100) || 'Project', runtime: 'codex',
             runtime_options: { sandbox_mode: 'danger-full-access', approval_policy: 'on-request', dangerously_bypass_approvals_and_sandbox: false } }), { mode: 0o600, flag: 'wx', flush: true });
           writeFileSync(join(role, 'AGENTS.md'), 'Work in the configured project workspace. Follow its instructions and the authorized human requests. This is a separate fleet-managed agent; the coding session performing setup is not your conversation.\n', { mode: 0o600, flag: 'wx', flush: true });
           for (const folder of [role, dirname(role), staging]) {

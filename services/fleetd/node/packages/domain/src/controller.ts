@@ -1,3 +1,4 @@
+import { truncateUtf16 } from '@ctlflow/crossfire-kernel/text';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Running } from './port.js';
 import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
@@ -49,7 +50,7 @@ export function createController(services: Services) {
       const completed = result.value;
       if (!completed || completed.completedAt === null) return failure('unavailable', 'The native session operation did not complete');
       return success({ status: completed.status === 'succeeded' ? 'succeeded' as const : 'failed' as const,
-        errorMessage: completed.status === 'succeeded' ? null : completed.errors.map(error => (error.instanceKey ? error.instanceKey + ': ' : '') + error.message).join('; ').slice(0, 4096) || 'Native session operation failed' });
+        errorMessage: completed.status === 'succeeded' ? null : truncateUtf16(completed.errors.map(error => (error.instanceKey ? error.instanceKey + ': ' : '') + error.message).join('; '), 4096) || 'Native session operation failed' });
     }, acknowledged: acknowledgeOperation });
     if (!result.ok) connectionErrors.set(configuration.directory, result.error.message);
     else connectionErrors.delete(configuration.directory);
@@ -180,6 +181,7 @@ export function createController(services: Services) {
     return current;
   }
   function rename(fleetId: string, revision: number, label: string): Result<FleetState> {
+    if (label.length < 1 || label.length > 100 || !label.isWellFormed() || /[\u0000-\u001f\u007f]/u.test(label)) return failure('invalid', 'Invalid fleet label');
     const current = mutable(fleetId, revision);
     if (!current.ok) return current;
     const changed = persist(records.map(record => record.fleetId === fleetId ? { ...record, label, revision: revision + 1 } : record));
@@ -257,7 +259,7 @@ export function createController(services: Services) {
     for (const instance of selected) {
       try { await stopInstance(fleetId, instance); }
       catch (error) {
-        const message = (error instanceof Error ? error.message : 'Native process cleanup failed').replace(/[\u0000-\u001f\u007f]/gu, ' ').slice(0, 4096);
+        const message = truncateUtf16((error instanceof Error ? error.message : 'Native process cleanup failed').replace(/[\u0000-\u001f\u007f]/gu, ' '), 4096);
         operation.errors.push({ instanceKey: instance.key, code: 'unavailable', message });
         const current = states.get(key(fleetId, instance.key));
         states.set(key(fleetId, instance.key), { instance, phase: 'failed', sessionId: current?.sessionId ?? null, startedAt: current?.startedAt ?? null, error: message });
@@ -274,7 +276,7 @@ export function createController(services: Services) {
     const identity = key(fleetId, instance.key);
     const detail = reason instanceof Error ? reason.message : typeof reason === 'string' ? reason
       : reason && typeof reason === 'object' && 'message' in reason && typeof reason.message === 'string' ? reason.message : 'Listener binding disconnected';
-    const message = detail.replace(/[\u0000-\u001f\u007f]/gu, ' ').slice(0, 4096);
+    const message = truncateUtf16(detail.replace(/[\u0000-\u001f\u007f]/gu, ' '), 4096);
     const intentional = isListenerStop(reason);
     const intentSaved = intentional && !stopping ? changeIntent(fleetId, [instance.key], false) : success(undefined);
     states.set(identity, { ...states.get(identity)!, phase: intentional ? 'stopping' : 'failed', error: intentional ? null : message });
@@ -284,7 +286,7 @@ export function createController(services: Services) {
       try { await runtime?.close(); cleaned = true; }
       catch (error) {
         const cleanup = error instanceof Error ? error.message : 'Runtime cleanup failed';
-        states.set(identity, { ...states.get(identity)!, phase: 'failed', error: (message + '; cleanup: ' + cleanup).slice(0, 4096) });
+        states.set(identity, { ...states.get(identity)!, phase: 'failed', error: truncateUtf16(message + '; cleanup: ' + cleanup, 4096) });
         return;
       } finally { if (cleaned && runtime && running.get(identity) === runtime) running.delete(identity); }
       if (intentional) { states.set(identity, { ...states.get(identity)!, phase: intentSaved.ok ? 'stopped' : 'failed', startedAt: null, error: intentSaved.ok ? null : intentSaved.error.message }); return; }
@@ -297,7 +299,7 @@ export function createController(services: Services) {
         try { result = await services.execution.start(configuration, instance, signal, 'recovery'); }
         catch (error) {
           if (signal.aborted || !wanted.has(identity)) return;
-          states.set(identity, { ...states.get(identity)!, error: (error instanceof Error ? error.message : 'Binding recovery failed').slice(0, 4096) });
+          states.set(identity, { ...states.get(identity)!, error: truncateUtf16(error instanceof Error ? error.message : 'Binding recovery failed', 4096) });
           if (!canRecoverFailure(error)) return;
           continue;
         }

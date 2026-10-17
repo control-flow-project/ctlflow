@@ -8,6 +8,7 @@ import { verifyPackageOwnership } from './verify-packages.mjs';
 import { verifyCsharpArchitecture } from './verify-csharp-architecture.mjs';
 import { verifyImplementationLayout } from './verify-implementation-layout.mjs';
 import { verifyDocumentation } from './verify-documentation.mjs';
+import { inventory } from './native-file-inventory.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 assert.deepEqual(readdirSync(join(root, 'services')).sort(), ['crossfire', 'fleet', 'fleetd']);
 for (const name of ['apps', 'packages', 'tests', 'skills', 'src', 'third-party']) {
@@ -24,6 +25,8 @@ assert.deepEqual(manifest.workspaces, ['services/*', 'services/*/apps/*', 'servi
 verifyPackageOwnership(root);
 verifyCsharpArchitecture(root);
 verifyImplementationLayout(root);
+const nativeFiles = inventory();
+console.log('Native file inventory verified: ' + nativeFiles.files.length + ' Node/C# files; ' + nativeFiles.rustFiles + ' Rust files; explicit semantic owners.');
 verifyDocumentation(root);
 console.log('Structure verified: service-local Crossfire, fleetd and fleet; no root application/package pool.');
 verifyTestTiming(root);

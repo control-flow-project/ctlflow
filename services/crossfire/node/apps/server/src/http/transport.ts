@@ -2,6 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { failure, success, type FailureCode, type Result } from '@ctlflow/crossfire-kernel/result';
 import { HTTP_LIMITS } from '@ctlflow/crossfire-contracts/rest/limits';
 import type { Reply } from './bind.js';
+import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
+import { json } from '@ctlflow/crossfire-contracts/matrix';
 export const COOKIE_NAME = '__Host-crossfire';
 const failureStatus: Record<FailureCode, number> = { invalid: 400, unauthorized: 401, forbidden: 403, missing: 404, conflict: 409, limit: 413, native: 502, unavailable: 503,
   stale_revision: 409, name_collision: 409, capacity: 409, rate_limit: 429, body_too_large: 413, method_not_allowed: 405 };
@@ -23,12 +25,13 @@ async function readText(request: IncomingMessage, contentType: string, limit: nu
     if (size > limit) return failure('body_too_large', 'Request body exceeds the configured bound');
     chunks.push(buffer);
   }
-  return success(Buffer.concat(chunks).toString('utf8'));
+  try { return success(decodeUtf8(Buffer.concat(chunks))); }
+  catch { return failure('invalid', 'Invalid UTF-8 request body'); }
 }
 export async function readBody(request: IncomingMessage, maximum: number = HTTP_LIMITS.requestBytes): Promise<Result<unknown>> {
   const body = await readText(request, 'application/json', maximum);
   if (!body.ok) return body;
-  try { return success(JSON.parse(body.value)); }
+  try { const parsed: unknown = JSON.parse(body.value); return json(parsed) ? success(parsed) : failure('invalid', 'Invalid JSON text or structure'); }
   catch { return failure('invalid', 'Invalid JSON'); }
 }
 export async function readForm(request: IncomingMessage): Promise<Result<URLSearchParams>> {

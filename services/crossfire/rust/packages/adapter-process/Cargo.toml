@@ -1,0 +1,26 @@
+[package]
+name = "crossfire-adapter-process"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license-file.workspace = true
+publish.workspace = true
+
+[dependencies]
+crossfire-kernel.workspace = true
+crossfire-adapter-filesystem.workspace = true
+rustix.workspace = true
+async-io.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "crossfire-native-guard"
+path = "src/guard_main.rs"

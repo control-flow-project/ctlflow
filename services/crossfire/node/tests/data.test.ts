@@ -1,11 +1,13 @@
 import { openTestStore } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { chmodSync, mkdirSync, mkdtempSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { createUnitOfWork } from '@ctlflow/crossfire-adapter-sqlite/unit-of-work';
 import { failure } from '@ctlflow/crossfire-kernel/result';
+import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
+import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { value } from './support/application.js';
 
 function directory() { mkdirSync('.temp', { recursive: true }); return mkdtempSync(join(process.cwd(), '.temp/storage-')); }
@@ -34,4 +36,28 @@ test('storage refuses symlinks and public files without modifying their permissi
   assert.throws(() => openTestStore(file), /private/); assert.equal(statSync(file).mode & 0o777, 0o644);
   chmodSync(file, 0o600); const link = join(root, 'linked.sqlite'); symlinkSync(file, link);
   assert.throws(() => openTestStore(link), /ELOOP|regular/);
+});
+test('UTF-8 decoding rejects malformed bytes without replacing or repairing private state', () => {
+  const root = directory(), path = join(root, 'state.json');
+  const malformed = [[0x80], [0xc0, 0xaf], [0xe2, 0x82], [0xed, 0xa0, 0x80], [0xf4, 0x90, 0x80, 0x80]];
+  try {
+    assert.equal(decodeUtf8(Buffer.from('東京 \ufffd')), '東京 \ufffd');
+    assert.equal(decodeUtf8(Buffer.from([0xef, 0xbb, 0xbf, 0x61])), '\ufeffa');
+    for (const bytes of malformed) {
+      assert.throws(() => decodeUtf8(Uint8Array.from(bytes)), TypeError);
+      const content = Buffer.concat([Buffer.from('{"value":"'), Buffer.from(bytes), Buffer.from('"}')]);
+      writeFileSync(path, content, { mode: 0o600 });
+      assert.throws(() => readJson(path), /encoding|UTF|utf/u);
+      assert.throws(() => writeJson(path, { value: 'replacement' }), /encoding|UTF|utf/u);
+      assert.equal(readFileSync(path).equals(content), true);
+    }
+    for (const text of ['{"value":"\\ud800"}', '{"\\udfff":true}']) {
+      const content = Buffer.from(text); writeFileSync(path, content, { mode: 0o600 });
+      assert.throws(() => readJson(path), /Unicode JSON/u);
+      assert.throws(() => writeJson(path, { value: 'replacement' }), /Unicode JSON/u);
+      assert.equal(readFileSync(path).equals(content), true);
+    }
+    rmSync(path);
+    assert.throws(() => writeJson(path, { value: '\ud800' }), /Unicode JSON/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
