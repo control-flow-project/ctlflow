@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { delimiter, join } from 'node:path';
 import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
+import { acquireFileLock, acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import { contractProcess, integer, list, observe, record, text, type ContractCommand, type ContractTarget } from '@ctlflow/crossfire-test-support/contract-process';
 import { contractHttp } from '@ctlflow/crossfire-test-support/contract-http';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
@@ -59,6 +60,26 @@ export async function cliContracts(scope: TestContext, platform: ContractPlatfor
   await scope.test('CLI daemon shutdown is resumable without installing a host service', async () => {
     await json('daemon', 'stop'); await observe(async () => { try { await contractHttp('http://localhost', 'GET', '/api/status', undefined, {}, join(root, 'fleetd.sock')); return false; } catch { return true; } }, 'Daemon must finish stopping');
     const restarted = record(await json('daemon', 'start')); assert.equal(record(restarted.controller).name, 'cli-contract'); assert.equal(list(await json('list')).length, 0);
+  });
+  await scope.test('CLI waits for the exact previous daemon owner before launching its replacement', async () => {
+    await json('daemon', 'stop');
+    const release = await acquireProcessLock(join(root, 'daemon'), 100, 100);
+    const starting = contractProcess(scope, selected.cli, ['daemon', 'start', '--root', root], directory, environment);
+    try {
+      await observe(() => {
+        assert(starting.alive(), starting.errors());
+        try { const unlock = acquireFileLock(join(root, 'launcher')); unlock(); return false; }
+        catch (error) { if (error instanceof Error && 'code' in error && error.code === 'ELOCKED') return true; throw error; }
+      }, 'The installed CLI holds its launcher while the previous daemon still owns the root');
+      const observing = performance.now();
+      await observe(() => { assert(starting.alive(), starting.errors()); return performance.now() - observing >= 500; },
+        'A closing controller owner cannot cause an immediate failed or overlapping launch', 2000);
+      await release();
+      await observe(() => !starting.alive(), 'The installed CLI finishes after the previous daemon releases ownership');
+      assert.equal(await starting.ended, 0, starting.errors());
+      assert.equal(record(record(JSON.parse(starting.output()) as unknown).controller).name, 'cli-contract');
+      assert.equal(provider.requests.length, 0);
+    } finally { await release(); await starting.close(); }
   });
   await scope.test('actual SSH forwards the same private API and rejects an untrusted host', async child => {
     const ssh = await sshFixture(child, environment.XDG_CONFIG_HOME!), previous = environment.PATH; environment.PATH = ssh.bin + delimiter + (previous ?? '');
@@ -133,7 +154,21 @@ export async function cliContracts(scope: TestContext, platform: ContractPlatfor
     assert.equal(record(await json('activate', configuredId)).deliveryEnabled, true);
     assert.equal((await cli('start', configuredId)).code, 0);
     await json('daemon', 'restart');
-    await observe(async () => (await cli('test', configuredId)).code === 0, 'Installed daemon restart restores its saved desired selection', 90000);
+    let readinessError = '';
+    try {
+      await observe(async () => {
+        const result = await cli('test', configuredId); readinessError = result.error.slice(-8192); return result.code === 0;
+      }, 'Installed daemon restart restores its saved desired selection', 90000);
+    } catch (error) {
+      const result = await cli('show', configuredId);
+      const current = result.code === 0 ? record(JSON.parse(result.output) as unknown) : null;
+      const logs = join(root, 'logs');
+      scope.diagnostic(JSON.stringify({ restartFailure: { readinessError, controllerError: result.error.slice(-8192),
+        connection: current?.connection, instances: current === null ? [] : list(current.instances).map(value => {
+          const instance = record(value); return { key: record(instance.instance).key, desiredActive: instance.desiredActive, phase: instance.phase, error: instance.error };
+        }), logs: existsSync(logs) ? readdirSync(logs).sort().slice(-1).map(file => readFileSync(join(logs, file), 'utf8').slice(-8192)) : [] } }));
+      throw error;
+    }
     assert.deepEqual(await json('agent', 'contexts', configuredId, 'setup-analyst'), histories);
     assert.equal(provider.requests.length, requests);
     provider.hold(); const marker = 'Installed CLI fleet message ' + randomUUID(), messageId = randomUUID();

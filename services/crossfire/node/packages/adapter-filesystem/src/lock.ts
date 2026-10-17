@@ -25,13 +25,14 @@ export function acquireFileLock(path: string): () => void {
   } catch (error) { database?.close(); closeSync(descriptor); throw error; }
 }
 
-export async function acquireProcessLock(path: string, retries = 0, intervalMs = 1000): Promise<() => Promise<void>> {
+export async function acquireProcessLock(path: string, retries = 0, intervalMs = 1000, signal?: AbortSignal): Promise<() => Promise<void>> {
   if (!Number.isInteger(retries) || retries < 0 || !Number.isInteger(intervalMs) || intervalMs < 1 || intervalMs > 1000) throw new Error('Private lock observation requires bounded retries and intervals');
   for (let attempt = 0; ; attempt++) {
+    signal?.throwIfAborted();
     try { const release = acquireFileLock(path); return async () => release(); }
     catch (error) {
       if (!(error instanceof Error && 'code' in error && error.code === 'ELOCKED') || attempt >= retries) throw error;
-      await delay(intervalMs);
+      await delay(intervalMs, undefined, { signal });
     }
   }
 }

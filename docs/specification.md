@@ -444,12 +444,20 @@ Desired intent is written before start/stop. Orderly shutdown retains intent and
 closes resources. Same-root daemon restart restores desired bindings with at most
 four concurrent attempts. Stop cancels restoration/recovery. No boot service
 starts it after machine failure.
+An unavailable socket is not proof that the previous daemon released its root.
+The installed CLI observes the same private daemon ownership lock before launching
+a replacement, with a finite cancellable deadline. It never starts an overlapping
+controller or treats an authentication/unsafe-state error as an absent controller.
 
 Saved unfinished-work checkpoints bind exact contexts/publications. After restart,
 settle preceding input before one correlated continuation asking the agent to
 reread applicable AGENTS.md and continue unfinished authorized work. It cannot
 approve decisions, infer a reply room or replay completed effects. Idle/sleeping
 contexts receive no synthetic task.
+Native state observations own unfinished-work checkpoints. Activation records
+work already observed before readiness, and shutdown snapshots those observations
+before closing the native generation. A cancelled or unavailable reader during
+shutdown cannot invent an unfinished task for an idle context.
 
 Reset stops selected processes before retiring any selected history. It exports
 available authorized Matrix history/nonsecret configuration to verified private

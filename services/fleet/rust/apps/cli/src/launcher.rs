@@ -68,19 +68,12 @@ pub async fn launch(root: &Path, name: Option<&str>, stop: CancellationToken) ->
     }
     PrivateDirectory::open(root, true)?;
     let deadline = tokio::time::Instant::now() + Duration::from_secs(65);
-    let _ownership = loop {
-        match StateLock::acquire(&root.join("launcher")) {
-            Ok(lock) => break lock,
-            Err(error) if error.code == ErrorCode::Conflict => {
-                wait(stop.clone(), deadline, Duration::from_millis(100)).await?
-            }
-            Err(error) => return Err(error),
-        }
-    };
+    let _ownership = ownership(&root.join("launcher"), stop.clone(), deadline).await?;
     if let Some(value) = probe(root, stop.clone()).await? {
         validate(&value, name)?;
         return Ok(value);
     }
+    drop(ownership(&root.join("daemon"), stop.clone(), deadline).await?);
     let binary = daemon()?;
     let file = OwnedFile::open(&binary, 268435456)?
         .ok_or_else(|| invalid("The installed native fleetd executable is missing"))?;
@@ -167,6 +160,21 @@ pub async fn wait(
     duration: Duration,
 ) -> Result<()> {
     tokio::select! {biased;_=stop.cancelled()=>Err(Failure::new(ErrorCode::Unavailable,"CLI disconnected; accepted operations continue in fleetd")),_=tokio::time::sleep_until(deadline)=>Err(Failure::new(ErrorCode::Unavailable,"Controller observation exceeded its deadline")),_=tokio::time::sleep(duration)=>Ok(())}
+}
+async fn ownership(
+    path: &Path,
+    stop: CancellationToken,
+    deadline: tokio::time::Instant,
+) -> Result<StateLock> {
+    loop {
+        match StateLock::acquire(path) {
+            Ok(lock) => return Ok(lock),
+            Err(error) if error.code == ErrorCode::Conflict => {
+                wait(stop.clone(), deadline, Duration::from_millis(100)).await?
+            }
+            Err(error) => return Err(error),
+        }
+    }
 }
 pub async fn restart(root: &Path, stop: CancellationToken) -> Result<Value> {
     let client = Client::open(&root.join("fleetd.sock"), stop.clone())?;

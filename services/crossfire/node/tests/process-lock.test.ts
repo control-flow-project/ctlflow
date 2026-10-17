@@ -24,6 +24,12 @@ test('native process locks survive suspension, release on owner death, and retai
   assert.deepEqual(readdirSync(directory), ['receiver.lock']);
   const inode = statSync(path + '.lock').ino;
   await assert.rejects(acquireProcessLock(path), { code: 'ELOCKED' });
+  const cancelled = new AbortController();
+  const pending = acquireProcessLock(path, 650, 100, cancelled.signal);
+  cancelled.abort();
+  await assert.rejects(pending, { name: 'AbortError' });
+  await assert.rejects(acquireProcessLock(join(directory, 'cancelled'), 650, 100, cancelled.signal), { name: 'AbortError' });
+  assert.deepEqual(readdirSync(directory), ['receiver.lock'], 'Cancelled admission cannot create or replace ownership');
   child.kill('SIGSTOP');
   await assert.rejects(acquireProcessLock(path), { code: 'ELOCKED' });
   child.kill('SIGKILL'); await ended;

@@ -1,7 +1,6 @@
 mod logical;
 use crate::{
     lifecycle_observer::{LifecycleHooks, Tracker},
-    model::InterruptedContext,
     resume_work::{self, WorkStore},
 };
 use crossfire_agent_core::synchronization::{CancellationToken, Mutex as AsyncMutex};
@@ -261,7 +260,7 @@ impl<
         input.allow_new_history &= original.is_empty();
         self.state.lock().map_err(|_| ownership())?.phase = Phase::Waking;
         self.observe(NativeState::Waking, None)?;
-        self.tracker.recording.store(false, Ordering::Release);
+        self.tracker.suspend()?;
         let generation = self
             .tracker
             .generation
@@ -314,6 +313,7 @@ impl<
                 self.work.as_ref(),
             )
             .await?;
+            self.tracker.checkpoint(&contexts, true)?;
             Ok(contexts)
         }
         .await;
@@ -332,11 +332,10 @@ impl<
         state.native = Some(connected.clone());
         state.phase = Phase::Running;
         self.tracker.touch()?;
-        self.tracker.recording.store(true, Ordering::Release);
         Ok(connected)
     }
     async fn discard(&self, native: &Arc<A::Connection>) -> Result<()> {
-        self.tracker.recording.store(false, Ordering::Release);
+        self.tracker.suspend()?;
         native.close().await.map_err(|_| {
             if let Ok(mut state) = self.state.lock() {
                 state.phase = Phase::Failed;
@@ -419,21 +418,8 @@ impl<
         let Some(native) = self.state.lock().map_err(|_| ownership())?.native.clone() else {
             return Ok(());
         };
-        if preserve_work && !native.lifetime().is_cancelled() {
-            let contexts = self.contexts().await?;
-            let uncertain = native.inspect().await.is_err();
-            let mut interrupted = Vec::new();
-            for context in contexts {
-                let room = (context.context != self.primary()).then_some(context.context.as_str());
-                let active = native.active_turn(room, None).await;
-                if uncertain || active.is_err() || active?.is_some() {
-                    interrupted.push(InterruptedContext {
-                        context: context.context,
-                        session_id: context.session_id,
-                    });
-                }
-            }
-            resume_work::capture(self.work.as_ref(), &interrupted, self.clock.now()?)?;
+        if preserve_work {
+            self.tracker.checkpoint(&self.contexts().await?, false)?;
         }
         self.discard(&native).await?;
         self.state.lock().map_err(|_| ownership())?.phase = Phase::Sleeping;

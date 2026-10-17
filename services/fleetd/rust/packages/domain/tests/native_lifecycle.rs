@@ -76,6 +76,8 @@ struct State {
     starts: AtomicUsize,
     closes: AtomicUsize,
     busy: AtomicBool,
+    inspection_fails: AtomicBool,
+    working_on_start: AtomicBool,
     closing_fails: AtomicBool,
     starting_fails: AtomicBool,
     native_stop: Mutex<Option<CancellationToken>>,
@@ -114,7 +116,10 @@ impl<H: Hooks + 'static> OwnedAdapter<H> for Adapter {
         if self.0.starting_fails.load(Ordering::SeqCst) {
             return Err(failed());
         }
-        self.0.busy.store(false, Ordering::SeqCst);
+        self.0.busy.store(
+            self.0.working_on_start.load(Ordering::SeqCst),
+            Ordering::SeqCst,
+        );
         let hooks = input.hooks.clone();
         self.0
             .observations
@@ -137,6 +142,19 @@ impl<H: Hooks + 'static> OwnedAdapter<H> for Adapter {
             });
         }
         *self.0.native_stop.lock().map_err(|_| failed())? = Some(stop.clone());
+        input.hooks.observe(ObservationEvent::State {
+            runtime: Runtime::Codex,
+            session_id: "saved".into(),
+            room_id: None,
+            state: if self.0.working_on_start.load(Ordering::SeqCst) {
+                NativeState::Working
+            } else {
+                NativeState::Idle
+            },
+            observed_at: 1,
+            settings: vec![],
+            error_message: None,
+        });
         Ok(Native {
             state: self.0.clone(),
             stop,
@@ -277,6 +295,9 @@ impl Connection for Native {
         self.stop.clone()
     }
     async fn inspect(&self) -> Result<bool> {
+        if self.state.inspection_fails.load(Ordering::SeqCst) {
+            return Err(failed());
+        }
         Ok(self.state.busy.load(Ordering::SeqCst))
     }
     async fn deliver(
@@ -329,6 +350,9 @@ impl TurnControl for Native {
         _room: Option<&str>,
         _admission: Option<&Admission>,
     ) -> Result<Option<String>> {
+        if self.state.inspection_fails.load(Ordering::SeqCst) {
+            return Err(failed());
+        }
         Ok(self
             .state
             .busy
@@ -424,6 +448,17 @@ async fn active_work_is_not_slept_and_explicit_stop_resumes_with_a_checkpointed_
     )
     .await?;
     state.busy.store(true, Ordering::SeqCst);
+    for observer in state.observations.lock().map_err(|_| failed())?.clone() {
+        observer(ObservationEvent::State {
+            runtime: Runtime::Codex,
+            session_id: "saved".into(),
+            room_id: None,
+            state: NativeState::Working,
+            observed_at: 1,
+            settings: vec![],
+            error_message: None,
+        });
+    }
     clock.store(3600000, Ordering::SeqCst);
     owner.maintain().await?;
     assert_eq!(state.closes.load(Ordering::SeqCst), 0);
@@ -444,6 +479,67 @@ async fn active_work_is_not_slept_and_explicit_stop_resumes_with_a_checkpointed_
     owner.close().await?;
     Ok(())
 }
+#[tokio::test]
+async fn an_idle_native_reader_failure_during_stop_cannot_invent_unfinished_work()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let state = Arc::new(State::default());
+    let work = Arc::new(Work::default());
+    let owner = Owner::open(
+        Arc::new(Adapter(state.clone())),
+        input(),
+        work.clone(),
+        Time(Arc::new(AtomicI64::new(1))),
+        Initial::Start,
+        CancellationToken::new(),
+        Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
+    )
+    .await?;
+    state.inspection_fails.store(true, Ordering::SeqCst);
+    owner.stop_native(true).await?;
+    assert!(
+        work.work()?.is_empty(),
+        "Shutdown cannot interpret a cancelled reader as an unfinished model task"
+    );
+    owner.close().await?;
+    assert_eq!(state.closes.load(Ordering::SeqCst), 1);
+    assert!(state.deliveries.lock().map_err(|_| failed())?.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn activation_durably_checkpoints_work_observed_before_native_start_returns()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let state = Arc::new(State::default());
+    state.working_on_start.store(true, Ordering::SeqCst);
+    let work = Arc::new(Work::default());
+    let owner = Owner::open(
+        Arc::new(Adapter(state.clone())),
+        input(),
+        work.clone(),
+        Time(Arc::new(AtomicI64::new(1))),
+        Initial::Start,
+        CancellationToken::new(),
+        Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
+    )
+    .await?;
+    let pending = work.work()?;
+    assert_eq!(
+        pending.len(),
+        1,
+        "An active turn observed during activation must survive an immediate controller crash"
+    );
+    assert_eq!(pending[0].context, "shared");
+    assert_eq!(pending[0].session_id, "saved");
+    state.inspection_fails.store(true, Ordering::SeqCst);
+    owner.close().await?;
+    assert_eq!(
+        work.work()?,
+        pending,
+        "Shutdown preserves the original correlated continuation without querying a stopped process"
+    );
+    Ok(())
+}
+
 #[tokio::test]
 async fn crashed_native_process_is_closed_before_replacement_and_failed_close_blocks_every_start()
 -> std::result::Result<(), Box<dyn std::error::Error>> {

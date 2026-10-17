@@ -21,9 +21,10 @@ public static partial class DaemonLauncher
         Prepare(root); using var scope = new CancellationTokenSource(TimeSpan.FromSeconds(65), clock); using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellation, scope.Token); StateLock? ownership = null;
         try
         {
-            while (ownership is null) { linked.Token.ThrowIfCancellationRequested(); try { ownership = new(Path.Combine(root, "launcher")); } catch (IOException) { await Task.Delay(TimeSpan.FromMilliseconds(100), clock, linked.Token); } }
+            ownership = await Acquire(Path.Combine(root, "launcher"), clock, linked.Token);
             using var client = new Client(Path.Combine(root, "fleetd.sock")); var previous = PrivateFiles.Exists(Path.Combine(root, "fleetd.sock")) ? await Call(client, "status", linked.Token) : Crossfire.Kernel.Results.Fail<JsonElement>("unavailable", "Controller has not started");
             if (previous.IsSuccess) { ValidateStatus(previous.Value, name); return previous.Value; } if (previous.Error.Code != "unavailable") throw new CommandFailure(previous.Error.Message);
+            using (await Acquire(Path.Combine(root, "daemon"), clock, linked.Token)) { }
             var executable = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "fleetd", "fleetd")); PrivateFiles.Executable(executable); var start = new ProcessStartInfo("/usr/bin/setsid") { UseShellExecute = false, WorkingDirectory = root, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
             foreach (var item in new[] { "--", executable, "--root", root, "--artifacts", ReleaseDirectory, "--background" }) start.ArgumentList.Add(item); if (name is not null) { start.ArgumentList.Add("--name"); start.ArgumentList.Add(name); }
             using var process = Process.Start(start) ?? throw new CommandFailure("Cannot start the installed native fleet controller"); process.StandardInput.Close(); process.StandardOutput.Close(); process.StandardError.Close(); var ready = false;
@@ -43,6 +44,16 @@ public static partial class DaemonLauncher
     private static void Prepare(string root)
     {
         if (!Path.IsPathFullyQualified(root) || root != Path.GetFullPath(root) || Encoding.UTF8.GetByteCount(Path.Combine(root, "fleetd.sock")) > 100) throw new CommandFailure("Use an exact absolute controller root short enough for its Unix socket"); if (PrivateFiles.Exists(root)) PrivateFiles.ExistingDirectory(root, true); else PrivateFiles.Directory(root);
+    }
+    private static async ValueTask<StateLock> Acquire(string path, TimeProvider clock, CancellationToken cancellation)
+    {
+        for (;;)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            try { return new StateLock(path); }
+            catch (IOException error) when (error.Message == "Another process already owns this private state")
+            { await Task.Delay(TimeSpan.FromMilliseconds(100), clock, cancellation); }
+        }
     }
     private static void ValidateStatus(JsonElement status, string? name)
     { var controller = status.GetProperty("controller"); if (name is not null && Text(controller, "name") != name || Boolean(status, "stopping")) throw new CommandFailure("Selected controller has another identity or is stopping"); }

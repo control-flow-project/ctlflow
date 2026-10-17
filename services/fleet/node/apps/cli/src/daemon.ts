@@ -43,6 +43,9 @@ async function launch(root: string, name: string | undefined, signal: AbortSigna
   }
   if (existing.error.code !== 'unavailable') throw new Error('Existing controller response is invalid: ' + existing.error.message);
   signal.throwIfAborted();
+  const relinquished = await acquireProcessLock(join(root, 'daemon'), 650, 100, signal);
+  await relinquished();
+  signal.throwIfAborted();
   const child = spawn(process.execPath, [fileURLToPath(import.meta.resolve('@ctlflow/fleetd/executable')), '--root', root, ...(name === undefined ? [] : ['--name', name])], { detached: true, stdio: 'ignore' });
   child.unref();
   const ended = new Promise<void>(resolve => { child.once('close', () => resolve()); });
