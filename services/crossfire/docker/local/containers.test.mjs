@@ -84,18 +84,13 @@ test('local Docker retains exact fleet history, stop intent, credentials and bro
       browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', headless: true });
       const context = await browser.newContext();
       const page = await context.newPage();
-      await scope.test('real browser signs in and content cannot read main-origin state', async () => {
+      await scope.test('real browser signs in on the canonical public origin', async () => {
         await page.goto(origin + '/manage/');
         await page.getByLabel('Matrix username').fill('@admin:local.test');
         await page.getByLabel('Password', { exact: true }).fill(bootstrap.administratorPassword);
         await page.getByRole('button', { name: 'Sign in', exact: true }).click();
         await expect(page.getByRole('link', { name: 'Fleets', exact: true }).first()).toBeVisible();
         await page.evaluate(() => { document.cookie = 'local_scope_probe=private; SameSite=Strict; Path=/'; localStorage.setItem('local_scope_probe', 'private'); });
-        const published = await context.newPage();
-        const response = await published.goto(content + '/'); assert.equal(response.status(), 404);
-        const separate = await published.evaluate(() => ({ cookie: document.cookie, storage: localStorage.getItem('local_scope_probe') }));
-        assert(!separate.cookie.includes('local_scope_probe')); assert.equal(separate.storage, null);
-        await published.close();
         assert.equal((await page.request.get(origin + '/_matrix/client/versions')).status(), 200);
         assert.equal((await page.request.get(origin + '/')).status(), 200);
       });
@@ -110,7 +105,34 @@ test('local Docker retains exact fleet history, stop intent, credentials and bro
         }, { path, body });
       }
       const models = { models: nativeModels().models.filter(model => model.slug === 'fixture-model') };
-      await script(`import{mkdirSync,writeFileSync}from"node:fs";process.umask(63);const home="/home/node/.codex",workspace="/home/node/workspaces/example";mkdirSync(home,{recursive:true});mkdirSync(workspace+"/agents/assistant",{recursive:true});writeFileSync(home+"/auth.json","{}");writeFileSync(home+"/models.json",${JSON.stringify(JSON.stringify(models))});writeFileSync(home+"/config.toml",${JSON.stringify('model = "fixture-model"\nmodel_reasoning_effort = "medium"\nmodel_catalog_json = "/home/node/.codex/models.json"\nmodel_provider = "fixture"\n[model_providers.fixture]\nname = "Inert local fixture"\nbase_url = "http://127.0.0.1:19000/v1"\nwire_api = "responses"\nrequires_openai_auth = false\nrequest_max_retries = 0\nstream_max_retries = 0\n')});writeFileSync(workspace+"/runtime.toml",${JSON.stringify('fleet = "example"\n[coordination]\nadapter = "crossfire"\nserver = "http://127.0.0.1:8080"\nowner = "@admin:local.test"\n[[instances]]\nkey = "alpha"\nname = "example-alpha"\ndefinition = "assistant"\nworkarea = "agents/assistant/workarea/alpha"\n[[instances]]\nkey = "bravo"\nname = "example-bravo"\ndefinition = "assistant"\nworkarea = "agents/assistant/workarea/bravo"\n')});writeFileSync(workspace+"/agents/assistant/agent.toml",'name = "Local fixture"\nruntime = "codex"\n[runtime_options]\napproval_policy = "never"\nsandbox_mode = "danger-full-access"\n');writeFileSync(workspace+"/agents/assistant/AGENTS.md","Inert local container verification. No external requests are authorized.");`);
+      const files = {
+        '/home/node/.codex/auth.json': '{}',
+        '/home/node/.codex/models.json': JSON.stringify(models),
+        '/home/node/.codex/config.toml': [
+          'model = "fixture-model"', 'model_reasoning_effort = "medium"',
+          'model_catalog_json = "/home/node/.codex/models.json"', 'model_provider = "fixture"',
+          '[model_providers.fixture]', 'name = "Inert local fixture"',
+          'base_url = "http://127.0.0.1:19000/v1"', 'wire_api = "responses"',
+          'requires_openai_auth = false', 'request_max_retries = 0', 'stream_max_retries = 0', '',
+        ].join('\n'),
+        '/home/node/workspaces/example/runtime.toml': [
+          'fleet = "example"', '[coordination]', 'adapter = "crossfire"',
+          'server = "http://127.0.0.1:8080"', 'owner = "@admin:local.test"',
+          '[[instances]]', 'key = "alpha"', 'name = "example-alpha"',
+          'definition = "assistant"', 'workarea = "agents/assistant/workarea/alpha"',
+          '[[instances]]', 'key = "bravo"', 'name = "example-bravo"',
+          'definition = "assistant"', 'workarea = "agents/assistant/workarea/bravo"', '',
+        ].join('\n'),
+        '/home/node/workspaces/example/agents/assistant/agent.toml': [
+          'name = "Local fixture"', 'runtime = "codex"', '[runtime_options]',
+          'approval_policy = "never"', 'sandbox_mode = "danger-full-access"', '',
+        ].join('\n'),
+        '/home/node/workspaces/example/agents/assistant/AGENTS.md':
+          'Inert local container verification. No external requests are authorized.',
+      };
+      await script('import{mkdirSync,writeFileSync}from"node:fs";import{dirname}from"node:path";'
+        + 'process.umask(63);const files=' + JSON.stringify(files)
+        + ';for(const [path,contents]of Object.entries(files)){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,contents);}');
       const providerSource = readFileSync(new URL('provider-fixture.mjs', import.meta.url), 'utf8');
       const startProvider = async () => {
         const provider = command([...composeArguments, 'exec', '-T', 'fleetd', 'node', '--input-type=module'], providerSource);
@@ -129,6 +151,31 @@ test('local Docker retains exact fleet history, stop intent, credentials and bro
           expectedRevision: request.revision, decision: 'approve', verificationCode: request.verificationCode,
         });
         assert((await setup.ended).includes('"status": "ready"'));
+      });
+      await scope.test('an actual agent publication cannot read main-origin cookies or storage', async () => {
+        await script('import{mkdirSync,writeFileSync}from"node:fs";mkdirSync("/home/node/report",{recursive:true});'
+          + 'writeFileSync("/home/node/report/index.html","<!doctype html><title>Local publication</title><h1>Local publication</h1>");');
+        const workspace = '/home/node/workspaces/example/agents/assistant/workarea/alpha';
+        const publication = json(await compose(['exec', '-T', 'fleetd', 'node', workspace + '/.crossfire/client.mjs',
+          '--project', workspace, '--profile', 'alpha', 'report', 'publish', '--directory', '/home/node/report', '--title', 'Local publication']));
+        assert.equal(new URL(publication.url).origin, content);
+        const published = await context.newPage();
+        try {
+          const response = await published.goto(publication.url); assert.equal(response.status(), 200);
+          await expect(published.getByRole('heading', { name: 'Local publication' })).toBeVisible();
+          assert.match(response.headers()['content-security-policy'], /^sandbox allow-scripts;/u);
+          const separate = await published.evaluate(() => {
+            function denied(read) {
+              try { read(); return false; }
+              catch (error) { return error instanceof DOMException && error.name === 'SecurityError'; }
+            }
+            return { cookies: denied(() => document.cookie), storage: denied(() => localStorage.getItem('local_scope_probe')) };
+          });
+          assert.deepEqual(separate, { cookies: true, storage: true });
+          assert.equal((await context.cookies(publication.url)).some(cookie => cookie.name === 'local_scope_probe'), false);
+          const contentRequest = await published.request.get(content + '/api/sessions/current');
+          assert.equal(contentRequest.status(), 404);
+        } finally { await published.close(); }
       });
       const contexts = async key => json(await fleet(['agent', 'contexts', 'example', key]));
       const before = { alpha: await contexts('alpha'), bravo: await contexts('bravo') };

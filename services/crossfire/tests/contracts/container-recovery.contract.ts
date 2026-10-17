@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { linkSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
 import { observe } from '@ctlflow/crossfire-test-support/contract-process';
@@ -65,7 +65,7 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
         const path = join(temporary, operator.name + '-' + failure); mkdirSync(path);
         const source = join(fixture.packages, operator.name), manifest = JSON.parse(readFileSync(join(source, 'release.json'), 'utf8')) as Record<string, unknown>;
         if (failure === 'archive') writeFileSync(join(path, 'images.tar'), 'corrupt archive');
-        else { linkSync(join(source, 'images.tar'), join(path, 'images.tar')); manifest.backend = 'incorrect-backend'; }
+        else { copyFileSync(join(source, 'images.tar'), join(path, 'images.tar')); manifest.backend = 'incorrect-backend'; }
         writeFileSync(join(path, 'release.json'), JSON.stringify(manifest));
         const identity = inspect(fixture.containerName, '{{.Id}}'); await fixture.abandon();
         const contender = fixture.launch(operator, path); await observe(() => !contender.alive(), 'Invalid package fails before stopping writers', 60000);

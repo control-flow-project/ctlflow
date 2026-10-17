@@ -37,6 +37,42 @@ test('Node fleet container retains private credentials and stopped registry acro
         assert.equal(before.uid, 1000); assert.equal(before.mode, 0o600);
         assert.equal(JSON.parse(await fleet(['daemon', 'status'])).controller.name, 'local-docker');
       });
+      await scope.test('installed Pi answers its actual offline RPC without provider credentials', async () => {
+        await node(String.raw`
+          import assert from 'node:assert/strict';
+          import { spawn } from 'node:child_process';
+          import { once } from 'node:events';
+          import { mkdtempSync, rmSync } from 'node:fs';
+          import { createInterface } from 'node:readline';
+          const home = mkdtempSync('/tmp/fleet-pi-rpc-');
+          const child = spawn('pi', ['--mode', 'rpc', '--offline', '--no-extensions', '--no-skills',
+            '--no-prompt-templates', '--no-themes', '--no-approve', '--session', home + '/session.jsonl'],
+            { env: { ...process.env, HOME: home, PI_CODING_AGENT_DIR: home }, stdio: ['pipe', 'pipe', 'pipe'] });
+          const ended = once(child, 'close'); void ended.catch(() => {});
+          const lines = createInterface({ input: child.stdout });
+          const response = new Promise((resolve, reject) => {
+            lines.on('line', line => {
+              try {
+                const value = JSON.parse(line);
+                if (value.id === 'local-readiness') resolve(value);
+              } catch (error) { reject(error); }
+            });
+          });
+          child.stderr.resume(); child.stdin.on('error', () => {});
+          const deadline = AbortSignal.timeout(15000);
+          try {
+            child.stdin.write(JSON.stringify({ id: 'local-readiness', type: 'get_state' }) + '\n');
+            const value = await Promise.race([response,
+              ended.then(() => { throw new Error('Pi exited before its native RPC response'); }),
+              new Promise((resolve, reject) => deadline.addEventListener('abort', () => reject(deadline.reason), { once: true }))]);
+            assert.equal(value.type, 'response'); assert.equal(value.command, 'get_state'); assert.equal(value.success, true);
+          } finally {
+            child.kill('SIGTERM');
+            const escalation = setTimeout(() => child.kill('SIGKILL'), 3000);
+            try { await ended; } finally { clearTimeout(escalation); lines.close(); rmSync(home, { recursive: true }); }
+          }
+        `);
+      });
       await node('import{mkdirSync,writeFileSync}from"node:fs";process.umask(63);const path="/home/node/workspaces/example";mkdirSync(path+"/agents/assistant",{recursive:true});writeFileSync(path+"/runtime.toml",\'fleet = "example"\\n[coordination]\\nadapter = "crossfire"\\nserver = "http://127.0.0.1:8080"\\nowner = "@admin:local.test"\\n[[instances]]\\nkey = "alpha"\\nname = "example-alpha"\\ndefinition = "assistant"\\nworkarea = "agents/assistant/workarea/alpha"\\n\');writeFileSync(path+"/agents/assistant/agent.toml",\'name = "Local fixture"\\nruntime = "codex"\\n[runtime_options]\\n\');writeFileSync(path+"/agents/assistant/AGENTS.md","Local fixture. No external requests are authorized.");');
       await fleet(['add', '/home/node/workspaces/example']);
       const registered = JSON.parse(await fleet(['show', 'example']));
