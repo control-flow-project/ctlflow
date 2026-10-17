@@ -34,12 +34,17 @@ public static class ListenerReportingAcceptance
             Equal(disconnected, 0, "expected delivery cancellation never invalidates the fleet connection"); Equal(started, 0, "cancelled registration is not reported as a listener run");
             control.Update(true, null); Equal((await reporting.Activate()).Value, true, "delivery resumes with the same controller binding"); var first = reporting.RunId;
             Equal(first is not null, true, "successful registration supplies a run identity"); Equal((await reporting.Activate()).Value, true, "current activity is reused"); Equal(calls, 2, "reuse does not register twice");
+            Equal((await reporting.Ready(lifetime.Token)).Value, first, "native questions read the current reporting identity");
             holdClose = true; control.Update(false, null); control.Update(true, null); var replacing = reporting.Activate().AsTask(); await closing.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var currentReady = reporting.Ready(lifetime.Token).AsTask(); Equal(currentReady.IsCompleted, false, "a closed generation cannot supply the first run to a new question");
             control.Update(false, null); control.Update(true, null); release.TrySetResult();
             Equal((await replacing.WaitAsync(TimeSpan.FromSeconds(5))).Value, false, "a generation cancelled during old-run cleanup is not activated"); Equal(calls, 2, "stale activation cannot register a replacement");
             Equal((await reporting.Activate()).Value, true, "next activation registers the current generation"); Equal(reporting.RunId != first, true, "new reporting generation has its own authenticated run");
+            Equal((await currentReady.WaitAsync(TimeSpan.FromSeconds(5))).Value, reporting.RunId, "a waiting native question receives the replacement reporting identity");
             Equal(started, 2, "only successful runs report activity"); Equal(disconnected, 0, "rapid pause and resume do not reconnect the fleet");
             await reporting.Pause(); Equal(stopped, 2, "both acquired reporters close exactly once"); Equal(reporting.RunId is null, true, "closed reporter has no live identity");
+            using var cancelled = new CancellationTokenSource(); var waiting = reporting.Ready(cancelled.Token).AsTask(); cancelled.Cancel();
+            Equal((await waiting.WaitAsync(TimeSpan.FromSeconds(5))).IsSuccess, false, "cancelled native questions cannot use a stale reporting identity");
         }
         finally { release.TrySetResult(); await reporting.Pause(); }
         using var failedControl = new ListenerControl(() => new("fleet", "connection", "credential"), (_, _, _, _) => ValueTask.FromResult(Results.Done()), _ => disconnected++);

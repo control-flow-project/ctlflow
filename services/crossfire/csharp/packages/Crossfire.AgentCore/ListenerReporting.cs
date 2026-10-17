@@ -9,11 +9,38 @@ public sealed record ListenerReportingOptions(Coordination Coordination, string 
 
 public sealed class ListenerReporting(ListenerReportingOptions options, CancellationToken lifetime)
 {
+    private readonly object gate = new();
+    private TaskCompletionSource<string> ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private ListenerActivity? activity;
     private CancellationToken generation;
     private CancellationTokenSource? scope;
     private CancellationTokenRegistration failure;
-    public string? RunId => activity?.RunId;
+    private string? CurrentRun()
+    {
+        var current = options.Control.Current();
+        return activity is not null && !activity.Failed.IsCancellationRequested && current.Active && current.Generation == generation
+            ? activity.RunId : null;
+    }
+    public string? RunId { get { lock (gate) return CurrentRun(); } }
+    public async ValueTask<Result<string>> Ready(CancellationToken cancellation)
+    {
+        using var scope = CancellationTokenSource.CreateLinkedTokenSource(lifetime, cancellation);
+        try
+        {
+            for (;;)
+            {
+                scope.Token.ThrowIfCancellationRequested(); Task<string> pending;
+                lock (gate)
+                {
+                    if (CurrentRun() is { } current) return Result<string>.Success(current);
+                    if (ready.Task.IsCompleted) ready = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    pending = ready.Task;
+                }
+                await pending.WaitAsync(scope.Token);
+            }
+        }
+        catch (OperationCanceledException) { return Results.Fail<string>("unavailable", "Listener reporting is not ready"); }
+    }
     public void Delivered(int count) => activity?.Delivered(count);
     public async ValueTask<Result<bool>> Activate()
     {
@@ -31,7 +58,8 @@ public sealed class ListenerReporting(ListenerReportingOptions options, Cancella
             if (!Retryable(result.Error)) return Result<bool>.Fail(result.Error);
             options.Control.Unavailable(result.Error.Message); return Result<bool>.Success(false);
         }
-        var reporter = result.Value; activity = reporter; generation = current.Generation;
+        var reporter = result.Value;
+        lock (gate) { activity = reporter; generation = current.Generation; ready.TrySetResult(reporter.RunId); }
         failure = reporter.Failed.Register(() =>
         {
             if (!ReferenceEquals(activity, reporter) || current.Generation.IsCancellationRequested || lifetime.IsCancellationRequested) return;
@@ -43,7 +71,8 @@ public sealed class ListenerReporting(ListenerReportingOptions options, Cancella
     }
     public async ValueTask Pause()
     {
-        failure.Dispose(); var previous = activity; activity = null;
+        failure.Dispose(); ListenerActivity? previous;
+        lock (gate) { previous = activity; activity = null; if (ready.Task.IsCompleted) ready = new(TaskCreationOptions.RunContinuationsAsynchronously); }
         try { if (previous is not null) await previous.DisposeAsync(); }
         finally { scope?.Dispose(); scope = null; }
     }

@@ -22,7 +22,6 @@ public sealed partial class ListenerReceiver
     private readonly SemaphoreSlim accessGate = new(1, 1);
     private readonly ListenerSignal changed = new();
     private readonly CancellationTokenSource lifetime;
-    private readonly TaskCompletionSource<string> reporting = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly List<CancellationTokenSource> retired = [];
     private int ordinaryUsers;
     private CancellationTokenSource ordinary = new();
@@ -61,7 +60,7 @@ public sealed partial class ListenerReceiver
     {
         this.options = options; lifetime = CancellationTokenSource.CreateLinkedTokenSource(stop); statistics = new(options.Profile.Account.UserId, options.Clock);
         activity = new(new(options.Coordination, options.Profile.Id, options.Release, options.Control, statistics, options.Clock, options.Log,
-            release => { updates.Available(release); Change(); }, (run, binding) => { reporting.TrySetResult(run); approval!.Start(); observer!.Start(run); options.Activity?.Invoke(run, binding); }, Fail), lifetime.Token);
+            release => { updates.Available(release); Change(); }, (run, binding) => { approval!.Start(); observer!.Start(run); options.Activity?.Invoke(run, binding); }, Fail), lifetime.Token);
     }
     private static T Take<T>(Result<T> value) => value.IsSuccess ? value.Value : throw new ReceiverFailure(value.Error);
     private void Fail(Failure error) { lock (gate) failure ??= error; lifetime.Cancel(); changed.Wake(); }
@@ -89,8 +88,7 @@ public sealed partial class ListenerReceiver
         await options.Control.WaitForActivation(lifetime.Token); var release = Take(await options.Coordination.Call(new("release", new Dictionary<string, string>()), lifetime.Token));
         if (WireJson.Text(release, "release") is not { } available || !ReleaseValues.Identity(available) || !ReleaseValues.Identity(options.Release)) throw new ReceiverFailure(new("invalid", "Crossfire software release identity is invalid"));
         observer = new(Storage, File + ".observation", options.Profile, options.Matrix, options.Coordination, options.Clock, options.HistoryMode, () => Volatile.Read(ref maximum), () => destination?.Lifecycle?.Current(), Fail, lifetime.Token);
-        approval = new(options.Profile, options.Coordination, options.Matrix, Storage, File + ".decisions", options.Clock, async token =>
-        { try { return Result<string>.Success(await reporting.Task.WaitAsync(token)); } catch (OperationCanceledException) { return Results.Fail<string>("unavailable", "Listener reporting is not ready"); } }, lifetime.Token);
+        approval = new(options.Profile, options.Coordination, options.Matrix, Storage, File + ".decisions", options.Clock, activity.Ready, lifetime.Token);
         destination = Take(await options.Runtime(new(approval.Request, statistics.Usage, approval.Responded, () => approval.Unresolved, PendingInput, observer.Observe), lifetime.Token));
         nativeFailure = Runtime.Lifetime.Register(() => Fail(new("unavailable", "Owned native runtime connection stopped; exact saved histories and original pending input remain retained")));
         state = SteeringControl.Load(Storage, ControlFile, Runtime.SessionId); since = ReceiveState.SyncCursor(Storage, File); cycle = ReceiveSnapshots.LoadWake(Storage, File);
@@ -133,7 +131,7 @@ public sealed partial class ListenerReceiver
     private async ValueTask Close()
     {
         List<Exception> errors = []; async Task Finish(Func<Task> action) { try { await action(); } catch (Exception error) { errors.Add(error); } }
-        await Finish(lifetime.CancelAsync); reporting.TrySetCanceled(); options.Control.Changed -= ControlChanged; changed.Wake(); Sending? current; lock (gate) current = sending;
+        await Finish(lifetime.CancelAsync); options.Control.Changed -= ControlChanged; changed.Wake(); Sending? current; lock (gate) current = sending;
         if (current is not null) await Finish(async () => { try { await current.Cancellation.CancelAsync(); } catch (ObjectDisposedException) { } await current.Done; });
         if (acquisition is not null) await Finish(() => acquisition); if (queries is not null) await Finish(() => queries.Invalidate().AsTask()); nativeFailure.Unregister();
         if (approval is not null) await Finish(() => approval.DisposeAsync().AsTask()); if (observer is not null) await Finish(() => observer.DisposeAsync().AsTask()); await Finish(() => PauseActivity().AsTask()); if (destination is not null) await Finish(() => destination.DisposeAsync().AsTask());

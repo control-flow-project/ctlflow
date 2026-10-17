@@ -458,6 +458,9 @@ Native state observations own unfinished-work checkpoints. Activation records
 work already observed before readiness, and shutdown snapshots those observations
 before closing the native generation. A cancelled or unavailable reader during
 shutdown cannot invent an unfinished task for an idle context.
+Native owner questions use the currently active listener run. A reporting
+replacement invalidates the preceding run; callers waiting during reconnection
+receive the new run, never the first run cached at initial startup.
 
 Reset stops selected processes before retiring any selected history. It exports
 available authorized Matrix history/nonsecret configuration to verified private
