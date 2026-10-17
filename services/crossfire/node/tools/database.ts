@@ -163,10 +163,10 @@ export async function verifyPreservation(before: string, after: string, retentio
         preserved[name] = existing.length - (expired[name] ?? 0);
       }
       if (converted) {
-        const archived = (database: Database.Database) => executeSelect(database, schema, query => query.from('audit_event')
-          .where(row => row.action === 'agent.name.canonicalized' && row.request_id === 'schema-15-agent-names')
+        const archived = (database: Database.Database) => executeSelect(database, schema, (query, params) => query.from('audit_event')
+          .where(row => row.action === 'agent.name.canonicalized' && row.request_id === 'schema-15-agent-names' && row.created_at >= params.cutoff)
           .select(row => ({ owner_id: row.owner_id, target_kind: row.target_kind, target_id: row.target_id, actor_kind: row.actor_kind,
-            action: row.action, request_id: row.request_id, outcome: row.outcome, message: row.message })).take(100001));
+            action: row.action, request_id: row.request_id, outcome: row.outcome, message: row.message })).take(100001), { cutoff: proof.value.cutoff });
         const expected = archived(converted), actual = archived(secondDatabase);
         if (expected.length > 100000 || actual.length > 100000) return failure('limit', 'Name-archive verification exceeds its finite record bound');
         const available = new Map<string, number>();

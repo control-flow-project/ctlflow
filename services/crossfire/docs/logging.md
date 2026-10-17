@@ -78,6 +78,10 @@ execution admission. Existing ownership/generation conflicts still fail.
 
 Verify production backup before the forward migration.
 Migration retains rows; later maintenance applies the policy.
+Prior name-canonicalization audit records use the same audit retention rule.
+They are historical logging, not another agent-name authority. Without explicit
+retention proof, preservation still requires their exact content. Cutoff equality,
+fresh migration evidence and changed retained rows remain failures.
 
 Strict operator preservation may explicitly allow absent age-eligible logging:
 
