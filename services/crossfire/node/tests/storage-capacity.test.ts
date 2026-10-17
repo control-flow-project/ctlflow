@@ -77,7 +77,7 @@ test('a full 256 MiB management store reopens and registers listeners without lo
   assert.ok(first && last);
   assert.deepEqual(database.pragma('wal_checkpoint(TRUNCATE)'), [{ busy: 0, log: 0, checkpointed: 0 }]);
   assert.equal(statSync(path).size, maximum);
-  assert.equal(database.pragma('freelist_count', { simple: true }), 0);
+  assert.equal(sqliteMetadata.freePageCount(database), 0);
   database.close();
 
   const reopened = await applicationFixture(scope, path);
@@ -109,7 +109,7 @@ test('native storage exhaustion is retryable and rolls back the complete transac
     status: 'active' as const, revision: 0, createdAt: 1 };
   value(repositories.principal.insert(principal));
   const maximum = sqliteMetadata.maximumPageCount(database);
-  const pages = database.pragma('page_count', { simple: true });
+  const pages = sqliteMetadata.pageCount(database);
   database.pragma('max_page_count = ' + pages);
   const record = audit('capacity-retry', 'x'.repeat(128 * 1024));
   function write() {

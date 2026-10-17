@@ -36,8 +36,9 @@ test('a management reader does not block a committed heartbeat or omit committed
       assert.equal(databaseValid(restored), true);
     } finally { restored.close(); }
     assert.equal(value(reads.principal.find({ id: original.id }))?.revision, 1);
-    assert.equal(writer.pragma('synchronous', { simple: true }), 2, 'Concurrency does not weaken full commit durability');
+    assert.equal(sqliteMetadata.synchronousMode(writer), 2, 'Concurrency does not weaken full commit durability');
   } finally {
     reader.close(); writer.close(); rmSync(root, { recursive: true });
   }
 });
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';

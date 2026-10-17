@@ -11,6 +11,9 @@ export type MetadataTables = {
   pragma_foreign_keys: { foreign_keys: number };
   pragma_page_size: { page_size: number };
   pragma_max_page_count: { max_page_count: number };
+  pragma_synchronous: { synchronous: number };
+  pragma_freelist_count: { freelist_count: number };
+  pragma_page_count: { page_count: number };
   pragma_integrity_check: { integrity_check: string };
   pragma_foreign_key_check: { table: string; rowid: number | null; parent: string; fkid: number };
   pragma_table_info: { arg: string; cid: number; name: string; type: string; notnull: number; dflt_value: string | null; pk: number };
@@ -52,6 +55,18 @@ export function pageSize(database: Database.Database): number {
 
 export function maximumPageCount(database: Database.Database): number {
   return metadataValue(executeSelect(database, metadataSchema, query => query.from('pragma_max_page_count').select(row => ({ value: row.max_page_count }))));
+}
+
+export function synchronousMode(database: Database.Database): number {
+  return metadataValue(executeSelect(database, metadataSchema, query => query.from('pragma_synchronous').select(row => ({ value: row.synchronous }))));
+}
+
+export function freePageCount(database: Database.Database): number {
+  return metadataValue(executeSelect(database, metadataSchema, query => query.from('pragma_freelist_count').select(row => ({ value: row.freelist_count }))));
+}
+
+export function pageCount(database: Database.Database): number {
+  return metadataValue(executeSelect(database, metadataSchema, query => query.from('pragma_page_count').select(row => ({ value: row.page_count }))));
 }
 
 export function databaseIdentity(database: Database.Database): { application: number; version: number } {
