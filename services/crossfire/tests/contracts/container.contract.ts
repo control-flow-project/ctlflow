@@ -17,9 +17,9 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
   const cgroupParent = process.env.CROSSFIRE_TEST_CGROUP_PARENT ?? '';
   assert(cgroupParent, 'Run the repository-root verify:container command inside a verified bounded test scope');
   const { origin, state: directory, port, contentPort, containerName: name } = fixture;
-  const release = JSON.parse(readFileSync(join(fixture.packages, fixture.current().name, 'release.json'), 'utf8')) as { migrationImage: string };
+  const release = JSON.parse(readFileSync(join(fixture.packages, fixture.current().name, 'release.json'), 'utf8')) as { migration: { reference: string } };
   const checked = spawnSync('docker', ['run', '--rm', '--cgroup-parent', cgroupParent, '--network', 'none', '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=128m', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
-    '--mount', 'type=bind,source=' + directory + ',target=/runtime,readonly', '--entrypoint', 'node', release.migrationImage, '/app/services/crossfire/dist/scripts/container-configuration.js',
+    '--mount', 'type=bind,source=' + directory + ',target=/runtime,readonly', '--entrypoint', 'node', release.migration.reference, '/app/services/crossfire/dist/scripts/container-configuration.js',
     '--directory', '/runtime', '--instance', 'verification', '--origin', origin, '--content-origin', 'http://localhost:' + contentPort, '--server-name', 'verification.localhost'], { encoding: 'utf8', timeout: 30000 });
   assert.equal(checked.status, 0, checked.stderr);
   const empty = await fetch(origin + '/_matrix/client/v3/joined_rooms', { headers: { Authorization: 'Bearer ' + fixture.owner.nativeToken } });

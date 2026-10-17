@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { randomInt } from 'node:crypto';
 import { once } from 'node:events';
+import { readFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { TestContext } from 'node:test';
@@ -9,10 +11,29 @@ import { cleanup } from './cleanup.js';
 export type ContractCommand = { binary: string; arguments: string[] };
 export type ContractTarget = { name: string; implementation: 'node' | 'csharp' | 'rust'; server: ContractCommand; daemon: ContractCommand; cli: ContractCommand };
 export type ContractProcess = { child: ChildProcess; ended: Promise<number | null>; alive(): boolean; output(): string; errors(): string; close(): Promise<void> };
-export async function freePorts(): Promise<[number, number]> {
-  const servers = [createServer(), createServer()];
-  try { for (const server of servers) { server.listen(0, '127.0.0.1'); await once(server, 'listening'); } return servers.map(server => { const address = server.address(); assert(address && typeof address !== 'string'); return address.port; }) as [number, number]; }
-  finally { for (const server of servers) if (server.listening) await new Promise<void>(resolveClose => server.close(() => resolveClose())); }
+export async function freePorts(scope: Parameters<typeof cleanup>[0]): Promise<[number, number]> {
+  assert.equal(process.platform, 'linux', 'Executable contracts require their Linux resource guard');
+  const range = readFileSync('/proc/sys/net/ipv4/ip_local_port_range', 'utf8').trim().split(/\s+/u).map(Number);
+  assert.equal(range.length, 2); const [first, last] = range as [number, number];
+  assert(Number.isInteger(first) && Number.isInteger(last) && first > 0 && first <= last && last <= 65535, 'Expected the kernel ephemeral port range');
+  const leases: ReturnType<typeof createServer>[] = [], ports: number[] = [];
+  const close = async () => { for (const lease of leases.reverse()) if (lease.listening) await new Promise<void>((resolveClose, rejectClose) => lease.close(error => error ? rejectClose(error) : resolveClose())); };
+  try {
+    for (let attempt = 0; ports.length < 2 && attempt < 4096; attempt++) {
+      const port = randomInt(1024, 65536); if (port >= first && port <= last) continue;
+      const lease = createServer(), probe = createServer();
+      try {
+        lease.listen('\0ctlflow-contract-port-' + process.getuid!() + '-' + port); await once(lease, 'listening');
+        probe.listen(port, '127.0.0.1'); await once(probe, 'listening');
+        leases.push(lease); ports.push(port);
+      } catch (error) {
+        if (lease.listening) await new Promise<void>(resolveClose => lease.close(() => resolveClose()));
+        if (!(error instanceof Error && 'code' in error && error.code === 'EADDRINUSE')) throw error;
+      } finally { if (probe.listening) await new Promise<void>(resolveClose => probe.close(() => resolveClose())); }
+    }
+    assert.equal(ports.length, 2, 'Two non-ephemeral contract ports must be available');
+    cleanup(scope, close); return ports as [number, number];
+  } catch (error) { await close(); throw error; }
 }
 export function record(value: unknown): Record<string, unknown> { assert(value !== null && typeof value === 'object' && !Array.isArray(value), 'Expected a protocol object'); return value as Record<string, unknown>; }
 export function text(value: unknown): string { assert.equal(typeof value, 'string', 'Expected protocol text'); return value as string; }

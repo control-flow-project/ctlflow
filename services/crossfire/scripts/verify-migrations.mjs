@@ -30,6 +30,10 @@ try {
       { stdio: 'inherit', timeout: 1_800_000 });
     image = execFileSync('docker', ['image', 'inspect', '--format', '{{.Id}}', tag], { encoding: 'utf8', timeout: 30000 }).trim();
     assert.match(image, /^sha256:[a-f0-9]{64}$/u);
+    execFileSync('docker', ['run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+      '--cgroup-parent', parent, '--entrypoint', '/bin/sh', image, '-c',
+      'test ! -e /usr/bin/g++ && test ! -d /app/services/crossfire/csharp && test ! -d /app/services/crossfire/node/tests && test ! -d /app/element && test ! -e /usr/local/bin/conduit'],
+    { stdio: 'inherit', timeout: 30000 });
     for (const version of [0, 13, 17, 18]) {
       const selected = join(directory, String(version)); mkdirSync(selected, { mode: 0o700 });
       const path = join(selected, 'management.sqlite');

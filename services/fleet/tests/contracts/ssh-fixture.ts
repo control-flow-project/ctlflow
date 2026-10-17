@@ -14,7 +14,7 @@ export async function sshFixture(scope: TestContext, configurationHome: string) 
   const bin = join(directory, 'bin'); mkdirSync(bin, { mode: 0o700 });
   const execute = promisify(execFile);
   for (const name of ['host', 'client', 'wrong-host']) await execute('/usr/bin/ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', join(directory, name)], { timeout: 15000 });
-  const [port] = await freePorts(), known = join(directory, 'known_hosts'), configuration = join(directory, 'ssh_config');
+  const [port] = await freePorts(scope), known = join(directory, 'known_hosts'), configuration = join(directory, 'ssh_config');
   const trust = (name: string) => writeFileSync(known, '[127.0.0.1]:' + port + ' ' + readFileSync(join(directory, name + '.pub'), 'utf8'), { mode: 0o600 }); trust('host');
   writeFileSync(configuration, 'Host fixture\n  HostName 127.0.0.1\n  Port ' + port + '\n  User ' + userInfo().username + '\n  IdentityFile ' + join(directory, 'client') + '\n  IdentitiesOnly yes\n  BatchMode yes\n  UserKnownHostsFile ' + known + '\n', { mode: 0o600 });
   writeFileSync(join(bin, 'ssh'), '#!/bin/sh\nexec /usr/bin/ssh -F ' + JSON.stringify(configuration) + ' "$@"\n', { mode: 0o700 });

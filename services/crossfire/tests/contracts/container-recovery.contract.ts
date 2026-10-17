@@ -21,7 +21,8 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
   await scope.test('a transferred derivative package imports its missing image and retains image-owned readiness', async child => {
     const original = fixture.current(), parent = inspect(fixture.containerName, '{{.Config.Image}}');
     assert.match(parent, /^sha256:[a-f0-9]{64}$/u);
-    const metadata = JSON.parse(readFileSync(join(fixture.packages, original.name, 'release.json'), 'utf8')) as { migrationImage: string };
+    const metadata = JSON.parse(readFileSync(join(fixture.packages, original.name, 'release.json'), 'utf8')) as { migration: { reference: string } };
+    const migrationImage = inspect(metadata.migration.reference, '{{.Id}}');
     const temporary = mkdtempSync(join(fixture.directory, 'transfer-'));
     let derivative: string | undefined;
     cleanup(child, () => fixture.start(original));
@@ -34,7 +35,7 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
     derivative = docker(['build', '--quiet', '--cgroup-parent', process.env.CROSSFIRE_TEST_CGROUP_PARENT!, '--file', join(temporary, 'Dockerfile'), temporary], artifactPreparationMilliseconds);
     assert.match(derivative, /^sha256:[a-f0-9]{64}$/u);
     const output = join(temporary, 'package');
-    const exported = spawnSync(process.execPath, [join(fixture.packages, original.name, 'package-tool.mjs'), 'export', '--runtime', derivative, '--migrations', metadata.migrationImage, '--output', output], { cwd: temporary, encoding: 'utf8', timeout: artifactPreparationMilliseconds });
+    const exported = spawnSync(process.execPath, [join(fixture.packages, original.name, 'package-tool.mjs'), 'export', '--runtime', derivative, '--migrations', migrationImage, '--output', output], { cwd: temporary, encoding: 'utf8', timeout: artifactPreparationMilliseconds });
     assert.equal(exported.status, 0, exported.stderr);
     docker(['image', 'rm', '--no-prune', derivative]);
     assert.notEqual(spawnSync('docker', ['image', 'inspect', derivative], { stdio: 'ignore' }).status, 0, 'The receiving operator must actually load the archive');
@@ -49,8 +50,8 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
     const original = fixture.current();
     for (const backend of fixture.targets) {
       await fixture.close(); await fixture.start(original, join(fixture.packages, backend.name));
-      const manifest = JSON.parse(readFileSync(join(fixture.packages, backend.name, 'release.json'), 'utf8')) as { runtimeImage: string };
-      assert.equal(inspect(fixture.containerName, '{{.Config.Image}}'), manifest.runtimeImage);
+      const manifest = JSON.parse(readFileSync(join(fixture.packages, backend.name, 'release.json'), 'utf8')) as { runtime: { reference: string } };
+      assert.equal(inspect(fixture.containerName, '{{.Config.Image}}'), inspect(manifest.runtime.reference, '{{.Id}}'));
       await fixture.operation(operations.currentSession);
       const health = JSON.parse(inspect(fixture.containerName, '{{json .Config.Healthcheck.Test}}')) as string[];
       assert.equal(health[0], 'CMD'); docker(['exec', fixture.containerName, ...health.slice(1)]);
@@ -61,16 +62,19 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
   await scope.test('corrupt archives and mismatched image labels cannot stop an existing runtime orphan', async () => {
     const original = fixture.current(), temporary = mkdtempSync(join(fixture.directory, 'bad-package-'));
     try {
-      for (const operator of fixture.targets) for (const failure of ['archive', 'labels']) {
+      for (const operator of fixture.targets) for (const failure of ['archive', 'labels', 'schema']) {
         const path = join(temporary, operator.name + '-' + failure); mkdirSync(path);
         try {
           const source = join(fixture.packages, operator.name), manifest = JSON.parse(readFileSync(join(source, 'release.json'), 'utf8')) as Record<string, unknown>;
           if (failure === 'archive') writeFileSync(join(path, 'images.tar'), 'corrupt archive');
-          else { copyFileSync(join(source, 'images.tar'), join(path, 'images.tar')); manifest.backend = 'incorrect-backend'; }
+          else {
+            copyFileSync(join(source, 'images.tar'), join(path, 'images.tar'));
+            if (failure === 'labels') manifest.backend = 'incorrect-backend'; else manifest.schemaVersion = 1;
+          }
           writeFileSync(join(path, 'release.json'), JSON.stringify(manifest));
           const identity = inspect(fixture.containerName, '{{.Id}}'); await fixture.abandon();
           const contender = fixture.launch(operator, path); await observe(() => !contender.alive(), 'Invalid package fails before stopping writers', 60000);
-          assert.notEqual(await contender.ended, 0); assert.match(contender.errors(), failure === 'archive' ? /SHA-256/u : /release labels/u);
+          assert.notEqual(await contender.ended, 0); assert.match(contender.errors(), failure === 'archive' ? /SHA-256/u : failure === 'labels' ? /release labels/u : /Invalid container package/u);
           assert.equal(inspect(identity, '{{.State.Status}}'), 'running'); await fixture.start(operator);
         } finally { rmSync(path, { recursive: true, force: true }); }
       }

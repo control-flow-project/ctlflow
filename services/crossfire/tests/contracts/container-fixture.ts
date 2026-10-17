@@ -19,7 +19,7 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
   mkdirSync(fixtureRoot, { recursive: true, mode: 0o700 });
   const directory = mkdtempSync(join(fixtureRoot, 'container-')), state = join(directory, 'state');
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true })); mkdirSync(state, { mode: 0o700 });
-  const [port, contentPort] = await freePorts(), { origin } = await secureProxy(scope, 'http://127.0.0.1:' + port), contentOrigin = 'http://localhost:' + contentPort;
+  const [port, contentPort] = await freePorts(scope), { origin } = await secureProxy(scope, 'http://127.0.0.1:' + port), contentOrigin = 'http://localhost:' + contentPort;
   const initialized = contractProcess(scope, initial.server, ['init', '--directory', state, '--instance', 'verification', '--origin', origin, '--content-origin', contentOrigin, '--server-name', 'verification.localhost', '--administrator', 'admin'], repository);
   assert.equal(await initialized.ended, 0, initialized.errors() + '\n' + initialized.output());
   const config = record(JSON.parse(readFileSync(join(state, 'config.json'), 'utf8')) as unknown);

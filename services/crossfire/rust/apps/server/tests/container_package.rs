@@ -9,7 +9,9 @@ use std::{
 use tokio_util::sync::CancellationToken;
 
 fn manifest() -> Value {
-    json!({"schemaVersion":1,"version":"0.1.20","sourceDigest":"a".repeat(64),"backend":"rust","platform":"linux/amd64","archiveSha256":format!("{:x}",Sha256::digest(b"fixture archive")),"runtimeImage":format!("sha256:{}","b".repeat(64)),"migrationImage":format!("sha256:{}","c".repeat(64))})
+    json!({"schemaVersion":2,"version":"0.1.21","sourceDigest":"a".repeat(64),"backend":"rust","platform":"linux/amd64","archiveSha256":format!("{:x}",Sha256::digest(b"fixture archive")),
+        "runtime":{"reference":format!("crossfire-package:{}","b".repeat(64)),"configDigest":format!("sha256:{}","b".repeat(64)),"descriptorDigest":format!("sha256:{}","d".repeat(64))},
+        "migration":{"reference":format!("crossfire-package:{}","c".repeat(64)),"configDigest":format!("sha256:{}","c".repeat(64)),"descriptorDigest":format!("sha256:{}","e".repeat(64))}})
 }
 #[test]
 fn exact_backend_independent_manifest_rejects_alternate_identities()
@@ -27,7 +29,7 @@ fn exact_backend_independent_manifest_rejects_alternate_identities()
         assert_eq!(serde_json::to_value(parsed)?, value);
     }
     for (key, value) in [
-        ("schemaVersion", json!(2)),
+        ("schemaVersion", json!(1)),
         ("platform", json!("linux/arm64")),
         ("backend", json!("migrations")),
         ("backend", json!("../node")),
@@ -39,7 +41,7 @@ fn exact_backend_independent_manifest_rejects_alternate_identities()
         ("sourceDigest", json!("A".repeat(64))),
         ("archiveSha256", Value::Null),
         ("runtimeImage", json!("mutable:latest")),
-        ("migrationImage", original["runtimeImage"].clone()),
+        ("migration", original["runtime"].clone()),
         ("extra", json!(true)),
     ] {
         let mut changed = original.clone();
@@ -55,8 +57,57 @@ fn exact_backend_independent_manifest_rejects_alternate_identities()
         assert!(package::parse(&changed).is_err(), "missing field {key}");
     }
     let mut numeric = original.clone();
-    numeric["schemaVersion"] = json!(1.0);
+    numeric["schemaVersion"] = json!(2.0);
     assert!(package::parse(&numeric).is_ok());
+    Ok(())
+}
+#[test]
+fn current_docker_stores_expose_exact_distinct_oci_objects()
+-> Result<(), Box<dyn std::error::Error>> {
+    let value = package::parse(&manifest())?;
+    let expected = &value.runtime;
+    assert_eq!(
+        package::native_image_identity(expected, &json!({"Id":expected.config_digest}))?,
+        expected.config_digest
+    );
+    for media in [
+        "application/vnd.oci.image.manifest.v1+json",
+        "application/vnd.oci.image.index.v1+json",
+        "application/vnd.docker.distribution.manifest.v2+json",
+        "application/vnd.docker.distribution.manifest.list.v2+json",
+    ] {
+        let descriptor = json!({"digest":expected.descriptor_digest,"mediaType":media});
+        assert_eq!(
+            package::native_image_identity(
+                expected,
+                &json!({"Id":expected.descriptor_digest,"Descriptor":descriptor})
+            )?,
+            expected.descriptor_digest
+        );
+        assert!(
+            package::native_image_identity(
+                expected,
+                &json!({"Id":expected.config_digest,"Descriptor":descriptor})
+            )
+            .is_err(),
+            "no identity retry for a current descriptor"
+        );
+    }
+    for descriptor in [
+        json!({}),
+        json!([]),
+        json!({"digest":value.migration.descriptor_digest,"mediaType":"application/vnd.oci.image.manifest.v1+json"}),
+        json!({"digest":expected.descriptor_digest,"mediaType":"unknown"}),
+    ] {
+        assert!(
+            package::native_image_identity(
+                expected,
+                &json!({"Id":expected.descriptor_digest,"Descriptor":descriptor})
+            )
+            .is_err(),
+            "incorrect descriptor is rejected"
+        );
+    }
     Ok(())
 }
 #[tokio::test]
@@ -176,8 +227,8 @@ case "$1 $2" in
   'image inspect')
     if [ "$FIXTURE_MODE" = missing ] && [ ! -f "$FIXTURE_ROOT/loaded" ]; then exit 1; fi
     case "$3" in
-      sha256:bbbb*) /bin/cat "$FIXTURE_ROOT/runtime.json" ;;
-      sha256:cccc*) /bin/cat "$FIXTURE_ROOT/migration.json" ;;
+      crossfire-package:bbbb*) /bin/cat "$FIXTURE_ROOT/runtime.json" ;;
+      crossfire-package:cccc*) /bin/cat "$FIXTURE_ROOT/migration.json" ;;
       *) exit 1 ;;
     esac ;;
   'load --input') printf loaded > "$FIXTURE_ROOT/loaded" ;;
@@ -208,7 +259,13 @@ esac
         std::fs::write(root.join("calls"), "")?;
         let rejected = run(root, "present")?;
         assert!(!rejected.status.success());
-        assert!(String::from_utf8(rejected.stderr)?.contains("release labels"));
+        assert!(
+            String::from_utf8(rejected.stderr)?.contains(if key == "Id" {
+                "identity"
+            } else {
+                "release labels"
+            })
+        );
         let calls = std::fs::read_to_string(root.join("calls"))?;
         assert!(
             !calls.contains("container ls")

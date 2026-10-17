@@ -19,7 +19,7 @@ services:
   initialize:
     <<: *server-resources
     profiles: [maintenance]
-    image: ${CROSSFIRE_MIGRATION_IMAGE:?Set the exact migrationImage from release.json}
+    image: ${CROSSFIRE_MIGRATION_IMAGE:?Set the exact matching migration image}
     network_mode: none
     volumes: *server-state
     entrypoint: [node, /app/services/crossfire/crossfire]
@@ -28,13 +28,13 @@ services:
   migrate:
     <<: *server-resources
     profiles: [maintenance]
-    image: ${CROSSFIRE_MIGRATION_IMAGE:?Set the exact migrationImage from release.json}
+    image: ${CROSSFIRE_MIGRATION_IMAGE:?Set the exact matching migration image}
     network_mode: none
     volumes: *server-state
 
   crossfire:
     <<: *server-resources
-    image: ${CROSSFIRE_RUNTIME_IMAGE:?Set the exact csharp-nativeaot runtimeImage from release.json}
+    image: ${CROSSFIRE_RUNTIME_IMAGE:?Set the exact csharp-nativeaot runtime image}
     volumes: *server-state
     ports:
       - "127.0.0.1:8080:8080"

@@ -21,7 +21,7 @@ export type ContractStack = Awaited<ReturnType<typeof contractClient>>;
 export async function contractStack(scope: TestContext, initial: ContractTarget, targets: readonly ContractTarget[]) {
   const secret = () => randomBytes(32).toString('base64url'); const jwtSecret = secret(); const native = await conduitFixture(scope, { jwtSecret }); const serverName = 'architecture.localhost';
   const directory = mkdtempSync(join(tmpdir(), 'cf-')); cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
-  const state = join(directory, 'state'); mkdirSync(state, { mode: 0o700 }); const [port, contentPort] = await freePorts(); const { origin } = await secureProxy(scope, 'http://127.0.0.1:' + port); const contentOrigin = 'http://localhost:' + contentPort;
+  const state = join(directory, 'state'); mkdirSync(state, { mode: 0o700 }); const [port, contentPort] = await freePorts(scope); const { origin } = await secureProxy(scope, 'http://127.0.0.1:' + port); const contentOrigin = 'http://localhost:' + contentPort;
   const bootstrap = { servicePassword: secret(), administratorPassword: secret() }; const configuration = { instance: 'contracts', serverName, publicOrigin: origin, contentOrigin, matrixOrigin: native.base,
     administrator: '@admin:' + serverName, jwtSecret, registrationSecret: native.registrationToken, trustedProxyAddresses: ['127.0.0.1'] };
   writeFileSync(join(state, 'config.json'), JSON.stringify(configuration), { mode: 0o600 }); writeFileSync(join(state, 'bootstrap.json'), JSON.stringify(bootstrap), { mode: 0o600 }); await migrateDatabase(join(state, 'management.sqlite'));
