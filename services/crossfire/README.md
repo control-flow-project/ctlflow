@@ -1,6 +1,6 @@
-# Crossfire service
+# crossfire service
 
-Crossfire owns Matrix-backed identities, enrollment, authorization, room access,
+crossfire owns Matrix-backed identities, enrollment, authorization, room access,
 coordination records, the management UI and agent messaging tools.
 It does not own native agent processes; fleetd does.
 
@@ -23,7 +23,7 @@ The React project, database migrations and external test scenarios are shared.
 - [Rust distribution](rust/README.md)
 - [Separate installation and packaging for every target](../../docs/distributions/README.md)
 
-The service is private. Only Fleet and fleetd may be public npm packages.
+The service is private. Only fleet and fleetd may be public npm packages.
 Production data, credentials and saved native histories are retained across
 supported upgrades. Schema changes use verified backups and forward Knex
 migrations, never runtime resets.

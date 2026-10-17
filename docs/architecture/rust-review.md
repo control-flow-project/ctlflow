@@ -10,7 +10,7 @@ native user histories, publication and deployment are outside this review.
 
 ## Ownership
 
-Node, C# and Rust implement Crossfire, fleetd and Fleet. Nineteen semantic package
+Node, C# and Rust implement crossfire, fleetd and fleet. Nineteen semantic package
 pairs match by responsibility. React, REST declarations, external assertions,
 agent-tool assets and Knex migrations each retain one shared owner. Native
 executables do not delegate backend requests to another implementation.

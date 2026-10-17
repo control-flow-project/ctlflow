@@ -11,7 +11,7 @@ const value = { schemaVersion: 1, version: '0.1.20', sourceDigest: 'a'.repeat(64
 
 test('container source identity covers all selected Rust workspace and toolchain inputs', () => {
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-source-'));
-  const inputs = ['.dockerignore', '.npmrc', 'LICENSE', 'package.json', 'package-lock.json', 'tsconfig.base.json', 'global.json', 'Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props', 'Crossfire.CSharp.slnx', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml'];
+  const inputs = ['.dockerignore', '.npmrc', 'LICENSE', 'package.json', 'package-lock.json', 'tsconfig.base.json', 'global.json', 'Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props', 'Ctlflow.CSharp.slnx', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml'];
   try {
     for (const name of inputs) writeFileSync(join(directory, name), name);
     for (const name of ['services', 'scripts']) mkdirSync(join(directory, name));

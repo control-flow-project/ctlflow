@@ -1,4 +1,4 @@
-# Fleet guides
+# fleet guides
 
 - [Install and set up](getting-started.md)
 - [Command reference](commands.md)
@@ -8,5 +8,5 @@
 - [Operations and updates](operations.md)
 - [Earendil Pi](pi.md)
 
-Fleet calls fleetd's private API even locally.
+fleet calls fleetd's private API even locally.
 Every managed agent belongs to a fleet; the setup assistant is not adopted.

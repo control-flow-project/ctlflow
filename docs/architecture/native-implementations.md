@@ -1,6 +1,6 @@
 # Implementation ownership and verification limits
 
-The repository has Node, C# and Rust implementations of Crossfire, fleetd and Fleet.
+The repository has Node, C# and Rust implementations of crossfire, fleetd and fleet.
 C# targets .NET 11 and produces managed and NativeAOT distributions from the same
 source. Rust uses native Cargo distributions. An executable matrix must identify
 the exact distributions tested.

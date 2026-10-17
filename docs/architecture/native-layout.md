@@ -88,10 +88,10 @@ transport, SQLite, runtime, filesystem or UI implementations. Composition roots
 assemble adapters. Applications are not reusable dependencies and product
 dependencies cannot reference test fixtures or build tooling.
 
-Fleetd owns one shared listener host and native lifecycle. Its daemon application
+fleetd owns one shared listener host and native lifecycle. Its daemon application
 owns the user-scoped private API, configuration, signals and composition only.
-Fleet uses that API even locally; SSH wraps the same private API remotely.
-Crossfire coordinates leases, authorization, activity and receipts but never
+fleet uses that API even locally; SSH wraps the same private API remotely.
+crossfire coordinates leases, authorization, activity and receipts but never
 launches an agent. Native adapters encapsulate engine-specific protocols.
 
 Knex alone creates and migrates databases. Tinqer, EF and Diesel own their

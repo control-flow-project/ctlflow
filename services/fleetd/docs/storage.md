@@ -63,6 +63,6 @@ Completed diagnostics/operation history use the logging age policy.
 The separate observation-journal conversion preserves pending output and records
 unknown historical metadata as null.
 
-- [Observation conversion tool](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/node/tools/README.md)
-- [Logging retention](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/logging.md)
+- [Observation conversion tool](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/node/tools/README.md)
+- [Logging retention](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/logging.md)
 - [Abrupt controller death](operations.md#abrupt-controller-death)

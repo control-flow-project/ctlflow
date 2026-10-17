@@ -34,7 +34,7 @@ export function Login() {
 
 export function Session({ children }: { children: ReactNode }) {
   const resource = useResource(operations.currentSession, {});
-  if (!resource.result) return <main className="loading" role="status">Connecting to Crossfire…</main>;
+  if (!resource.result) return <main className="loading" role="status">Connecting to crossfire…</main>;
   if (!resource.result.ok) {
     if (['unauthorized', 'forbidden'].includes(resource.result.error.code)) return <Login/>;
     return <AccountPage title="Unable to load your session"><Alert>{resource.result.error.message}</Alert><button onClick={resource.refresh}>Retry</button></AccountPage>;

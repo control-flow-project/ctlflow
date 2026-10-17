@@ -37,7 +37,7 @@ runtime files, common web/tool assets, licenses, the implementation README and
 coordinated version, tool release and executable paths.
 
 This command writes local files. It does not create a release upload or publish
-to npm. Only the Node Fleet/fleetd packages may be public npm packages.
+to npm. Only the Node fleet/fleetd packages may be public npm packages.
 
 ## Install and run the server
 
@@ -71,7 +71,7 @@ The example serves Element at `http://127.0.0.1:8098/` and management at
 Public deployments must configure their exact HTTPS origins, separate proxy
 routes and trusted ingress. These example addresses are not live deployments.
 
-## Install and connect Fleet and fleetd
+## Install and connect fleet and fleetd
 
 Keep the distribution's sibling `fleet` and `fleetd` directories together.
 The CLI resolves its controller and `fleetd/artifacts` from that layout; do not
@@ -130,7 +130,7 @@ actual containers and Knex. EF NativeAOT diagnostics from the other C# build
 remain visible. Supported fixed-query tests do not establish arbitrary EF query,
 reflection or plugin compatibility.
 
-- [Shared product configuration and commands](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/README.md)
-- [Server configuration and backup](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/operations.md)
-- [Dependency and verification limits](https://github.com/control-flow-project/crossfire/blob/main/docs/architecture/native-implementations.md)
-- [Proprietary license](https://github.com/control-flow-project/crossfire/blob/main/LICENSE)
+- [Shared product configuration and commands](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/docs/README.md)
+- [Server configuration and backup](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/operations.md)
+- [Dependency and verification limits](https://github.com/control-flow-project/ctlflow/blob/main/docs/architecture/native-implementations.md)
+- [Proprietary license](https://github.com/control-flow-project/ctlflow/blob/main/LICENSE)

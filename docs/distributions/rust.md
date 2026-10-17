@@ -41,7 +41,7 @@ data, first-party LICENSE, dependency licenses/notices, this README and
 coordinated version, tool release and executable paths.
 
 This writes a local distribution, not a release upload, npm package or deployment.
-Only the Node Fleet/fleetd products may be public npm packages.
+Only the Node fleet/fleetd products may be public npm packages.
 
 Server image construction is separate from executable packaging. After the shared
 Node build, the root command builds Node, managed C#, NativeAOT C# and Rust packages:
@@ -93,7 +93,7 @@ redirects. It does not need Node, curl or a shell-based HTTP client in the Rust
 runtime. Removal observes an already-removing exact container for at most two
 minutes; failure to confirm absence blocks replacement.
 
-## Install and connect Fleet and fleetd
+## Install and connect fleet and fleetd
 
 Keep sibling `fleet` and `fleetd` directories together. The CLI resolves its
 controller and `fleetd/artifacts` from that layout. The packaged process guard
@@ -155,7 +155,7 @@ other product implementations. The separate `verify:parity` coordinator covers
 all implementations after their owners resolve outstanding findings. Results name their
 platform/providers; they do not establish paid-model quality or every host/crash.
 
-- [Shared product configuration and commands](https://github.com/control-flow-project/crossfire/blob/main/services/fleet/docs/README.md)
-- [Server configuration and backup](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/operations.md)
-- [Architecture and verification limits](https://github.com/control-flow-project/crossfire/blob/main/docs/architecture/native-implementations.md)
-- [Proprietary license](https://github.com/control-flow-project/crossfire/blob/main/LICENSE)
+- [Shared product configuration and commands](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/docs/README.md)
+- [Server configuration and backup](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/operations.md)
+- [Architecture and verification limits](https://github.com/control-flow-project/ctlflow/blob/main/docs/architecture/native-implementations.md)
+- [Proprietary license](https://github.com/control-flow-project/ctlflow/blob/main/LICENSE)

@@ -1,4 +1,4 @@
-# Crossfire operator tools
+# crossfire operator tools
 
 Build the workspace, then run from the repository root:
 
@@ -27,7 +27,7 @@ Unknown or repeated options fail.
 | enrollment | --origin, --credentials, --plan | --execute |
 | fleet-wake | --origin, --credentials, --plan | --execute |
 
-These commands do not replace Fleet lifecycle controls.
+These commands do not replace fleet lifecycle controls.
 Only enrollment/fleet-wake have explicit reviewed mutation modes.
 Browser/content checks execute selected pages, including their JavaScript;
 they do not call a model or publish a report.
@@ -40,7 +40,7 @@ Private credentials input:
 {"matrixUserId":"@operator:example.test","password":"supplied-secret"}
 ```
 
-Tools use native Matrix login and the ordinary Crossfire cookie/CSRF session.
+Tools use native Matrix login and the ordinary crossfire cookie/CSRF session.
 The returned account is verified; no role bypass or owner impersonation occurs.
 Cleanup has independent deadlines for logout. Login/audit rows are ordinary
 server activity, so this is not a zero-write claim.

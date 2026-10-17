@@ -12,7 +12,7 @@ continue after a permission request.
 | Working | Native runtime reports active work |
 | Waiting for approval/answer | Native runtime reports a blocking request |
 | Pending nonblocking question | A question exists; execution may continue |
-| Answered | Crossfire recorded the owner's selection |
+| Answered | crossfire recorded the owner's selection |
 | Responded | The original native socket write completed |
 | Lost contact | Execution state is unknown, not a proven crash |
 

@@ -72,5 +72,5 @@ Rust Linux adapter binds its owned engine group to the parent lifetime through
 a packaged guard. Tools that escape the group are outside that protection.
 Retained data alone does not guarantee a provider/native service is available.
 
-- [Controller operations](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/operations.md)
-- [History and uncertainty](https://github.com/control-flow-project/crossfire/blob/main/services/crossfire/docs/history.md)
+- [Controller operations](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/docs/operations.md)
+- [History and uncertainty](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/history.md)

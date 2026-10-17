@@ -1,4 +1,4 @@
-# Fleet operations
+# fleet operations
 
 ## Inspect before acting
 
@@ -56,6 +56,6 @@ terminates its owned native group on parent death; it does not contain tools
 that escape that group. Process-name scanning and history copying are not
 recovery methods. No target guarantees arbitrary subprocess cleanup after SIGKILL.
 
-- [Controller failure boundaries](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/docs/operations.md)
+- [Controller failure boundaries](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/docs/operations.md)
 - [Session controls](sessions.md)
-- [Operator inspection tools](https://github.com/control-flow-project/crossfire/blob/main/services/fleetd/node/tools/README.md)
+- [Operator inspection tools](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/node/tools/README.md)

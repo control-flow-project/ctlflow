@@ -113,7 +113,7 @@ async fn initialize<P: Protocol>(
             None
         }
     };
-    let initialized = value(protocol.as_ref(), "initialize", &json!({"clientInfo":{"name":"crossfire","title":"Crossfire listener","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true}}), cancellation.clone()).await?;
+    let initialized = value(protocol.as_ref(), "initialize", &json!({"clientInfo":{"name":"crossfire","title":"crossfire listener","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true}}), cancellation.clone()).await?;
     let user_agent = initialized
         .get("userAgent")
         .and_then(Value::as_str)

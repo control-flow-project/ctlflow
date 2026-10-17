@@ -10,7 +10,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 function fixture() {
   const directory = mkdtempSync(join(tmpdir(), 'rust-package-build-')), source = join(directory, 'source'), binaries = join(directory, 'binaries');
   mkdirSync(source); mkdirSync(binaries);
-  for (const name of ['.dockerignore', '.npmrc', 'LICENSE', 'package-lock.json', 'tsconfig.base.json', 'global.json', 'Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props', 'Crossfire.CSharp.slnx', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml']) writeFileSync(join(source, name), name + '\n');
+  for (const name of ['.dockerignore', '.npmrc', 'LICENSE', 'package-lock.json', 'tsconfig.base.json', 'global.json', 'Directory.Build.props', 'Directory.Build.targets', 'Directory.Packages.props', 'Ctlflow.CSharp.slnx', 'Cargo.toml', 'Cargo.lock', 'rust-toolchain.toml']) writeFileSync(join(source, name), name + '\n');
   writeFileSync(join(source, 'package.json'), JSON.stringify({ version: '0.1.20' }));
   mkdirSync(join(source, 'scripts')); mkdirSync(join(source, 'services/crossfire/dist'), { recursive: true });
   writeFileSync(join(source, 'services/crossfire/dist/container-package-tool.mjs'), '// opaque trusted build tool fixture\n');

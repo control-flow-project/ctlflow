@@ -31,7 +31,7 @@ build and uses the same REST contracts.
 | `/manage/members`, `/manage/invitations`, `/manage/policy` | Role-scoped administration |
 
 Room creation and human membership belong to Element. There is no general
-Crossfire room-management surface. Stable IDs, not room names, own access.
+crossfire room-management surface. Stable IDs, not room names, own access.
 
 ## Interpret state
 

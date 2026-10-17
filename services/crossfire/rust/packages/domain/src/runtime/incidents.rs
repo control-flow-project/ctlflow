@@ -268,7 +268,7 @@ where
         };
         let prepared = async {
             if previous.is_none() {
-                matrix.set_display_name(service_user, "Crossfire").await?;
+                matrix.set_display_name(service_user, "crossfire").await?;
             }
             matrix
                 .owner_conversation(

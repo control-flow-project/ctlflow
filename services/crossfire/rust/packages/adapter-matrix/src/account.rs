@@ -112,7 +112,7 @@ impl Authority {
             "{unsigned}.{}",
             URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes())
         );
-        let body = self.http.ok(None, Method::POST, &format!("{API}/login"), Some(&json!({"type":"m.login.token","token":token,"device_id":"CROSSFIRE_MANAGEMENT","initial_device_display_name":"Crossfire management"}))).await?;
+        let body = self.http.ok(None, Method::POST, &format!("{API}/login"), Some(&json!({"type":"m.login.token","token":token,"device_id":"CROSSFIRE_MANAGEMENT","initial_device_display_name":"crossfire management"}))).await?;
         let account = credentials(&body, id)?;
         self.cache.remember_session(id, &account.access_token)?;
         Ok(account.access_token)

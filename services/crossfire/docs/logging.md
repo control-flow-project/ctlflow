@@ -1,12 +1,12 @@
 # Logging retention
 
-Crossfire and fleetd accept private `loggingRetentionDays`.
+crossfire and fleetd accept private `loggingRetentionDays`.
 Omitted means seven days. Values must be positive exact integers.
 There is no unlimited-log setting.
 
-Set it independently in the Crossfire instance and controller root
+Set it independently in the crossfire instance and controller root
 `config.json`; restart the affected process normally.
-A controller may serve several Crossfire instances, so its local retention
+A controller may serve several crossfire instances, so its local retention
 cannot be selected by whichever remote instance connected first.
 
 ## Covered records

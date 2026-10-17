@@ -58,7 +58,7 @@ pub async fn handle<Incoming>(
                 .is_some_and(|value| value.signup_mode == "open");
             Ok((invited, open))
         })?;
-        let mut result = json!({"brand":"Crossfire","default_theme":"light"});
+        let mut result = json!({"brand":"crossfire","default_theme":"light"});
         if let Some(presentation) = state.assets.presentation.as_object() {
             for (key, value) in presentation {
                 result[key] = value.clone();

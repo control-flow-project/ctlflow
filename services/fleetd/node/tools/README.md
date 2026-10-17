@@ -32,7 +32,7 @@ Unsolicited native decisions close the inspection connection without answering.
 
 Pi has no equivalent live attachment inspector; unsupported inspection fails.
 Do not launch another native writer to approximate it.
-Ordinary Fleet status/contexts remain available.
+Ordinary fleet status/contexts remain available.
 
 Snapshots retain exact account/context/session identities and provider-file
 fingerprints. Appended instances/files are allowed only while all earlier

@@ -101,7 +101,7 @@ export function generate(source: string): MatrixSchema {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { values } = parseArgs({ options: { root: { type: 'string' }, source: { type: 'string' }, check: { type: 'boolean' } } });
-  if (!values.root) throw new Error('--root must name the exact Crossfire monorepo root');
+  if (!values.root) throw new Error('--root must name the exact ctlflow monorepo root');
   if (!values.source) throw new Error('--source must name the official v1.12 data/api/client-server directory');
   const text = JSON.stringify(generate(values.source), null, 2) + '\n';
   if (JSON.parse(text).sourceSha256 !== '037337015f765c9d96a0561888ea15c870d34ea327dac94bab6884e33a0b30cd') {

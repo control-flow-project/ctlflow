@@ -1,6 +1,6 @@
 # Rust implementation
 
-Rust implements Crossfire, fleetd and Fleet. It uses the shared React UI, wire
+Rust implements crossfire, fleetd and fleet. It uses the shared React UI, wire
 contracts, agent-tool assets and SQLite files. Diesel owns Rust application
 queries; Knex alone creates and migrates schemas. Rust executables do not invoke
 Node or C# as backend substitutes.
@@ -9,7 +9,7 @@ Node or C# as backend substitutes.
 
 `apps/server/` contains server/operator composition. `packages/` contains rules,
 contracts, ports and adapters. Integration tests belong to their crates;
-service-wide native tests live under `tests/`. Fleet and fleetd have their own
+service-wide native tests live under `tests/`. fleet and fleetd have their own
 service-owned Rust applications and packages. `scripts/` owns native container
 package construction; the root coordinator composes all backend packages with
 the shared format/exporter and Knex image. The root Cargo workspace checks

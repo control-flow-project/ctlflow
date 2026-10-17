@@ -1,6 +1,6 @@
 # Native runtime behavior
 
-fleetd owns native processes through runtime adapters. Crossfire owns coordination,
+fleetd owns native processes through runtime adapters. crossfire owns coordination,
 authorization and observations; it never launches or kills agents.
 
 Codex and Earendil Pi are implemented. Claude is rejected at configuration
@@ -97,7 +97,7 @@ exact saved history. Explicit Stop cancels desired activation and stays stopped.
 Unexpected failure closes the affected generation before bounded recovery.
 Transient retries back off from one to sixty seconds; authorization/configuration
 conflicts require action. Failed cleanup blocks a replacement writer.
-The controller reports incidents to the owner's private Crossfire management DM.
+The controller reports incidents to the owner's private crossfire management DM.
 Lost contact is unknown execution state; a dead controller cannot report itself.
 
 After Node/C# fleetd is killed, a native Codex app-server can remain alive.

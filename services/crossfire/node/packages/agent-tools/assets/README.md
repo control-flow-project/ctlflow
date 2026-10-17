@@ -1,4 +1,4 @@
-# Crossfire agent tools
+# crossfire agent tools
 
 These tools belong to a fleetd-managed agent.
 They do not enroll, connect, launch a listener or adopt an existing coding session.
@@ -57,7 +57,7 @@ and machine information.
 
 ## Lifecycle and updates
 
-Fleet CLI/management owns Stop, Resume, delivery pause and confirmed Fresh history.
+fleet CLI/management owns Stop, Resume, delivery pause and confirmed Fresh history.
 Normal resume retains exact histories. Idle sleep differs from explicit Stop.
 The listener can remain ready without a native engine.
 The independent coding assistant that performed setup is not controller-owned.

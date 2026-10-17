@@ -1,4 +1,4 @@
-# Crossfire guides
+# crossfire guides
 
 - [Install the server](getting-started.md)
 - [Build and deploy Docker packages](container-packages.md)

@@ -1,4 +1,11 @@
-# Crossfire monorepo instructions
+# ctlflow monorepo instructions
+
+The monorepo is ctlflow. Its products are crossfire, fleetd and fleet; use these
+lowercase names consistently in current documentation and display branding.
+Commands, package names, wire identifiers and protocol text retain their exact
+contracts. Native identifiers follow language conventions, including Crossfire.*,
+Fleetd.* and Fleet.* in C#. Generic UI headings use ordinary sentence casing.
+Historical verification records describe their original revisions.
 
 Read docs/specification.md before implementation. It is the current architecture,
 API, data and acceptance contract. Work is greenfield: WCBUBWHB, one current
@@ -92,7 +99,7 @@ Enrollment, connection, filtering, blocked-mention notices, approvals, release
 checking and telemetry use ordinary code, not model calls. A new software release
 may deliver one receipt-confirmed notice per session/release so the model asks
 the human for update consent and reads changed skill content. No silent upgrades.
-Every Crossfire agent belongs to a fleet. fleetd hosts the shared listener and
+Every crossfire agent belongs to a fleet. fleetd hosts the shared listener and
 owns native lifecycle through runtime adapters, including one-agent fleets.
 The coding session performing setup remains independent; do not adopt its
 process or conversation. Setup is noninteractive with private persisted defaults

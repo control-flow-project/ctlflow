@@ -1,6 +1,6 @@
 # Operator checks
 
-Reusable checks belong to Crossfire/fleetd. Site hosts, branding, TLS, owners,
+Reusable checks belong to crossfire/fleetd. Site hosts, branding, TLS, owners,
 fleets and release expectations are explicit inputs.
 These tools are not another deployment or lifecycle implementation.
 
@@ -8,12 +8,12 @@ These tools are not another deployment or lifecycle implementation.
 
 | Location | Responsibility |
 | --- | --- |
-| Crossfire node/packages/operator-support | Private evidence, argument parsing, bounded HTTP/process reads and pagination |
-| Crossfire node/tools | API, browser, releases, database, files, host and reviewed policy checks |
+| crossfire node/packages/operator-support | Private evidence, argument parsing, bounded HTTP/process reads and pagination |
+| crossfire node/tools | API, browser, releases, database, files, host and reviewed policy checks |
 | fleetd node/tools | Existing controller bindings, native settings and preservation |
-| Fleet CLI | Setup, stop/resume, update, reset and retirement |
+| fleet CLI | Setup, stop/resume, update, reset and retirement |
 
-- [Crossfire command/input reference](../services/crossfire/node/tools/README.md)
+- [crossfire command/input reference](../services/crossfire/node/tools/README.md)
 - [fleetd command/input reference](../services/fleetd/node/tools/README.md)
 - [Script inventory](operator-script-inventory.md)
 

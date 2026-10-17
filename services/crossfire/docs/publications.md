@@ -54,7 +54,7 @@ Every content response includes `sandbox allow-scripts` without
 `allow-same-origin`. HTML and directly opened SVG execute at an opaque origin.
 Public asset CORS allows local report assets/modules/data without credentials.
 
-Content serves no Crossfire/Matrix authentication, management API, directory
+Content serves no crossfire/Matrix authentication, management API, directory
 listing or service worker. Main APIs reject content/null origins.
 Main/invitation cookies are Secure, HttpOnly, host-only `__Host-` cookies
 with Path=/; browser storage remains origin-scoped.

@@ -25,7 +25,7 @@ public static class PlatformRoutes
                 foreach (var name in new[] { "brand", "default_theme" })
                 {
                     writer.WritePropertyName(name);
-                    if (shown.TryGetProperty(name, out var value)) value.WriteTo(writer); else writer.WriteStringValue(name == "brand" ? "Crossfire" : "light");
+                    if (shown.TryGetProperty(name, out var value)) value.WriteTo(writer); else writer.WriteStringValue(name == "brand" ? "crossfire" : "light");
                 }
                 foreach (var name in new[] { "branding", "embedded_pages", "setting_defaults" })
                     if (shown.TryGetProperty(name, out var value)) { writer.WritePropertyName(name); value.WriteTo(writer); }

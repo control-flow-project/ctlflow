@@ -89,7 +89,7 @@ public static class RuntimeIncidents
             if (!previous.IsSuccess) return Result<Unit>.Fail(previous.Error);
             if (previous.Value is null)
             {
-                var named = await ports.Matrix.SetDisplayName(ports.ServiceMatrixId, "Crossfire", cancellation);
+                var named = await ports.Matrix.SetDisplayName(ports.ServiceMatrixId, "crossfire", cancellation);
                 if (!named.IsSuccess) continue;
             }
             var conversation = await ports.Matrix.OwnerConversation(owner.Value.MatrixUserId, ports.ServiceMatrixId, previous.Value?.RoomId, null, cancellation);

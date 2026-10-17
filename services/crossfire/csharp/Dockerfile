@@ -4,7 +4,7 @@ FROM mcr.microsoft.com/dotnet/sdk:11.0.100-rc.1@sha256:207b30ec860b1c4edef3bfe33
 WORKDIR /app
 ENV DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_GENERATE_ASPNET_CERTIFICATE=false
 RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ zlib1g-dev && rm -rf /var/lib/apt/lists/*
-COPY global.json Directory.Build.props Directory.Build.targets Directory.Packages.props Crossfire.CSharp.slnx ./
+COPY global.json Directory.Build.props Directory.Build.targets Directory.Packages.props Ctlflow.CSharp.slnx ./
 COPY services/crossfire/csharp ./services/crossfire/csharp
 RUN dotnet publish services/crossfire/csharp/apps/Crossfire.Server -c Release -r linux-x64 -p:PublishAot=true -p:CppCompilerAndLinker=gcc -o /native
 RUN dotnet publish services/crossfire/csharp/apps/Crossfire.Server -c Release -p:PublishAot=false --self-contained false -o /managed
