@@ -69,6 +69,9 @@ test('fleet image installs only packaged Node products and explicitly checked na
   const runtime = dockerfile.slice(dockerfile.lastIndexOf('\nFROM '));
   assert.match(runtime, /USER node/u); assert.match(runtime, /chmod 0700 \/home\/node/u);
   assert.match(runtime, /CMD \["fleetd", "--root", "\/home\/node\/\.ctlflow\/controller", "--name", "local-docker"\]/u);
+  const defaultCommand = /^CMD (\[.*\])$/mu.exec(runtime);
+  assert(defaultCommand);
+  assert.deepEqual(service('fleetd').command, JSON.parse(defaultCommand[1]!));
   assert(!/^COPY services \.\/services$/mu.test(runtime)); assert(!runtime.includes('COPY . '));
   assert(!runtime.includes('CODEX_THREAD_ID')); assert(!dockerfile.includes('latest'));
   const composeDirectory = new URL('services/crossfire/docker/local/', root);

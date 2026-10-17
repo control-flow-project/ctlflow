@@ -51,6 +51,17 @@ code; the archive checksum is not authentication of this helper.
 
 ## Format and image contract
 
+Verified generic images may be published to GHCR under
+`ghcr.io/control-flow-project/crossfire-node`, `crossfire-csharp-managed`,
+`crossfire-csharp-nativeaot`, `crossfire-rust`, `crossfire-migrations` and
+`fleetd-node`. Publish a coordinated version only after its applicable gates
+pass. Do not overwrite an existing version with different bytes or publish
+site-specific source, instructions, data, configuration or credentials.
+Record the registry manifest digest separately from Docker's local image ID;
+they identify different objects. Consumers use complete immutable references,
+not an automatically updated `latest` tag. Registry publication does not replace
+the matching-release checks or one-shot migration requirement.
+
 `release.json` is a UTF-8 JSON object of at most 8192 bytes. It has exactly:
 
 | Field | Meaning |

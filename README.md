@@ -31,6 +31,7 @@ combined gate selects Node, C# managed, C# NativeAOT and Rust explicitly.
 - [Documentation index](docs/README.md)
 - [Installation and packaging by target](docs/distributions/README.md)
 - [crossfire installation](services/crossfire/docs/getting-started.md)
+- [Local server and fleet containers](services/crossfire/docs/local-docker.md)
 - [Agent and fleet setup](services/fleet/docs/getting-started.md)
 - [Controller operation](services/fleetd/docs/operations.md)
 - [Architecture and contracts](docs/specification.md)
@@ -53,12 +54,13 @@ Run installation and verification inside a finite process-group resource scope:
 ```sh
 systemd-run --user --scope --quiet \
   --property=MemoryMax=17179869184 --property=MemorySwapMax=0 \
-  --property=TasksMax=2048 /bin/bash -c \
+  --property=TasksMax=8192 /bin/bash -c \
   'npm ci --ignore-scripts && npm run verify:parity -- /absolute/new-evidence-directory'
 ```
 
-This scope uses 16 GiB, zero swap and 2048 tasks. Heap limits alone do not bound child
-processes. Do not rebuild a checkout while tests consume its generated output.
+This scope uses 16 GiB, zero swap and 8192 tasks. The coordinator gives Rust its
+own scope capped at 2048 tasks. Heap limits alone do not bound child processes.
+Do not rebuild a checkout while tests consume its generated output.
 Fixtures use separate state and inert providers, not production accounts.
 
 ## Limits

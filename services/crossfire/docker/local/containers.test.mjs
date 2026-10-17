@@ -150,9 +150,11 @@ test('local Docker retains exact fleet history, stop intent, credentials and bro
         assert.deepEqual(json(await authState()), authentication);
       });
     } finally {
-      await browser?.close();
-      await compose(['down', '--volumes', '--remove-orphans']);
-      for (const child of children) child.kill('SIGTERM');
+      try { await browser?.close(); }
+      finally {
+        try { await compose(['down', '--volumes', '--remove-orphans']); }
+        finally { for (const child of children) child.kill('SIGTERM'); }
+      }
     }
   });
 });

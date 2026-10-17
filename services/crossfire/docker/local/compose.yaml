@@ -43,12 +43,13 @@ services:
 
   fleetd:
     platform: linux/amd64
-    image: ${CTLFLOW_FLEET_IMAGE:-ctlflow-fleet-local}
+    image: ${CTLFLOW_FLEET_IMAGE:?Set the exact Node fleet image}
     pull_policy: never
     build:
       context: ../../../..
       dockerfile: services/fleetd/docker/node/Dockerfile
     entrypoint: [/opt/ctlflow/start-local.sh]
+    command: [fleetd, --root, /home/node/.ctlflow/controller, --name, local-docker]
     depends_on:
       crossfire:
         condition: service_healthy

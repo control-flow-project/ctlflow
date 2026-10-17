@@ -9,31 +9,32 @@ on the host. The calling setup assistant remains independent.
 
 - Docker with Compose v2 and Linux amd64 containers. Native ARM64 images are not
   provided; Docker Desktop on another CPU would require unverified emulation.
-- A trusted `csharp-nativeaot` package produced by the existing
-  [container build](container-packages.md), and this matching source checkout.
+- Trusted immutable GHCR references for the coordinated C# NativeAOT server,
+  common migration image and Node fleet image, and this matching source checkout.
 - Loopback ports 8080 and 8082 available. This is local-only HTTP, not a public
   deployment. Do not change the bindings to `0.0.0.0`.
 - Your own supported provider login. No credentials are included in either image.
 
-The fleet image builds the coordinated Node fleet/fleetd archives from this
-checkout. It installs Codex 0.162.0 and Earendil Pi 1.0.0 using the repository's
+The fleet image contains the coordinated Node fleet/fleetd archives. Its build
+installs Codex 0.162.0 and Earendil Pi 1.0.0 using the repository's
 npm age policy. The build verifies the required Codex developer-instruction RPC,
 structured-question feature and Pi version through the existing adapter checks.
 Missing capabilities fail the build; another executable is never substituted.
 
 ## First start
 
-Use the `runtimeImage` and `migrationImage` exact IDs from the same trusted
-`release.json`. Verify `images.tar` against its `archiveSha256` before loading.
-The manifest must select `csharp-nativeaot`, `linux/amd64`, and the same
-coordinated version as this checkout. Do not mix runtime and migration releases.
-Build packages normally if you do not already have one; this quickstart does
-not maintain a second server Dockerfile or database migration implementation.
+Use the three complete `@sha256:` references supplied by the trusted release
+publisher. The examples below contain placeholders, not published digests.
+Authenticate to GHCR on the host if the selected packages require it; registry
+credentials are not mounted into either container. Do not mix releases.
 
 ```sh
-docker load --input /absolute/packages/csharp-nativeaot/images.tar
-export CROSSFIRE_RUNTIME_IMAGE=sha256:RUNTIME_IMAGE_ID
-export CROSSFIRE_MIGRATION_IMAGE=sha256:MIGRATION_IMAGE_ID
+export CROSSFIRE_RUNTIME_IMAGE=ghcr.io/control-flow-project/crossfire-csharp-nativeaot@sha256:RUNTIME_MANIFEST_DIGEST
+export CROSSFIRE_MIGRATION_IMAGE=ghcr.io/control-flow-project/crossfire-migrations@sha256:MIGRATION_MANIFEST_DIGEST
+export CTLFLOW_FLEET_IMAGE=ghcr.io/control-flow-project/fleetd-node@sha256:FLEET_MANIFEST_DIGEST
+docker pull "$CROSSFIRE_RUNTIME_IMAGE"
+docker pull "$CROSSFIRE_MIGRATION_IMAGE"
+docker pull "$CTLFLOW_FLEET_IMAGE"
 ```
 
 From this checkout's root:
@@ -41,7 +42,7 @@ From this checkout's root:
 ```sh
 docker compose -f services/crossfire/docker/local/compose.yaml --profile maintenance run --rm initialize
 docker compose -f services/crossfire/docker/local/compose.yaml --profile maintenance run --rm migrate
-docker compose -f services/crossfire/docker/local/compose.yaml up --build --wait
+docker compose -f services/crossfire/docker/local/compose.yaml up --no-build --wait
 ```
 
 Initialization is only for a new empty server volume. It generates private
@@ -140,6 +141,16 @@ and the one-shot migration before restarting. Do not run migrations while the
 server is writing. Compose restarts the dependent fleet container when it
 replaces the server. This quickstart does not install host boot services or
 perform automatic upgrades.
+
+## Source builds
+
+Maintainers use the existing [container build](container-packages.md) for the
+server and migration images. Set their exact local image IDs from the verified
+package, explicitly select a local `CTLFLOW_FLEET_IMAGE` tag, then run
+`docker compose -f services/crossfire/docker/local/compose.yaml build fleetd`.
+This builds the same fleet Dockerfile used for registry publication. There is
+no second server implementation, migration owner or automatic build after a
+failed pull.
 
 ## Focused verification
 

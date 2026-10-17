@@ -56,6 +56,15 @@ contracts now assert that obsolete controller files block startup, retain exact
 input bytes and publish neither a ready socket nor imported operation storage
 for every selected target.
 
-The full current-source target/container/migration matrix is recorded separately
-when complete. Passing checks do not establish an absolute proof against every
+Current runtime verification passes the 943-test Node bank, architecture checks,
+managed/NativeAOT C# core and native-runtime banks, and 271 Rust tests in 137
+isolated binaries. The same 69 executable contract checks pass on each of Node,
+C# managed, C# NativeAOT and Rust, including obsolete-state rejection. Actual
+Codex and Pi participate; fixtures do not call paid model providers.
+
+The optional Docker assets add four focused canonical Node tests, which pass
+after parent integration. Parent review removed shared server/fleet networking
+and supplied the explicit Compose command required by its entrypoint override.
+Actual full-container/migration/local-stack acceptance and registry publication
+remain pending. Passing checks do not establish an absolute proof against every
 possible undiscovered defect.

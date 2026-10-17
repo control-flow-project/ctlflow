@@ -53,8 +53,8 @@ test('Node fleet container retains private credentials and stopped registry acro
         assert.deepEqual(JSON.parse(await credential()), before);
       });
     } finally {
-      await docker(['rm', '--force', name]);
-      await docker(['volume', 'rm', volume]);
+      try { await docker(['rm', '--force', name]); }
+      finally { await docker(['volume', 'rm', volume]); }
     }
   });
 });
