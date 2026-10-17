@@ -175,9 +175,14 @@ impl<
         let native = self.state.lock().map_err(|_| ownership())?.native.clone().filter(|native| !native.lifetime().is_cancelled())
             .ok_or_else(|| Failure::new(ErrorCode::Conflict,"Resume this agent before attaching its terminal; reading a pointer never starts a session"))?;
         let context = context.unwrap_or(self.primary());
-        native
-            .attachments()
-            .await?
+        let attachments = native.attachments().await?;
+        if attachments.is_empty() {
+            return Err(Failure::new(
+                ErrorCode::Unavailable,
+                "This native runtime does not support terminal attachment",
+            ));
+        }
+        attachments
             .into_iter()
             .find(|(key, _)| key == context)
             .map(|(_, attachment)| attachment)

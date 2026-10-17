@@ -9,7 +9,7 @@
     "tests/**/*.ts",
     "scripts/**/*.ts",
     "tools/**/*.ts",
-    "../tests/contracts/**/*.ts"
+    "../tests/**/*.ts"
   ],
   "exclude": [
     "scripts/architecture-proof/*.test.ts",

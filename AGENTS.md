@@ -100,7 +100,13 @@ modules by responsibility near 600 lines. Domain code imports neither transport
 nor concrete storage/adapter/UI modules. Composition roots wire implementations.
 SQL tables/columns are singular snake_case; normalized domain state uses indexed
 relations. Tinqer owns Node queries, EF Core C# queries and Diesel Rust queries.
-Raw SQL is schema/metadata only.
+The owner prohibits handwritten SQL strings, including tests. Do not route a
+string through a helper, a raw-query API or a fixture to evade this rule. Query
+libraries generate execution statements from structured queries. Knex remains
+the sole schema/migration owner; migration fixtures use its structured builders.
+Do not weaken database constraints or verification to remove a SQL statement.
+Any unavoidable schema/control limitation requires an explicit owner decision,
+not a silently assumed exception.
 Expected transaction failures roll back. Native operations stay outside transactions.
 
 ## Execution and security
@@ -160,6 +166,12 @@ installation/packaging instructions for Node, C# managed, C# NativeAOT and Rust;
 installed guides must not depend on checkout-relative documentation links.
 
 ## Test execution
+External behavior has one shared executable acceptance suite for crossfire,
+fleetd and fleet. Select Node, managed .NET, NativeAOT and Rust through executable
+configuration, not copied assertions or implementation-specific omissions.
+Run both Codex and Pi. Skipped/unfinished scenarios and differing assertion
+counts fail the shared gate. Language-owned internal/compiler tests supplement
+this suite without defining competing external expectations.
 Runtime verification includes Codex and Pi. Claude remains unimplemented and has
 no product test suite or retained legacy adapter. Prepare pinned native assets
 once before isolated workers; do not select an optional runtime verification path.

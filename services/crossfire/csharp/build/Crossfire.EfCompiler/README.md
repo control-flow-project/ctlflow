@@ -13,7 +13,7 @@ This project is not a production runtime dependency.
 | Generated annotations | Generator emits nullable annotations; output is not patched afterward |
 | Query location | Typed DbContext parameters, locals, fields and properties are recognized |
 | Context scope | Only the selected context produces its query interceptors |
-| Captures | Actual caller parameters remain native query parameters |
+| Captures | Actual caller parameters, including enclosing parameters read inside local functions, remain native query parameters |
 | Syntax/conversions | Anonymous shorthand, numeric literals and CLR conversions retain their carriers |
 | File scope | Namespace/constant/accessor/translator state resets per generated file |
 | Build-time objects | Constructor-free typed placeholders; user constructors never execute |

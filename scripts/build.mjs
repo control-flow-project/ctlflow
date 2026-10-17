@@ -22,9 +22,9 @@ export function productBuildClosure(selected) {
   return products.filter(service => included.has(service));
 }
 
-export function command(binary, arguments_, cwd) {
+export function command(binary, arguments_, cwd, environment = process.env) {
   return new Promise((resolve, reject) => {
-    const child = spawn(binary, arguments_, { cwd, stdio: 'inherit' });
+    const child = spawn(binary, arguments_, { cwd, env: environment, stdio: 'inherit' });
     child.once('error', reject);
     child.once('close', (code, signal) => code === 0 ? resolve() : reject(new Error(binary + ' failed: ' + (signal ?? code))));
   });
@@ -72,8 +72,11 @@ async function buildProduct(service) {
     }
   }
   await bundle({ entryPoints: entries, outdir: join(root, 'dist'), outbase: join(root, 'node'), platform: 'node', format: 'esm', target: 'node26' });
-  const contracts = join(root, 'tests/contracts');
-  if (existsSync(contracts)) await bundle({ entryPoints: readdirSync(contracts).filter(file => file.endsWith('.ts')).map(file => join(contracts, file)), outdir: join(root, 'dist/tests/contracts'), bundle: true, packages: 'external', platform: 'node', format: 'esm', target: 'node26' });
+  const sharedTests = join(root, 'tests');
+  for (const suite of existsSync(sharedTests) ? readdirSync(sharedTests) : []) {
+    const directory = join(sharedTests, suite);
+    await bundle({ entryPoints: readdirSync(directory).filter(file => file.endsWith('.ts')).map(file => join(directory, file)), outdir: join(root, 'dist/tests', suite), bundle: true, packages: 'external', platform: 'node', format: 'esm', target: 'node26' });
+  }
   if (service === 'crossfire') {
     await bundle({ entryPoints: [join(root, 'node/scripts/container-package-tool.ts')], outfile: join(root, 'dist/container-package-tool.mjs'), bundle: true, platform: 'node', format: 'esm', target: 'node26' });
     await command(process.execPath, [join(root, 'dist/scripts/build-release.js'), '--root', root, '--web-directory', join(root, 'apps/web/dist')], root);

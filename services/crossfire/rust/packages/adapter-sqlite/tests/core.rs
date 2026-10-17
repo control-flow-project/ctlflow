@@ -49,7 +49,13 @@ fn canonical_identity_authority_and_policy_are_transactional()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let mut fixture = fixture()?;
     let store = &mut fixture.store;
-    assert_eq!(store.schema_identity()?, (1_129_465_426, 17));
+    assert_eq!(
+        store.schema_identity()?,
+        (
+            1_129_465_426,
+            crossfire_adapter_sqlite::schema::SCHEMA_VERSION
+        )
+    );
     let actor = administrator(store)?;
     registration::initialize(store, "@admin:example.test", NOW)?;
     assert_eq!(store.active_administrator_count()?, 1);

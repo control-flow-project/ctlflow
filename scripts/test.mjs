@@ -74,7 +74,7 @@ export async function runTests(selected, selection) {
       });
       clearTimeout(deadline); clearTimeout(escalation);
       const { tail, ...counts } = output.finish();
-      const failure = exitFailure ?? (!counts.complete ? 'Missing or invalid test summary counters' : counts.failed || counts.cancelled ? 'Failed or cancelled test assertions' : null);
+      const failure = exitFailure ?? (!counts.complete ? 'Missing or invalid test summary counters' : counts.failed || counts.cancelled || counts.skipped || counts.todo ? 'Failed, cancelled, skipped or unfinished test assertions' : null);
       const result = { file: job.label, elapsedMs: Math.round(performance.now() - before), failure, log, ...counts };
       results.push(result);
       console.log((failure ? 'FAIL ' : 'PASS ') + job.label + ' (' + (result.elapsedMs / 1000).toFixed(2) + 's)');
@@ -84,8 +84,9 @@ export async function runTests(selected, selection) {
   const summary = { runtimes, resourceScope, workers: concurrency, preparationMs, elapsedMs: Math.round(performance.now() - started), files: results.sort((left, right) => right.elapsedMs - left.elapsedMs) };
   writeFileSync(join(evidence, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
   const totals = results.reduce((total, result) => {
-    total.tests += result.tests; total.failed += result.failed; total.cancelled += result.cancelled; return total;
-  }, { tests: 0, failed: 0, cancelled: 0 });
+    total.tests += result.tests; total.failed += result.failed; total.cancelled += result.cancelled;
+    total.skipped += result.skipped; total.todo += result.todo; return total;
+  }, { tests: 0, failed: 0, cancelled: 0, skipped: 0, todo: 0 });
   console.log(JSON.stringify({ ...totals, runtimes, files: results.length, workers: concurrency, preparationMs, elapsedMs: summary.elapsedMs, evidence }));
   if (results.some(result => result.failure)) throw new Error('Test failures; inspect the per-file evidence');
 }

@@ -40,7 +40,7 @@ test('management storage retains native SQLite capacity for memory and every sup
       assert.equal(database.pragma('page_size', { simple: true }), pageSize);
       assert.equal(database.pragma('max_page_count', { simple: true }), expected);
       assert.equal(database.pragma('foreign_keys', { simple: true }), 1);
-      assert.equal(database.pragma('journal_mode', { simple: true }), 'delete');
+      assert.equal(database.pragma('journal_mode', { simple: true }), 'wal');
     } finally { database.close(); }
   }
 });
@@ -74,6 +74,7 @@ test('a full 256 MiB management store reopens and registers listeners without lo
     assert.equal(exhausted, true, 'The disposable capacity fixture must remain bounded');
   }
   assert.ok(first && last);
+  assert.deepEqual(database.pragma('wal_checkpoint(TRUNCATE)'), [{ busy: 0, log: 0, checkpointed: 0 }]);
   assert.equal(statSync(path).size, maximum);
   assert.equal(database.pragma('freelist_count', { simple: true }), 0);
   database.close();
@@ -90,9 +91,10 @@ test('a full 256 MiB management store reopens and registers listeners without lo
     const retained = value(reopened.services.repositories.auditEvent.find({ id: record.id }));
     assert.equal(retained?.message === record.message, true, 'Committed audit bytes remain identical');
   }
-  value(reopened.services.repositories.auditEvent.insert(audit('after-capacity', 'New audit after listener registration')));
+  value(reopened.services.repositories.auditEvent.insert(audit('after-capacity', 'New audit after listener registration\n' + 'x'.repeat(128 * 1024))));
   reopened.application.close();
   database = openTestStore(path);
+  assert.deepEqual(database.pragma('wal_checkpoint(TRUNCATE)'), [{ busy: 0, log: 0, checkpointed: 0 }]);
   assert.ok(statSync(path).size > maximum, 'The original database must grow beyond its former ceiling');
   assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
   assert.deepEqual(database.pragma('foreign_key_check'), []);

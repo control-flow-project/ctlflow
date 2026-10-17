@@ -72,7 +72,7 @@ fn discovery_is_paginated_filtered_and_resolves_unknown_identities_without_adopt
     let mut database = scenario.database()?;
     assert_eq!(
         crossfire_adapter_sqlite::schema::pragma(database.connection(), "user_version")?,
-        17
+        crossfire_adapter_sqlite::schema::SCHEMA_VERSION
     );
     let guest = scenario.add_human("@guest:example.test")?;
     let query = DiscoveryFilter {

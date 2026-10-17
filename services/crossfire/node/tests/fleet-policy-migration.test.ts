@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { value } from './support/application.js';
+import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
+import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
+import { metadataSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
+import { migrationChange, migrationQuery } from './support/migration-data.js';
 
 function policyStore() {
   const database = openTestStore(':memory:'), repositories = createRepositories(database);
@@ -41,15 +45,17 @@ test('normalized requested and approved policies enforce principal, catalog, own
     assert.equal(repositories.fleetPolicy.approve({ agentId: 'ada', approvedByMemberId: 'other', approvedAt: 1, permissions: [] }).ok, false);
     value(repositories.fleetPolicy.approve({ agentId: 'ada', approvedByMemberId: 'owner', approvedAt: 10, permissions: ['room.agent.invite'] }));
     assert.deepEqual(value(repositories.fleetPolicy.approved('ada'))!.permissions, ['room.agent.invite']);
-    assert.throws(() => database.prepare('INSERT INTO fleet_instance_permission VALUES (?, ?, ?)').run('ada', 'policy.manage', 'agent_room'));
-    assert.throws(() => database.prepare('INSERT INTO enrollment_item_wake_sender VALUES (?, ?, ?, ?)').run('request', 'ada', 'missing', 0));
+    assert.throws(() => migrationChange(database, migrationQuery('fleet_instance_permission')
+      .insert({ agent_id: 'ada', permission_code: 'policy.manage', grant_scope: 'agent_room' })));
+    assert.throws(() => migrationChange(database, migrationQuery('enrollment_item_wake_sender')
+      .insert({ request_id: 'request', instance_key: 'ada', sender_principal_id: 'missing', include_agents: 0 })));
     for (const name of ['ix_enrollment_item_permission_code', 'ix_enrollment_item_wake_sender_principal', 'ix_fleet_instance_policy_owner', 'ix_fleet_instance_permission_code']) {
-      assert(database.prepare("SELECT name FROM sqlite_schema WHERE type='index' AND name=?").get(name), name);
+      assert(executeSelect(database, metadataSchema, (query, params) => query.from('sqlite_schema').where(row => row.type === 'index' && row.name === params.name).any(), { name }), name);
     }
     const binding = value(repositories.fleetInstance.findByAgent('ada'))!;
     value(repositories.fleetInstance.update({ ...binding, retiredAt: 10 }));
     assert.deepEqual(value(repositories.fleetPolicy.approved('ada'))!.permissions, ['room.agent.invite']);
-    assert.deepEqual(database.prepare('SELECT * FROM fleet_instance_permission').all(), [{ agent_id: 'ada', permission_code: 'room.agent.invite', grant_scope: 'agent_room' }]);
+    assert.deepEqual(executeSelect(database, schema, query => query.from('fleet_instance_permission')), [{ agent_id: 'ada', permission_code: 'room.agent.invite', grant_scope: 'agent_room' }]);
     assert(value(repositories.agentRoomPermission.find({ agentId: 'ada', roomId: '!matter:test', permissionCode: 'room.agent.invite' })), 'Retirement preserves explicitly granted room history without independent execution');
     assert.deepEqual(database.pragma('foreign_key_check'), []);
   } finally { database.close(); }

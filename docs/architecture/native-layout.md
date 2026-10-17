@@ -73,6 +73,7 @@ class names or artificial files, is authoritative.
 | Calendar scheduling | adapter-schedule | Crossfire.AdapterSchedule | adapter-schedule |
 | Pure listener/runtime coordination | agent-core | Crossfire.AgentCore | agent-core |
 | Journals, exact receipts and restart state | adapter-runtime | Crossfire.AdapterRuntime | adapter-runtime |
+| Native parent-lifetime guard and owned groups | adapter-runtime + Node process/IPC primitives | Crossfire.AdapterRuntime + Crossfire.AdapterProcess | adapter-process |
 | Codex integration | adapter-codex | Crossfire.AdapterCodex | adapter-codex |
 | Earendil Pi integration | adapter-pi | Crossfire.AdapterPi | adapter-pi |
 | Enrollment, fleet connection and private listener host | adapter-crossfire | Crossfire.AdapterCrossfire | adapter-crossfire |

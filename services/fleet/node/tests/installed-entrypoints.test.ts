@@ -66,7 +66,7 @@ test('clean installed public tarballs resolve only public dependencies and own o
     const packageRoot = join(prefix, 'node_modules', '@ctlflow', name), sourceRoot = dirname(fileURLToPath(import.meta.resolve('@ctlflow/' + name + '/package.json')));
     const guides = readdirSync(join(sourceRoot, 'docs')); for (const guide of guides) assert.match(guide, /^[A-Za-z0-9-]+\.md$/u, 'Published guides contain only Markdown');
     const expected = ['LICENSE', 'README.md', 'package.json', join('dist', 'bin', name + '.mjs'), ...guides.map(file => join('docs', file)),
-      ...(name === 'fleetd' ? ['README.md', 'SKILL.md', 'crossfire-client.mjs', 'manifest.json', 'matrix-spec-LICENSE.txt'].map(file => join('dist', 'assets', file)) : [])];
+      ...(name === 'fleetd' ? [join('dist', 'bin', 'native-guard.js'), ...['README.md', 'SKILL.md', 'crossfire-client.mjs', 'manifest.json', 'matrix-spec-LICENSE.txt'].map(file => join('dist', 'assets', file))] : [])];
     assert.deepEqual(installedFiles(packageRoot).sort(), expected.sort(), 'Exact public files contain no source, tests, credentials or extra artifact path');
     const license = readFileSync(join(sourceRoot, 'LICENSE'), 'utf8');
     assert.equal(readFileSync(join(packageRoot, 'LICENSE'), 'utf8'), license, 'The installed public product includes the complete MIT license');

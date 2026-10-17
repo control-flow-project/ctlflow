@@ -1,41 +1,17 @@
 use crate::{error::failure, schema, tables};
 use crossfire_adapter_filesystem::PrivateDirectory;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
-use diesel::{
-    prelude::*,
-    sql_types::{BigInt, Text},
-};
+use diesel::{prelude::*, sql_types::Text};
 use std::{
     fs::File,
     path::{Path, PathBuf},
 };
 
-#[derive(QueryableByName)]
-struct Number {
-    #[diesel(sql_type=BigInt)]
-    value: i64,
-}
-#[derive(QueryableByName)]
-struct Check {
-    #[diesel(sql_type=Text)]
-    integrity_check: String,
-}
-#[derive(QueryableByName)]
-struct ForeignKey {
-    #[diesel(sql_type=Text, column_name=table)]
-    _table: String,
-}
 fn invalid() -> Failure {
     Failure::new(
         ErrorCode::Conflict,
         "Unsupported or invalid management database; migration is blocked and no data was changed",
     )
-}
-fn number(connection: &mut SqliteConnection, sql: &str) -> Result<i64> {
-    diesel::sql_query(sql)
-        .get_result::<Number>(connection)
-        .map(|row| row.value)
-        .map_err(failure)
 }
 fn open(path: &Path) -> Result<SqliteConnection> {
     let parent = PrivateDirectory::open(path.parent().ok_or_else(invalid)?, false)?;
@@ -52,16 +28,7 @@ fn verify(connection: &mut SqliteConnection) -> Result<()> {
     if schema::pragma(connection, "application_id")? != tables::APPLICATION_ID {
         return Err(invalid());
     }
-    let checks = diesel::sql_query("PRAGMA integrity_check")
-        .load::<Check>(connection)
-        .map_err(failure)?;
-    if checks.len() != 1 || checks[0].integrity_check != "ok" {
-        return Err(invalid());
-    }
-    let violations = diesel::sql_query("PRAGMA foreign_key_check")
-        .load::<ForeignKey>(connection)
-        .map_err(failure)?;
-    if !violations.is_empty() {
+    if !schema::valid(connection)? {
         return Err(invalid());
     }
     Ok(())
@@ -77,20 +44,8 @@ pub fn backup_before_migration(directory: &Path) -> Result<Option<PathBuf>> {
     let mut source = open(&file)?;
     let application = schema::pragma(&mut source, "application_id")?;
     let version = schema::pragma(&mut source, "user_version")?;
-    if application == 0 && version == 0 {
-        let count = number(
-            &mut source,
-            "SELECT count(*) AS value FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('knex_migrations','knex_migrations_lock')",
-        )?;
-        if count == 0
-            && (number(
-                &mut source,
-                "SELECT count(*) AS value FROM sqlite_schema WHERE type='table' AND name='knex_migrations'",
-            )? == 0
-                || number(&mut source, "SELECT count(*) AS value FROM knex_migrations")? == 0)
-        {
-            return Ok(None);
-        }
+    if application == 0 && version == 0 && schema::empty(&mut source)? {
+        return Ok(None);
     }
     if application != tables::APPLICATION_ID || !(13..=tables::SCHEMA_VERSION).contains(&version) {
         return Err(invalid());

@@ -3,6 +3,12 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 
 const resourceNames = ['memory.max', 'memory.swap.max', 'pids.max'];
 
+export function userManagerEnvironment(environment) {
+  const selected = { ...environment };
+  delete selected.DBUS_SESSION_BUS_ADDRESS;
+  return selected;
+}
+
 export function resourceLimits(group, root, read = file => readFileSync(file, 'utf8')) {
   const directory = resolve(group), boundary = resolve(root);
   if (relative(boundary, directory).startsWith('..') || isAbsolute(relative(boundary, directory))) throw new Error('Resource scope is outside the cgroup filesystem');

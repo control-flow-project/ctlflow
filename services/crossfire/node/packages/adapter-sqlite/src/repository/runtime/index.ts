@@ -116,11 +116,14 @@ export function createRuntimeRepository(database: Database.Database): RuntimeRep
     conversation(ownerId) { return stored(() => { const row = executeSelect(database, schema, (query, params) => query.from('management_conversation').where(row => row.owner_id === params.id).firstOrDefault(), { id: ownerId }); return success(row ? { ownerId: row.owner_id, roomId: row.room_id, createdAt: row.created_at } : null); }); },
     conversationByRoom(roomId) { return stored(() => { const row = executeSelect(database, schema, (query, params) => query.from('management_conversation').where(row => row.room_id === params.id).firstOrDefault(), { id: roomId }); return success(row ? { ownerId: row.owner_id, roomId: row.room_id, createdAt: row.created_at } : null); }); },
     insertConversation(value) { return stored(() => { executeInsert(database, schema, (query, params) => query.insertInto('management_conversation').values({ owner_id: params.ownerId, room_id: params.roomId, created_at: params.createdAt }), value); return success(undefined); }); },
-    watchedRuns() { return stored(() => success(executeSelect(database, schema, query => query.from('listener_run')
-      .join(query.from('listener_run').groupBy(row => row.agent_id).select(group => ({ agentId: group.key, startedAt: group.max(row => row.started_at) })),
-        row => row.agent_id, latest => latest.agentId, (run, latest) => ({ run, latest }))
-      .where(row => row.run.started_at === row.latest.startedAt)
-      .select(row => ({ id: row.run.id, agentId: row.run.agent_id, startedAt: row.run.started_at, lastSeenAt: row.run.last_seen_at, stoppedAt: row.run.stopped_at, disconnectRequestedAt: row.run.disconnect_requested_at }))))); },
+    watchedRuns() { return stored(() => success(executeSelect(database, schema, (query, _params, helpers) => query.from('listener_run')
+      .select(row => ({ id: row.id, agentId: row.agent_id, startedAt: row.started_at, lastSeenAt: row.last_seen_at,
+        stoppedAt: row.stopped_at, disconnectRequestedAt: row.disconnect_requested_at,
+        position: helpers.window(row).partitionBy(item => item.agent_id).orderByDescending(item => item.started_at)
+          .thenByDescending(item => item.id).rowNumber() }))
+      .where(row => row.position === 1)
+      .select(row => ({ id: row.id, agentId: row.agentId, startedAt: row.startedAt, lastSeenAt: row.lastSeenAt,
+        stoppedAt: row.stoppedAt, disconnectRequestedAt: row.disconnectRequestedAt })), {}))); },
     watchedFleets() { return stored(() => success(executeSelect(database, schema, query => query.from('fleet_connection')
       .join(query.from('fleet'), connection => connection.fleet_id, fleet => fleet.id, (connection, fleet) => ({ connection, fleet }))
       .select(row => ({ id: row.fleet.id, ownerId: row.fleet.owner_id, label: row.fleet.label, connectionId: row.connection.connection_id, expiresAt: row.connection.expires_at, closedAt: row.connection.closed_at }))))); },

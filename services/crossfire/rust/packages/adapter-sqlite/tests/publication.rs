@@ -141,7 +141,10 @@ async fn report_create_upload_commit_list_read_delete_is_generation_authorized_a
     );
     assert_eq!(
         shared.with(|repo| repo.schema_identity())?,
-        (1_129_465_426, 17)
+        (
+            1_129_465_426,
+            crossfire_adapter_sqlite::schema::SCHEMA_VERSION
+        )
     );
     let count: i64 = diesel::QueryDsl::count(crossfire_adapter_sqlite::tables::publication::table)
         .get_result(metadata.connection())?;

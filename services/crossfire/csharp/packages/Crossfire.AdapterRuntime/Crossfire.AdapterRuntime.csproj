@@ -1,7 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Crossfire.AgentCore/Crossfire.AgentCore.csproj" />
     <ProjectReference Include="../Crossfire.Contracts/Crossfire.Contracts.csproj" />
     <ProjectReference Include="../Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj" />
+    <ProjectReference Include="../Crossfire.AdapterProcess/Crossfire.AdapterProcess.csproj" />
   </ItemGroup>
 </Project>

@@ -9,6 +9,7 @@ import { admitDatabase, databaseConfiguration } from '@ctlflow/crossfire-data/ma
 import schemaDefinition from '@ctlflow/crossfire-data/management/sqlite/schema' with { type: 'json' };
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { validateSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/validate-schema';
+import { migrationChange, migrationQuery } from './migration-data.js';
 
 export const loggingSchema = schemaDefinition.parts.loggingSchema;
 export const statisticsSchema = schemaDefinition.parts.statisticsSchema;
@@ -48,7 +49,7 @@ export function applicationDatabase(scope: TestContext, path = ':memory:'): stri
 }
 
 export function forgetFixtureMigrations(database: Database.Database): void {
-  database.exec('DELETE FROM knex_migrations');
+  migrationChange(database, migrationQuery('knex_migrations').delete());
 }
 
 export async function migrateFixture(database: Database.Database): Promise<void> {

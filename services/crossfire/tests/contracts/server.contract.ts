@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import type { TestContext } from 'node:test';
+import Database from 'better-sqlite3';
+import { join } from 'node:path';
 import { contractError, contractHttp } from '@ctlflow/crossfire-test-support/contract-http';
 import { integer, list, observe, record, text } from '@ctlflow/crossfire-test-support/contract-process';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
@@ -8,6 +10,10 @@ import type { ContractStack } from './fixture.js';
 import { publicationBrowser } from './browser.contract.js';
 import { paginationContracts } from '@ctlflow/crossfire-test-support/contract-pagination';
 import { resourceContracts } from './resources.contract.js';
+import { defineSelect } from '@tinqerjs/tinqer';
+import { executeSelect, toSql } from '@tinqerjs/better-sqlite3-adapter';
+import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
+import { metadataSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 
 export async function serverContracts(scope: TestContext, fixture: ContractStack): Promise<void> {
   await paginationContracts(scope, query => fixture.raw('/api/fleets' + query, 'GET', undefined, fixture.headers()));
@@ -72,6 +78,27 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
     const messageId = randomUUID(); await fixture.operation(operations.createFleetMessage, fleetParams, { messageId, body: 'Shared contract message' }, agent.credential);
     const current = await fixture.data(operations.fleet, fleetParams, undefined, agent.credential); await fixture.operation(operations.fleetControl, fleetParams, undefined, agent.credential, '?connectionId=' + agent.connectionId + '&revision=' + integer(current.revision) + '&waitMs=0'); await fixture.operation(operations.acknowledgeFleetMessage, { ...fleetParams, messageId, agentId: agent.id }, { status: 'delivered', errorMessage: null }, agent.credential);
     const messages = await fixture.operation(operations.fleetMessages, fleetParams, undefined, agent.credential); assert.equal(record(list(messages.data)[0]).delivered, 1);
+  });
+  await scope.test('an open management read snapshot cannot block a controller heartbeat commit', async () => {
+    const reader = new Database(join(fixture.state, 'management.sqlite'), { readonly: true, fileMustExist: true });
+    try {
+      const journal = executeSelect(reader, metadataSchema, query => query.from('pragma_journal_mode')
+        .select(row => ({ mode: row.journal_mode })).firstOrDefault());
+      assert.equal(journal?.mode, 'wal');
+      const generated = toSql(defineSelect(schema, (query, params: { fleetId: string }) => query.from('fleet_connection')
+        .where(row => row.fleet_id === params.fleetId).select(row => ({ last_seen_at: row.last_seen_at }))), { fleetId: agent.fleetId });
+      const snapshot = reader.prepare<[Record<string, unknown>], { last_seen_at: number }>(generated.sql).iterate(generated.params);
+      try {
+        const previous = snapshot.next(); assert(!previous.done);
+        const read = () => executeSelect(reader, schema, (query, params) => query.from('fleet_connection')
+          .where(row => row.fleet_id === params.fleetId).select(row => ({ last_seen_at: row.last_seen_at })).firstOrDefault(), { fleetId: agent.fleetId });
+        await fixture.operation(operations.reportFleetConnection, { ...fleetParams, connectionId: agent.connectionId }, { stopped: false }, agent.credential);
+        assert.deepEqual(read(), previous.value, 'The existing reader keeps its snapshot while the controller commits');
+        snapshot.return?.();
+        const current = read();
+        assert(current && current.last_seen_at > previous.value.last_seen_at);
+      } finally { snapshot.return?.(); }
+    } finally { reader.close(); }
   });
   await scope.test('static publications are separate-origin, immutable, readable by link and owner-deletable', async () => {
     const bytes = Buffer.from('<!doctype html><body>Shared report<script>document.body.dataset.origin=globalThis.origin;try{document.cookie;document.body.dataset.cookie="readable"}catch{document.body.dataset.cookie="blocked"}try{localStorage.length;document.body.dataset.storage="readable"}catch{document.body.dataset.storage="blocked"}document.body.dataset.report="ready";</script></body>'); const publication = await fixture.data(operations.createPublication, {}, { title: 'Shared report', files: [{ path: 'index.html', bytes: bytes.length, mediaType: 'text/html', sha256: createHash('sha256').update(bytes).digest('hex') }] }, agent.token);

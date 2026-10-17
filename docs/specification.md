@@ -104,9 +104,12 @@ Contracts may import pure domain values; domain code does not import contracts.
 | Management UI | Human views/actions using the canonical REST contracts |
 
 Node queries use Tinqer, C# queries use EF Core and Rust queries use Diesel.
-Knex alone creates/migrates
-owned SQL stores. Raw SQL is limited to schema conversion, metadata/configuration
-and query-plan inspection.
+Knex alone creates/migrates owned SQL stores. Handwritten SQL strings are
+prohibited, including fixture setup and test assertions. Query libraries own
+statement generation; migration fixtures use Knex builders. Metadata reads use
+the selected implementation's query library. A required database operation that
+the selected library cannot express needs an explicit owner decision; a raw
+helper or removal of a safety check is not an implicit exception.
 
 Use strict types, named exports, explicit TypeScript .js relative imports,
 functional modules and Result for expected failures. Split by responsibility,
@@ -310,6 +313,9 @@ Preflight checks the complete roster before native launch. Reusing an existing
 identity/name requires private proof. Preflight is not a reservation.
 Introduction atomically claims the whole roster; collision/capacity races roll it
 all back with a specific error. No suffixing, takeover or hidden successful subset.
+Adding a local instance with an existing key or registered name returns
+`name_collision` without changing the roster or its revision. Stale revisions
+are rejected before evaluating the proposed edit.
 
 The owner reviews exactly the roster, controller and complete item coordination
 policies, including existing identities. Administrators may reject another
@@ -457,13 +463,16 @@ overlapping replacement. Permanent configuration, authority, corrupt-state and
 protocol conflicts require action, not unlimited restarts.
 Stop completion requires exact owned-process evidence, not process-name scans.
 
-The Rust process adapter binds its native writer and process group to an exact
-parent pidfd and private lifetime lock through its packaged native guard. Parent
-death terminates that owned group; another writer cannot overlap. Node/C# stock
-Codex parent-death coverage is separately bounded: a surviving writer lock refuses
-another writer. No target guesses process identities, adopts orphans or rewrites
-native history. Unrelated subprocess continuation and arbitrary process escape
-are not product guarantees. Actual per-target coverage is recorded in the review.
+Owned native writers have a parent-lifetime guard and a private process lifetime
+lock in every implementation. Node uses its IPC parent channel on Linux/macOS;
+C# uses the native parent process handle, and Rust uses a parent pidfd on Linux.
+Parent death terminates the exact owned native group. A replacement waits for
+exclusive ownership instead of overlapping the old writer. Guards run only while
+their native engine runs; sleeping fleets retain no native guard processes.
+No target guesses process identities, adopts orphans or rewrites native history.
+Arbitrary subprocess escape from the owned group is not a product guarantee.
+The same executable acceptance scenarios verify idle and in-flight controller
+death, exact retained histories and authorized continuation in every target.
 
 ## 9. Controller admission
 
@@ -475,6 +484,9 @@ Reconnection obtains a fresh generation/current intent.
 A possibly acquired lease survives lost response locally and is released by exact
 identity before reacquisition. Shutdown closes local gates without indefinitely
 waiting for remote release; expiry remains the outage bound.
+An expected remote lease-close refusal cannot prevent local shutdown or
+unregistration after archive revokes the credential. A repeated close reuses
+its completed local outcome; failed remote release is never marked confirmed.
 
 Each reporting run proves exact fleet/connection/credential, active owner/agent,
 immutable instance binding and delivery intent. A run cannot switch generations.
@@ -830,13 +842,19 @@ All implementations directly share management SQLite.
 owns application ID/version and migration filenames. Knex assets own exact columns,
 constraints, indexes and reference data, not a duplicated handwritten schema.
 
+File-backed management storage uses SQLite write-ahead logging and full commit
+durability. A management read snapshot must not block a controller heartbeat
+commit. Node, C# and Rust use the same journal mode; none switch back to a rollback
+journal. Backups use SQLite's backup API or the documented quiescent procedure,
+including committed WAL state. A live main-file copy alone is not a backup.
+
 Layout is database/<database>/<backend>/{migrations,seeds}, per-database knexfile
 and one-shot migration image, as in Lesser/Snapped. Every future SQL store follows
 that owner/nesting. Unimplemented backends have no placeholder runtime.
 Fleet file state and external Conduit RocksDB are not invented SQL stores.
 
-Current schema is 17: 63 singular application tables plus Knex tracking.
-Fresh stores and supported deployed 13–16 stores advance through Knex.
+Current schema is 18: 63 singular application tables plus Knex tracking.
+Fresh stores and supported deployed 13–17 stores advance through Knex.
 Inventoried schema-17 stores lacking history may be adopted without business
 changes. Unsupported/foreign/future stores fail without mutation.
 Conversion preserves identities, credentials, grants, receipts, usage, audit and
@@ -851,6 +869,10 @@ Historical enrollment archives retain attribution, never live authority.
 Indexes serve concrete queries/FKs. Scope/filter/count/order/page precedes
 hydration; batch labels/settings. Owner shapes do not use administrator-OR-owner
 predicates that prevent seeks. Query-plan/count tests verify actual behavior.
+Listener lifetime totals use a dedicated covering agent/activity index without
+replacing the narrow per-agent lookup index; current native
+status selects the latest run before reading its observations, not a repeated
+newer-run comparison across historical observations.
 Substring search is not constant-time; offsets may scan skipped matches.
 
 Directory, fleet, wake-rule and publication searches use bound SQLite LIKE
@@ -946,6 +968,13 @@ External behavior has one product-owned assertion bank selected by executable
 matrix. Node, C# managed, actual NativeAOT and Rust execute identical assertions.
 Configured failures/missing targets cannot be skipped. Internal algorithm,
 compiler and injected-failure tests remain language-owned.
+The shared runner requires complete summary counters, no skipped or unfinished
+scenarios and identical assertion counts for every selected implementation.
+Product test directories partition this one acceptance bank by ownership, not
+implementation. Every selected executable set runs crossfire, fleetd and fleet
+scenarios; both controller and CLI scenarios exercise Codex and Pi. Native
+capability differences have explicit shared expectations, not per-backend
+omissions or substituted implementations.
 
 Every REST declaration requires a decoded successful response, not merely an
 unauthenticated refusal. Shared scenarios also cover malformed queries, pagination,

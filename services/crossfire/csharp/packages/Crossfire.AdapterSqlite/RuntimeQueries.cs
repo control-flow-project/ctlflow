@@ -18,19 +18,18 @@ public static class RuntimeQueries
     public static Result<IReadOnlyDictionary<string, RuntimeSummary?>> Summaries(CrossfireDbContext context, IReadOnlyList<string> requested)
     {
         var ids = requested.ToArray();
-        var observations = Stored.Read(() => context.RuntimeObservation.AsNoTracking().Where(row => ids.Contains(row.AgentId))
-            .Join(context.ListenerRun, observation => observation.RunId, run => run.Id, (observation, run) => new { observation, run })
-            .Where(joined => !context.ListenerRun.Any(other => other.AgentId == joined.run.AgentId && (other.StartedAt > joined.run.StartedAt || other.StartedAt == joined.run.StartedAt && string.Compare(other.Id, joined.run.Id) > 0)))
-            .Select(joined => new AgentRuntimeState(joined.observation.AgentId, new RuntimeStateObservation(joined.observation.State, joined.observation.ObservedAt,
-                joined.observation.LastActivityAt, joined.observation.HistoryAvailable == null ? null : joined.observation.HistoryAvailable == 1))).ToArray());
+        var latest = ListenerQueries.Latest(context, ids);
+        if (!latest.IsSuccess) return Result<IReadOnlyDictionary<string, RuntimeSummary?>>.Fail(latest.Error);
+        var runIds = latest.Value.Select(run => run.Id).ToArray();
+        var stoppedRunIds = latest.Value.Where(run => run.StoppedAt is not null).Select(run => run.Id).ToArray();
+        var observations = Stored.Read(() => context.RuntimeObservation.AsNoTracking().Where(row => runIds.Contains(row.RunId))
+            .Select(row => new AgentRuntimeState(row.AgentId, new RuntimeStateObservation(row.State, row.ObservedAt,
+                row.LastActivityAt, row.HistoryAvailable == null ? null : row.HistoryAvailable == 1))).ToArray());
         if (!observations.IsSuccess) return Result<IReadOnlyDictionary<string, RuntimeSummary?>>.Fail(observations.Error);
-        var proof = Stored.Read(() => context.FleetNativeStop.AsNoTracking().Where(row => ids.Contains(row.AgentId) && row.InvalidatedAt == null)
-            .Join(context.ListenerRun.Where(row => row.StoppedAt != null), proof => proof.RunId, run => run.Id, (proof, run) => new { proof, run })
-            .Where(joined => !context.ListenerRun.Any(other => other.AgentId == joined.run.AgentId && (other.StartedAt > joined.run.StartedAt || other.StartedAt == joined.run.StartedAt && string.Compare(other.Id, joined.run.Id) > 0)))
-            .GroupBy(joined => joined.run.AgentId).Select(group => new RuntimeStopTime(group.Key, group.Max(joined => joined.proof.NativeStoppedAt))).ToArray());
+        var proof = Stored.Read(() => context.FleetNativeStop.AsNoTracking().Where(row => stoppedRunIds.Contains(row.RunId) && row.InvalidatedAt == null)
+            .GroupBy(row => row.AgentId).Select(group => new RuntimeStopTime(group.Key, group.Max(row => row.NativeStoppedAt))).ToArray());
         if (!proof.IsSuccess) return Result<IReadOnlyDictionary<string, RuntimeSummary?>>.Fail(proof.Error);
-        var operations = Stored.Read(() => context.ListenerRun.AsNoTracking().Where(row => ids.Contains(row.AgentId) && row.StoppedAt != null)
-            .Where(run => !context.ListenerRun.Any(other => other.AgentId == run.AgentId && (other.StartedAt > run.StartedAt || other.StartedAt == run.StartedAt && string.Compare(other.Id, run.Id) > 0)))
+        var operations = Stored.Read(() => context.ListenerRun.AsNoTracking().Where(row => stoppedRunIds.Contains(row.Id))
             .Join(context.FleetRuntimeOperation.Where(row => row.Action == "stop" && row.Status == "succeeded"), run => run.ControllerFleetId, operation => operation.FleetId, (run, operation) => new { run, operation })
             .Where(joined => (joined.operation.AgentId == null || joined.operation.AgentId == joined.run.AgentId) && joined.operation.CompletedAt >= joined.run.StoppedAt)
             .GroupBy(joined => joined.run.AgentId).Select(group => new RuntimeStopTime(group.Key, group.Max(joined => joined.operation.CompletedAt))).ToArray());
@@ -44,11 +43,9 @@ public static class RuntimeQueries
 
     private static Result<IReadOnlyList<AgentObservation>> Load(CrossfireDbContext context, IReadOnlyList<string> requested)
     {
-        var ids = requested.ToArray();
-        var runs = Stored.Read(() => context.ListenerRun.AsNoTracking().Where(run => ids.Contains(run.AgentId)
-            && !context.ListenerRun.Any(other => other.AgentId == run.AgentId && (other.StartedAt > run.StartedAt || other.StartedAt == run.StartedAt && string.Compare(other.Id, run.Id) > 0))).Select(row => row.Id).ToArray());
+        var runs = ListenerQueries.Latest(context, requested);
         if (!runs.IsSuccess) return Result<IReadOnlyList<AgentObservation>>.Fail(runs.Error);
-        var runIds = runs.Value;
+        var runIds = runs.Value.Select(run => run.Id).ToArray();
         var rows = Stored.Read(() => context.RuntimeObservation.AsNoTracking().Where(row => runIds.Contains(row.RunId)).OrderByDescending(row => row.ObservedAt).ThenBy(row => row.SessionId).ToArray());
         if (!rows.IsSuccess) return Result<IReadOnlyList<AgentObservation>>.Fail(rows.Error);
         var settings = Stored.Read(() => context.RuntimeSetting.AsNoTracking().Where(row => runIds.Contains(row.RunId)).OrderBy(row => row.Name).ToArray());

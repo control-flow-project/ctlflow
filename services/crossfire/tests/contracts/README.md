@@ -2,6 +2,10 @@
 
 These tests select backend executables, not backend-specific expected values.
 Run through the root coordinators in a finite resource scope.
+This is one acceptance suite across all three products. Product directories
+partition source ownership only; every selected Node, managed .NET, NativeAOT
+or Rust executable set receives these same assertions. Codex and Pi both run
+through the controller and installed CLI scenarios.
 
 | Capability | Scenario owner | Evidence |
 | --- | --- | --- |
@@ -19,9 +23,13 @@ Run through the root coordinators in a finite resource scope.
 | Management mutations | management-browser.contract.ts | Wake drafts/conflicts, delegation, schedule CRUD, decisions, dialog focus/cancel and report deletion |
 | Native chat and interruption | fleetd/tests/contracts/messages.contract.ts | Actual Codex/Pi input, source attribution, held-turn interruption and owner notices |
 | History/lifecycle | fleetd/tests/contracts/daemon.contract.ts | Saved contexts, controller restart, explicit stopped intent and management receipts |
-| CLI and SSH | fleet/tests/contracts/cli.contract.ts | Installed commands, private API, host-key refusal and noninteractive setup |
+| Crash recovery | fleetd/tests/contracts/daemon.contract.ts | Actual idle and in-flight controller SIGKILL, native writer exit, retained desired selection/history and unfinished-input continuation |
+| Upstream recovery | fleetd/tests/contracts/daemon.contract.ts | The actual server stops and restarts; the controller remains observable, closes unavailable delivery and reconnects without replacing histories or calling a model |
+| Controller operations | fleetd/tests/contracts/daemon.contract.ts | Declaration coverage, unknown-query/body refusal, roster CRUD, revision fences, idempotent operation replay, explicit update and stopped setup/unregistration |
+| CLI and SSH | fleet/tests/contracts/cli.contract.ts | Both native engines; installed setup, per-agent/fleet start/stop/reset/update, replay, delivery, broadcast, daemon restart and host-key refusal |
 | Controller authentication | fleetd/tests/contracts/authentication.contract.ts | Mandatory bearer for every daemon operation, duplicate/wrong/missing key refusal, private initialization and browser-header denial |
 | Data interchange | server.contract.ts | Every selected implementation reopens the same SQLite file |
+| Concurrent storage | server.contract.ts | An open read snapshot does not block a committed controller heartbeat; every backend retains WAL |
 | Container deployment | container.contract.ts | Actual operator/image, Element login/room/media, assets and persisted restart |
 | Operator arguments | operator.contract.ts | Repeated-option refusal, canonical decimal port bounds, unchanged private state and validation before native operations |
 | Operator recovery | container-recovery.contract.ts | Concurrent refusal, real launcher death, running/exited orphans and foreign-ownership fencing |
@@ -30,6 +38,8 @@ An authentication check is not successful-operation coverage. A decoded success
 is not proof of every possible state transition. Language-local suites retain
 internal failure-injection, compiler and algorithm checks. Paid-provider quality,
 arbitrary subprocess containment and unselected platforms are outside this bank.
+Pi's unsupported terminal attachment is an explicit checked native-capability
+refusal on every implementation, never a backend-specific skipped scenario.
 
 The shared `@ctlflow/crossfire-test-support/tls` fixture owns a distinct authority and CA:FALSE server certificate,
 with localhost/IP subject alternatives and serverAuth usage. Strict native clients

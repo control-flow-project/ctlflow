@@ -25,11 +25,12 @@ test('streamed evidence keeps finite logs and diagnostics while counting every s
   const file = join(directory, 'file.log'), evidence = testEvidence(file, { logBytes: 1024, tailBytes: 128, lineBytes: 256 });
   const chunk = Buffer.from('x'.repeat(4096));
   for (let index = 0; index < 1024; index++) evidence.append('stdout', chunk);
-  const summary = Buffer.from('\nℹ tests 42\nℹ fail 3\nℹ cancelled 2\n');
+  const summary = Buffer.from('\nℹ tests 42\nℹ fail 3\nℹ cancelled 2\nℹ skipped 4\nℹ todo 5\n');
   for (const byte of summary) evidence.append('stdout', Buffer.from([byte]));
   evidence.append('stderr', 'Failure tail.');
   const result = evidence.finish();
   assert.equal(result.complete, true); assert.equal(result.tests, 42); assert.equal(result.failed, 3); assert.equal(result.cancelled, 2);
+  assert.equal(result.skipped, 4); assert.equal(result.todo, 5);
   assert.equal(result.retainedBytes, 1024); assert.equal(result.bytes, chunk.length * 1024 + summary.length + 13);
   assert.equal(result.truncatedBytes, result.bytes - result.retainedBytes);
   assert(Buffer.byteLength(result.tail) <= 128); assert.match(result.tail, /Failure tail\./u);
@@ -39,12 +40,14 @@ test('streamed evidence keeps finite logs and diagnostics while counting every s
 
 test('evidence distinguishes missing, duplicate and overflowed counters without discarding genuine failures', scope => {
   const directory = mkdtempSync(join(tmpdir(), 'test-counters-')); scope.after(() => rmSync(directory, { recursive: true }));
-  for (const [index, text] of ['ℹ tests 1\nℹ fail 0\n', 'ℹ tests 1\nℹ tests 2\nℹ fail 0\nℹ cancelled 0\n',
-    'ℹ tests 9999999999999999999\nℹ fail 0\nℹ cancelled 0\n'].entries()) {
+  for (const [index, text] of ['ℹ tests 1\nℹ fail 0\n', 'ℹ tests 1\nℹ tests 2\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\n',
+    'ℹ tests 9999999999999999999\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\n',
+    'ℹ tests 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\n',
+    'ℹ tests 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ skipped 1\n'].entries()) {
     const evidence = testEvidence(join(directory, String(index))); evidence.append('stdout', text); assert.equal(evidence.finish().complete, false);
   }
   const evidence = testEvidence(join(directory, 'valid'));
-  evidence.append('stdout', 'ℹ tests 0\r\nℹ fail 0\r\nℹ cancelled 0'); assert.equal(evidence.finish().complete, true);
+  evidence.append('stdout', 'ℹ tests 0\r\nℹ fail 0\r\nℹ cancelled 0\r\nℹ skipped 0\r\nℹ todo 0'); assert.equal(evidence.finish().complete, true);
 });
 
 test('process-group resource verification uses effective finite ancestor limits and fails closed on absent, unsafe or unbounded scopes', () => {

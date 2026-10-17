@@ -6,6 +6,20 @@ namespace Crossfire.AdapterSqlite;
 
 public static class ListenerQueries
 {
+    public static Result<IReadOnlyList<ListenerRun>> Latest(CrossfireDbContext context, IReadOnlyList<string> requested)
+    {
+        var ids = requested.ToArray();
+        var selected = Stored.Read(() => context.Agent.AsNoTracking().Where(row => ids.Contains(row.PrincipalId))
+            .Select(agent => context.ListenerRun.Where(run => run.AgentId == agent.PrincipalId).OrderByDescending(run => run.StartedAt).ThenByDescending(run => run.Id)
+                .Select(run => run.Id).FirstOrDefault()).ToArray());
+        if (!selected.IsSuccess) return Result<IReadOnlyList<ListenerRun>>.Fail(selected.Error);
+        var runIds = selected.Value.Where(id => id is not null).Select(id => id!).ToArray();
+        return Stored.Read<IReadOnlyList<ListenerRun>>(() => context.ListenerRun.AsNoTracking().Where(row => runIds.Contains(row.Id))
+            .Select(row => new ListenerRun(row.Id, row.AgentId, row.Release, row.ControllerFleetId == null || row.ControllerConnectionId == null || row.ControllerCredentialId == null
+                ? null : new ListenerController(row.ControllerFleetId, row.ControllerConnectionId, row.ControllerCredentialId), row.StartedAt, row.LastSeenAt,
+                row.ActiveMs, row.MessagesDelivered, row.StoppedAt, row.DisconnectRequestedAt)).ToArray());
+    }
+
     public static Result<Unit> Live(CrossfireDbContext context, string agentId, string runId, long now)
     {
         var found = Find(context, runId);

@@ -106,9 +106,10 @@ public class CrossfireCSharpToLinqTranslator : CSharpSyntaxVisitor<Expression>
 
         // Perform data flow analysis to detect all variables flowing into the query (e.g. captured variables)
         _dataFlowsIn.Clear();
-        foreach (var flowsIn in _semanticModel.AnalyzeDataFlow(node).DataFlowsIn)
+        var flow = _semanticModel.AnalyzeDataFlow(node);
+        foreach (var flowsIn in flow.DataFlowsIn.Concat(flow.ReadInside.Except(flow.VariablesDeclared, SymbolEqualityComparer.Default)))
         {
-            _dataFlowsIn[flowsIn] = null;
+            if (flowsIn is ILocalSymbol or IParameterSymbol) _dataFlowsIn[flowsIn] = null;
         }
 
         var result = Visit(node);

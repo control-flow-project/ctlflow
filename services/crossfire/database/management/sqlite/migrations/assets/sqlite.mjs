@@ -5,12 +5,12 @@ export async function executeSql(knex, sql) {
 }
 
 export async function version(knex) {
-  const rows = await knex.raw('PRAGMA user_version');
+  const rows = await knex('pragma_user_version').select('user_version');
   return rows[0].user_version;
 }
 
 export async function verifyRelationships(knex) {
-  if ((await knex.raw('PRAGMA foreign_key_check')).length)
+  if ((await knex('pragma_foreign_key_check').select('*')).length)
     throw new Error('Migration would violate preserved relationships');
 }
 

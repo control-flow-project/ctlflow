@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AdapterProcess;
+using Crossfire.AdapterRuntime;
 using Crossfire.Kernel;
 
 namespace Crossfire.AdapterCodex;
@@ -80,7 +81,7 @@ public sealed partial class OwnedProcess : IAsyncDisposable
         if (string.IsNullOrEmpty(path) || path.Length > 4096 || path.Any(char.IsControl)) return Results.Fail<OwnedProcess>("invalid", "Codex requires a bounded native executable search path");
         var token = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32)); var tokenFile = System.IO.Path.Combine(home, ".crossfire-token-" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(12)));
         PrivateFiles.Write(tokenFile, Encoding.ASCII.GetBytes(token), 64);
-        var launched = NativeProcess.Start(new(binary, ["app-server", "--listen", "ws://127.0.0.1:0", "--ws-auth", "capability-token", "--ws-token-file", tokenFile], workspace, environment));
+        var launched = NativeGuard.Start(new(binary, ["app-server", "--listen", "ws://127.0.0.1:0", "--ws-auth", "capability-token", "--ws-token-file", tokenFile], workspace, environment), home, "codex");
         if (!launched.IsSuccess) { PrivateFiles.DeletePrivate(tokenFile); return Result<OwnedProcess>.Fail(launched.Error); }
         var owner = new OwnedProcess(launched.Value, stateLock, token, tokenFile, binary, path, cancellation);
         try { owner.Endpoint = await owner.ready.Task.WaitAsync(TimeSpan.FromSeconds(15), cancellation); return Result<OwnedProcess>.Success(owner); }

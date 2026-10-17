@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { executeDelete } from '@tinqerjs/better-sqlite3-adapter';
+import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -141,7 +143,7 @@ test('binding an existing private owner DM retires its discretionary invitation 
   value(await connectOwnerConversation(services, agent.actor, agent.id));
   const previous = value(services.repositories.ownerConversation.find({ agentId: agent.id }))!;
   const grant = value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId: previous.roomId }))!;
-  database.prepare('DELETE FROM agent_owner_conversation WHERE agent_id = ?').run(agent.id);
+  executeDelete(database, schema, (query, params) => query.deleteFrom('agent_owner_conversation').where(row => row.agent_id === params.agentId), { agentId: agent.id });
   value(setRoomPermission(services, admin.actor, { agentId: agent.id, roomId: previous.roomId,
     expectedRevision: value(services.directory.agent(agent.id))!.principal.revision, expectedGeneration: grant.generation,
     permissions: ['room.agent.invite'] }, randomUUID()));
@@ -215,7 +217,7 @@ test('binding an owner DM invalidates pending third-party grant authorization at
   const ada = await fixture.agent(admin.actor, 'ada'), jo = await fixture.agent(admin.actor, 'jo');
   value(await connectOwnerConversation(services, ada.actor, ada.id));
   const conversation = value(services.repositories.ownerConversation.find({ agentId: ada.id }))!;
-  database.prepare('DELETE FROM agent_owner_conversation WHERE agent_id = ?').run(ada.id);
+  executeDelete(database, schema, (query, params) => query.deleteFrom('agent_owner_conversation').where(row => row.agent_id === params.agentId), { agentId: ada.id });
   const input = { agentId: jo.id, roomId: conversation.roomId, expectedRevision: value(services.directory.agent(jo.id))!.principal.revision,
     expectedGeneration: null, accessMode: 'reply' as const, powerLevel: null, muted: false };
   const proof = value(await authorizeGrantChange(services, admin.actor, input));

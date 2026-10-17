@@ -26,7 +26,7 @@ export function verifyImplementationLayout(root) {
     }
     if (service === 'fleetd') for (const file of ['execution', 'enrollment', 'failures', 'native-stops', 'reset']) assert(!existsSync(join(directory, 'node/apps/daemon/src', file + '.ts')), 'Native execution belongs to the execution adapter, not the daemon application');
     for (const name of ['packages', 'tools']) assert(!existsSync(join(directory, name)), 'Superseded service-level implementation path: ' + service + '/' + name);
-    assert.deepEqual(readdirSync(join(directory, 'tests')).sort(), ['contracts'], 'Only common external contracts belong outside implementation tests');
+    assert.deepEqual(readdirSync(join(directory, 'tests')).sort(), service === 'crossfire' ? ['contracts', 'performance'] : ['contracts'], 'Only common external verification belongs outside implementation tests');
     const sharedApplications = join(directory, 'apps');
     assert.deepEqual(existsSync(sharedApplications) ? readdirSync(sharedApplications).sort() : [], service === 'crossfire' ? ['web'] : [], 'One common UI, no duplicate or old backend application');
   }

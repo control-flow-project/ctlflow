@@ -10,7 +10,7 @@ import type { ContractPlatform } from '@ctlflow/crossfire-test-support/contract-
 
 export type MessageFixture = { platform: ContractPlatform; fleetDirectory: string; agent: { id: string; matrixUserId: string; token: string };
   provider: { requests: readonly unknown[]; hold(): void; held(): ServerResponse | undefined; finish(): void }; idle(): Promise<boolean>; delivery(enabled: boolean): Promise<void> };
-function lastUser(request: unknown): string {
+export function lastUser(request: unknown): string {
   const body = record(request), rows = list(body.input ?? body.messages).map(record), user = rows.findLast(value => value.role === 'user'); assert(user, 'Native provider must receive an attributed user input');
   return typeof user.content === 'string' ? user.content : list(user.content).map(value => text(record(value).text)).join('\n');
 }
@@ -30,7 +30,8 @@ export async function messageContracts(scope: TestContext, fixture: MessageFixtu
   }, 'Authorized native invitation must be accepted by the shared listener', 90000);
   await observe(async () => { const response = await contractHttp(platform.origin, 'GET', '/api/agents/' + agent.id + '/delivery-policy', undefined, { Authorization: 'Bearer ' + agent.token }); return response.status === 200 && JSON.stringify(response.body).includes(room); }, 'Accepted native room must have its scoped grant');
   const send = (body: string, mention = false) => matrix('PUT', '/rooms/' + encodeURIComponent(room) + '/send/m.room.message/' + randomUUID(), { msgtype: 'm.text', body, ...(mention ? { 'm.mentions': { user_ids: [agent.matrixUserId] } } : {}) });
-  await scope.test('real messages carry source attribution and real mentions interrupt held native work', async () => {
+  await scope.test('real messages carry source attribution and real mentions interrupt held native work', async child => {
+    child.after(() => { if (provider.held()) provider.finish(); });
     provider.hold(); const first = 'Original task ' + randomUUID(); await send(first); await observe(() => provider.held() !== undefined, 'First native task reaches the held inert provider', 30000); const held = provider.held()!;
     assert.equal(provider.requests.length, 1); assert(lastUser(provider.requests[0]).includes(first)); assert(lastUser(provider.requests[0]).includes(room)); assert(lastUser(provider.requests[0]).includes(platform.owner.matrixUserId));
     provider.hold(); const replacement = 'Interrupt and use this instruction ' + randomUUID(); const started = Date.now(); const mentioned = await send(replacement, true); const event = text(mentioned.event_id);
@@ -48,7 +49,8 @@ export async function messageContracts(scope: TestContext, fixture: MessageFixtu
     }, 'Private owner DM records both receipt and actual native acceptance');
     provider.finish(); await observe(fixture.idle, 'Replacement native task completes'); assert.equal(provider.requests.length, 2);
   });
-  await scope.test('large batches use private files, while room and global history remain tool-accessible', async () => {
+  await scope.test('large batches use private files, while room and global history remain tool-accessible', async child => {
+    child.after(() => { if (provider.held()) provider.finish(); });
     await fixture.delivery(false); provider.hold(); const marker = 'Large message proof ' + randomUUID(); await send(marker + 'A'.repeat(40000)); await send(marker + 'B'.repeat(40000)); await fixture.delivery(true);
     await observe(() => provider.requests.length === 3 && provider.held() !== undefined, 'Large chat batch reaches native input'); const input = lastUser(provider.requests[2]); assert(Buffer.byteLength(input) <= 65536); const pointerLine = input.split('\n').find(value => value.startsWith('{') && value.includes('crossfire-message-files')); assert(pointerLine, 'Large native input must be a file pointer, not the full messages'); const pointer = record(JSON.parse(pointerLine) as unknown);
     const manifest = text(pointer.manifest); assert(manifest.startsWith(join(fixture.fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst') + '/')); assert.equal(statSync(manifest).mode & 0o777, 0o600); const bundle = record(JSON.parse(readFileSync(manifest, 'utf8')) as unknown); const messages = list(bundle.messages).map(record);

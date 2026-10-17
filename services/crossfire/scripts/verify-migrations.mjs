@@ -4,6 +4,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Database from 'better-sqlite3';
+import knex from 'knex';
+import { databaseConfiguration } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 import { withDockerTestResources } from '../../../scripts/docker-test-resources.mjs';
 import { containerSourceDigest } from '../dist/scripts/container-packages.js';
 import { packageLabels } from '../dist/apps/server/src/container-package.js';
@@ -34,16 +36,21 @@ try {
       '--cgroup-parent', parent, '--entrypoint', '/bin/sh', image, '-c',
       'test ! -e /usr/bin/g++ && test ! -d /app/services/crossfire/csharp && test ! -d /app/services/crossfire/node/tests && test ! -d /app/element && test ! -e /usr/local/bin/conduit'],
     { stdio: 'inherit', timeout: 30000 });
-    for (const version of [0, 13, 17, 18]) {
+    for (const version of [0, 13, 17, 18, 19]) {
       const selected = join(directory, String(version)); mkdirSync(selected, { mode: 0o700 });
       const path = join(selected, 'management.sqlite');
       if (version !== 0) {
         const previous = schema13Store();
         try { writeFileSync(path, previous.serialize(), { mode: 0o600 }); } finally { previous.close(); }
       }
-      if (version === 17) await ownedDocker(migrationArguments(selected, image, parent), AbortSignal.timeout(60000));
-      if (version === 18) {
-        const future = new Database(path); try { future.pragma('user_version=18'); } finally { future.close(); }
+      if (version === 17) {
+        const historical = knex(databaseConfiguration(path));
+        try { await historical.migrate.up({ name: '20261014000000_initial_schema.mjs' }); await historical.migrate.up({ name: '20261014000001_initial_data.mjs' }); }
+        finally { await historical.destroy(); }
+      }
+      if (version === 18) await ownedDocker(migrationArguments(selected, image, parent), AbortSignal.timeout(60000));
+      if (version === 19) {
+        const future = new Database(path); try { future.pragma('user_version=19'); } finally { future.close(); }
         await assert.rejects(() => ownedDocker(migrationArguments(selected, image, parent), AbortSignal.timeout(60000)),
           /Unsupported Crossfire schema/u);
         outcomes.push({ version, status: 'rejected' });
@@ -52,7 +59,7 @@ try {
       await ownedDocker(migrationArguments(selected, image, parent), AbortSignal.timeout(60000));
       const database = openStore(path);
       try {
-        assert.equal(database.pragma('user_version', { simple: true }), 17);
+        assert.equal(database.pragma('user_version', { simple: true }), 18);
         assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
         assert.deepEqual(database.pragma('foreign_key_check'), []);
       } finally { database.close(); }

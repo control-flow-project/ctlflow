@@ -42,6 +42,7 @@ try
     Equal(AuthorizationQueries.Principal(context, ownerId).Value?.MatrixUserId, matrixId, "precompiled context-parameter projection");
     Equal(AuthorizationQueries.Principal(context, Identity.Identifier()).Value is null, true, "query parameters are not reused");
     Equal(AuthorizationQueries.Permissions(context, ownerId).Value.Contains("member.invite"), true, "precompiled role-permission join");
+    StorageConcurrencyAcceptance.Verify(context, ownerId);
     var rolledBack = Transactions.Run(context, () =>
     {
         var record = context.Member.Single(value => value.PrincipalId == ownerId);
@@ -75,6 +76,7 @@ try
     });
     Equal(nested.IsSuccess, true, "outer transaction commits after handled nested failure");
     await DomainAcceptance.Verify(context, ownerId, matrixId);
+    LatestListenerAcceptance.Verify(context, ownerId);
     await ContainerCommandAcceptance.Verify();
     PublicRequestBudgetAcceptance.Verify();
     await HttpAcceptance.Verify();

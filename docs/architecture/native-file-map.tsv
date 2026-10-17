@@ -156,6 +156,7 @@ services/crossfire/csharp/packages/Crossfire.AdapterProcess/Crossfire.AdapterPro
 services/crossfire/csharp/packages/Crossfire.AdapterProcess/NativeProcess.cs	services/crossfire/rust/packages/adapter-process	native library
 services/crossfire/csharp/packages/Crossfire.AdapterRuntime/Crossfire.AdapterRuntime.csproj	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/csharp/packages/Crossfire.AdapterRuntime/NativeDelivery.cs	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/csharp/packages/Crossfire.AdapterRuntime/NativeGuard.cs	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/csharp/packages/Crossfire.AdapterRuntime/NativeJournal.cs	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/csharp/packages/Crossfire.AdapterRuntime/ResumptionInput.cs	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSchedule/CalendarSchedule.cs	services/crossfire/rust/packages/adapter-schedule	native library
@@ -256,6 +257,7 @@ services/crossfire/csharp/packages/Crossfire.AdapterSqlite/ListenerQueries.cs	se
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/LoggingRetention.cs	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/MemberCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/MemberQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Metadata.cs	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/OwnerConversationCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/PolicyCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/PolicyQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
@@ -450,6 +452,7 @@ services/crossfire/csharp/tests/Crossfire.Storage.Tests/FleetAcceptance.cs	servi
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/FleetChangesAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/FleetFixture.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/HttpAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/LatestListenerAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/LoggingAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/MatrixAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/NativeEnrollmentAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
@@ -466,6 +469,7 @@ services/crossfire/csharp/tests/Crossfire.Storage.Tests/SchemaAcceptance.cs	serv
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/ServerAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/StateLockAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/StatisticsAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Storage.Tests/StorageConcurrencyAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/WakeAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Storage.Tests/WireAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/calendar-cases.mjs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
@@ -606,6 +610,8 @@ services/crossfire/node/packages/adapter-runtime/src/clock.ts	services/crossfire
 services/crossfire/node/packages/adapter-runtime/src/delivery.ts	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/node/packages/adapter-runtime/src/journal.ts	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/node/packages/adapter-runtime/src/native-file.ts	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/node/packages/adapter-runtime/src/native-guard.ts	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/node/packages/adapter-runtime/src/native-process.ts	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/node/packages/adapter-runtime/src/resumption.ts	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/node/packages/adapter-schedule/LICENSE	services/crossfire/rust/packages/adapter-schedule	native library
 services/crossfire/node/packages/adapter-schedule/package.json	services/crossfire/rust/packages/adapter-schedule	native library
@@ -700,6 +706,7 @@ services/crossfire/node/packages/adapter-sqlite/src/repository/wake-notice/map.t
 services/crossfire/node/packages/adapter-sqlite/src/repository/wake-rule-agent/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/node/packages/adapter-sqlite/src/repository/wake-rule/index.ts	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/node/packages/adapter-sqlite/src/repository/wake-rule/map.ts	services/crossfire/rust/packages/adapter-sqlite	native library
+services/crossfire/node/packages/adapter-sqlite/src/schema/metadata.ts	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/node/packages/adapter-sqlite/src/schema/tables.ts	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/node/packages/adapter-sqlite/src/schema/validate-schema.ts	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/node/packages/adapter-sqlite/src/unit-of-work.ts	services/crossfire/rust/packages/adapter-sqlite	native library
@@ -1128,6 +1135,7 @@ services/crossfire/node/tests/service-lifecycle.test.ts	services/crossfire/tests
 services/crossfire/node/tests/statistics.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/steering-receipts.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/storage-capacity.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/storage-concurrency.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/support/application.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/support/architecture.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/support/browser-controller.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
@@ -1139,6 +1147,7 @@ services/crossfire/node/tests/support/http.ts	services/crossfire/tests/contracts
 services/crossfire/node/tests/support/lock-owner.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/support/map-fleet.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/support/matrix-authority.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/support/migration-data.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/support/native-application.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/support/native-server.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/support/onboarding-browser.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { TestContext } from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, rmSync, copyFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, chmodSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { executeInsert, executeSelect, executeUpdate } from '@tinqerjs/better-sqlite3-adapter';
@@ -170,7 +170,7 @@ test('settled decisions, notifications, deliveries, operation receipts, invitati
   executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_permission').values({ request_id: params.archive, instance_key: 'workflow', permission_code: 'room.agent.invite', grant_scope: 'agent_room' }), { archive });
   executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_wake_sender').values({ request_id: params.archive, instance_key: 'workflow', sender_principal_id: params.owner, include_agents: 0 }), { archive, owner: admin.actor.principalId });
   executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_metadata').values({ enrollment_id: params.archive, key: 'label', value: 'Archived diagnostic metadata' }), { archive });
-  const backup = fixture.file + '.backup'; copyFileSync(fixture.file, backup); const backupBytes = readFileSync(backup);
+  const backup = fixture.file + '.backup'; await database.backup(backup); chmodSync(backup, 0o600); const backupBytes = readFileSync(backup);
   fixture.advance(8 * DAY_MS); value(maintainLogging(services));
   assert.equal(value(services.runtime.decision(question.id)), null); assert.equal(value(services.runtime.decision(permission.id)), null);
   assert.equal(executeSelect(database, schema, query => query.from('runtime_decision_question').count()), 0);

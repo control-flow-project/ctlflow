@@ -42,7 +42,7 @@ impl Database {
             )
         })?;
         schema::verify(&mut connection)?;
-        connection.batch_execute("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA journal_mode=DELETE; PRAGMA trusted_schema=OFF;").map_err(failure)?;
+        connection.batch_execute("PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA trusted_schema=OFF;").map_err(failure)?;
         Ok(Self {
             connection,
             _directory: directory,

@@ -1,5 +1,5 @@
-import { spawn, execFile } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { writePrivateBytes } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { piEnvironment } from './home.js';
@@ -7,6 +7,7 @@ import { piVersion } from './options.js';
 import { piExtensionSource } from './extension.js';
 import { failureError } from '@ctlflow/crossfire-kernel/result';
 import { piErrorText } from './errors.js';
+import { guardedProcess } from '@ctlflow/crossfire-adapter-runtime/native-process';
 
 export function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw failureError({ code: 'invalid', message: 'Invalid native Pi object' });
@@ -27,9 +28,9 @@ export async function startPi(input: { binary: string; workspace: string; stateD
   const extension = join(input.home, 'crossfire-extension.mjs'), instructions = join(input.home, 'crossfire-instructions.txt');
   writePrivateBytes(extension, Buffer.from(piExtensionSource()), 1024 * 1024);
   writePrivateBytes(instructions, Buffer.from(input.instructions), 8 * 1024 * 1024);
-  const child = spawn(input.binary, ['--mode', 'rpc', '--offline', '--no-extensions', '--no-skills', '--no-prompt-templates', '--no-themes',
+  const child = guardedProcess(input.binary, ['--mode', 'rpc', '--offline', '--no-extensions', '--no-skills', '--no-prompt-templates', '--no-themes',
     '--no-approve', '--session', input.sessionFile, '--append-system-prompt', instructions, '--extension', extension],
-  { cwd: input.workspace, env: environment, detached: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  { workspace: input.workspace, environment, directory: input.home, identity: createHash('sha256').update(input.sessionFile).digest('hex') });
   const failed = new AbortController(), lifetime = AbortSignal.any([stop, failed.signal]);
   const requests = new Map<string, { command: string; resolve: (value: unknown) => void; reject: (error: unknown) => void }>();
   const controls = new Map<string, { resolve: (value: unknown) => void; reject: (error: unknown) => void }>();
@@ -49,7 +50,7 @@ export async function startPi(input: { binary: string; workspace: string; stateD
       failed.abort(new Error('Owned Pi connection closed'));
       let rejectEscalation!: (error: unknown) => void;
       const escalation = new Promise<never>((_resolve, reject) => { rejectEscalation = reject; });
-      const timer = setTimeout(() => { try { terminate('SIGKILL'); } catch (error) { rejectEscalation(error); } }, 3000);
+      const timer = setTimeout(() => { try { terminate('SIGKILL'); } catch (error) { rejectEscalation(error); } }, 8000);
       try { terminate('SIGTERM'); await Promise.race([ended, escalation]); } finally { clearTimeout(timer); lifetime.removeEventListener('abort', aborted); }
     });
   }

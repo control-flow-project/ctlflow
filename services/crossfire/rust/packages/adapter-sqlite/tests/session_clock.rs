@@ -57,7 +57,7 @@ async fn management_session_time_is_read_after_native_authentication_finishes()
     assert_eq!(run.last_seen_at, NOW);
     assert_eq!(
         crossfire_adapter_sqlite::schema::pragma(database.connection(), "user_version")?,
-        17
+        crossfire_adapter_sqlite::schema::SCHEMA_VERSION
     );
     Ok(())
 }

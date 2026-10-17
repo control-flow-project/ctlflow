@@ -14,12 +14,12 @@ stale maps. Association alone does not prove functional equivalence.
 
 | Product | Node files | C# files | Coverage |
 | --- | ---: | ---: | --- |
-| crossfire | 705 | 477 | Server, domain, contracts, adapters, queries, assets, tests, operators and build |
-| fleetd | 76 | 40 | Daemon, lifecycle, execution composition, state, setup, authentication and tests |
+| crossfire | 711 | 480 | Server, domain, contracts, adapters, queries, assets, tests, operators and build |
+| fleetd | 74 | 39 | Daemon, lifecycle, execution composition, state, setup, authentication and tests |
 | fleet | 26 | 13 | CLI, daemon client, setup, SSH, packaging and tests |
-| Total | 807 | 530 | 1,337 files, with no source/test/manifest/guide exclusions |
+| Total | 811 | 532 | 1,343 files, with no source/test/manifest/guide exclusions |
 
-The current inventory maps these owners to 595 Rust files or explicit shared assets. Review follows
+The current inventory maps these owners to 594 Rust files or explicit shared assets. Review follows
 configuration/validation, authorization/transactions, filter/count/order/page,
 input/receipt/restart, process/lock/cleanup and declaration/generator/package
 paths. Public behavior uses one external assertion bank.

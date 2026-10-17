@@ -12,7 +12,6 @@ const check = process.argv.slice(2);
 assert(check.length === 0 || check.length === 1 && check[0] === '--check', 'Use --check or no arguments');
 const migrator = knex(databaseConfiguration(':memory:'));
 await migrator.migrate.latest();
-const database = await migrator.client.acquireConnection();
 const pascal = value => value.split('_').map(part => part[0].toUpperCase() + part.slice(1)).join('');
 const quote = value => JSON.stringify(value);
 const nativeTypes = { TEXT: 'string', INTEGER: 'long', REAL: 'double', BLOB: 'byte[]' };
@@ -24,9 +23,11 @@ function emit(relative, lines) {
 }
 
 try {
-  const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'knex_%' ORDER BY rowid").all()
-    .map(({ name }) => ({ name, columns: database.prepare('PRAGMA table_info(' + quote(name) + ')').all(),
-      foreignKeys: database.prepare('PRAGMA foreign_key_list(' + quote(name) + ')').all() }));
+  const names = await migrator('sqlite_schema').select('name').where('type', 'table')
+    .where('name', 'not like', 'sqlite_%').where('name', 'not like', 'knex_%').orderBy('rowid');
+  const tables = await Promise.all(names.map(async ({ name }) => ({ name,
+    columns: await migrator('pragma_table_info').where('arg', name).select('*'),
+    foreignKeys: await migrator('pragma_foreign_key_list').where('arg', name).select('*') })));
   for (const table of tables) {
     const properties = table.columns.map(column => {
       const required = Boolean(column.notnull || column.pk), type = nativeTypes[column.type];
@@ -68,4 +69,4 @@ try {
     '    public const long ApplicationId = ' + contract.application + ';', '    public const long Version = ' + contract.version + ';',
     '    public static readonly string[] Migrations = [' + contract.migrations.map(quote).join(', ') + '];', '}']);
   console.log(JSON.stringify({ tables: tables.length, relationships: foreignKeys.length / 3, mode: check.length ? 'check' : 'generate' }));
-} finally { await migrator.client.releaseConnection(database); await migrator.destroy(); }
+} finally { await migrator.destroy(); }

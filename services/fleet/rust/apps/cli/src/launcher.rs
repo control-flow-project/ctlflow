@@ -41,7 +41,11 @@ pub async fn probe(root: &Path, stop: CancellationToken) -> Result<Option<Value>
         Err(_) => return Err(invalid("Cannot inspect controller endpoint")),
         Ok(_) => {}
     }
-    let client = Client::open(&root.join("fleetd.sock"), stop.clone())?;
+    let client = match Client::open(&root.join("fleetd.sock"), stop.clone()) {
+        Ok(client) => client,
+        Err(error) if error.code == ErrorCode::Unavailable => return Ok(None),
+        Err(error) => return Err(error),
+    };
     match client.call(&Call::new(OperationId::Status), stop).await {
         Ok(value) => Ok(Some(value)),
         Err(error) if error.code == ErrorCode::Unavailable => Ok(None),

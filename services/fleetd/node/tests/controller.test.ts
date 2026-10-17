@@ -126,6 +126,21 @@ test('controller owns runtimes, rejects duplicates and operation reuse with diff
 });
 const fixtureController = fixture;
 
+test('duplicate instance keys and agent names are rejected without changing the stopped roster', async scope => {
+  const fixture = fixtureController(); cleanup(scope, () => fixture.controller.close());
+  const before = readFileSync(join(fixture.fleet, 'runtime.toml'));
+  const current = value(fixture.controller.view(fixture.record.fleetId));
+  const original = current.instances[0]!.instance;
+  for (const instance of [original, { ...original, name: 'different' }, { ...original, key: 'another', workarea: 'agents/analyst/workarea/another' }]) {
+    const result = await fixture.controller.editInstance(current.fleetId, current.revision, { kind: 'add', instance });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.error.code, 'name_collision');
+    assert.deepEqual(readFileSync(join(fixture.fleet, 'runtime.toml')), before);
+    assert.equal(value(fixture.controller.view(current.fleetId)).revision, current.revision);
+  }
+  assert.equal(fixture.started.length, 0);
+});
+
 test('automatic recovery closes the exact failed generation, retains deployed configuration and stops on explicit intent', async scope => {
   const native: AbortController[] = [], calls: string[] = [], waits: { milliseconds: number; release: () => void }[] = [];
   const fixture = fixtureController({ start: async (_configuration, _instance, _signal, reason) => {

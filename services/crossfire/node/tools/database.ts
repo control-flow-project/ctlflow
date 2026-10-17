@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
+import { databaseIdentity, databaseTables, databaseValid, tableMetadata } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/validate-schema';
@@ -99,12 +100,11 @@ export function inspectDatabase(file: string, expected: check.Parsed<typeof data
     database = new Database(file, { readonly: true, fileMustExist: true });
     const selected = database;
     return selected.transaction(() => {
-      if (selected.pragma('application_id', { simple: true }) !== 1129465426) return failure('invalid', 'Not a Crossfire database; nothing was changed');
-      const version = selected.pragma('user_version', { simple: true });
+      const { application, version } = databaseIdentity(selected);
+      if (application !== 1129465426) return failure('invalid', 'Not a Crossfire database; nothing was changed');
       if (expected.schemaVersion !== undefined && version !== expected.schemaVersion) return failure('conflict', 'Unexpected Crossfire schema version');
-      const integrity = selected.pragma('integrity_check', { simple: true });
-      if (integrity !== 'ok' || (selected.pragma('foreign_key_check') as unknown[]).length !== 0) return failure('native', 'Database integrity or foreign keys failed');
-      const names = selected.prepare("SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('knex_migrations','knex_migrations_lock') ORDER BY name").all() as { name: string }[];
+      if (!databaseValid(selected)) return failure('native', 'Database integrity or foreign keys failed');
+      const names = databaseTables(selected);
       const readers = counts(selected), totals: Record<string, number> = {};
       if (names.length !== Object.keys(readers).length) return failure('invalid', 'Database does not contain the complete current schema');
       for (const { name } of names) {
@@ -112,8 +112,7 @@ export function inspectDatabase(file: string, expected: check.Parsed<typeof data
         totals[name] = readers[name as keyof typeof readers]();
       }
       for (const [name, count] of Object.entries(expected.counts ?? {})) if (totals[name] !== count) return failure('conflict', 'Unexpected row count in ' + name);
-      const metadata = includeSchema ? names.map(({ name }) => ({ name, columns: selected.pragma('table_info(' + name + ')'),
-        foreignKeys: selected.pragma('foreign_key_list(' + name + ')'), indexes: selected.pragma('index_list(' + name + ')') })) : undefined;
+      const metadata = includeSchema ? names.map(({ name }) => tableMetadata(selected, name)) : undefined;
       return success({ checkedAt: new Date().toISOString(), schemaVersion: version, integrity: 'ok', foreignKeys: 'ok', counts: totals,
         ...(metadata ? { schema: metadata } : {}) });
     })();
@@ -125,23 +124,18 @@ export async function verifyPreservation(before: string, after: string, retentio
   const first = inspectDatabase(before, {}, false), second = inspectDatabase(after, {}, false);
   if (!first.ok) return first; if (!second.ok) return second;
   let original: Database.Database | undefined, current: Database.Database | undefined, converted: Database.Database | undefined;
+  let migrationDirectory: string | undefined;
   try {
     original = new Database(before, { readonly: true, fileMustExist: true });
     current = new Database(after, { readonly: true, fileMustExist: true });
     if (first.value.schemaVersion !== second.value.schemaVersion) {
-      if (![13, 14, 15, 16].includes(Number(first.value.schemaVersion)) || second.value.schemaVersion !== SCHEMA_VERSION) return failure('invalid', 'No verified forward migration exists between these stores');
-      converted = new Database(original.serialize());
-      converted.pragma('foreign_keys = ON');
-      const temporary = mkdtempSync(join(realpathSync(tmpdir()), 'crossfire-preservation-'));
-      try {
-        const file = join(temporary, 'management.sqlite');
-        writeFileSync(file, converted.serialize(), { mode: 0o600 });
-        converted.close();
-        await migrateDatabase(file);
-        const migrated = new Database(file, { readonly: true, fileMustExist: true });
-        try { converted = new Database(migrated.serialize()); }
-        finally { migrated.close(); }
-      } finally { rmSync(temporary, { recursive: true }); }
+      if (![13, 14, 15, 16, 17].includes(Number(first.value.schemaVersion)) || second.value.schemaVersion !== SCHEMA_VERSION) return failure('invalid', 'No verified forward migration exists between these stores');
+      migrationDirectory = mkdtempSync(join(realpathSync(tmpdir()), 'crossfire-preservation-'));
+      const file = join(migrationDirectory, 'management.sqlite');
+      writeFileSync(file, '', { mode: 0o600, flag: 'wx' });
+      await original.backup(file);
+      await migrateDatabase(file);
+      converted = new Database(file, { readonly: true, fileMustExist: true });
     }
     const firstDatabase = converted ?? original, secondDatabase = current;
     return firstDatabase.transaction(() => secondDatabase.transaction(() => {
@@ -181,7 +175,10 @@ export async function verifyPreservation(before: string, after: string, retentio
         expired, loggingRetention: retention ?? null, beforeCounts: first.value.counts, afterCounts: second.value.counts });
     })())();
   } catch { return failure('invalid', 'Cannot inspect protected records using the current schema'); }
-  finally { converted?.close(); original?.close(); current?.close(); }
+  finally {
+    converted?.close(); original?.close(); current?.close();
+    if (migrationDirectory) rmSync(migrationDirectory, { recursive: true });
+  }
 }
 
 function protectedRecords(database: Database.Database) {

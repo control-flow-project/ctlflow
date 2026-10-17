@@ -13,6 +13,10 @@ test('native process locks survive suspension, release on owner death, and retai
   const directory = mkdtempSync(join(tmpdir(), 'crossfire-lock-'));
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const path = join(directory, 'receiver');
+  for (const [retries, interval] of [[-1, 25], [1.5, 25], [1, 0], [1, 1001], [1, Number.NaN]]) {
+    await assert.rejects(acquireProcessLock(path, retries, interval), /bounded retries and intervals/u);
+    assert.deepEqual(readdirSync(directory), [], 'Invalid observation settings cannot create lock state');
+  }
   const child = spawn(process.execPath, [fileURLToPath(new URL('./support/lock-owner.js', import.meta.url)), path], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
   const ended = once(child, 'close');
   cleanup(scope, async () => { child.kill('SIGKILL'); await ended; });

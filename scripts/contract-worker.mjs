@@ -22,7 +22,7 @@ test('shared product contracts: ' + selected.name, { timeout: 780000 }, async sc
   const platform = await contractStack(scope, selected, targets);
   await scope.test('Crossfire HTTP, Matrix, security and persisted-data contracts', child => serverContracts(child, platform));
   for (const runtime of ['codex', 'pi']) await scope.test('fleetd lifecycle contract with actual ' + runtime, child => daemonContracts(child, platform, selected, runtime));
-  await scope.test('Fleet CLI contract', child => cliContracts(child, platform, selected));
+  for (const runtime of ['codex', 'pi']) await scope.test('fleet CLI contract with actual ' + runtime, child => cliContracts(child, platform, selected, runtime));
   await scope.test('Shared React contract', child => browserContracts(child, platform));
   await scope.test('Trusted ingress contract', child => ingressContracts(child, platform));
   await platform.close();

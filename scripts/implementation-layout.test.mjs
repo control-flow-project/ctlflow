@@ -21,6 +21,7 @@ function fixture(scope) {
     mkdirSync(join(directory, 'tests/contracts'), { recursive: true });
   }
   mkdirSync(join(root, 'services/crossfire/apps/web'), { recursive: true });
+  mkdirSync(join(root, 'services/crossfire/tests/performance'));
   return root;
 }
 

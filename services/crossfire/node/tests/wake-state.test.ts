@@ -8,13 +8,16 @@ import { applicationFixture, value } from './support/application.js';
 import { changeWakePolicy } from '@ctlflow/crossfire-domain/wake/change-policy';
 import { deliveryPolicy } from '@ctlflow/crossfire-domain/agent/delivery-policy';
 import { randomUUID } from 'node:crypto';
+import { migrationChange, migrationQuery, migrationRows } from './support/migration-data.js';
 
 test('one schema refuses unrelated storage without modifying it', () => {
   mkdirSync('.temp', { recursive: true }); const path = join(mkdtempSync(join(process.cwd(), '.temp/schema-')), 'foreign.sqlite');
-  const original = new Database(path); original.exec('CREATE TABLE unrelated (id TEXT PRIMARY KEY); INSERT INTO unrelated VALUES (\'retained\')'); original.close(); chmodSync(path, 0o600);
+  const original = new Database(path);
+  migrationChange(original, migrationQuery.schema.createTable('unrelated', table => table.text('id').primary()));
+  migrationChange(original, migrationQuery('unrelated').insert({ id: 'retained' })); original.close(); chmodSync(path, 0o600);
   assert.throws(() => openStore(path), /Unsupported Crossfire schema.*No data was changed/u);
   const inspection = new Database(path);
-  assert.deepEqual(inspection.prepare('SELECT id FROM unrelated').all(), [{ id: 'retained' }]);
+  assert.deepEqual(migrationRows(inspection, migrationQuery('unrelated').select('id')), [{ id: 'retained' }]);
   assert.equal(inspection.pragma('user_version', { simple: true }), 0); inspection.close();
 });
 test('wake mode and selected senders persist in their canonical normalized relations', async scope => {
