@@ -1061,6 +1061,7 @@ services/crossfire/node/tests/listener-invitation.test.ts	services/crossfire/tes
 services/crossfire/node/tests/listener-maintenance.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/listener-priority.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/listener-updates.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/node/tests/local-docker.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/logging-files.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/logging-retention.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/management-confirmation-browser.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
