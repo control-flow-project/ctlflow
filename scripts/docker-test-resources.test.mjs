@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { dockerResourceProperties } from './docker-test-resources.mjs';
+import { dockerManagerEnvironment, dockerResourceProperties } from './docker-test-resources.mjs';
+
+test('only manager commands reconnect to the native user bus; browser inheritance stays disabled', () => {
+  const browser = { DBUS_SESSION_BUS_ADDRESS: 'unix:path=/dev/null', XDG_RUNTIME_DIR: '/run/user/1001', PATH: '/bin' };
+  assert.deepEqual(dockerManagerEnvironment(browser), { XDG_RUNTIME_DIR: '/run/user/1001', PATH: '/bin' });
+  assert.equal(browser.DBUS_SESSION_BUS_ADDRESS, 'unix:path=/dev/null');
+});
 
 test('Docker verification carries finite aggregate memory, swap and task budgets into its exact slice', () => {
   assert.deepEqual(dockerResourceProperties({ 'memory.max': '8589934592', 'memory.swap.max': '0', 'pids.max': '1024' }),
