@@ -63,3 +63,21 @@ test('process-group resource verification uses effective finite ancestor limits 
   const actual = verifyTestResources();
   assert(BigInt(actual['memory.max']) > 0n); assert(BigInt(actual['memory.swap.max']) >= 0n); assert(BigInt(actual['pids.max']) > 0n);
 });
+
+test('actual headless Chromium retains the verified aggregate process scope instead of registering a desktop scope', { timeout: 30000 }, async () => {
+  verifyTestResources();
+  assert.equal(process.env.DBUS_SESSION_BUS_ADDRESS, 'unix:path=/dev/null');
+  const { chromium } = await import('@playwright/test');
+  const group = readFileSync('/proc/self/cgroup', 'utf8');
+  const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
+  try {
+    const page = await browser.newPage(); await page.goto('data:text/html,<title>Resource scope</title>');
+    const session = await browser.newBrowserCDPSession();
+    const { processInfo } = await session.send('SystemInfo.getProcessInfo');
+    assert(processInfo.length > 0, 'Native browser process evidence must not be empty');
+    for (const process of processInfo) {
+      assert(Number.isSafeInteger(process.id) && process.id > 0, 'Native browser process ID must be valid');
+      assert.equal(readFileSync('/proc/' + process.id + '/cgroup', 'utf8') === group, true, process.type + ' remains inside the guarded scope');
+    }
+  } finally { await browser.close(); }
+});
