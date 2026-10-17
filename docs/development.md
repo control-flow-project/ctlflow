@@ -1,5 +1,10 @@
 # Development and verification
 
+Private work notes belong in ignored `.analysis/` directories. Never track,
+force-add, commit or publish them at any depth. `npm run verify:structure`
+checks the Git index and ignore coverage. Public verification reports belong
+under `docs/verification/` after review, not in private working-note directories.
+
 ## Prerequisites
 
 Use the repository's Node/npm engine requirements, lockfile, `global.json` and

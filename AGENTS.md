@@ -112,6 +112,11 @@ All npm names use @ctlflow. Only @ctlflow/fleet and @ctlflow/fleetd may be publi
 every other workspace remains private. Public builds cannot require publishing
 internal modules or resolving source through the monorepo.
 Controller labels/metadata are descriptive, not authentication or permissions.
+Every fleetd operation requires its shared OS-user configuration credential.
+fleetd alone initializes the persistent random key; fleet reads the same private
+OS-native file locally or through strict SSH. No anonymous or compatibility path.
+Normal harness-facing setup always uses pinned npm fleet/fleetd, independent of
+server implementation; do not require .NET/Rust on ordinary setup hosts.
 No systemd/global services, global skills, unrequested host changes, production
 resets or unrequested deployment. Preserve credentials and shared source work.
 Do not delegate or start subagents without explicit authorization.
@@ -159,6 +164,11 @@ Node, C# and Rust keep symmetric service ownership and semantic source structure
 language/framework differences must be explicit and justified, not hidden paths.
 
 ## Git
+Never track, force-add, commit or publish .analysis directories at any depth.
+They are private local work notes, not source or release evidence. Keep reviewed
+public verification records under docs/verification instead. The structure gate
+rejects tracked .analysis paths even when a prior commit or force-add bypassed
+ignore rules. Apply this rule across all projects, not just this monorepo.
 Never commit/push main, force-push, reset/clean/stash shared work or create PRs.
 Authorized checkpoints go to the feature branch and are not release claims.
 Provide manual /pull/new/<branch> links, one link per flat list item.
