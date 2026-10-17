@@ -63,14 +63,16 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
     try {
       for (const operator of fixture.targets) for (const failure of ['archive', 'labels']) {
         const path = join(temporary, operator.name + '-' + failure); mkdirSync(path);
-        const source = join(fixture.packages, operator.name), manifest = JSON.parse(readFileSync(join(source, 'release.json'), 'utf8')) as Record<string, unknown>;
-        if (failure === 'archive') writeFileSync(join(path, 'images.tar'), 'corrupt archive');
-        else { copyFileSync(join(source, 'images.tar'), join(path, 'images.tar')); manifest.backend = 'incorrect-backend'; }
-        writeFileSync(join(path, 'release.json'), JSON.stringify(manifest));
-        const identity = inspect(fixture.containerName, '{{.Id}}'); await fixture.abandon();
-        const contender = fixture.launch(operator, path); await observe(() => !contender.alive(), 'Invalid package fails before stopping writers', 60000);
-        assert.notEqual(await contender.ended, 0); assert.match(contender.errors(), failure === 'archive' ? /SHA-256/u : /release labels/u);
-        assert.equal(inspect(identity, '{{.State.Status}}'), 'running'); await fixture.start(operator);
+        try {
+          const source = join(fixture.packages, operator.name), manifest = JSON.parse(readFileSync(join(source, 'release.json'), 'utf8')) as Record<string, unknown>;
+          if (failure === 'archive') writeFileSync(join(path, 'images.tar'), 'corrupt archive');
+          else { copyFileSync(join(source, 'images.tar'), join(path, 'images.tar')); manifest.backend = 'incorrect-backend'; }
+          writeFileSync(join(path, 'release.json'), JSON.stringify(manifest));
+          const identity = inspect(fixture.containerName, '{{.Id}}'); await fixture.abandon();
+          const contender = fixture.launch(operator, path); await observe(() => !contender.alive(), 'Invalid package fails before stopping writers', 60000);
+          assert.notEqual(await contender.ended, 0); assert.match(contender.errors(), failure === 'archive' ? /SHA-256/u : /release labels/u);
+          assert.equal(inspect(identity, '{{.State.Status}}'), 'running'); await fixture.start(operator);
+        } finally { rmSync(path, { recursive: true, force: true }); }
       }
     } finally { rmSync(temporary, { recursive: true, force: true }); await fixture.restart(original); }
   });
