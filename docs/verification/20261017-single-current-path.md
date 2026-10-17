@@ -65,6 +65,39 @@ Codex and Pi participate; fixtures do not call paid model providers.
 The optional Docker assets add four focused canonical Node tests, which pass
 after parent integration. Parent review removed shared server/fleet networking
 and supplied the explicit Compose command required by its entrypoint override.
-Actual full-container/migration/local-stack acceptance and registry publication
-remain pending. Passing checks do not establish an absolute proof against every
-possible undiscovered defect.
+The final container matrix passes the same 32 checks on each of Node, managed
+C#, NativeAOT C# and Rust: 128 checks, zero failures or cancellations. Every
+installed operator runs every backend package against the same retained state.
+Checks include corrupt archives, incorrect labels, concurrent owners, killed
+launchers and abandoned runtime/migration containers. Target durations are
+332–364 seconds with four workers under a finite 16-GiB, zero-swap, 8192-task
+aggregate budget.
+
+Two test-fixture defects were corrected without changing runtime checks:
+negative cases now copy rather than hard-link a shared archive, because link
+changes invalidate the producer's inode metadata; large archives use disk-backed
+project temporary directories rather than accumulating on RAM-backed `/tmp`.
+Each negative-case copy is removed immediately. Earlier failed runs are not
+counted as passing evidence.
+
+The actual shared Knex container passes empty, schema-13 and schema-17 cases and
+rejects future schema 18 without modifying it. The migration gate uses the
+canonical producer's image labels rather than replacing the selected tag with an
+unlabelled image. Both selectable C# distributions and actual Codex/Pi adapters
+remain covered by their runtime banks; no paid-provider quality claim follows.
+
+The final optional local stack passes 7/7 browser/container checks, including
+owner-reviewed enrollment, separate native histories, public-port-only network
+access, actual agent HTML publication, browser credential isolation and exact
+identity/history/stop-state preservation after recreation. The final standalone
+fleet image passes 4/4 checks, including actual offline Pi RPC. Strict types,
+architecture (33/33) and the four focused Docker-source checks pass after parent
+integration. These are Linux/amd64 results, not macOS/ARM certification.
+
+Public npm fleet/fleetd 0.1.21 were published and their registry SHA-512 integrity
+values match the verified local tarballs. All 120 external npm lock records are
+unchanged. Other workspaces remain private. GHCR publication requires a separate
+package-write credential and is not claimed by this report.
+
+Passing checks do not establish an absolute proof against every possible
+undiscovered defect.
