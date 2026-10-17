@@ -10,7 +10,7 @@ export async function buildAgentClient(destination: string): Promise<void> {
   await build({ absWorkingDir: join(dirname(fileURLToPath(import.meta.url)), '..'),
     entryPoints: [fileURLToPath(import.meta.resolve('@ctlflow/crossfire-agent-tools/entry'))], outfile: destination,
     bundle: true, platform: 'node', format: 'esm', target: 'node26',
-    banner: { js: "/*! Copyright (c) 2026 Jeswin P Kumar. All rights reserved. Proprietary; see README.md. Contact: jeswinpk@agilehead.com. */\nimport { createRequire as crossfireCreateRequire } from 'node:module'; const require = crossfireCreateRequire(import.meta.url);" } });
+    banner: { js: "/*! Copyright (c) 2026 Jeswin P Kumar. MIT License; see README.md. Contact: jeswinpk@agilehead.com. */\nimport { createRequire as crossfireCreateRequire } from 'node:module'; const require = crossfireCreateRequire(import.meta.url);" } });
 }
 
 export async function buildAgentArtifacts(outputDirectory: string, version: string): Promise<Release> {

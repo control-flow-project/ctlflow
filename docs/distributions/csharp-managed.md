@@ -133,4 +133,4 @@ reflection or plugin compatibility.
 - [Shared product configuration and commands](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/docs/README.md)
 - [Server configuration and backup](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/operations.md)
 - [Dependency and verification limits](https://github.com/control-flow-project/ctlflow/blob/main/docs/architecture/native-implementations.md)
-- [Proprietary license](https://github.com/control-flow-project/ctlflow/blob/main/LICENSE)
+- [MIT license](https://github.com/control-flow-project/ctlflow/blob/main/LICENSE)

@@ -70,9 +70,9 @@ or reflection support. Test results identify their actual platform and providers
 
 ## License
 
-Copyright (c) 2026 Jeswin P Kumar. All rights reserved.
-First-party code, documentation and assets require a separate written commercial
-license. Public npm distribution does not grant open-source rights.
+Copyright (c) 2026 Jeswin P Kumar.
+First-party code, documentation and assets are licensed under MIT. Internal
+packages remain private; the license does not change publication permissions.
 
 - [License](LICENSE)
 

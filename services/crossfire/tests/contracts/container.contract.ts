@@ -37,7 +37,7 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
       assert.equal(containerId.status, 0); assert.match(containerId.stdout.trim(), /^[a-f0-9]{64}$/u);
       const license = spawnSync('docker', ['exec', name, 'cat', '/app/LICENSE'], { encoding: 'utf8' });
       assert.equal(license.status, 0);
-      assert.equal(license.stdout, readFileSync(join(repository, 'LICENSE'), 'utf8'), 'The distribution retains its root proprietary license');
+      assert.equal(license.stdout, readFileSync(join(repository, 'LICENSE'), 'utf8'), 'The distribution retains its root MIT license');
       const actualGroup = spawnSync('systemctl', ['--user', 'show', 'docker-' + containerId.stdout.trim() + '.scope', '--property=ControlGroup', '--value'], { encoding: 'utf8' });
       assert.equal(actualGroup.status, 0);
       assert(actualGroup.stdout.trim().endsWith('/' + cgroupParent + '/docker-' + containerId.stdout.trim() + '.scope'), 'The actual runtime process group belongs to the finite Docker verification slice');

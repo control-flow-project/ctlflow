@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/fleet-ssh-transport", "version": "0.1.20", "private": true, "type": "module",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
   "dependencies": {}

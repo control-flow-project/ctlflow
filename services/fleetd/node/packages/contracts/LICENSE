@@ -1,33 +1,21 @@
-Proprietary Commercial License
+MIT License
 
-Copyright (c) 2026 Jeswin P Kumar
-Contact: jeswinpk@agilehead.com
-All rights reserved.
+Copyright (c) 2026 Jeswin P Kumar <jeswinpk@agilehead.com>
 
-1. Scope
-This license applies only to the first-party software, documentation and assets
-provided with it (the "Software"). The Software is proprietary, not open source.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-2. Permission required
-No permission to use, install, access, copy, modify, distribute, sublicense, sell,
-host or otherwise exploit the Software is granted by this notice. Such rights
-require a separate written commercial license agreement with Jeswin P Kumar.
-Access to a repository, package or download does not itself grant these rights.
-Any authorized use is limited to the rights and conditions in that agreement.
-Rights that cannot lawfully be restricted remain unaffected.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-3. Notices and third-party materials
-Authorized copies must retain this license and applicable copyright notices.
-Third-party software, dependencies and materials remain subject to their own
-licenses. This license does not replace those licenses or claim ownership of
-third-party materials.
-Licenses previously granted for earlier versions are not retroactively revoked.
-
-4. Warranty and liability
-Except as otherwise expressly agreed in writing or required by applicable law,
-the Software is provided "AS IS", without warranties of any kind, express or
-implied, including merchantability, fitness for a particular purpose and
-noninfringement. To the fullest extent permitted by applicable law, Jeswin P Kumar
-is not liable for damages or other liability arising from the Software or its use.
-
-For commercial licensing or other permissions, contact jeswinpk@agilehead.com.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

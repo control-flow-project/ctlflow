@@ -15,7 +15,7 @@
     <Authors>Jeswin P Kumar</Authors>
     <Company>Control Flow</Company>
     <Copyright>Copyright 2026 Jeswin P Kumar (jeswinpk@agilehead.com)</Copyright>
-    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <OptimizationPreference>Speed</OptimizationPreference>

@@ -1,7 +1,7 @@
 {
   "name": "@ctlflow/crossfire-server",
   "version": "0.1.20",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
   "type": "module",

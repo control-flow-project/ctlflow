@@ -41,7 +41,8 @@ for publication. A moderate-or-higher production dependency audit blocks image
 construction, in the producer and common Docker build stage. Sites consume those
 reviewed artifacts rather than maintaining private dependency/source overlays.
 Docker may obtain pinned build dependencies/base images.
-Treat these proprietary packages as private release artifacts.
+First-party code in these packages is MIT-licensed; dependencies retain their
+separate licenses and notices.
 The bundled package-tool.mjs is trusted Node.js 26 build-side tooling for verifying
 and exporting branded derivatives without a source checkout. It is not executed
 by the server or required by the C# operator. Trust its publisher as executable
