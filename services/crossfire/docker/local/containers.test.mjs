@@ -7,6 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { chromium, expect } from '@playwright/test';
+import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { installedFleet } from '../../dist/tests/support/public-fleet.js';
 import { withDockerTestResources } from '../../../../scripts/docker-test-resources.mjs';
@@ -32,7 +33,7 @@ test('local Docker server and host fleet retain exact histories, stop intent and
   process.umask(0o077);
   mkdirSync(join(repository, '.temp'), { recursive: true });
   const directory = mkdtempSync(join(repository, '.temp/local-host-fleet-'));
-  scope.after(() => rmSync(directory, { recursive: true, force: true }));
+  cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const home = join(directory, 'home'), project = join(directory, 'project'), controller = join(directory, 'controller');
   const nativeHome = join(home, '.codex');
   mkdirSync(nativeHome, { recursive: true }); mkdirSync(project);
