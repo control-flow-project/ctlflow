@@ -108,6 +108,12 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
     await publicationBrowser(url.href);
     await fixture.operation(operations.deletePublication, { publicationId }, { expectedRevision: integer(committed.revision) }); assert.equal((await contractHttp(fixture.contentOrigin, 'GET', url.pathname)).status, 404);
     await fixture.operation(operations.reportListener, { ...params, runId }, { release: fixture.release.release.manifest.release, messagesDelivered: 1, stopped: true, statistics: null, controller }, agent.token); await fixture.operation(operations.recordFleetNativeStop, { ...fleetParams, agentId: agent.id }, { connectionId: agent.connectionId, runId, receiptId: randomUUID() }, agent.credential);
+    const emptyRun = randomUUID();
+    await fixture.operation(operations.reportListener, { ...params, runId: emptyRun }, { release: fixture.release.release.manifest.release, messagesDelivered: 0, stopped: false, statistics: null, controller }, agent.token);
+    const emptyObservations = await fixture.operation(operations.runtimeObservations, params);
+    assert.deepEqual(emptyObservations.data, [], 'A new listener without observations cannot expose the preceding run');
+    await fixture.operation(operations.reportListener, { ...params, runId: emptyRun }, { release: fixture.release.release.manifest.release, messagesDelivered: 0, stopped: true, statistics: null, controller }, agent.token);
+    await fixture.operation(operations.recordFleetNativeStop, { ...fleetParams, agentId: agent.id }, { connectionId: agent.connectionId, runId: emptyRun, receiptId: randomUUID() }, agent.credential);
   });
   await scope.test('every backend resumes the exact same SQLite file and canonical identities', async () => {
     const original = fixture.current();

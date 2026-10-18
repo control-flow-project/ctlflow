@@ -11,13 +11,13 @@ public static class RuntimeQueries
 {
     public static Result<IReadOnlyList<RuntimeObservation>> Observations(CrossfireDbContext context, string agentId)
     {
-        var latest = Stored.Read(() => context.ListenerRun.AsNoTracking().Where(row => row.AgentId == agentId)
-            .OrderByDescending(row => row.StartedAt).ThenByDescending(row => row.Id).Select(row => row.Id).FirstOrDefault());
-        if (!latest.IsSuccess) return Result<IReadOnlyList<RuntimeObservation>>.Fail(latest.Error);
-        if (latest.Value is not { } runId) return Result<IReadOnlyList<RuntimeObservation>>.Success([]);
-        var rows = Stored.Read(() => context.RuntimeObservation.AsNoTracking().Where(row => row.RunId == runId)
+        var rows = Stored.Read(() => context.ListenerRun.AsNoTracking().Where(row => row.AgentId == agentId)
+            .OrderByDescending(row => row.StartedAt).ThenByDescending(row => row.Id).Take(1)
+            .Join(context.RuntimeObservation, run => run.Id, observation => observation.RunId, (run, observation) => observation)
             .OrderByDescending(row => row.ObservedAt).ThenBy(row => row.SessionId).ToArray());
         if (!rows.IsSuccess) return Result<IReadOnlyList<RuntimeObservation>>.Fail(rows.Error);
+        if (rows.Value.Length == 0) return Result<IReadOnlyList<RuntimeObservation>>.Success([]);
+        var runId = rows.Value[0].RunId;
         var settings = Stored.Read(() => context.RuntimeSetting.AsNoTracking().Where(row => row.RunId == runId).OrderBy(row => row.Name).ToArray());
         return settings.Map<IReadOnlyList<RuntimeObservation>>(values =>
         {

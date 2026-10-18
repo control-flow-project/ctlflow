@@ -28,5 +28,7 @@ public static class LatestListenerAcceptance
         Equal(RuntimeQueries.Observations(context, fixture.AgentId).Value.Single().RunId, higher, "runtime detail selects only the latest run");
         Equal(RetirementQueries.Snapshot(context, [fixture.AgentId], [], now).Value.Agents.Single().LatestRun!.Id, higher, "retirement and runtime use the same latest run");
         Equal(ContactQueries.Runs(context).Value.Single(row => row.AgentId == fixture.AgentId).Id, higher, "contact checks use the same latest run");
+        Equal(ListenerCommands.Save(context, original with { Id = Identity.Identifier(), StartedAt = now + 1, LastSeenAt = now + 1, StoppedAt = now + 1 }, true).IsSuccess, true, "newest listener has not reported native observations");
+        Equal(RuntimeQueries.Observations(context, fixture.AgentId).Value.Count, 0, "an empty latest run never exposes an older native observation");
     }
 }
