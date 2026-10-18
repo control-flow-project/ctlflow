@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Condition="'$(PublishAot)' == 'true'">
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);IL2026;IL3050</WarningsNotAsErrors>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Crossfire.Kernel/Crossfire.Kernel.csproj" />
     <ProjectReference Include="../Crossfire.Domain/Crossfire.Domain.csproj" />

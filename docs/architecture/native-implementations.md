@@ -113,6 +113,15 @@ to `11.0.0-rc.2.26504.105`. Managed initial deployment is permitted.
 There is no automatic managed fallback inside a NativeAOT executable.
 
 NativeAOT publication emits IL diagnostics from EF/BCL reflection and generic
+paths. The SQLite adapter's standard EF options constructor emits IL2026 and
+IL3050 at C# compilation as well as linking; these remain visible warnings,
+consistent with the existing linker policy. Its fixed model and queries are
+compiled at publication. Managed and actual NativeAOT acceptance exercise the
+pooled constructor, independent concurrent leases, reset, rollback, connection
+release and privacy revalidation. Passing those checks does not establish that
+arbitrary EF models or query shapes are NativeAOT-compatible.
+
+NativeAOT publication also emits diagnostics from other EF/BCL reflection and generic
 paths. They remain visible. Prior server publication emitted 1,007 diagnostics;
 that count is a run observation, not a count of independent defects or a fixed
 budget. Supported fixed queries use generated model/query metadata and run in
