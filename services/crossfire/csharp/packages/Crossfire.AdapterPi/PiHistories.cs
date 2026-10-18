@@ -67,7 +67,9 @@ public sealed class PiHistories : OwnedRuntimeConnection, TurnControl
         lock (gate)
         {
             if (binding.SessionId is not null && registry.Bindings.Any(value => value.Context != binding.Context && value.SessionId == binding.SessionId)) return Results.Fail<Unit>("conflict", "Pi reused another native context identity");
-            var next = new PiRegistry(Mode(input.HistoryMode), [.. registry.Bindings.Where(value => value.Context != binding.Context), binding]);
+            var bindings = registry.Bindings.ToList(); var position = bindings.FindIndex(value => value.Context == binding.Context);
+            if (position < 0) bindings.Add(binding); else bindings[position] = binding;
+            var next = new PiRegistry(Mode(input.HistoryMode), bindings);
             var saved = PiState.Write(home, next); if (saved.IsSuccess) registry = next; return saved;
         }
     }
