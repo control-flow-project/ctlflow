@@ -15,7 +15,7 @@ public static class PlatformRoutes
         if (path == "/config.json" || path == "/config." + new Uri(state.Configuration.PublicOrigin).Host + ".json")
         {
             if (!ReadMethod(http)) return true;
-            using var context = new CrossfireDbContext(state.Database);
+            using var context = state.Storage.Open();
             var claim = InvitationCookies.Read(http.Request);
             var invited = claim is not null && Invitations.Verify(InvitationCommands.Ports(context, state.Now), claim.Id, claim.Secret).IsSuccess;
             var policy = PolicyQueries.Find(context);
@@ -49,7 +49,7 @@ public static class PlatformRoutes
         if (!query.IsSuccess || query.Value.Count != 1 || !Validation.UserId(query.Value.GetValueOrDefault("ownerMatrixId", "")))
         { await Transport.Send(http, requestId, Results.Fail<ApiReply>("invalid", "Exactly one ownerMatrixId is required"), 200); return true; }
         var ownerId = query.Value["ownerMatrixId"];
-        using (var context = new CrossfireDbContext(state.Database))
+        using (var context = state.Storage.Open())
         {
             var principal = MemberQueries.ByMatrixId(context, ownerId);
             if (!principal.IsSuccess) { await Transport.Send(http, requestId, Result<ApiReply>.Fail(principal.Error), 200); return true; }

@@ -9,7 +9,7 @@ public static class DatabaseUpgrade
 {
     private static CrossfireDbContext Open(string file)
     {
-        var context = new CrossfireDbContext(file, readOnly: true);
+        var context = new CrossfireDbContext(DatabaseConnections.Options(file, readOnly: true));
         try { context.Database.OpenConnection(); return context; } catch { context.Dispose(); throw; }
     }
     private static void Verify(CrossfireDbContext context)

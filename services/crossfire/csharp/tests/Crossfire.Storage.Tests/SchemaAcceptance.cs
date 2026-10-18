@@ -19,7 +19,7 @@ public static class SchemaAcceptance
         }
         if (arguments.Length != 2 || arguments[0] != "--validate") return false;
         if (!Path.IsPathFullyQualified(arguments[1])) throw new ArgumentException("Select an absolute existing database");
-        using var context = new CrossfireDbContext(arguments[1]);
+        using var context = new CrossfireDbContext(DatabaseConnections.Options(arguments[1]));
         var validation = Schema.Validate(context);
         Console.WriteLine(JsonSerializer.Serialize(new SchemaResult(validation.IsSuccess ? "passed" : "rejected",
             validation.IsSuccess ? null : validation.Error.Message, RuntimeFeature.IsDynamicCodeSupported,

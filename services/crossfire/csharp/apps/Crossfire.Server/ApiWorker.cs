@@ -33,7 +33,7 @@ public sealed class ApiWorker(ApiState state, TimeProvider? time = null) : IAsyn
             if (stop.IsCancellationRequested) break;
             try
             {
-                using var context = new CrossfireDbContext(state.Database);
+                using var context = state.Storage.Open();
                 var enrolled = EnrollmentCommands.Ports(context, state.Now, state.Configuration.ServerName, state.Matrix.Identify, state.Matrix.Room);
                 var expired = Transactions.Run(context, () => EnrollmentRequests.Expire(enrolled));
                 if (!expired.IsSuccess) { state.Diagnostics.Write("Enrollment maintenance remains pending: " + expired.Error.Code); continue; }

@@ -11,13 +11,13 @@ public static class StorageConcurrencyAcceptance
     public static void Verify(CrossfireDbContext context, string ownerId)
     {
         var file = context.Database.GetDbConnection().DataSource;
-        using var reader = new CrossfireDbContext(file, readOnly: true);
+        using var reader = new CrossfireDbContext(DatabaseConnections.Options(file, readOnly: true));
         reader.Database.OpenConnection();
         Equal(Metadata.Journal(reader), "wal", "management implementations share write-ahead logging");
         using var transaction = ((SqliteConnection)reader.Database.GetDbConnection()).BeginTransaction(deferred: true);
         reader.Database.UseTransaction(transaction);
         Equal(Revision(), 0L, "a management read snapshot sees the original revision");
-        using var writer = new CrossfireDbContext(file);
+        using var writer = new CrossfireDbContext(DatabaseConnections.Options(file));
         Equal(Transactions.Run(writer, () =>
         {
             writer.Principal.Where(row => row.Id == ownerId).ExecuteUpdate(update => update.SetProperty(row => row.Revision, 1));

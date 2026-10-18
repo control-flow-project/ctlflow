@@ -26,7 +26,7 @@ public static class MatrixRoutes
         {
             await NativeResponses.Error(http, requestId, 401, "M_MISSING_TOKEN", "Native bearer authentication is required"); return;
         }
-        using var database = new CrossfireDbContext(state.Database);
+        using var database = state.Storage.Open();
         var actor = await NativeActors.Principal(new(AuthorizationQueries.Ports(database, state.Now), id => MemberQueries.ByMatrixId(database, id), state.Matrix.Identify), bearer.Value, http.RequestAborted);
         if (!actor.IsSuccess) { await NativeResponses.Reject(http, requestId, actor.Error); return; }
         if (directory) await Directory(state, database, http, actor.Value, requestId);

@@ -13,7 +13,7 @@ public static class ApiApplication
 
     public static void Initialize(ApiState state)
     {
-        using (var database = new CrossfireDbContext(state.Database))
+        using (var database = state.Storage.Open())
         {
             var schema = Schema.Validate(database);
             if (!schema.IsSuccess) throw new IOException(schema.Error.Message);

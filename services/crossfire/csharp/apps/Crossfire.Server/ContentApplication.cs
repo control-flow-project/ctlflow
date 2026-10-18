@@ -33,7 +33,7 @@ public static partial class ContentApplication
             var raw = http.Features.Get<IHttpRequestFeature>()?.RawTarget ?? ""; var matched = PathPattern().Match(raw);
             if (!matched.Success || !PublicationValues.Path(matched.Groups[2].Value)) { response.StatusCode = 404; return; }
             var key = matched.Groups[1].Value; var path = matched.Groups[2].Value;
-            using var database = new CrossfireDbContext(state.Database); var record = PublicationQueries.PublicFile(database, key, path);
+            using var database = state.Storage.Open(); var record = PublicationQueries.PublicFile(database, key, path);
             if (!record.IsSuccess || record.Value is null) { response.StatusCode = record.IsSuccess ? 404 : 503; return; }
             if (http.Request.Method == "OPTIONS") { response.StatusCode = 204; return; }
             if (Interlocked.Increment(ref active) > 32) { Interlocked.Decrement(ref active); response.StatusCode = 503; return; }

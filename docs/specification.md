@@ -898,6 +898,12 @@ commit. Node, C# and Rust use the same journal mode; none switch back to a rollb
 journal. Backups use SQLite's backup API or the documented quiescent procedure,
 including committed WAL state. A live main-file copy alone is not a backup.
 
+C# leases independent DbContexts from EF's context pool. Each lease revalidates
+the private database path and retains its connection across that operation's
+queries. Disposal releases the connection and resets tracking and transactions;
+concurrent operations never share a context. Pooling does not cache identities,
+permissions or query results, or remove commit-time authority checks.
+
 Layout is database/<database>/<backend>/{migrations,seeds}, per-database knexfile
 and one-shot migration image, as in Lesser/Snapped. Every future SQL store follows
 that owner/nesting. Unimplemented backends have no placeholder runtime.
