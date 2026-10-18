@@ -53,7 +53,8 @@ code; the archive checksum is not authentication of this helper.
 
 ## Format and image contract
 
-Verified generic images may be published to GHCR under
+The [published 0.1.22 release](releases/0.1.22.md) provides immutable references for
+the generic images under
 `ghcr.io/control-flow-project/crossfire-node`, `crossfire-csharp-managed`,
 `crossfire-csharp-nativeaot`, `crossfire-rust` and `crossfire-migrations`.
 These are server images; fleet/fleetd and native agents run on the execution host,
