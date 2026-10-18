@@ -1,5 +1,7 @@
 <Project>
   <PropertyGroup>
+    <EFScaffoldModelStage>publish</EFScaffoldModelStage>
+    <EFPrecompileQueriesStage>publish</EFPrecompileQueriesStage>
     <CrossfireEfHostOutput>$(MSBuildThisFileDirectory)Crossfire.EfHost/bin/$(MSBuildProjectName)/$(Configuration)/net11.0/</CrossfireEfHostOutput>
     <EFStartupAssembly>$(CrossfireEfHostOutput)Crossfire.EfHost.exe</EFStartupAssembly>
   </PropertyGroup>

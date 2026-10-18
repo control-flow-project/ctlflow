@@ -112,6 +112,11 @@ The SDK is pinned to `11.0.100-rc.2.26504.105`; EF/SQLite packages are pinned
 to `11.0.0-rc.2.26504.105`. Managed initial deployment is permitted.
 There is no automatic managed fallback inside a NativeAOT executable.
 
+Both managed and NativeAOT publication precompile the fixed EF models and queries
+through the same build owner. Managed publication does not leave query expression
+compilation on the request path. Development builds retain the ordinary EF build
+cycle; neither publication uses a second query implementation or a result cache.
+
 NativeAOT publication emits IL diagnostics from EF/BCL reflection and generic
 paths. The SQLite adapter's standard EF options constructor emits IL2026 and
 IL3050 at C# compilation as well as linking; these remain visible warnings,
