@@ -21,13 +21,14 @@ Docker socket into the server. The server neither installs nor runs a harness.
 
 ## Start a new server
 
-Obtain the two complete immutable references from the trusted release publisher.
-These examples are placeholders, not published digests. Authenticate to the
-registry on the host if necessary; registry credentials stay outside containers.
+The [published 0.1.22 release](releases/0.1.22.md) provides the immutable references
+below. They select the tested NativeAOT server and its matching migration image,
+not a mutable tag or an arbitrary build of main. Registry credentials, if needed,
+stay on the host outside containers.
 
 ```sh
-export CROSSFIRE_RUNTIME_IMAGE=ghcr.io/control-flow-project/crossfire-csharp-nativeaot@sha256:RUNTIME_MANIFEST_DIGEST
-export CROSSFIRE_MIGRATION_IMAGE=ghcr.io/control-flow-project/crossfire-migrations@sha256:MIGRATION_MANIFEST_DIGEST
+export CROSSFIRE_RUNTIME_IMAGE=ghcr.io/control-flow-project/crossfire-csharp-nativeaot@sha256:f658c1bdaddd30f58edf2d0421ef4b6204f9b2f25254b435a8c3d6c0d975a826
+export CROSSFIRE_MIGRATION_IMAGE=ghcr.io/control-flow-project/crossfire-migrations@sha256:a2e3723374b19f386a33d6f8062306df6efc46809228149060cfde60bfc62bc3
 docker pull \
   "$CROSSFIRE_RUNTIME_IMAGE"
 docker pull \
