@@ -491,16 +491,22 @@ test('failed write-ahead persistence prevents any native submission', async scop
 });
 
 test('inspection and stop clear a completed room without clearing another room with unacknowledged input', async scope => {
-  for (const action of ['inspect', 'stop']) {
+  for (const action of ['inspect', 'stop', 'stop-during-inspection']) {
     const current = fixture(), start = current.services.start;
     const rooms = ['!active:test', '!completed:test'].map((context, index) => ({ context, runtime: 'fixture', sessionId: 'room-history-' + index, workspace: '/fixture' }));
     current.saved.push(...rooms);
     const busy = new Map(rooms.map(item => [item.context, false]));
+    let holdInspection = false, inspecting = false, release: (() => void) | undefined;
+    let older: Promise<{ busy: boolean }> | undefined;
     current.services.start = async (...input) => {
       const result = await start(...input); if (!result.ok) return result;
       const root = result.value;
-      root.activity = async () => ({ busy: [...busy.values()].some(Boolean), contexts: current.saved.map(item => ({
-        context: item.context, sessionId: item.sessionId, busy: busy.get(item.context) ?? false })) });
+      root.activity = async () => {
+        const snapshot = { busy: [...busy.values()].some(Boolean), contexts: current.saved.map(item => ({
+          context: item.context, sessionId: item.sessionId, busy: busy.get(item.context) ?? false })) };
+        if (holdInspection) { holdInspection = false; inspecting = true; await new Promise<void>(resolve => { release = resolve; }); }
+        return snapshot;
+      };
       root.conversation = async room => {
         const saved = rooms.find(item => item.context === room)!;
         return { ...root, sessionId: saved.sessionId, deliver: async () => { busy.set(room, true); } };
@@ -514,10 +520,14 @@ test('inspection and stop clear a completed room without clearing another room w
       const active = await managed.runtime.conversation!(rooms[0]!.context);
       await active.deliver('Keep this room task pending', 'active');
       assert.equal(value(current.services.work.read()).length, 2);
+      if (action === 'stop-during-inspection') {
+        holdInspection = true; older = managed.runtime.inspect(); await until(() => inspecting);
+      }
       if (action === 'inspect') assert.equal((await managed.runtime.inspect()).busy, true);
       else await managed.close();
+      release?.(); await older;
       assert.deepEqual(value(current.services.work.read()).map(item => item.context), [rooms[0]!.context], 'Only the unfinished exact room can receive a later restart reminder');
-    } finally { await managed.close(); }
+    } finally { release?.(); await older; await managed.close(); }
   }
 });
 

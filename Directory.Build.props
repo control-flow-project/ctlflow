@@ -19,6 +19,7 @@
     <IsPackable>false</IsPackable>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <OptimizationPreference>Speed</OptimizationPreference>
+    <TieredCompilation>false</TieredCompilation>
     <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.EntityFrameworkCore.GeneratedInterceptors</InterceptorsNamespaces>
   </PropertyGroup>
   <PropertyGroup Condition="'$(PublishAot)' == 'true'">

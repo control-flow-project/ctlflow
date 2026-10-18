@@ -49,12 +49,15 @@ public static class NativeWorkAcceptance
             check(!(await current.Runtime.Inspect()).Value && fixture.Work.Count == 0, "Completion after repeated restarts clears the retained task");
         }
         finally { await current.DisposeAsync(); }
-        foreach (var inspect in new[] { true, false })
+        foreach (var action in new[] { "inspect", "stop", "stop-during-inspection" })
         {
             fixture = new Harness();
             fixture.Contexts.AddRange([new("!active:fixture", "codex", "active-history", "/fixture"), new("!completed:fixture", "codex", "completed-history", "/fixture")]);
             fixture.ContextBusy["active-history"] = true; fixture.ContextBusy["completed-history"] = false;
             var owner = await fixture.Open("running");
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            Task<Result<bool>>? older = null;
             try
             {
                 var completed = (await owner.Runtime.Conversation("!completed:fixture")).Value;
@@ -62,11 +65,17 @@ public static class NativeWorkAcceptance
                 var active = (await owner.Runtime.Conversation("!active:fixture")).Value;
                 check((await active.Deliver("Unfinished room task", "active")).IsSuccess && fixture.Work.Count == 2, "Both room tasks are independently checkpointed");
                 await active.TurnControl!.ActiveTurn(); check(fixture.CapturedRooms[^1] == "!active:fixture", "A room defaults turn inspection to its own native history");
-                if (inspect) check((await owner.Runtime.Inspect()).Value, "Another room remains busy after exact-context inspection");
+                if (action == "stop-during-inspection")
+                {
+                    fixture.ActivityBarrier = () => { fixture.ActivityBarrier = null; entered.SetResult(); return new(release.Task); };
+                    older = owner.Runtime.Inspect().AsTask(); await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                }
+                if (action == "inspect") check((await owner.Runtime.Inspect()).Value, "Another room remains busy after exact-context inspection");
                 else await owner.DisposeAsync();
+                release.TrySetResult(); if (older is not null) await older;
                 check(fixture.Work.Count == 1 && fixture.Work[0].Context == "!active:fixture", "Inspection and stop clear only the verified completed room");
             }
-            finally { await owner.DisposeAsync(); }
+            finally { release.TrySetResult(); if (older is not null) await older; await owner.DisposeAsync(); }
         }
     }
 
@@ -80,6 +89,7 @@ public static class NativeWorkAcceptance
         public List<SavedRuntimeContext> Contexts { get; } = [new("shared", "codex", Session, "/fixture")];
         public Dictionary<string, bool> ContextBusy { get; } = new(StringComparer.Ordinal);
         public List<string?> CapturedRooms { get; } = [];
+        public Func<ValueTask>? ActivityBarrier { get; set; }
         public bool FailCapture { get; set; }
         public Action<RuntimeObservationEvent>? Observe { get; private set; }
         public Probe? Native { get; private set; }
@@ -126,6 +136,7 @@ public static class NativeWorkAcceptance
         public ValueTask<Result<bool>> Inspect() => Inspection is { } inspect ? inspect() : ValueTask.FromResult(Result<bool>.Success(Busy || fixture.Receipts.Count != 0));
         public async ValueTask<Result<NativeActivity>> Activity()
         {
+            if (fixture.ActivityBarrier is { } barrier) await barrier();
             if (fixture.ContextBusy.Count == 0) return (await Inspect()).Map(value => new NativeActivity(value, [new("shared", SessionId, value)]));
             var contexts = fixture.Contexts.Select(value => new NativeContextActivity(value.Context, value.SessionId, fixture.ContextBusy.GetValueOrDefault(value.SessionId))).ToArray();
             return Result<NativeActivity>.Success(new(contexts.Any(value => value.Busy), contexts));

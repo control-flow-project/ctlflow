@@ -38,6 +38,9 @@ There is no standalone-agent or existing-session-adoption path.
 
 Node, C# and Rust are independently selected implementations of all three products.
 C# targets .NET 11 and produces managed and NativeAOT builds from the same source.
+Managed products optimize methods at first JIT compilation, with tiered
+compilation disabled. NativeAOT compilation remains ahead of time. The performance
+bank measures each installed target's defaults without test-only runtime tuning.
 An executable never substitutes another implementation when its selected one
 fails. Rust is verified separately and in the same explicit four-target matrix;
 Node/C#-only results do not establish Rust readiness.
@@ -463,6 +466,9 @@ input in flight or unacknowledged. Native adapters return one read-only activity
 snapshot containing exact context/history identities and native busy/publication
 state. Aggregate status uses the same snapshot. Another busy room cannot retain
 a completed room's checkpoint. Inspection never opens a native room process.
+Explicit stop reconciles existing work before closing native execution, even
+when another inspection is running. With no unfinished-work checkpoint, shutdown
+does not wait for an unrelated reader.
 A stopped or unavailable reader cannot prove completion or invent
 an unfinished task. A restart first resolves native submission and acknowledges
 its previous reminder, leaving ordinary input confirmations with their producer.

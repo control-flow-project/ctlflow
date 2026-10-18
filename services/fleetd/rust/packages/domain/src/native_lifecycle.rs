@@ -52,7 +52,6 @@ pub struct Owner<
     state: Mutex<State<A::Connection>>,
     transition: AsyncMutex<()>,
     calls: AtomicUsize,
-    inspections: AtomicUsize,
     stop: CancellationToken,
     approval: Approval,
     budget: Arc<Budget>,
@@ -143,7 +142,6 @@ impl<
             }),
             transition: AsyncMutex::new(()),
             calls: AtomicUsize::new(0),
-            inspections: AtomicUsize::new(0),
             stop,
             approval,
             budget,
@@ -368,8 +366,6 @@ impl<
         Ok(())
     }
     async fn inspect_native(&self, native: &Arc<A::Connection>) -> Result<bool> {
-        self.inspections.fetch_add(1, Ordering::AcqRel);
-        let _inspection = Operation(&self.inspections);
         let revision = self.tracker.revision()?;
         let generation = self.tracker.generation.load(Ordering::Acquire);
         let activity = native.activity().await?;
@@ -474,7 +470,7 @@ impl<
         if preserve_work {
             if !self.stop.is_cancelled()
                 && !native.lifetime().is_cancelled()
-                && self.inspections.load(Ordering::Acquire) == 0
+                && !self.work.work().is_ok_and(|work| work.is_empty())
             {
                 let _ = self.inspect_native(&native).await;
             }
@@ -486,9 +482,10 @@ impl<
         Ok(())
     }
     pub async fn close(&self) -> Result<()> {
+        let unfinished = !self.work.work().is_ok_and(|work| work.is_empty());
         let native = {
             let state = self.state.lock().map_err(|_| ownership())?;
-            (state.phase == Phase::Running && self.inspections.load(Ordering::Acquire) == 0)
+            (state.phase == Phase::Running && unfinished)
                 .then(|| state.native.clone())
                 .flatten()
         };

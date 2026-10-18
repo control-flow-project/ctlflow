@@ -42,7 +42,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   let native: OwnedRuntimeConnection | undefined, opening: Promise<OwnedRuntimeConnection> | undefined, closingNative: Promise<void> | undefined;
   let recovery: Promise<void> | undefined, closing: Promise<void> | undefined;
   let preparing: Promise<OwnedRuntimeConnection> | undefined;
-  let activeCalls = 0, inspections = 0, idleSeconds = 1800, lastActivityAt = services.clock.now();
+  let activeCalls = 0, idleSeconds = 1800, lastActivityAt = services.clock.now();
   let observationGeneration = 0;
   let workRevision = 0;
   let cancelIdle: (() => void) | undefined;
@@ -69,12 +69,9 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   }
   async function inspectNative(connection: OwnedRuntimeConnection): Promise<{ busy: boolean }> {
     const revision = workRevision;
-    inspections++;
-    try {
-      const status = await connection.activity();
-      completeIdleWork(connection, revision, status.contexts.filter(item => !item.busy));
-      return { busy: status.busy };
-    } finally { inspections--; }
+    const status = await connection.activity();
+    completeIdleWork(connection, revision, status.contexts.filter(item => !item.busy));
+    return { busy: status.busy };
   }
 
   function report(error: unknown): void {
@@ -354,7 +351,10 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   }
   function close(): Promise<void> {
     return closing ??= (async () => {
-      if (native && !native.signal.aborted && continuationReady && !inspections) await inspectNative(native).catch(() => undefined);
+      if (native && !native.signal.aborted && continuationReady) {
+        const work = services.work.read();
+        if (!work.ok || work.value.length > 0) await inspectNative(native).catch(() => undefined);
+      }
       recordingWork = false;
       stop.abort(new Error('Native listener binding stopped'));
       cancelIdle?.(); cancelIdle = undefined;

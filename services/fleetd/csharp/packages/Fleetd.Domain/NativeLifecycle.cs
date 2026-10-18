@@ -20,7 +20,7 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
     private Task? recovery, idleWork, closing;
     private string session, phase = "sleeping";
     private long lastActivity, generation, workRevision;
-    private int idleSeconds = 1800, activeCalls, inspections, closed;
+    private int idleSeconds = 1800, activeCalls, closed;
     private bool activated, ready, recording, failedEpisode, inspectionUncertain;
     private Failure? initializationFailure;
     public RuntimeConnection Runtime { get; private set; } = null!;
@@ -65,12 +65,6 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
         lock (observationGate) { workRevision++; return services.Work.Capture([new(context, sessionId)]); }
     }
     private async ValueTask<Result<bool>> InspectNative(OwnedRuntimeConnection connection)
-    {
-        Interlocked.Increment(ref inspections);
-        try { return await InspectCurrent(connection); }
-        finally { Interlocked.Decrement(ref inspections); }
-    }
-    private async ValueTask<Result<bool>> InspectCurrent(OwnedRuntimeConnection connection)
     {
         long revision; lock (observationGate) revision = workRevision;
         var activity = await connection.Activity(); if (!activity.IsSuccess) return Result<bool>.Fail(activity.Error);
@@ -225,8 +219,12 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
     private async Task Close()
     {
         if (Interlocked.Exchange(ref closed, 1) != 0) return;
-        bool inspect; lock (gate) inspect = ready && inspections == 0;
-        if (inspect && native is { } current && !current.Lifetime.IsCancellationRequested) await InspectNative(current);
+        bool inspect; lock (gate) inspect = ready;
+        if (inspect && native is { } current && !current.Lifetime.IsCancellationRequested)
+        {
+            var work = services.Work.Read();
+            if (!work.IsSuccess || work.Value.Count > 0) await InspectNative(current);
+        }
         lock (gate) { recording = false; idleTimer?.Dispose(); idleTimer = null; }
         List<Exception> errors = []; async Task Finish(Func<Task> action) { try { await action(); } catch (Exception error) { errors.Add(error); } }
         await Finish(lifetime.CancelAsync);

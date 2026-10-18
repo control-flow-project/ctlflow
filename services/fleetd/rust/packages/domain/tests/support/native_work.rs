@@ -3,7 +3,7 @@ use super::*;
 #[tokio::test]
 async fn completed_room_is_cleared_without_erasing_another_room_with_unacknowledged_input()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
-    for inspect in [true, false] {
+    for action in ["inspect", "stop", "stop-during-inspection"] {
         let state = Arc::new(State::default());
         let work = Arc::new(Work::default());
         let owner = Owner::open(
@@ -62,10 +62,28 @@ async fn completed_room_is_cleared_without_erasing_another_room_with_unacknowled
             )
             .await?;
         assert_eq!(work.work()?.len(), 2);
-        if inspect {
+        let inspection = if action == "stop-during-inspection" {
+            let entered = Arc::new(tokio::sync::Notify::new());
+            let release = Arc::new(tokio::sync::Notify::new());
+            *state.inspection_gate.lock().map_err(|_| failed())? =
+                Some((entered.clone(), release.clone()));
+            let runtime = owner.runtime()?;
+            let reader = tokio::spawn(async move { runtime.inspect().await });
+            tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified()).await?;
+            state.inspection_gate.lock().map_err(|_| failed())?.take();
+            Some((reader, release))
+        } else {
+            None
+        };
+        if action == "inspect" {
             assert!(owner.runtime()?.inspect().await?);
         } else {
-            owner.close().await?;
+            let stopped = owner.close().await;
+            if let Some((reader, release)) = inspection {
+                release.notify_one();
+                reader.await??;
+            }
+            stopped?;
         }
         assert_eq!(
             work.work()?
