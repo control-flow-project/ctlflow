@@ -75,3 +75,7 @@ every platform.
 
 Third-party Matrix schema material retains its original license in
 `matrix-spec-LICENSE.txt`.
+
+The bundled Undici HTTP client is MIT-licensed.
+Copyright (c) Matteo Collina and Undici contributors.
+The MIT permission and warranty terms in the License section also apply to it.
