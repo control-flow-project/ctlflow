@@ -35,6 +35,7 @@ pub struct Tracker<H, W, T> {
 #[derive(Default)]
 struct Observations {
     recording: bool,
+    revision: u64,
     settings: BTreeMap<String, (State, Vec<Setting>)>,
 }
 pub struct LifecycleHooks<H, W, T> {
@@ -102,6 +103,32 @@ impl<H: Hooks, W: WorkStore, T: Clock> Tracker<H, W, T> {
             .lock()
             .map_err(|_| self.ownership())?
             .recording = false;
+        Ok(())
+    }
+    pub fn capture_input(&self, context: InterruptedContext) -> Result<()> {
+        let mut observed = self.observations.lock().map_err(|_| self.ownership())?;
+        observed.revision = observed.revision.wrapping_add(1);
+        resume_work::capture(self.work.as_ref(), &[context], self.clock.now()?)
+    }
+    pub fn revision(&self) -> Result<u64> {
+        Ok(self
+            .observations
+            .lock()
+            .map_err(|_| self.ownership())?
+            .revision)
+    }
+    pub fn complete_idle(
+        &self,
+        revision: u64,
+        stable: impl FnOnce() -> Result<bool>,
+    ) -> Result<()> {
+        let observed = self.observations.lock().map_err(|_| self.ownership())?;
+        if !observed.recording || observed.revision != revision || !stable()? {
+            return Ok(());
+        }
+        if !self.work.work()?.is_empty() {
+            self.work.save_work(&[])?;
+        }
         Ok(())
     }
     pub fn checkpoint(&self, contexts: &[SavedContext], recording: bool) -> Result<()> {
@@ -175,26 +202,16 @@ impl<H: Hooks, W: WorkStore, T: Clock> Tracker<H, W, T> {
                 {
                     self.touch()?;
                 }
-                if observed.recording {
-                    if working {
-                        resume_work::capture(
-                            self.work.as_ref(),
-                            &[InterruptedContext {
-                                context: room_id.clone().unwrap_or_else(|| self.primary.to_owned()),
-                                session_id: session_id.clone(),
-                            }],
-                            self.clock.now()?,
-                        )?;
-                    } else if *state == State::Idle {
-                        for work in self
-                            .work
-                            .work()?
-                            .into_iter()
-                            .filter(|work| &work.session_id == session_id)
-                        {
-                            resume_work::acknowledge(self.work.as_ref(), &work.message_id)?;
-                        }
-                    }
+                if observed.recording && working {
+                    observed.revision = observed.revision.wrapping_add(1);
+                    resume_work::capture(
+                        self.work.as_ref(),
+                        &[InterruptedContext {
+                            context: room_id.clone().unwrap_or_else(|| self.primary.to_owned()),
+                            session_id: session_id.clone(),
+                        }],
+                        self.clock.now()?,
+                    )?;
                 }
             }
         }

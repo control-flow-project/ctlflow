@@ -27,12 +27,16 @@ public sealed partial class NativeLifecycle
         public async ValueTask<Result<bool>> Inspect()
         {
             var connection = owner.native; if (connection is null || connection.Lifetime.IsCancellationRequested) return Result<bool>.Success(owner.phase is "waking" or "failed" || Volatile.Read(ref owner.activeCalls) > 0);
-            var result = await connection.Inspect(); bool unsettled; lock (owner.gate) unsettled = owner.unsettled.Count != 0; return result.Map(value => value || Volatile.Read(ref owner.activeCalls) > 0 || unsettled);
+            var result = await owner.InspectNative(connection); bool unsettled; lock (owner.gate) unsettled = owner.unsettled.Count != 0 || !ReferenceEquals(owner.native, connection) || connection.Lifetime.IsCancellationRequested; return result.Map(value => value || Volatile.Read(ref owner.activeCalls) > 0 || unsettled);
         }
         public ValueTask<Result<Unit>> Deliver(string text, string messageId, CancellationToken cancellation = default, InputPriority? priority = null)
         {
             cancellation.ThrowIfCancellationRequested(); lock (owner.gate) owner.unsettled.Add(messageId); InputAdmission? admission = priority is null ? null : new(priority.Value, cancellation);
-            return Call(async connection => { var selected = await Select(connection, admission); return selected.IsSuccess ? await selected.Value.Deliver(text, messageId, cancellation, priority) : Result<Unit>.Fail(selected.Error); }, true, admission);
+            return Call(async connection => {
+                var selected = await Select(connection, admission); if (!selected.IsSuccess) return Result<Unit>.Fail(selected.Error);
+                cancellation.ThrowIfCancellationRequested(); var captured = owner.CaptureInput(context, session); if (!captured.IsSuccess) return captured;
+                return await selected.Value.Deliver(text, messageId, cancellation, priority);
+            }, true, admission);
         }
         public async ValueTask<Result<bool>> Recover(string text, string messageId, CancellationToken cancellation = default)
         {

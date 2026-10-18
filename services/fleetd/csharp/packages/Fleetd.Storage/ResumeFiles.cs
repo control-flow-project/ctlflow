@@ -13,7 +13,7 @@ public sealed class ResumeFiles
     private readonly TimeProvider clock;
     private readonly object gate = new();
     public ResumeWorkStore Port { get; }
-    public ResumeFiles(string state, TimeProvider clock) { this.clock = clock; file = Path.Combine(PrivateFiles.Directory(state), "resume-work.json"); Port = new(Read, Capture, Acknowledge); }
+    public ResumeFiles(string state, TimeProvider clock) { this.clock = clock; file = Path.Combine(PrivateFiles.Directory(state), "resume-work.json"); Port = new(Read, Capture, Renew, Clear); }
     private Result<IReadOnlyList<ResumeWork>> Read() => ConfigurationFiles.Boundary(() =>
     {
         lock (gate)
@@ -37,5 +37,14 @@ public sealed class ResumeFiles
             return changed ? Save(next.Values.ToArray()) : Results.Done();
         }
     }
-    private Result<Unit> Acknowledge(string id) { lock (gate) { var read = Read(); if (!read.IsSuccess) return Result<Unit>.Fail(read.Error); return read.Value.Any(value => value.MessageId == id) ? Save(read.Value.Where(value => value.MessageId != id).ToArray()) : Results.Done(); } }
+    private Result<Unit> Renew(string id)
+    {
+        lock (gate)
+        {
+            var read = Read(); if (!read.IsSuccess) return Result<Unit>.Fail(read.Error);
+            if (!read.Value.Any(value => value.MessageId == id)) return Results.Fail<Unit>("conflict", "Interrupted work changed before exact-history resume");
+            return Save(read.Value.Select(value => value.MessageId == id ? value with { MessageId = Identity.Identifier(), CheckpointedAt = clock.GetUtcNow().ToUnixTimeMilliseconds() } : value).ToArray());
+        }
+    }
+    private Result<Unit> Clear() { lock (gate) { var read = Read(); if (!read.IsSuccess) return Result<Unit>.Fail(read.Error); return read.Value.Count != 0 ? Save([]) : Results.Done(); } }
 }

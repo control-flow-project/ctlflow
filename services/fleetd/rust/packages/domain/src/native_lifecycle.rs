@@ -50,6 +50,7 @@ pub struct Owner<
     state: Mutex<State<A::Connection>>,
     transition: AsyncMutex<()>,
     calls: AtomicUsize,
+    inspections: AtomicUsize,
     stop: CancellationToken,
     approval: Approval,
     budget: Arc<Budget>,
@@ -63,6 +64,12 @@ pub struct Logical<
     owner: Arc<Owner<A, H, W, T>>,
     room: Option<String>,
     session: String,
+}
+struct Operation<'scope>(&'scope AtomicUsize);
+impl Drop for Operation<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
 }
 fn unavailable(message: &str) -> Failure {
     Failure::new(ErrorCode::Unavailable, message)
@@ -134,6 +141,7 @@ impl<
             }),
             transition: AsyncMutex::new(()),
             calls: AtomicUsize::new(0),
+            inspections: AtomicUsize::new(0),
             stop,
             approval,
             budget,
@@ -311,6 +319,7 @@ impl<
                 self.primary(),
                 &contexts,
                 self.work.as_ref(),
+                self.clock.now()?,
             )
             .await?;
             self.tracker.checkpoint(&contexts, true)?;
@@ -356,6 +365,30 @@ impl<
         }
         Ok(())
     }
+    async fn inspect_native(&self, native: &Arc<A::Connection>) -> Result<bool> {
+        self.inspections.fetch_add(1, Ordering::AcqRel);
+        let _inspection = Operation(&self.inspections);
+        let revision = self.tracker.revision()?;
+        let generation = self.tracker.generation.load(Ordering::Acquire);
+        let busy = native.inspect().await?;
+        if !busy {
+            self.tracker.complete_idle(revision, || {
+                let state = self.state.lock().map_err(|_| ownership())?;
+                Ok(
+                    generation == self.tracker.generation.load(Ordering::Acquire)
+                        && !native.lifetime().is_cancelled()
+                        && state.phase == Phase::Running
+                        && self.calls.load(Ordering::Acquire) == 0
+                        && state.unsettled.is_empty()
+                        && state
+                            .native
+                            .as_ref()
+                            .is_some_and(|current| Arc::ptr_eq(current, native)),
+                )
+            })?;
+        }
+        Ok(busy)
+    }
     pub async fn maintain(&self) -> Result<()> {
         self.tracker.check()?;
         if self.stop.is_cancelled() {
@@ -389,7 +422,7 @@ impl<
         if !due
             || self.input.hooks.pending_decisions()
             || self.input.hooks.pending_input()
-            || native.inspect().await?
+            || self.inspect_native(&native).await?
         {
             return Ok(());
         }
@@ -419,7 +452,20 @@ impl<
             return Ok(());
         };
         if preserve_work {
-            self.tracker.checkpoint(&self.contexts().await?, false)?;
+            if !self.stop.is_cancelled()
+                && !native.lifetime().is_cancelled()
+                && self.calls.load(Ordering::Acquire) == 0
+                && self.inspections.load(Ordering::Acquire) == 0
+                && self
+                    .state
+                    .lock()
+                    .map_err(|_| ownership())?
+                    .unsettled
+                    .is_empty()
+            {
+                let _ = self.inspect_native(&native).await;
+            }
+            self.tracker.suspend()?;
         }
         self.discard(&native).await?;
         self.state.lock().map_err(|_| ownership())?.phase = Phase::Sleeping;
@@ -427,6 +473,17 @@ impl<
         Ok(())
     }
     pub async fn close(&self) -> Result<()> {
+        let native = {
+            let state = self.state.lock().map_err(|_| ownership())?;
+            (self.calls.load(Ordering::Acquire) == 0
+                && self.inspections.load(Ordering::Acquire) == 0
+                && state.unsettled.is_empty())
+            .then(|| state.native.clone())
+            .flatten()
+        };
+        if let Some(native) = native {
+            let _ = self.inspect_native(&native).await;
+        }
         self.stop.cancel();
         self.stop_native(true).await
     }

@@ -35,7 +35,9 @@ function fixture() {
     work: { read: () => success(work.map(item => ({ ...item }))),
       capture: contexts => { for (const context of contexts) if (!work.some(item => item.context === context.context)) work.push({ ...context,
         messageId: '00000000-0000-4000-8000-' + String(++sequence).padStart(12, '0'), checkpointedAt: now }); return success(undefined); },
-      acknowledge: messageId => { work = work.filter(item => item.messageId !== messageId); return success(undefined); } },
+      renew: messageId => { work = work.map(item => item.messageId === messageId ? { ...item,
+        messageId: '00000000-0000-4000-8000-' + String(++sequence).padStart(12, '0'), checkpointedAt: now } : item); return success(undefined); },
+      clear: () => { work = []; return success(undefined); } },
     hooks: { requestDecision: async () => failure('forbidden', 'Unexpected decision'), pendingInput: () => pending,
       pendingDecisions: () => decisions, observe: event => observed.push(event) },
     saved: async () => success(saved), failed: (_session, error) => failures.push(error), recovered: () => { recovered++; },
@@ -176,13 +178,15 @@ test('interrupted work and pending decisions survive stop and receive one contin
     let managed = value(await initializedLifecycle(current.services, new AbortController().signal)); scope.after(() => managed.close());
     const observation = { runtime: 'fixture', sessionId: 'exact-history', roomId: null, state, observedAt: 1000, settings: [], errorMessage: null };
     current.nativeObservers[0]!({ kind: 'state', observation });
+    current.setBusy(true);
     const checkpoint = value(current.services.work.read()); assert.equal(checkpoint.length, 1);
     current.nativeObservers[0]!({ kind: 'state', observation }); assert.deepEqual(value(current.services.work.read()), checkpoint);
     await managed.close(); current.services.initial = 'sleeping';
     assert.deepEqual(value(current.services.work.read()), checkpoint, 'A shutdown retains its interrupted native task');
     managed = value(await initializedLifecycle(current.services, new AbortController().signal));
     assert.equal(managed.runtime.sessionId, 'exact-history'); assert.equal(managed.nativeState().phase, 'running');
-    assert.deepEqual(current.delivered, [checkpoint[0]!.messageId]); assert.deepEqual(value(current.services.work.read()), []);
+    assert.deepEqual(current.delivered, [checkpoint[0]!.messageId]); assert.equal(value(current.services.work.read()).length, 1);
+    assert.notEqual(value(current.services.work.read())[0]!.messageId, checkpoint[0]!.messageId, 'A resumed task retains another durable restart identity');
     value(await managed.resume()); assert.equal(current.delivered.length, 1, 'Repeated resume does not send another task instruction');
     assert.equal(current.started.length, 2);
   }
@@ -192,7 +196,9 @@ test('completed work clears its checkpoint and sleeping restoration has no synth
   const current = fixture(); let managed = value(await initializedLifecycle(current.services, new AbortController().signal)); scope.after(() => managed.close());
   const observation = { runtime: 'fixture', sessionId: 'exact-history', roomId: null, observedAt: 1000, settings: [], errorMessage: null };
   current.nativeObservers[0]!({ kind: 'state', observation: { ...observation, state: 'working' } }); assert.equal(value(current.services.work.read()).length, 1);
-  current.nativeObservers[0]!({ kind: 'state', observation: { ...observation, state: 'idle' } }); assert.deepEqual(value(current.services.work.read()), []);
+  current.nativeObservers[0]!({ kind: 'state', observation: { ...observation, state: 'idle' } });
+  assert.equal(value(current.services.work.read()).length, 1, 'An idle notification alone cannot erase submitted work');
+  assert.equal((await managed.runtime.inspect()).busy, false); assert.deepEqual(value(current.services.work.read()), []);
   await managed.close(); current.services.initial = 'sleeping'; managed = value(await initializedLifecycle(current.services, new AbortController().signal));
   assert.equal(current.started.length, 1); assert.equal(managed.nativeState().phase, 'sleeping'); assert.deepEqual(current.delivered, []);
 });
@@ -395,7 +401,8 @@ test('a crashed generation remains retryable even when recovery has already deta
   await until(() => managed.nativeState().phase === 'running' && fixture_.started.length === 2);
   assert.equal(await managed.runtime.recover('One', 'one'), false);
   await managed.runtime.deliver('One', 'one'); managed.runtime.acknowledge(['one']);
-  assert.deepEqual(fixture_.delivered, ['one']); assert.equal(managed.runtime.signal.aborted, false);
+  assert.equal(fixture_.delivered.length, 2); assert.equal(fixture_.delivered[1], 'one');
+  assert(fixture_.delivered[0]!.startsWith('00000000-0000-4000-8000-')); assert.equal(managed.runtime.signal.aborted, false);
 });
 
 test('input racing with native cleanup observes sleeping before waking and resumes only after cleanup', async scope => {
@@ -434,4 +441,46 @@ test('unverified process cleanup blocks replacement rather than risking duplicat
   await assert.rejects(managed.runtime.deliver('One', 'one'), error => error instanceof Error && 'code' in error && error.code === 'conflict');
   assert.equal(fixture_.started.length, 1); assert.equal(fixture_.failures.length, 1);
   await assert.rejects(managed.close(), /cleanup failed/);
+});
+
+test('submission persists unfinished work before entering the native adapter without waiting for an observation', async scope => {
+  const current = fixture(), start = current.services.start;
+  current.services.start = async (...input) => {
+    const result = await start(...input); if (!result.ok) return result;
+    return success({ ...result.value, deliver: async (_text, messageId) => {
+      const pending = value(current.services.work.read());
+      assert.equal(pending.length, 1); assert.equal(pending[0]!.context, 'shared'); assert.equal(pending[0]!.sessionId, 'exact-history');
+      current.delivered.push(messageId);
+    } });
+  };
+  const managed = value(await initializedLifecycle(current.services, scope.signal)); scope.after(() => managed.close());
+  await managed.runtime.deliver('Write before native I/O', 'write-ahead');
+  assert.deepEqual(current.delivered, ['write-ahead']);
+  assert.equal(value(current.services.work.read()).length, 1);
+  managed.runtime.acknowledge(['write-ahead']);
+  assert.equal((await managed.runtime.inspect()).busy, false); assert.deepEqual(value(current.services.work.read()), []);
+});
+
+test('a delayed idle notification and an older native query cannot erase a newer submitted task', async scope => {
+  const current = fixture(), managed = value(await initializedLifecycle(current.services, scope.signal)); scope.after(() => managed.close());
+  await managed.runtime.deliver('First task', 'first'); managed.runtime.acknowledge(['first']);
+  current.setBusy(true);
+  current.nativeObservers[0]!({ kind: 'state', observation: { runtime: 'fixture', sessionId: 'exact-history', roomId: null,
+    state: 'idle', observedAt: 1000, settings: [], errorMessage: null } });
+  assert.equal((await managed.runtime.inspect()).busy, true); assert.equal(value(current.services.work.read()).length, 1);
+  let release!: (status: { busy: boolean }) => void;
+  current.setInspect(() => new Promise(resolve => { release = resolve; }));
+  const older = managed.runtime.inspect(); await until(() => typeof release === 'function');
+  await managed.runtime.deliver('Newer task', 'newer'); managed.runtime.acknowledge(['newer']);
+  release({ busy: false }); await older;
+  assert.equal(value(current.services.work.read()).length, 1, 'A query that began before newer input cannot establish its completion');
+  current.setInspect(undefined); assert.equal((await managed.runtime.inspect()).busy, true);
+  current.setBusy(false); assert.equal((await managed.runtime.inspect()).busy, false); assert.deepEqual(value(current.services.work.read()), []);
+});
+
+test('failed write-ahead persistence prevents any native submission', async scope => {
+  const current = fixture(), managed = value(await initializedLifecycle(current.services, scope.signal)); scope.after(() => managed.close());
+  current.services.work.capture = () => failure('unavailable', 'Controlled write-ahead failure');
+  await assert.rejects(managed.runtime.deliver('Must not reach native input', 'blocked'), /Controlled write-ahead failure/);
+  assert.deepEqual(current.delivered, []); assert.equal(managed.runtime.signal.aborted, false);
 });

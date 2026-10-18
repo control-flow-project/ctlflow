@@ -28,6 +28,7 @@ import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal';
 import { codexInput } from '@ctlflow/crossfire-adapter-codex/input';
 import { contextState, contextReceipt } from '@ctlflow/crossfire-adapter-codex/context-state';
+import { listenerRequest } from '@ctlflow/crossfire-adapter-crossfire/listener-client';
 
 const execute = promisify(execFile);
 async function until(predicate: () => boolean | Promise<boolean>): Promise<void> {
@@ -171,6 +172,11 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   await until(() => { try { return readFileSync(outside, 'utf8') === 'fleet-full-access-confirmed'; } catch { return false; } });
   await until(() => providers[0]!.requests.length === 3);
   await acknowledged();
+  await until(async () => {
+    const status = await listenerRequest(join(definition, 'workarea/north/.crossfire/state/north'), { action: 'test' });
+    assert(status?.ok, 'The actual listener must remain observable until native work completes');
+    return status.value.test?.busy === false;
+  });
   const delivered = providers[0]!.requests.length;
   await cli('stop', 'research'); await cli('start', 'research');
   await acquired(); await acknowledged();

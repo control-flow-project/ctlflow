@@ -45,6 +45,13 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     await call(operations.changeFleetDelivery, { fleetId }, { expectedRevision: integer(record(fleet.connection).revision), enabled });
     await observe(async () => record(list(record((await call(operations.fleet, { fleetId })).data).instances)[0]).listenerActive === enabled, 'Controller applies delivery intent');
   }
+  async function idle(): Promise<boolean> {
+    const file = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/listener.json');
+    const endpoint = record(JSON.parse(readFileSync(file, 'utf8')) as unknown);
+    const response = await contractHttp('http://127.0.0.1:' + String(endpoint.port), 'POST', '/bindings/' + text(endpoint.binding) + '/control',
+      { action: 'test' }, { Authorization: 'Bearer ' + text(endpoint.secret) });
+    return response.status === 200 && record(record(response.body).test).busy === false;
+  }
   await scope.test('Unix transport, strict contracts and private ownership are identical', async () => {
     const status = record((await call(operations.status)).data); assert.equal(record(status.controller).name, 'shared-contract'); assert.equal(statSync(root).mode & 0o777, 0o700); assert.equal(statSync(socket).mode & 0o777, 0o600);
     contractError(await raw('/api/status', 'GET', undefined, { Origin: 'https://foreign.invalid' }), 403, 'forbidden'); contractError(await raw('/api/status', 'GET', undefined, { Host: 'foreign.invalid' }), 403, 'forbidden'); contractError(await raw('/api/status', 'GET', undefined, { Authorization: 'Bearer guessed' }), 401, 'unauthorized');
@@ -189,7 +196,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     assert.equal(provider.requests.length, count, 'A network outage must not create housekeeping model work');
   });
   await scope.test('real native chat, steering and bounded history contracts', child => messageContracts(child, { platform, fleetDirectory, agent: { id: agentId, matrixUserId, token }, provider,
-    async idle() { const file = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/listener.json'); const endpoint = record(JSON.parse(readFileSync(file, 'utf8')) as unknown); const response = await contractHttp('http://127.0.0.1:' + String(endpoint.port), 'POST', '/bindings/' + text(endpoint.binding) + '/control', { action: 'test' }, { Authorization: 'Bearer ' + text(endpoint.secret) }); return response.status === 200 && record(record(response.body).test).busy === false; },
+    idle,
     delivery }));
   await scope.test('an actual native question waits for explicit owner submission and returns only to its original history', async () => {
     const requests = provider.requests.length, choice = 'Reviewed choice ' + randomUUID();
@@ -277,30 +284,41 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
     } finally { await delivery(true); }
   });
-  await scope.test('a crash during a held native response resumes the same history and unfinished request', async child => {
+  await scope.test('repeated crashes during held native responses resume the same history and unfinished request', async child => {
     child.after(() => { if (provider.held()) provider.finish(); });
-    const before = provider.requests.length, marker = 'Resume this unfinished fleet request ' + randomUUID();
+    const marker = 'Resume this unfinished fleet request ' + randomUUID();
     provider.hold();
     await call(operations.createFleetMessage, { fleetId }, { messageId: randomUUID(), body: marker });
     await observe(() => provider.held() !== undefined, 'Fleet broadcast reaches the actual native engine');
-    assert(lastUser(provider.requests.at(-1)).includes(marker)); const original = provider.held()!;
-    provider.hold(); assert.equal(daemon.child.kill('SIGKILL'), true); await daemon.ended;
-    await observe(() => original.destroyed, 'A dead controller leaves no native writer holding the old provider response');
-    daemon = contractProcess(scope, selected.daemon, ['--root', root], directory, environment);
-    await observe(() => provider.requests.length >= before + 2 && provider.held() !== undefined, 'Restart resumes the unfinished request rather than silently dropping it', 90000);
+    assert(lastUser(provider.requests.at(-1)).includes(marker));
+    const checkpoint = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/resume-work.json');
     try {
-      const request = provider.requests.at(-1), input = lastUser(request);
-      assert(input.includes('[Crossfire session restarted]'), 'Recovery explicitly identifies the restarted session');
-      if (!JSON.stringify(request).includes(marker)) {
-        const location = /is saved at ("(?:[^"\\]|\\.)*")\./u.exec(input);
-        assert(location, 'Uncertain native receipt must retain the exact original input in a private file');
-        const path = join(fleetDirectory, 'agents/analyst/workarea/analyst', text(JSON.parse(location[1]!) as unknown));
-        assert.equal(statSync(path).mode & 0o777, 0o600);
-        assert(readFileSync(path, 'utf8').includes(marker), 'The restart context retains the original request verbatim');
+      for (let restart = 0; restart < 2; restart++) {
+        const beforeCrash = readFileSync(checkpoint, 'utf8'), before = provider.requests.length, original = provider.held()!;
+        assert.equal(list(JSON.parse(beforeCrash) as unknown).length, 1, 'Unfinished work is durable before the actual provider request can be observed');
+        provider.hold(); assert.equal(daemon.child.kill('SIGKILL'), true); await daemon.ended;
+        await observe(() => original.destroyed, 'A dead controller leaves no native writer holding the old provider response');
+        daemon = contractProcess(scope, selected.daemon, ['--root', root], directory, environment);
+        try { await observe(() => provider.requests.length >= before + 1 && provider.held() !== undefined, 'Restart resumes the unfinished request rather than silently dropping it', 90000); }
+        catch (error) {
+          child.diagnostic(JSON.stringify({ restart, beforeCrash, afterRestart: existsSync(checkpoint) ? readFileSync(checkpoint, 'utf8') : null,
+            fleet: (await raw('/api/fleets/' + fleetId)).body, requestsBefore: before, requestsAfter: provider.requests.length, errors: daemon.errors().slice(-8192) }));
+          throw error;
+        }
+        const request = provider.requests.at(-1), input = lastUser(request);
+        assert(input.includes('[Crossfire session restarted]'), 'Recovery explicitly identifies the restarted session');
+        if (!JSON.stringify(request).includes(marker)) {
+          const location = /is saved at ("(?:[^"\\]|\\.)*")\./u.exec(input);
+          assert(location, 'Uncertain native receipt must retain the exact original input in a private file');
+          const path = join(fleetDirectory, 'agents/analyst/workarea/analyst', text(JSON.parse(location[1]!) as unknown));
+          assert.equal(statSync(path).mode & 0o777, 0o600);
+          assert(readFileSync(path, 'utf8').includes(marker), 'The restart context retains the original request verbatim');
+        }
+        assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
       }
-      assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
-    } finally { provider.finish(); }
-    await observe(async () => (await raw('/api/fleets/' + fleetId + '/readiness')).status === 200, 'Recovered native work completes and leaves the listener ready');
+    } finally { if (provider.held()) provider.finish(); }
+    await observe(idle, 'Recovered native work completes and leaves the listener idle');
+    assert.deepEqual(JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, [], 'Verified native completion clears the durable work record');
   });
   await scope.test('explicit fresh-history reset retains enrolled identity and makes no housekeeping model call', async () => {
     const original = saved, requests = provider.requests.length;

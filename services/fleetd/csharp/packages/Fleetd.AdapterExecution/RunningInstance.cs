@@ -40,13 +40,14 @@ public sealed partial class ExecutionHost
         var loaded = BindingFiles.Load(configuration); if (!loaded.IsSuccess) return Result<RunningAgent>.Fail(loaded.Error); var binding = loaded.Value; var identity = binding.Identities.FirstOrDefault(identity => identity.InstanceKey == instance.Key); if (identity is null) return Results.Fail<RunningAgent>("missing", "Instance has no enrolled identity"); var connection = Find(configuration.Directory); if (connection is null) return Results.Fail<RunningAgent>("conflict", "Fleet controller connection is not initialized");
         var definition = configuration.Definitions[instance.Definition]; if (!adapters.TryGetValue(definition.Runtime, out var adapter)) return Results.Fail<RunningAgent>("invalid", "Unsupported native runtime: " + definition.Runtime); var validated = adapter.Validate(configuration.NativeOptions(instance)); if (!validated.IsSuccess) return Result<RunningAgent>.Fail(validated.Error);
         var stateDirectory = PrivateFiles.Directory(Path.Combine(configuration.Directory, instance.Workarea)); var workspace = instance.Workspace ?? stateDirectory; var protectedFiles = await ProjectFiles.Protect(stateDirectory, [".crossfire/"], cancellation); if (!protectedFiles.IsSuccess) return Result<RunningAgent>.Fail(protectedFiles.Error); var local = AgentProjects.Paths(stateDirectory, instance.Key); PrivateFiles.Directory(local.State);
-        StateLock? owner = null; ListenerControl? control = null; NativeLifecycle? native = null; Task<Result<Unit>>? receiving = null; Task? observation = null, activation = null; StopActivity? activity = null; var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation); var transferred = false;
+        StateLock? owner = null; ListenerControl? control = null; NativeLifecycle? native = null; Task<Result<Unit>>? receiving = null; Task? observation = null, activation = null; StopActivity? activity = null; var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation); var transferred = false; var deliberatelyClosing = 0;
         async Task Close()
         {
             List<Exception> errors = []; async Task Finish(Func<Task> action) { try { await action(); } catch (Exception error) { errors.Add(error); } }
-            await Finish(stop.CancelAsync); var received = receiving; var observed = observation; var activated = activation; var ownedNative = native;
-            if (received is not null) await Finish(async () => { await received; }); if (observed is not null) await Finish(() => observed); if (activated is not null) await Finish(() => activated);
+            Interlocked.Exchange(ref deliberatelyClosing, 1); var received = receiving; var observed = observation; var activated = activation; var ownedNative = native;
             var nativeClosed = ownedNative is null; if (ownedNative is not null) await Finish(async () => { await ownedNative.DisposeAsync(); nativeClosed = true; });
+            await Finish(stop.CancelAsync);
+            if (received is not null) await Finish(async () => { await received; }); if (observed is not null) await Finish(() => observed); if (activated is not null) await Finish(() => activated);
             if (nativeClosed && activity is { } reported) await Finish(() => { connection.Reports.Closed(reported); return Task.CompletedTask; });
             if (control is not null) await Finish(() => { connection.Control.Unbind(identity.AgentId); return Task.CompletedTask; });
             if (nativeClosed) await Finish(() => { owner?.Dispose(); return Task.CompletedTask; }); stop.Dispose(); if (errors.Count != 0) throw new AggregateException("Native instance shutdown requires inspection", errors);
@@ -76,7 +77,7 @@ public sealed partial class ExecutionHost
             observation = Observe(); async Task Observe()
             {
                 Result<Unit> ended; try { ended = await receiving; } catch (Exception error) { ended = Results.Fail<Unit>("unavailable", "Receiver task failed: " + error.Message); }
-                if (!stop.IsCancellationRequested) { if (!ended.IsSuccess) connection.Reports.Failure(identity.AgentId, native?.Runtime.SessionId, ended.Error); else if (running is not null) running.DeliberatelyStopped = true; ready.TrySetResult(ended.IsSuccess ? Results.Fail<Unit>("conflict", "Listener disconnected by its local control") : ended); await stop.CancelAsync(); }
+                if (!stop.IsCancellationRequested && Volatile.Read(ref deliberatelyClosing) == 0) { if (!ended.IsSuccess) connection.Reports.Failure(identity.AgentId, native?.Runtime.SessionId, ended.Error); else if (running is not null) running.DeliberatelyStopped = true; ready.TrySetResult(ended.IsSuccess ? Results.Fail<Unit>("conflict", "Listener disconnected by its local control") : ended); await stop.CancelAsync(); }
             }
             var readiness = await ready.Task.WaitAsync(stop.Token); if (!readiness.IsSuccess) return Result<RunningAgent>.Fail(readiness.Error); if (native is null) return Results.Fail<RunningAgent>("invalid", "Runtime did not report its session"); connection.Reports.Recovered(identity.AgentId);
             running = new(native, stop.Token, control, Close); transferred = true; return Result<RunningAgent>.Success(running);

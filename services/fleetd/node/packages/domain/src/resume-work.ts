@@ -7,7 +7,8 @@ export type ResumeWork = InterruptedContext & { messageId: string; checkpointedA
 export type ResumeWorkStore = {
   read(): Result<ResumeWork[]>;
   capture(contexts: InterruptedContext[]): Result<void>;
-  acknowledge(messageId: string): Result<void>;
+  renew(messageId: string): Result<void>;
+  clear(): Result<void>;
 };
 
 export function continuationText(work: ResumeWork): string {
@@ -31,11 +32,11 @@ export async function resumeInterruptedWork(connection: OwnedRuntimeConnection, 
   for (const work of pending.value) {
     const target: RuntimeConnection | undefined = work.context === primary ? connection : await connection.conversation?.(work.context);
     if (!target || target.sessionId !== work.sessionId) throw Object.assign(new Error('Interrupted task cannot use a different room history'), { code: 'conflict' });
+    const renewed = store.renew(work.messageId);
+    if (!renewed.ok) throw Object.assign(new Error(renewed.error.message), { code: renewed.error.code });
     await target.settle();
     const text = continuationText(work);
     if (!await target.turnControl?.activeTurn() && !await target.recover(text, work.messageId)) await target.deliver(text, work.messageId);
-    const acknowledged = store.acknowledge(work.messageId);
-    if (!acknowledged.ok) throw Object.assign(new Error(acknowledged.error.message), { code: acknowledged.error.code });
     target.acknowledge([work.messageId]);
   }
 }

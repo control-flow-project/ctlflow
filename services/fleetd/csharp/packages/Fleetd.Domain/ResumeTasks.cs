@@ -18,13 +18,14 @@ public static class ResumeTasks
         foreach (var work in saved.Value)
         {
             var target = work.Context == primary ? Result<RuntimeConnection>.Success(connection) : await connection.Conversation(work.Context); if (!target.IsSuccess) return Result<Unit>.Fail(target.Error); if (target.Value.SessionId != work.SessionId) return Results.Fail<Unit>("conflict", "Interrupted task cannot use a different room history");
+            var renewed = store.Renew(work.MessageId); if (!renewed.IsSuccess) return renewed;
             var settled = await target.Value.Settle(); if (!settled.IsSuccess) return Result<Unit>.Fail(settled.Error); var turn = target.Value.TurnControl is null ? Result<string?>.Success(null) : await target.Value.TurnControl.ActiveTurn(); if (!turn.IsSuccess) return Result<Unit>.Fail(turn.Error);
             if (turn.Value is null)
             {
                 var recovered = await target.Value.Recover(Text(work), work.MessageId); if (!recovered.IsSuccess) return Result<Unit>.Fail(recovered.Error);
                 if (!recovered.Value) { var delivered = await target.Value.Deliver(Text(work), work.MessageId); if (!delivered.IsSuccess) return delivered; }
             }
-            var acknowledged = store.Acknowledge(work.MessageId); if (!acknowledged.IsSuccess) return acknowledged; acknowledged = target.Value.Acknowledge([work.MessageId]); if (!acknowledged.IsSuccess) return acknowledged;
+            var acknowledged = target.Value.Acknowledge([work.MessageId]); if (!acknowledged.IsSuccess) return acknowledged;
         }
         return Results.Done();
     }

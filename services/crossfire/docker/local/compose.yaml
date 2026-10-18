@@ -34,7 +34,7 @@ services:
 
   crossfire:
     <<: *server-resources
-    image: ${CROSSFIRE_RUNTIME_IMAGE:?Set the exact csharp-nativeaot runtime image}
+    image: ${CROSSFIRE_RUNTIME_IMAGE:?Set the exact selected runtime image}
     volumes: *server-state
     ports:
       - "127.0.0.1:8080:8080"

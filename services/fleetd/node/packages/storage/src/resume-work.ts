@@ -40,9 +40,14 @@ export function createResumeWork(state: string, now = Date.now, id = randomUUID)
       }
       return changed ? save([...next.values()]) : success(undefined);
     },
-    acknowledge(messageId) {
+    renew(messageId) {
       const previous = read(); if (!previous.ok) return previous;
-      return previous.value.some(item => item.messageId === messageId) ? save(previous.value.filter(item => item.messageId !== messageId)) : success(undefined);
+      if (!previous.value.some(item => item.messageId === messageId)) return failure('conflict', 'Interrupted work changed before exact-history resume');
+      return save(previous.value.map(item => item.messageId === messageId ? { ...item, messageId: id(), checkpointedAt: now() } : item));
+    },
+    clear() {
+      const previous = read(); if (!previous.ok) return previous;
+      return previous.value.length ? save([]) : success(undefined);
     },
   };
 }

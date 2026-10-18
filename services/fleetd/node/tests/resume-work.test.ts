@@ -42,7 +42,7 @@ test('interrupted work is private, bounded, exact-history keyed and durable with
   assert.equal(statSync(file).mode & 0o777, 0o600); assert.equal(statSync(state).mode & 0o777, 0o700);
   const restored = createResumeWork(state); assert.deepEqual(value(restored.read()), value(store.read()));
   assert.equal(store.capture([{ ...context, sessionId: randomUUID() }]).ok, false);
-  value(restored.acknowledge(value(store.read())[0]!.messageId)); assert.deepEqual(value(store.read()), []);
+  value(restored.clear()); assert.deepEqual(value(store.read()), []);
   value(store.capture([context])); assert.notDeepEqual(readFileSync(file), first, 'A later interrupted task has another native receipt');
 });
 
@@ -67,21 +67,26 @@ test('room continuations retain attribution, never approve decisions and touch o
   assert(delivered.every(item => item.text.includes('re-read the applicable AGENTS.md files')));
   assert(delivered.every(item => item.text.includes('not a new assignment') && item.text.includes('No pending question or permission has been answered or approved')));
   assert(delivered[0]!.text.includes('!room-a:test') && !delivered[0]!.text.includes('!room-b:test'));
-  assert.equal(receipts.size, 0); assert.deepEqual(value(store.read()), []);
-  await resumeInterruptedWork(owned, 'control', contexts, store); assert.equal(delivered.length, 2);
+  assert.equal(receipts.size, 0); assert.equal(value(store.read()).length, 2);
+  assert(value(store.read()).every(work => !delivered.some(item => item.messageId === work.messageId)), 'Every unfinished context retains a fresh restart identity');
 });
 
-test('ambiguous post-delivery storage failure recovers the same receipt without a duplicate continuation', async scope => {
+test('restart identity is persisted before native submission and another restart cannot reuse the previous reminder', async scope => {
   const { store } = fixture(scope), sessionId = randomUUID(), receipts = new Set<string>(), delivered: { sessionId: string; messageId: string; text: string }[] = [];
   const primary = connection(sessionId, receipts, delivered), contexts = [{ context: 'shared', sessionId, runtime: 'fixture', workspace: '/fixture' }];
   const owned: OwnedRuntimeConnection = { ...primary, attachment: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: {} }, attachments: async () => [] };
   value(store.capture(contexts.map(({ context, sessionId }) => ({ context, sessionId }))));
-  const failing: ResumeWorkStore = { ...store, acknowledge: () => failure('unavailable', 'Controlled atomic checkpoint failure') };
+  const before = value(store.read());
+  const failing: ResumeWorkStore = { ...store, renew: () => failure('unavailable', 'Controlled atomic checkpoint failure') };
   await assert.rejects(resumeInterruptedWork(owned, 'shared', contexts, failing), /Controlled atomic checkpoint failure/);
-  assert.equal(delivered.length, 1); assert.equal(receipts.size, 1); assert.equal(value(store.read()).length, 1);
-  assert(delivered[0]!.text.includes('re-read the applicable AGENTS.md files'));
+  assert.equal(delivered.length, 0); assert.equal(receipts.size, 0); assert.deepEqual(value(store.read()), before);
   await resumeInterruptedWork(owned, 'shared', contexts, store);
-  assert.equal(delivered.length, 1); assert.equal(receipts.size, 0); assert.deepEqual(value(store.read()), []);
+  assert.equal(delivered.length, 1); assert.equal(receipts.size, 0); assert.equal(value(store.read()).length, 1);
+  assert(delivered[0]!.text.includes('re-read the applicable AGENTS.md files'));
+  assert.notEqual(value(store.read())[0]!.messageId, delivered[0]!.messageId);
+  await resumeInterruptedWork(owned, 'shared', contexts, store);
+  assert.equal(delivered.length, 2); assert.notEqual(delivered[1]!.messageId, delivered[0]!.messageId);
+  assert.notEqual(value(store.read())[0]!.messageId, delivered[1]!.messageId);
 });
 
 test('all saved context identities are validated before any continuation or conversation creation', async scope => {

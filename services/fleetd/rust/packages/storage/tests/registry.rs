@@ -122,9 +122,22 @@ fn interrupted_work_keeps_the_exact_history_and_message_identity_until_acknowled
     );
     let reopened = Work::open(directory.path())?;
     assert_eq!(reopened.work()?, first);
-    resume_work::acknowledge(&reopened, &identity::id())?;
+    assert_eq!(
+        resume_work::renew(&reopened, &identity::id(), 1_792_000_000_002)
+            .err()
+            .ok_or("Missing checkpoint")?
+            .code,
+        ErrorCode::Conflict
+    );
     assert_eq!(reopened.work()?, first);
-    resume_work::acknowledge(&reopened, &first[0].message_id)?;
+    resume_work::renew(&reopened, &first[0].message_id, 1_792_000_000_002)?;
+    let renewed = reopened.work()?;
+    assert_eq!(renewed.len(), 1);
+    assert_eq!(renewed[0].context, first[0].context);
+    assert_eq!(renewed[0].session_id, first[0].session_id);
+    assert_ne!(renewed[0].message_id, first[0].message_id);
+    assert_eq!(renewed[0].checkpointed_at, 1_792_000_000_002);
+    reopened.save_work(&[])?;
     assert!(reopened.work()?.is_empty());
     fs::write(
         directory.path().join("resume-work.json"),

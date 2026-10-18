@@ -52,14 +52,20 @@ pub fn capture(store: &impl WorkStore, contexts: &[InterruptedContext], now: i64
     }
     Ok(())
 }
-pub fn acknowledge(store: &impl WorkStore, message_id: &str) -> Result<()> {
+pub fn renew(store: &impl WorkStore, message_id: &str, now: i64) -> Result<()> {
     let mut previous = store.work()?;
-    let length = previous.len();
-    previous.retain(|value| value.message_id != message_id);
-    if length != previous.len() {
-        store.save_work(&previous)?;
-    }
-    Ok(())
+    let work = previous
+        .iter_mut()
+        .find(|value| value.message_id == message_id)
+        .ok_or_else(|| {
+            Failure::new(
+                ErrorCode::Conflict,
+                "Interrupted work changed before exact-history resume",
+            )
+        })?;
+    work.message_id = identity::id();
+    work.checkpointed_at = now;
+    store.save_work(&previous)
 }
 pub fn continuation_text(work: &ResumeWork) -> Result<String> {
     Ok(format!(
@@ -84,6 +90,7 @@ pub async fn resume<
     primary: &str,
     contexts: &[crossfire_agent_core::owned_runtime::SavedContext],
     store: &S,
+    now: i64,
 ) -> Result<()> {
     let pending = store.work()?;
     if pending.iter().any(|work| {
@@ -98,10 +105,10 @@ pub async fn resume<
     }
     for work in pending {
         if work.context == primary {
-            continue_context(connection, &work, store).await?;
+            continue_context(connection, &work, store, now).await?;
         } else {
             let target = connection.conversation(&work.context, None).await?;
-            continue_context(&target, &work, store).await?;
+            continue_context(&target, &work, store, now).await?;
         }
     }
     Ok(())
@@ -113,6 +120,7 @@ async fn continue_context<
     connection: &C,
     work: &ResumeWork,
     store: &S,
+    now: i64,
 ) -> Result<()> {
     if connection.session_id() != work.session_id {
         return Err(Failure::new(
@@ -120,6 +128,7 @@ async fn continue_context<
             "Interrupted task cannot use a different room history",
         ));
     }
+    renew(store, &work.message_id, now)?;
     connection
         .settle(connection.lifetime().child_token())
         .await?;
@@ -138,6 +147,5 @@ async fn continue_context<
             )
             .await?;
     }
-    acknowledge(store, &work.message_id)?;
     connection.acknowledge(std::slice::from_ref(&work.message_id))
 }

@@ -454,10 +454,15 @@ settle preceding input before one correlated continuation asking the agent to
 reread applicable AGENTS.md and continue unfinished authorized work. It cannot
 approve decisions, infer a reply room or replay completed effects. Idle/sleeping
 contexts receive no synthetic task.
-Native state observations own unfinished-work checkpoints. Activation records
-work already observed before readiness, and shutdown snapshots those observations
-before closing the native generation. A cancelled or unavailable reader during
-shutdown cannot invent an unfinished task for an idle context.
+The lifecycle checkpoints the exact context before submitting input to the native
+adapter, without waiting for asynchronous activity notifications. It also records
+work already observed during activation. Idle notifications cannot erase submitted
+work. Existing native inspection clears completed checkpoints atomically only when
+the generation and activity revision are unchanged and no input is in flight or
+unacknowledged. A stopped or unavailable reader cannot prove completion or invent
+an unfinished task. A restart renews its internal reminder identity before native
+I/O and retains the work record until verified completion, including across
+repeated controller crashes. Delivering a reminder does not complete its task.
 Native owner questions use the currently active listener run. A reporting
 replacement invalidates the preceding run; callers waiting during reconnection
 receive the new run, never the first run cached at initial startup.

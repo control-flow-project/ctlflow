@@ -40,7 +40,7 @@ public sealed record FleetRegistry(Func<Result<IReadOnlyList<FleetRegistration>>
     Func<SetupRequest, Result<SetupConfiguration>> Setup, Func<string, Result<Unit>> CompleteSetup, Func<string, string, Result<Unit>> RetrySetup);
 public sealed record ResumeWork(string Context, string SessionId, string MessageId, long CheckpointedAt);
 public sealed record InterruptedContext(string Context, string SessionId);
-public sealed record ResumeWorkStore(Func<Result<IReadOnlyList<ResumeWork>>> Read, Func<IReadOnlyList<InterruptedContext>, Result<Unit>> Capture, Func<string, Result<Unit>> Acknowledge);
+public sealed record ResumeWorkStore(Func<Result<IReadOnlyList<ResumeWork>>> Read, Func<IReadOnlyList<InterruptedContext>, Result<Unit>> Capture, Func<string, Result<Unit>> Renew, Func<Result<Unit>> Clear);
 public sealed record NativeLifecycleServices(string Runtime, RuntimeApproval Approval, string Primary, string Initial, IReadOnlyList<RuntimeSetting> Settings, RuntimeHooks Hooks,
     ResumeWorkStore Work, Func<Result<IReadOnlyList<SavedRuntimeContext>>> Saved,
     Func<Action<RuntimeObservationEvent>, InputAdmission?, CancellationToken, ValueTask<Result<OwnedRuntimeConnection>>> Start,
