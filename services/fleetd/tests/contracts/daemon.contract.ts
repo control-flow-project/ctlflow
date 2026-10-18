@@ -55,6 +55,14 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     nativeInspection = { status: response.status, body: response.body };
     return response.status === 200 && record(record(response.body).test).busy === false;
   }
+  function publications() {
+    const home = join(fleetDirectory, 'agents/analyst/workarea/analyst', runtime === 'pi' ? '.pi/receipts' : '.codex');
+    return readdirSync(home).filter(name => runtime === 'pi' ? name.endsWith('.json') : name.endsWith('.receipt')).map(name => {
+      const journal = record(JSON.parse(readFileSync(join(home, name), 'utf8')) as unknown);
+      return { file: name, sessionId: journal.sessionId, pending: journal.pending === null ? null : record(journal.pending).messageId,
+        confirmed: list(journal.confirmed).map(value => record(value).messageId) };
+    });
+  }
   await scope.test('Unix transport, strict contracts and private ownership are identical', async () => {
     const status = record((await call(operations.status)).data); assert.equal(record(status.controller).name, 'shared-contract'); assert.equal(statSync(root).mode & 0o777, 0o700); assert.equal(statSync(socket).mode & 0o777, 0o600);
     contractError(await raw('/api/status', 'GET', undefined, { Origin: 'https://foreign.invalid' }), 403, 'forbidden'); contractError(await raw('/api/status', 'GET', undefined, { Host: 'foreign.invalid' }), 403, 'forbidden'); contractError(await raw('/api/status', 'GET', undefined, { Authorization: 'Bearer guessed' }), 401, 'unauthorized');
@@ -373,6 +381,8 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
         const response = await contractHttp(platform.origin, 'GET', '/api/agents/' + agentId + '/runtime-observations', undefined, { Cookie: platform.owner.cookie, Origin: platform.origin });
         return response.status === 200 && list(record(response.body).data).map(record).some(value => value.sessionId === completedSession && value.state === 'idle');
       }, 'The completed room reaches observed native idle');
+      await observe(() => publications().some(journal => journal.sessionId === completedSession && journal.pending === null && journal.confirmed.length === 0),
+        'The delivery producer acknowledges the completed room input before it is classified as finished');
       provider.hold(); await send(rooms[1]!, unfinished);
       await observe(() => provider.held() !== undefined && lastUser(provider.requests.at(-1)).includes(unfinished), 'Another room has actual unfinished native work');
       const histories = (await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data;
@@ -393,13 +403,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       try { await observe(idle, 'Per-room resume settles to native idle'); }
       catch (error) {
         try {
-          const home = join(fleetDirectory, 'agents/analyst/workarea/analyst', runtime === 'pi' ? '.pi/receipts' : '.codex');
-          const journals = readdirSync(home).filter(name => runtime === 'pi' ? name.endsWith('.json') : name.endsWith('.receipt')).map(name => {
-            const journal = record(JSON.parse(readFileSync(join(home, name), 'utf8')) as unknown);
-            return { file: name, sessionId: journal.sessionId, pending: journal.pending === null ? null : record(journal.pending).messageId,
-              confirmed: list(journal.confirmed).map(value => record(value).messageId) };
-          });
-          scope.diagnostic(JSON.stringify({ nativeInspection, work: JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, journals }).slice(0, 8192));
+          scope.diagnostic(JSON.stringify({ nativeInspection, work: JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, journals: publications() }).slice(0, 8192));
         } catch (diagnosticError) { scope.diagnostic(String(diagnosticError).slice(0, 1024)); }
         throw error;
       }
