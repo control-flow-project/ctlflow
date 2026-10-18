@@ -1,8 +1,8 @@
 # Pinned EF query compiler
 
 Build-only source is pinned to dotnet/efcore tag
-`v11.0.0-rc.1.26425.128`, commit
-`c22dd77aa7f7392f997cf779f0c23e0b9aab1988`.
+`v11.0.0-rc.2.26504.105`, commit
+`f05a97f83d8fe43366d92d561cce59f02c6dd102`.
 Original .NET Foundation MIT headers/notices remain.
 This project is not a production runtime dependency.
 

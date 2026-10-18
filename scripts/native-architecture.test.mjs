@@ -1,8 +1,33 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { nativeOwner, validateNativeGraph, rustGraph, compareStructure, csharpProjectEdges, verifyDomainPrimitives } from './native-architecture.mjs';
 
 const root = '/test/checkout';
+test('C# SDK, EF compiler packages and container stages select the same exact release', () => {
+  const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+  const { sdk } = JSON.parse(read('global.json'));
+  assert.equal(sdk.rollForward, 'disable');
+  assert.equal(sdk.allowPrerelease, true);
+  const release = /^(\d+\.\d+)\.100-(rc\.\d+)\.(\d+\.\d+)$/u.exec(sdk.version);
+  assert(release, 'The selected SDK must identify its exact release-candidate build');
+  const runtime = release[1] + '.0-' + release[2] + '.' + release[3];
+  const packages = new Map([...read('Directory.Packages.props').matchAll(/<PackageVersion Include="([^"]+)" Version="([^"]+)"/gu)]
+    .map(([, name, version]) => [name, version]));
+  for (const name of ['Microsoft.EntityFrameworkCore.Sqlite', 'Microsoft.EntityFrameworkCore.Design',
+    'Microsoft.EntityFrameworkCore.Tasks', 'Microsoft.EntityFrameworkCore.Relational', 'Microsoft.Data.Sqlite'])
+    assert.equal(packages.get(name), runtime, name);
+  const docker = read('services/crossfire/csharp/Dockerfile');
+  for (const [image, version] of [['sdk', release[1] + '.100-' + release[2]],
+    ['aspnet', release[1] + '.0-' + release[2]], ['runtime-deps', release[1] + '.0-' + release[2]]]) {
+    const reference = 'mcr.microsoft.com/dotnet/' + image + ':' + version + '@sha256:';
+    assert(docker.includes(reference), image + ' must select the coordinated release');
+    assert.match(docker.slice(docker.indexOf(reference) + reference.length), /^[a-f0-9]{64} AS /u);
+  }
+  assert(read('services/crossfire/csharp/build/Crossfire.EfCompiler/README.md').includes('`v' + runtime + '`'),
+    'The reviewed build-source provenance must match the EF packages');
+});
+
 test('native JSON values and asynchronous coordination are primitives, not transport or storage adapters', () => {
   for (const library of ['serde_json', 'tokio']) assert.equal(validateNativeGraph([owner('domain', {edges:[{kind:'runtime',manifest:null,library}]})]).length,1);
   for (const library of ['reqwest', 'diesel', 'unknown']) assert.throws(() => validateNativeGraph([owner('domain', {edges:[{kind:'runtime',manifest:null,library}]})]), /pure library owners/u);
