@@ -458,11 +458,18 @@ The lifecycle checkpoints the exact context before submitting input to the nativ
 adapter, without waiting for asynchronous activity notifications. It also records
 work already observed during activation. Idle notifications cannot erase submitted
 work. Existing native inspection clears completed checkpoints atomically only when
-the generation and activity revision are unchanged and no input is in flight or
-unacknowledged. A stopped or unavailable reader cannot prove completion or invent
-an unfinished task. A restart renews its internal reminder identity before native
-I/O and retains the work record until verified completion, including across
-repeated controller crashes. Delivering a reminder does not complete its task.
+the generation and activity revision are unchanged and that exact context has no
+input in flight or unacknowledged. Native adapters return one read-only activity
+snapshot containing exact context/history identities and native busy/publication
+state. Aggregate status uses the same snapshot. Another busy room cannot retain
+a completed room's checkpoint. Inspection never opens a native room process.
+A stopped or unavailable reader cannot prove completion or invent
+an unfinished task. A restart first resolves native submission and acknowledges
+its previous reminder, leaving ordinary input confirmations with their producer.
+Only when no native turn is active does it atomically save a new reminder identity
+and submit that exact reminder. The work record retains this identity until
+verified completion, including across repeated controller crashes. Delivering a
+reminder does not complete its task.
 Native owner questions use the currently active listener run. A reporting
 replacement invalidates the preceding run; callers waiting during reconnection
 receive the new run, never the first run cached at initial startup.

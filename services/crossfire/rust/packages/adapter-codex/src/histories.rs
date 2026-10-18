@@ -16,7 +16,7 @@ use crossfire_adapter_runtime::{
 };
 use crossfire_agent_core::{
     hooks::ContextHooks,
-    owned_runtime::Attachment,
+    owned_runtime::{Attachment, NativeActivity, NativeContextActivity},
     runtime::{Admission, Hooks},
 };
 use crossfire_domain::runtime::values::{HistoryMode, State};
@@ -398,12 +398,10 @@ impl<H: Hooks + 'static> Histories<H> {
         }
         Ok(())
     }
-    pub async fn inspect(&self) -> Result<bool> {
+    pub async fn activity(&self) -> Result<NativeActivity> {
         clock::check(&self.lifetime())?;
-        if self.hooks.pending_decisions() {
-            return Ok(true);
-        }
         let before = self.contexts()?;
+        let mut activity = Vec::new();
         let inspector = self
             .existing(self.primary())?
             .ok_or_else(|| invalid("Native activity needs an owned live native connection"))?;
@@ -415,33 +413,60 @@ impl<H: Hooks + 'static> Histories<H> {
                 .slots
                 .get(context)
                 .cloned();
-            if slot
+            let retained = self
+                .contexts
+                .lock()
+                .map_err(|_| invalid("Native history ownership failed"))?
+                .registry
+                .session(context)
+                .map(str::to_owned);
+            let Some(session_id) = retained else {
+                continue;
+            };
+            let busy = if slot
                 .as_ref()
                 .is_some_and(|slot| slot.opening.try_lock().is_err())
-                || self.unacknowledged(context)?
             {
-                return Ok(true);
-            }
-            if let Some(connection) = self.existing(context)? {
-                if connection.unsettled()? || connection.inspect().await? {
-                    return Ok(true);
-                }
+                return Ok(NativeActivity {
+                    busy: true,
+                    contexts: Vec::new(),
+                });
+            } else if self.unacknowledged(context)? {
+                true
+            } else if let Some(connection) = self.existing(context)? {
+                connection.unsettled()? || connection.inspect().await?
             } else {
-                let retained = self
-                    .contexts
-                    .lock()
-                    .map_err(|_| invalid("Native history ownership failed"))?
-                    .registry
-                    .session(context)
-                    .map(str::to_owned);
-                if let Some(session) = retained
-                    && inspector.inspect_session(&session).await?
-                {
-                    return Ok(true);
-                }
-            }
+                inspector.inspect_session(&session_id).await?
+            };
+            activity.push(NativeContextActivity {
+                context: context.clone(),
+                session_id,
+                busy,
+            });
         }
-        Ok(before != self.contexts()? || self.hooks.pending_decisions())
+        let opening = self
+            .contexts
+            .lock()
+            .map_err(|_| invalid("Native history ownership failed"))?
+            .slots
+            .values()
+            .any(|slot| slot.opening.try_lock().is_err());
+        if opening || before != self.contexts()? {
+            return Ok(NativeActivity {
+                busy: true,
+                contexts: Vec::new(),
+            });
+        }
+        for item in &mut activity {
+            item.busy |= match self.existing(&item.context)? {
+                Some(connection) => connection.unsettled()?,
+                None => self.unacknowledged(&item.context)?,
+            };
+        }
+        Ok(NativeActivity {
+            busy: self.hooks.pending_decisions() || activity.iter().any(|item| item.busy),
+            contexts: activity,
+        })
     }
     pub fn attachments(&self) -> Result<Vec<(String, Attachment)>> {
         let contexts = self

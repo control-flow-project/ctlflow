@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, delimiter } from 'node:path';
 import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
@@ -317,7 +317,16 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
         assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
       }
     } finally { if (provider.held()) provider.finish(); }
-    await observe(idle, 'Recovered native work completes and leaves the listener idle');
+    try { await observe(idle, 'Recovered native work completes and leaves the listener idle'); }
+    catch (error) {
+      const workarea = join(fleetDirectory, 'agents/analyst/workarea/analyst'), state = join(workarea, '.crossfire/state/analyst');
+      const native = join(workarea, '.codex');
+      const files = [...readdirSync(state).filter(name => name === 'resume-work.json' || name.endsWith('.controller-input')).map(name => join(state, name)),
+        ...runtime === 'codex' ? readdirSync(native).filter(name => name.endsWith('.receipt')).map(name => join(native, name)) : []];
+      child.diagnostic(JSON.stringify({ completionTimeout: files.map(file => ({ file, value: readFileSync(file, 'utf8').slice(0, 8192) })),
+        fleet: (await raw('/api/fleets/' + fleetId)).body, requests: provider.requests.length, errors: daemon.errors().slice(-8192) }));
+      throw error;
+    }
     assert.deepEqual(JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, [], 'Verified native completion clears the durable work record');
   });
   await scope.test('explicit fresh-history reset retains enrolled identity and makes no housekeeping model call', async () => {
@@ -330,6 +339,61 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     assert.notDeepEqual(saved, original, 'Only an explicit reset replaces the native history');
     assert.equal(readFileSync(join(fleetDirectory, '.fleet/binding.json'), 'utf8'), binding, 'Reset never reenrolls or replaces accounts and credentials');
     assert.equal(provider.requests.length, requests, 'Reset exports context and instructions without model housekeeping');
+  });
+  await scope.test('per-room stop and resume continue only unfinished work in its exact history', async () => {
+    const configuration = join(fleetDirectory, 'runtime.toml'), original = readFileSync(configuration, 'utf8');
+    await operate('stop');
+    assert(original.includes('[instances.runtime_options]'));
+    writeFileSync(configuration, original.replace('[instances.runtime_options]', '[instances.listener_options]\nhistory_mode = "per-room"\n[instances.runtime_options]'), { mode: 0o600 });
+    try {
+      await operate('reset');
+      async function matrix(method: string, path: string, body?: unknown) {
+        const response = await contractHttp(platform.origin, method, '/_matrix/client/v3' + path, body, { Authorization: 'Bearer ' + platform.owner.nativeToken });
+        assert.equal(response.status, 200, JSON.stringify(response.body).slice(0, 1024)); return record(response.body);
+      }
+      const rooms: string[] = [];
+      for (const name of ['Completed room', 'Unfinished room']) {
+        const room = text((await matrix('POST', '/createRoom', { name, invite: [matrixUserId] })).room_id); rooms.push(room);
+        await observe(async () => Object.hasOwn(record((await matrix('GET', '/rooms/' + encodeURIComponent(room) + '/joined_members')).joined), matrixUserId),
+          'The same listener accepts an authorized per-room invitation', 90000);
+      }
+      const send = (room: string, body: string) => matrix('PUT', '/rooms/' + encodeURIComponent(room) + '/send/m.room.message/' + randomUUID(), { msgtype: 'm.text', body });
+      const completed = 'Completed private room task ' + randomUUID(), unfinished = 'Unfinished private room task ' + randomUUID();
+      const beforeCompleted = provider.requests.length;
+      await send(rooms[0]!, completed);
+      await observe(() => provider.requests.length > beforeCompleted && lastUser(provider.requests.at(-1)).includes(completed), 'The completed room receives its own native input');
+      let completedSession = '';
+      await observe(async () => {
+        const contexts = list((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data).map(record);
+        completedSession = text(contexts.find(value => value.context === rooms[0])?.sessionId ?? '');
+        const response = await contractHttp(platform.origin, 'GET', '/api/agents/' + agentId + '/runtime-observations', undefined, { Cookie: platform.owner.cookie, Origin: platform.origin });
+        return response.status === 200 && list(record(response.body).data).map(record).some(value => value.sessionId === completedSession && value.state === 'idle');
+      }, 'The completed room reaches observed native idle');
+      provider.hold(); await send(rooms[1]!, unfinished);
+      await observe(() => provider.held() !== undefined && lastUser(provider.requests.at(-1)).includes(unfinished), 'Another room has actual unfinished native work');
+      const histories = (await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data;
+      assert.deepEqual(list(histories).map(record).map(value => value.context).sort(), ['control', ...rooms].sort());
+      const previousResponse = provider.held()!;
+      await operate('stop');
+      await observe(() => previousResponse.destroyed, 'Stop closes the exact native writer for the unfinished room');
+      const checkpoint = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/resume-work.json');
+      assert.deepEqual(list(JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown).map(record).map(value => value.context), [rooms[1]],
+        'A completed room cannot receive synthetic restart work because another room is busy');
+      const beforeResume = provider.requests.length;
+      provider.hold(); const resuming = operate('start');
+      try {
+        await observe(() => provider.requests.length > beforeResume && provider.held() !== undefined, 'Resume continues the actual unfinished room', 90000);
+        assert(lastUser(provider.requests.at(-1)).includes('[Crossfire session restarted]'));
+        assert(!JSON.stringify(provider.requests.at(-1)).includes(completed), 'The unfinished room never receives another room task history');
+      } finally { if (provider.held()) provider.finish(); await resuming; }
+      await observe(idle, 'Per-room resume settles to native idle');
+      assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, histories, 'Every room retains its exact saved native history');
+      assert.deepEqual(JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, []);
+    } finally {
+      if (provider.held()) provider.finish();
+      await operate('stop'); writeFileSync(configuration, original, { mode: 0o600 }); await operate('reset');
+      saved = (await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data;
+    }
   });
   await scope.test('stop, daemon restart and explicit resume retain history and stop intent', async () => {
     const authentication = readFileSync(authenticationFile);

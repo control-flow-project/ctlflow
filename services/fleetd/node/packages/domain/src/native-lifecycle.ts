@@ -37,7 +37,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   const stop = new AbortController(), lifetime = AbortSignal.any([signal, stop.signal]);
   const observations = new Map<string, Observation>();
   const working = new Set<string>();
-  const unsettled = new Set<string>();
+  const unsettled = new Map<string, string>();
   let phase: NativeSessionState['phase'] = 'sleeping';
   let native: OwnedRuntimeConnection | undefined, opening: Promise<OwnedRuntimeConnection> | undefined, closingNative: Promise<void> | undefined;
   let recovery: Promise<void> | undefined, closing: Promise<void> | undefined;
@@ -58,18 +58,22 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     report(nativeError(result.error.code, result.error.message));
     stop.abort(nativeError(result.error.code, result.error.message));
   }
-  function completeIdleWork(connection: OwnedRuntimeConnection, revision: number): void {
-    if (!continuationReady || native !== connection || connection.signal.aborted || revision !== workRevision || activeCalls || unsettled.size) return;
-    const cleared = services.work.clear();
+  function completeIdleWork(connection: OwnedRuntimeConnection, revision: number, idle: { context: string; sessionId: string }[]): void {
+    if (!continuationReady || native !== connection || connection.signal.aborted || revision !== workRevision) return;
+    const pending = new Set(unsettled.values());
+    const saved = new Map(contexts.map(item => [item.context, item.sessionId]));
+    const completed = idle.filter(item => !pending.has(item.context) && saved.get(item.context) === item.sessionId)
+      .map(({ context, sessionId }) => ({ context, sessionId }));
+    const cleared = services.work.clear(completed);
     if (!cleared.ok) throw nativeError(cleared.error.code, cleared.error.message);
   }
   async function inspectNative(connection: OwnedRuntimeConnection): Promise<{ busy: boolean }> {
     const revision = workRevision;
     inspections++;
     try {
-      const status = await connection.inspect();
-      if (!status.busy) completeIdleWork(connection, revision);
-      return status;
+      const status = await connection.activity();
+      completeIdleWork(connection, revision, status.contexts.filter(item => !item.busy));
+      return { busy: status.busy };
     } finally { inspections--; }
   }
 
@@ -302,7 +306,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       },
       deliver: async (text, messageId, cancelled, priority) => {
         cancelled?.throwIfAborted();
-        unsettled.add(messageId);
+        unsettled.set(messageId, context);
         await call(async connection => {
           cancelled?.throwIfAborted();
           const target = await selected(connection, priority ? { priority, signal: cancelled ?? lifetime } : undefined);
@@ -315,7 +319,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
           priority ? { priority, signal: cancelled ?? lifetime } : undefined);
       },
       recover: async (text, messageId, cancelled) => {
-        unsettled.add(messageId);
+        unsettled.set(messageId, context);
         const received = await call(async connection => (await selected(connection)).recover(text, messageId, cancelled), true);
         if (!received) { unsettled.delete(messageId); schedule(); }
         return received;
@@ -348,7 +352,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   }
   function close(): Promise<void> {
     return closing ??= (async () => {
-      if (native && !native.signal.aborted && !activeCalls && !unsettled.size && !inspections) await inspectNative(native).catch(() => undefined);
+      if (native && !native.signal.aborted && continuationReady && !inspections) await inspectNative(native).catch(() => undefined);
       recordingWork = false;
       stop.abort(new Error('Native listener binding stopped'));
       cancelIdle?.(); cancelIdle = undefined;

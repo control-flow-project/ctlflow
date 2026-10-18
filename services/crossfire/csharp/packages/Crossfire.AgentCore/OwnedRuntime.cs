@@ -9,6 +9,8 @@ public sealed record RuntimeAttachment(string Runtime, string SessionId, string 
 public sealed record RuntimeTerminalAdapter(Func<RuntimeAttachment, Result<string>> Command);
 public sealed record ContextAttachment(string Context, RuntimeAttachment Attachment);
 public sealed record SavedRuntimeContext(string Context, string Runtime, string SessionId, string Workspace);
+public sealed record NativeContextActivity(string Context, string SessionId, bool Busy);
+public sealed record NativeActivity(bool Busy, IReadOnlyList<NativeContextActivity> Contexts);
 public sealed record RuntimeInspectionInput(string Workspace, string StateDirectory, JsonElement Options);
 public sealed record RuntimeResetInput(string Workspace, string StateDirectory, string ResetId);
 public sealed record ValidatedRuntime(JsonElement Options, RuntimeApproval Approval);
@@ -17,6 +19,7 @@ public sealed record OwnedRuntimeInput(string Profile, string Name, string Works
 public interface OwnedRuntimeConnection : RuntimeConnection
 {
     RuntimeAttachment? Attachment { get; }
+    ValueTask<Result<NativeActivity>> Activity();
     ValueTask<Result<IReadOnlyList<ContextAttachment>>> Attachments();
 }
 public sealed record OwnedRuntimeAdapter(

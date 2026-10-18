@@ -3,6 +3,7 @@ import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { deliveryJournalExists, readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal';
 import type { RuntimeHooks, InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
 import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
+import type { NativeActivity, NativeContextActivity } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import { openSession } from './session.js';
 import { codexDelivery, type CodexConnection } from './connection.js';
 import { contextState, contextReceipt } from './context-state.js';
@@ -79,24 +80,28 @@ export function codexHistories(options: { home: string; workspace: string; name:
     try { return await pending; } finally { initializing.delete(context); admission?.signal.removeEventListener('abort', cancelled); }
   }
   return { open, signal: lifetime,
-    async inspect() {
+    async activity(): Promise<NativeActivity> {
       lifetime.throwIfAborted();
-      if (initializing.size || options.hooks.pendingDecisions?.()) return { busy: true };
+      if (initializing.size) return { busy: true, contexts: [] };
       const count = opened.size;
       const inspector = opened.values().next().value;
       if (!inspector) throw new Error('Native activity cannot be inspected without an owned live native connection');
+      const activity: NativeContextActivity[] = [];
       for (const context of [...new Set(['shared', 'control', ...contexts()])]) {
         const connection = opened.get(context);
+        const sessionId = retainedSession(context);
+        if (!sessionId) continue;
+        let busy: boolean;
         if (connection) {
-          if (connection.unsettled() || (await connection.inspect()).busy) return { busy: true };
+          busy = connection.unsettled() || (await connection.inspect()).busy;
         } else {
-          if (unacknowledged(context)) return { busy: true };
-          const sessionId = retainedSession(context);
-          if (sessionId && (await inspector.inspectSession(sessionId)).busy) return { busy: true };
+          busy = unacknowledged(context) || (await inspector.inspectSession(sessionId)).busy;
         }
+        activity.push({ context, sessionId, busy });
       }
-      return { busy: initializing.size > 0 || opened.size !== count || options.hooks.pendingDecisions?.() === true
-        || [...opened.values()].some(connection => connection.unsettled()) };
+      if (initializing.size || opened.size !== count) return { busy: true, contexts: [] };
+      for (const item of activity) item.busy ||= opened.get(item.context)?.unsettled() === true;
+      return { busy: options.hooks.pendingDecisions?.() === true || activity.some(item => item.busy), contexts: activity };
     },
     async close() {
       failed.abort(new Error('Native history owner stopped')); await Promise.allSettled([...initializing.values()]);

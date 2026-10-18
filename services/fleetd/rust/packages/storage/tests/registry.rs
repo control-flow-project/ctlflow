@@ -137,7 +137,27 @@ fn interrupted_work_keeps_the_exact_history_and_message_identity_until_acknowled
     assert_eq!(renewed[0].session_id, first[0].session_id);
     assert_ne!(renewed[0].message_id, first[0].message_id);
     assert_eq!(renewed[0].checkpointed_at, 1_792_000_000_002);
-    reopened.save_work(&[])?;
+    assert!(
+        resume_work::clear(
+            &reopened,
+            &[InterruptedContext {
+                context: context.context.clone(),
+                session_id: identity::id()
+            }]
+        )
+        .is_err()
+    );
+    assert_eq!(reopened.work()?, renewed);
+    assert!(resume_work::clear(&reopened, &[context.clone(), context.clone()]).is_err());
+    assert_eq!(reopened.work()?, renewed);
+    let other = InterruptedContext {
+        context: "!other:fixture".into(),
+        session_id: identity::id(),
+    };
+    resume_work::capture(&reopened, std::slice::from_ref(&other), 1_792_000_000_003)?;
+    resume_work::clear(&reopened, std::slice::from_ref(&other))?;
+    assert_eq!(reopened.work()?, renewed);
+    resume_work::clear(&reopened, std::slice::from_ref(&context))?;
     assert!(reopened.work()?.is_empty());
     fs::write(
         directory.path().join("resume-work.json"),

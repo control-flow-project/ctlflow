@@ -8,7 +8,7 @@ import type { ResumeWork, ResumeWorkStore } from '@ctlflow/fleetd-domain/resume-
 
 const context = { context: check.text(255), sessionId: check.text(200) };
 const pending = check.list(check.object({ ...context, messageId: check.identifier, checkpointedAt: check.integer(0, 8640000000000000) }), 2002);
-const captured = check.list(check.object(context), 2002);
+const captured = check.refine(check.list(check.object(context), 2002), values => new Set(values.map(value => value.context)).size === values.length, 'Duplicate interrupted native history');
 const maximum = 2 * 1024 * 1024;
 export function createResumeWork(state: string, now = Date.now, id = randomUUID): ResumeWorkStore {
   const file = join(privateDir(state), 'resume-work.json');
@@ -42,12 +42,19 @@ export function createResumeWork(state: string, now = Date.now, id = randomUUID)
     },
     renew(messageId) {
       const previous = read(); if (!previous.ok) return previous;
-      if (!previous.value.some(item => item.messageId === messageId)) return failure('conflict', 'Interrupted work changed before exact-history resume');
-      return save(previous.value.map(item => item.messageId === messageId ? { ...item, messageId: id(), checkpointedAt: now() } : item));
+      const work = previous.value.find(item => item.messageId === messageId);
+      if (!work) return failure('conflict', 'Interrupted work changed before exact-history resume');
+      const renewed = { ...work, messageId: id(), checkpointedAt: now() };
+      const saved = save(previous.value.map(item => item === work ? renewed : item));
+      return saved.ok ? success(renewed) : saved;
     },
-    clear() {
+    clear(contexts) {
+      const valid = captured(contexts); if (!valid.ok) return valid;
       const previous = read(); if (!previous.ok) return previous;
-      return previous.value.length ? save([]) : success(undefined);
+      const selected = new Map(valid.value.map(item => [item.context, item.sessionId]));
+      if (previous.value.some(item => selected.has(item.context) && selected.get(item.context) !== item.sessionId)) return failure('conflict', 'Completed work belongs to another saved native history');
+      const next = previous.value.filter(item => !selected.has(item.context));
+      return next.length !== previous.value.length ? save(next) : success(undefined);
     },
   };
 }

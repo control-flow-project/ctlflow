@@ -6,7 +6,9 @@ use crate::{
 use crossfire_agent_core::synchronization::{CancellationToken, Mutex as AsyncMutex};
 use crossfire_agent_core::{
     listener_budget::{Budget, Work},
-    owned_runtime::{Attachment, Input, Inspection, OwnedAdapter, OwnedConnection, SavedContext},
+    owned_runtime::{
+        Attachment, Input, Inspection, NativeActivity, OwnedAdapter, OwnedConnection, SavedContext,
+    },
     runtime::{
         Admission, Approval, Connection, Hooks, InputPriority, InterruptResult, Lifecycle,
         ObservationEvent, Phase, SessionState, TurnControl,
@@ -16,7 +18,7 @@ use crossfire_agent_core::{
 use crossfire_domain::runtime::values::{HistoryMode, Runtime, State as NativeState};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, time::Clock};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     sync::{
         Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
@@ -34,7 +36,7 @@ struct State<N> {
     idle_seconds: i64,
     session: String,
     contexts: Vec<SavedContext>,
-    unsettled: BTreeSet<String>,
+    unsettled: BTreeMap<String, String>,
 }
 pub struct Owner<
     A: OwnedAdapter<LifecycleHooks<H, W, T>>,
@@ -137,7 +139,7 @@ impl<
                 idle_seconds: 1800,
                 session,
                 contexts,
-                unsettled: BTreeSet::new(),
+                unsettled: BTreeMap::new(),
             }),
             transition: AsyncMutex::new(()),
             calls: AtomicUsize::new(0),
@@ -370,24 +372,42 @@ impl<
         let _inspection = Operation(&self.inspections);
         let revision = self.tracker.revision()?;
         let generation = self.tracker.generation.load(Ordering::Acquire);
-        let busy = native.inspect().await?;
-        if !busy {
-            self.tracker.complete_idle(revision, || {
-                let state = self.state.lock().map_err(|_| ownership())?;
-                Ok(
-                    generation == self.tracker.generation.load(Ordering::Acquire)
-                        && !native.lifetime().is_cancelled()
-                        && state.phase == Phase::Running
-                        && self.calls.load(Ordering::Acquire) == 0
-                        && state.unsettled.is_empty()
-                        && state
-                            .native
-                            .as_ref()
-                            .is_some_and(|current| Arc::ptr_eq(current, native)),
-                )
-            })?;
-        }
-        Ok(busy)
+        let activity = native.activity().await?;
+        self.tracker.complete_idle(revision, || {
+            let state = self.state.lock().map_err(|_| ownership())?;
+            if generation != self.tracker.generation.load(Ordering::Acquire)
+                || native.lifetime().is_cancelled()
+                || state.phase != Phase::Running
+                || !state
+                    .native
+                    .as_ref()
+                    .is_some_and(|current| Arc::ptr_eq(current, native))
+            {
+                return Ok(Vec::new());
+            }
+            let pending = state.unsettled.values().collect::<BTreeSet<_>>();
+            let saved = state
+                .contexts
+                .iter()
+                .map(|value| (&value.context, &value.session_id))
+                .collect::<BTreeMap<_, _>>();
+            Ok(activity
+                .contexts
+                .iter()
+                .filter(|value| {
+                    !value.busy
+                        && !pending.contains(&value.context)
+                        && saved
+                            .get(&value.context)
+                            .is_some_and(|session| **session == value.session_id)
+                })
+                .map(|value| crate::model::InterruptedContext {
+                    context: value.context.clone(),
+                    session_id: value.session_id.clone(),
+                })
+                .collect())
+        })?;
+        Ok(activity.busy)
     }
     pub async fn maintain(&self) -> Result<()> {
         self.tracker.check()?;
@@ -454,14 +474,7 @@ impl<
         if preserve_work {
             if !self.stop.is_cancelled()
                 && !native.lifetime().is_cancelled()
-                && self.calls.load(Ordering::Acquire) == 0
                 && self.inspections.load(Ordering::Acquire) == 0
-                && self
-                    .state
-                    .lock()
-                    .map_err(|_| ownership())?
-                    .unsettled
-                    .is_empty()
             {
                 let _ = self.inspect_native(&native).await;
             }
@@ -475,11 +488,9 @@ impl<
     pub async fn close(&self) -> Result<()> {
         let native = {
             let state = self.state.lock().map_err(|_| ownership())?;
-            (self.calls.load(Ordering::Acquire) == 0
-                && self.inspections.load(Ordering::Acquire) == 0
-                && state.unsettled.is_empty())
-            .then(|| state.native.clone())
-            .flatten()
+            (state.phase == Phase::Running && self.inspections.load(Ordering::Acquire) == 0)
+                .then(|| state.native.clone())
+                .flatten()
         };
         if let Some(native) = native {
             let _ = self.inspect_native(&native).await;
@@ -487,12 +498,12 @@ impl<
         self.stop.cancel();
         self.stop_native(true).await
     }
-    fn touch(&self, message: Option<&str>) -> Result<()> {
+    fn touch(&self, message: &str, context: &str) -> Result<()> {
         let mut state = self.state.lock().map_err(|_| ownership())?;
         self.tracker.touch()?;
-        if let Some(message) = message {
-            state.unsettled.insert(message.to_owned());
-        }
+        state
+            .unsettled
+            .insert(message.to_owned(), context.to_owned());
         Ok(())
     }
 }

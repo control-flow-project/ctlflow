@@ -13,6 +13,7 @@ use crossfire_adapter_runtime::{
 };
 use crossfire_agent_core::{
     hooks::ContextHooks,
+    owned_runtime::{NativeActivity, NativeContextActivity},
     runtime::{Admission, Hooks},
 };
 use crossfire_domain::runtime::values::{HistoryMode, State};
@@ -415,35 +416,74 @@ impl<H: Hooks + 'static> Histories<H> {
         )?;
         Ok(journal.pending.is_some() || !journal.confirmed.is_empty())
     }
-    pub async fn inspect(&self) -> Result<bool> {
+    pub async fn activity(&self) -> Result<NativeActivity> {
         clock::check(&self.lifetime())?;
-        if self.configuration.hooks.pending_decisions() {
-            return Ok(true);
+        let before = self.contexts()?;
+        let mut activity = Vec::new();
+        for context in &before {
+            let (slot, session_id) = {
+                let current = self
+                    .contexts
+                    .lock()
+                    .map_err(|_| invalid("Pi history ownership failed"))?;
+                (
+                    current.slots.get(context).cloned(),
+                    current
+                        .registry
+                        .bindings
+                        .iter()
+                        .find(|value| value.context == *context)
+                        .and_then(|value| value.session_id.clone()),
+                )
+            };
+            if slot
+                .as_ref()
+                .is_some_and(|value| value.opening.try_lock().is_err())
+            {
+                return Ok(NativeActivity {
+                    busy: true,
+                    contexts: Vec::new(),
+                });
+            }
+            let Some(session_id) = session_id else {
+                return Err(invalid("Pi activity has no exact native history"));
+            };
+            let busy = match slot.as_ref().and_then(|value| value.opened.get()) {
+                Some(opened) => {
+                    opened.connection.unsettled()? || opened.connection.inspect().await?
+                }
+                None => self.unacknowledged(context)?,
+            };
+            activity.push(NativeContextActivity {
+                context: context.clone(),
+                session_id,
+                busy,
+            });
         }
-        let slots = self
+        let opening = self
             .contexts
             .lock()
             .map_err(|_| invalid("Pi history ownership failed"))?
             .slots
             .values()
-            .cloned()
-            .collect::<Vec<_>>();
-        for slot in slots {
-            if slot.opening.try_lock().is_err() {
-                return Ok(true);
-            }
-            if let Some(opened) = slot.opened.get()
-                && (opened.connection.unsettled()? || opened.connection.inspect().await?)
-            {
-                return Ok(true);
-            }
+            .any(|slot| slot.opening.try_lock().is_err());
+        if opening || before != self.contexts()? {
+            return Ok(NativeActivity {
+                busy: true,
+                contexts: Vec::new(),
+            });
         }
-        for context in self.contexts()? {
-            if self.unacknowledged(&context)? {
-                return Ok(true);
-            }
+        for item in &mut activity {
+            item.busy |= match self.existing(&item.context)? {
+                Some(connection) => connection.unsettled()?,
+                None => self.unacknowledged(&item.context)?,
+            };
         }
-        Ok(self.configuration.hooks.pending_decisions())
+        Ok(NativeActivity {
+            busy: self.configuration.hooks.pending_decisions()
+                || activity.iter().any(|item| item.busy),
+            contexts: activity,
+        })
     }
     pub async fn settle(&self, cancellation: CancellationToken) -> Result<bool> {
         let mut received = false;

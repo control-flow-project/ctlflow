@@ -67,7 +67,7 @@ export function piRuntime(binary = 'pi'): OwnedRuntimeAdapter {
         histories = piHistories({ ...input, options: parsed.value.options }, home, binary, stop);
         const owner = histories, unlock = release;
         const primary = await owner.open(input.listenerOptions?.historyMode === 'per-room' ? 'control' : 'shared');
-        return success({ ...primary, signal: owner.signal, attachment: null, attachments: async () => [], inspect: owner.inspect,
+        return success({ ...primary, signal: owner.signal, attachment: null, attachments: async () => [], activity: owner.activity, inspect: async () => ({ busy: (await owner.activity()).busy }),
           ...(input.listenerOptions?.historyMode === 'per-room' ? { conversation: owner.open } : {}), settle: owner.settle, acknowledge: owner.acknowledge,
           turnControl: { activeTurn: owner.activeTurn, interrupt: owner.interrupt },
           close: async () => { try { await owner.close(); } finally { await unlock(); } } });

@@ -126,27 +126,36 @@ public sealed class CodexHistories : OwnedRuntimeConnection, TurnControl
             finally { lock (gate) initializing.Remove(context); completion.TrySetResult(result); }
         }
     }
-    public async ValueTask<Result<bool>> Inspect()
+    public async ValueTask<Result<bool>> Inspect() => (await Activity()).Map(value => value.Busy);
+    public async ValueTask<Result<NativeActivity>> Activity()
     {
-        if (Lifetime.IsCancellationRequested) return Results.Fail<bool>("unavailable", "Native history owner stopped");
-        OpenedContext[] initial; lock (gate) { if (initializing.Count != 0 || input.Hooks.PendingDecisions?.Invoke() == true) return Result<bool>.Success(true); initial = opened.Values.ToArray(); }
-        if (initial.Length == 0) return Results.Fail<bool>("unavailable", "Native activity cannot be inspected without an owned live native connection");
+        if (Lifetime.IsCancellationRequested) return Results.Fail<NativeActivity>("unavailable", "Native history owner stopped");
+        OpenedContext[] initial; lock (gate) { if (initializing.Count != 0) return Result<NativeActivity>.Success(new(true, [])); initial = opened.Values.ToArray(); }
+        if (initial.Length == 0) return Results.Fail<NativeActivity>("unavailable", "Native activity cannot be inspected without an owned live native connection");
+        List<NativeContextActivity> activity = [];
         foreach (var context in Contexts())
         {
             OpenedContext? current; lock (gate) opened.TryGetValue(context, out current);
+            var session = Retained(context); if (session is null) continue;
+            Result<bool> busy;
             if (current is not null)
             {
-                if (current.Connection.Unsettled) return Result<bool>.Success(true); var busy = await current.Connection.Inspect();
-                if (!busy.IsSuccess || busy.Value) return busy;
+                busy = current.Connection.Unsettled ? Result<bool>.Success(true) : await current.Connection.Inspect();
             }
             else
             {
-                var unsettled = Unacknowledged(context); if (!unsettled.IsSuccess || unsettled.Value) return unsettled;
-                var session = Retained(context); if (session is null) continue;
-                var busy = await initial[0].Connection.InspectSession(session); if (!busy.IsSuccess || busy.Value) return busy;
+                var unsettled = Unacknowledged(context); if (!unsettled.IsSuccess) return Result<NativeActivity>.Fail(unsettled.Error);
+                busy = unsettled.Value ? Result<bool>.Success(true) : await initial[0].Connection.InspectSession(session);
             }
+            if (!busy.IsSuccess) return Result<NativeActivity>.Fail(busy.Error);
+            activity.Add(new(context, session, busy.Value));
         }
-        lock (gate) return Result<bool>.Success(initializing.Count != 0 || opened.Count != initial.Length || input.Hooks.PendingDecisions?.Invoke() == true || opened.Values.Any(value => value.Connection.Unsettled));
+        lock (gate)
+        {
+            if (initializing.Count != 0 || opened.Count != initial.Length) return Result<NativeActivity>.Success(new(true, []));
+            var current = activity.Select(value => value with { Busy = value.Busy || opened.GetValueOrDefault(value.Context)?.Connection.Unsettled == true }).ToArray();
+            return Result<NativeActivity>.Success(new(input.Hooks.PendingDecisions?.Invoke() == true || current.Any(value => value.Busy), current));
+        }
     }
     public ValueTask<Result<Unit>> Deliver(string text, string messageId, CancellationToken cancellation = default, InputPriority? priority = null) => Primary.Deliver(text, messageId, cancellation, priority);
     public ValueTask<Result<bool>> Recover(string text, string messageId, CancellationToken cancellation = default) => Primary.Recover(text, messageId, cancellation);

@@ -24,6 +24,7 @@ through the controller and installed CLI scenarios.
 | Native chat and interruption | fleetd/tests/contracts/messages.contract.ts | Actual Codex/Pi input, source attribution, held-turn interruption and owner notices |
 | History/lifecycle | fleetd/tests/contracts/daemon.contract.ts | Saved contexts, controller restart, explicit stopped intent and management receipts |
 | Crash recovery | fleetd/tests/contracts/daemon.contract.ts | Actual idle and in-flight controller SIGKILL, native writer exit, retained desired selection/history and unfinished-input continuation |
+| Room-scoped recovery | fleetd/tests/contracts/daemon.contract.ts | Actual Codex/Pi room histories, one completed room and another unfinished room; stop/resume retains exact histories and does not restart completed work or mix room input |
 | Upstream recovery | fleetd/tests/contracts/daemon.contract.ts | The actual server stops and restarts; the controller remains observable, closes unavailable delivery and reconnects without replacing histories or calling a model |
 | Controller operations | fleetd/tests/contracts/daemon.contract.ts | Declaration coverage, unknown-query/body refusal, roster CRUD, revision fences, idempotent operation replay, explicit update and stopped setup/unregistration |
 | CLI and SSH | fleet/tests/contracts/cli.contract.ts | Both native engines; installed setup, per-agent/fleet start/stop/reset/update, replay, delivery, broadcast, daemon restart and host-key refusal |

@@ -6,8 +6,8 @@ use crossfire_adapter_filesystem::{PrivateDirectory, lock::StateLock};
 use crossfire_adapter_runtime::clock;
 use crossfire_agent_core::{
     owned_runtime::{
-        Attachment, Input, Inspection, OwnedAdapter, OwnedConnection, Reset, SavedContext,
-        Validation,
+        Attachment, Input, Inspection, NativeActivity, OwnedAdapter, OwnedConnection, Reset,
+        SavedContext, Validation,
     },
     runtime::{
         Admission, Approval, Connection, Decision, Hooks, InputPriority, InterruptResult,
@@ -247,7 +247,7 @@ impl<H: Hooks + 'static> Connection for PiOwnedConnection<H> {
         self.owner.histories.lifetime()
     }
     async fn inspect(&self) -> Result<bool> {
-        self.owner.histories.inspect().await
+        Ok(self.owner.histories.activity().await?.busy)
     }
     async fn deliver(
         &self,
@@ -295,6 +295,9 @@ impl<H: Hooks + 'static> Connection for PiOwnedConnection<H> {
     }
 }
 impl<H: Hooks + 'static> OwnedConnection for PiOwnedConnection<H> {
+    async fn activity(&self) -> Result<NativeActivity> {
+        self.owner.histories.activity().await
+    }
     fn attachment(&self) -> Option<Attachment> {
         None
     }

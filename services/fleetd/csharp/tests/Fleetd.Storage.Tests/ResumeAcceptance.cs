@@ -25,8 +25,12 @@ public static class ResumeAcceptance
             "Reopened checkpoint retains its exact history with a new reminder identity");
         check(renewed[1] == before[1], "Renewal does not alter another room checkpoint");
         check(File.GetUnixFileMode(file) == (UnixFileMode.UserRead | UnixFileMode.UserWrite), "Checkpoint bytes remain private");
-        check(store.Clear().IsSuccess && store.Read().Value.Count == 0, "Verified idle clears all completed contexts atomically");
+        bytes = File.ReadAllBytes(file);
+        check(!store.Clear([contexts[1] with { SessionId = Identity.Identifier() }]).IsSuccess && File.ReadAllBytes(file).AsSpan().SequenceEqual(bytes), "Completion rejects another native history without writes");
+        check(!store.Clear([contexts[1], contexts[1]]).IsSuccess && File.ReadAllBytes(file).AsSpan().SequenceEqual(bytes), "Completion rejects duplicate context claims without writes");
+        check(store.Clear([contexts[1]]).IsSuccess && store.Read().Value.Count == 1 && store.Read().Value[0].Context == contexts[0].Context, "Clearing one completed room retains the other exact native task");
+        check(store.Clear(contexts).IsSuccess && store.Read().Value.Count == 0, "Verified idle clears all completed contexts atomically");
         modified = File.GetLastWriteTimeUtc(file);
-        check(store.Clear().IsSuccess && File.GetLastWriteTimeUtc(file) == modified, "Idle verification does not rewrite an already empty store");
+        check(store.Clear(contexts).IsSuccess && File.GetLastWriteTimeUtc(file) == modified, "Idle verification does not rewrite an already empty store");
     }
 }

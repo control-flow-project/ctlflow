@@ -1,7 +1,7 @@
 use crossfire_agent_core::{
     owned_runtime::{
-        Attachment, Input, Inspection, OwnedAdapter, OwnedConnection, Reset, SavedContext,
-        Validation,
+        Attachment, Input, Inspection, NativeActivity, NativeContextActivity, OwnedAdapter,
+        OwnedConnection, Reset, SavedContext, Validation,
     },
     runtime::{
         Admission, Approval, Connection, Decision, Hooks, InputPriority, InterruptResult,
@@ -20,6 +20,7 @@ use fleetd_domain::{
 };
 use serde_json::{Value, json};
 use std::{
+    collections::BTreeMap,
     path::PathBuf,
     sync::{
         Arc, Mutex,
@@ -90,6 +91,7 @@ struct State {
     starting_fails: AtomicBool,
     native_stop: Mutex<Option<CancellationToken>>,
     contexts: Mutex<Vec<SavedContext>>,
+    context_busy: Mutex<BTreeMap<String, bool>>,
     deliveries: Mutex<Vec<(String, String)>>,
     observations: Mutex<Observers>,
     before_delivery: Mutex<Option<BeforeDelivery>>,
@@ -99,6 +101,7 @@ struct Adapter(Arc<State>);
 struct Native {
     state: Arc<State>,
     stop: CancellationToken,
+    session: String,
 }
 impl<H: Hooks + 'static> OwnedAdapter<H> for Adapter {
     type Connection = Native;
@@ -168,6 +171,7 @@ impl<H: Hooks + 'static> OwnedAdapter<H> for Adapter {
         Ok(Native {
             state: self.0.clone(),
             stop,
+            session: "saved".into(),
         })
     }
 }
@@ -299,7 +303,7 @@ async fn observations_checkpoint_work_before_a_crash_and_ignore_a_replaced_proce
 }
 impl Connection for Native {
     fn session_id(&self) -> &str {
-        "saved"
+        &self.session
     }
     fn approval(&self) -> Approval {
         Approval::Runtime
@@ -362,10 +366,21 @@ impl Connection for Native {
     fn acknowledge(&self, _messages: &[String]) -> Result<()> {
         Ok(())
     }
-    async fn conversation(&self, _room: &str, _admission: Option<&Admission>) -> Result<Self> {
+    async fn conversation(&self, room: &str, _admission: Option<&Admission>) -> Result<Self> {
+        let session = self
+            .state
+            .contexts
+            .lock()
+            .map_err(|_| failed())?
+            .iter()
+            .find(|value| value.context == room)
+            .ok_or_else(failed)?
+            .session_id
+            .clone();
         Ok(Self {
             state: self.state.clone(),
             stop: self.stop.clone(),
+            session,
         })
     }
     async fn close(&self) -> Result<()> {
@@ -406,6 +421,26 @@ impl TurnControl for Native {
     }
 }
 impl OwnedConnection for Native {
+    async fn activity(&self) -> Result<NativeActivity> {
+        let busy = self.inspect().await?;
+        let selected = self.state.context_busy.lock().map_err(|_| failed())?;
+        let contexts = self
+            .state
+            .contexts
+            .lock()
+            .map_err(|_| failed())?
+            .iter()
+            .map(|value| NativeContextActivity {
+                context: value.context.clone(),
+                session_id: value.session_id.clone(),
+                busy: selected.get(&value.context).copied().unwrap_or(busy),
+            })
+            .collect::<Vec<_>>();
+        Ok(NativeActivity {
+            busy: contexts.iter().any(|value| value.busy),
+            contexts,
+        })
+    }
     fn attachment(&self) -> Option<Attachment> {
         None
     }

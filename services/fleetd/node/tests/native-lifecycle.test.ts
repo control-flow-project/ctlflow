@@ -35,9 +35,13 @@ function fixture() {
     work: { read: () => success(work.map(item => ({ ...item }))),
       capture: contexts => { for (const context of contexts) if (!work.some(item => item.context === context.context)) work.push({ ...context,
         messageId: '00000000-0000-4000-8000-' + String(++sequence).padStart(12, '0'), checkpointedAt: now }); return success(undefined); },
-      renew: messageId => { work = work.map(item => item.messageId === messageId ? { ...item,
-        messageId: '00000000-0000-4000-8000-' + String(++sequence).padStart(12, '0'), checkpointedAt: now } : item); return success(undefined); },
-      clear: () => { work = []; return success(undefined); } },
+      renew: messageId => {
+        const index = work.findIndex(item => item.messageId === messageId);
+        if (index < 0) return failure('conflict', 'Checkpoint changed before resume');
+        const renewed = { ...work[index]!, messageId: '00000000-0000-4000-8000-' + String(++sequence).padStart(12, '0'), checkpointedAt: now };
+        work[index] = renewed; return success(renewed);
+      },
+      clear: contexts => { const selected = new Map(contexts.map(item => [item.context, item.sessionId])); work = work.filter(item => selected.get(item.context) !== item.sessionId); return success(undefined); } },
     hooks: { requestDecision: async () => failure('forbidden', 'Unexpected decision'), pendingInput: () => pending,
       pendingDecisions: () => decisions, observe: event => observed.push(event) },
     saved: async () => success(saved), failed: (_session, error) => failures.push(error), recovered: () => { recovered++; },
@@ -50,6 +54,7 @@ function fixture() {
         attachment: { runtime: 'fixture', sessionId: context.sessionId, workspace: '/fixture', connection: {} },
         attachments: async () => saved.map(context => ({ context: context.context, attachment: { runtime: 'fixture', sessionId: context.sessionId, workspace: '/fixture', connection: {} } })),
         inspect: () => inspect ? inspect() : unknown ? Promise.reject(new Error('Unknown native status')) : Promise.resolve({ busy }),
+        activity: async () => { const status = await connection.inspect(); return { ...status, contexts: saved.map(item => ({ context: item.context, sessionId: item.sessionId, busy: status.busy })) }; },
         deliver: async (_text, messageId) => { delivered.push(messageId); }, recover: async (_text, messageId) => delivered.includes(messageId),
         acknowledge: () => {}, settle: async () => false, turnControl: { activeTurn: async () => null, interrupt: async () => 'inactive' },
         close: async () => { closed.push(context.sessionId); stop.abort(new Error('Closed native fixture')); },
@@ -169,7 +174,7 @@ test('continuation waits for listener readiness and concurrent input cannot over
   const message = managed.runtime.deliver('New authorized input', 'after-readiness'); await yieldLoop();
   assert.deepEqual(current.delivered, [], 'Input waits for the one activation initialization'); finish();
   await activating; await message; managed.runtime.acknowledge(['after-readiness']); await managed.activate();
-  assert.deepEqual(current.delivered, [checkpoint[0]!.messageId, 'after-readiness']); assert.equal(current.started.length, 1);
+  assert.deepEqual(current.delivered, [value(current.services.work.read())[0]!.messageId, 'after-readiness']); assert.equal(current.started.length, 1);
 });
 
 test('interrupted work and pending decisions survive stop and receive one continuation in the exact saved history', async scope => {
@@ -185,7 +190,7 @@ test('interrupted work and pending decisions survive stop and receive one contin
     assert.deepEqual(value(current.services.work.read()), checkpoint, 'A shutdown retains its interrupted native task');
     managed = value(await initializedLifecycle(current.services, new AbortController().signal));
     assert.equal(managed.runtime.sessionId, 'exact-history'); assert.equal(managed.nativeState().phase, 'running');
-    assert.deepEqual(current.delivered, [checkpoint[0]!.messageId]); assert.equal(value(current.services.work.read()).length, 1);
+    assert.deepEqual(current.delivered, [value(current.services.work.read())[0]!.messageId]); assert.equal(value(current.services.work.read()).length, 1);
     assert.notEqual(value(current.services.work.read())[0]!.messageId, checkpoint[0]!.messageId, 'A resumed task retains another durable restart identity');
     value(await managed.resume()); assert.equal(current.delivered.length, 1, 'Repeated resume does not send another task instruction');
     assert.equal(current.started.length, 2);
@@ -483,4 +488,35 @@ test('failed write-ahead persistence prevents any native submission', async scop
   current.services.work.capture = () => failure('unavailable', 'Controlled write-ahead failure');
   await assert.rejects(managed.runtime.deliver('Must not reach native input', 'blocked'), /Controlled write-ahead failure/);
   assert.deepEqual(current.delivered, []); assert.equal(managed.runtime.signal.aborted, false);
+});
+
+test('inspection and stop clear a completed room without clearing another room with unacknowledged input', async scope => {
+  for (const action of ['inspect', 'stop']) {
+    const current = fixture(), start = current.services.start;
+    const rooms = ['!active:test', '!completed:test'].map((context, index) => ({ context, runtime: 'fixture', sessionId: 'room-history-' + index, workspace: '/fixture' }));
+    current.saved.push(...rooms);
+    const busy = new Map(rooms.map(item => [item.context, false]));
+    current.services.start = async (...input) => {
+      const result = await start(...input); if (!result.ok) return result;
+      const root = result.value;
+      root.activity = async () => ({ busy: [...busy.values()].some(Boolean), contexts: current.saved.map(item => ({
+        context: item.context, sessionId: item.sessionId, busy: busy.get(item.context) ?? false })) });
+      root.conversation = async room => {
+        const saved = rooms.find(item => item.context === room)!;
+        return { ...root, sessionId: saved.sessionId, deliver: async () => { busy.set(room, true); } };
+      };
+      return result;
+    };
+    const managed = value(await initializedLifecycle(current.services, scope.signal));
+    try {
+      const completed = await managed.runtime.conversation!(rooms[1]!.context);
+      await completed.deliver('Complete this room task', 'completed'); completed.acknowledge(['completed']); busy.set(rooms[1]!.context, false);
+      const active = await managed.runtime.conversation!(rooms[0]!.context);
+      await active.deliver('Keep this room task pending', 'active');
+      assert.equal(value(current.services.work.read()).length, 2);
+      if (action === 'inspect') assert.equal((await managed.runtime.inspect()).busy, true);
+      else await managed.close();
+      assert.deepEqual(value(current.services.work.read()).map(item => item.context), [rooms[0]!.context], 'Only the unfinished exact room can receive a later restart reminder');
+    } finally { await managed.close(); }
+  }
 });

@@ -120,16 +120,13 @@ impl<H: Hooks, W: WorkStore, T: Clock> Tracker<H, W, T> {
     pub fn complete_idle(
         &self,
         revision: u64,
-        stable: impl FnOnce() -> Result<bool>,
+        completed: impl FnOnce() -> Result<Vec<InterruptedContext>>,
     ) -> Result<()> {
         let observed = self.observations.lock().map_err(|_| self.ownership())?;
-        if !observed.recording || observed.revision != revision || !stable()? {
+        if !observed.recording || observed.revision != revision {
             return Ok(());
         }
-        if !self.work.work()?.is_empty() {
-            self.work.save_work(&[])?;
-        }
-        Ok(())
+        resume_work::clear(self.work.as_ref(), &completed()?)
     }
     pub fn checkpoint(&self, contexts: &[SavedContext], recording: bool) -> Result<()> {
         let mut observed = self.observations.lock().map_err(|_| self.ownership())?;

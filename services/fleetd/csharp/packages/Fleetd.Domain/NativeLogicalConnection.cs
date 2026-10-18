@@ -31,7 +31,7 @@ public sealed partial class NativeLifecycle
         }
         public ValueTask<Result<Unit>> Deliver(string text, string messageId, CancellationToken cancellation = default, InputPriority? priority = null)
         {
-            cancellation.ThrowIfCancellationRequested(); lock (owner.gate) owner.unsettled.Add(messageId); InputAdmission? admission = priority is null ? null : new(priority.Value, cancellation);
+            cancellation.ThrowIfCancellationRequested(); lock (owner.gate) owner.unsettled[messageId] = context; InputAdmission? admission = priority is null ? null : new(priority.Value, cancellation);
             return Call(async connection => {
                 var selected = await Select(connection, admission); if (!selected.IsSuccess) return Result<Unit>.Fail(selected.Error);
                 cancellation.ThrowIfCancellationRequested(); var captured = owner.CaptureInput(context, session); if (!captured.IsSuccess) return captured;
@@ -40,7 +40,7 @@ public sealed partial class NativeLifecycle
         }
         public async ValueTask<Result<bool>> Recover(string text, string messageId, CancellationToken cancellation = default)
         {
-            lock (owner.gate) owner.unsettled.Add(messageId); var result = await Call(async connection => { var selected = await Select(connection); return selected.IsSuccess ? await selected.Value.Recover(text, messageId, cancellation) : Result<bool>.Fail(selected.Error); }, true);
+            lock (owner.gate) owner.unsettled[messageId] = context; var result = await Call(async connection => { var selected = await Select(connection); return selected.IsSuccess ? await selected.Value.Recover(text, messageId, cancellation) : Result<bool>.Fail(selected.Error); }, true);
             if (result.IsSuccess && !result.Value) lock (owner.gate) { owner.unsettled.Remove(messageId); owner.Schedule(); } return result;
         }
         public ValueTask<Result<bool>> Settle(CancellationToken cancellation = default)

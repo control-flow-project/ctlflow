@@ -66,7 +66,17 @@ pub struct Reset {
     pub reset_id: String,
 }
 
+pub struct NativeContextActivity {
+    pub context: String,
+    pub session_id: String,
+    pub busy: bool,
+}
+pub struct NativeActivity {
+    pub busy: bool,
+    pub contexts: Vec<NativeContextActivity>,
+}
 pub trait OwnedConnection: Connection + TurnControl {
+    fn activity(&self) -> impl Future<Output = Result<NativeActivity>> + Send;
     fn attachment(&self) -> Option<Attachment>;
     fn attachments(&self) -> impl Future<Output = Result<Vec<(String, Attachment)>>> + Send;
 }

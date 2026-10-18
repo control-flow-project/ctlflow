@@ -13,8 +13,8 @@ use crossfire_adapter_process::NativeCommand;
 use crossfire_adapter_runtime::clock;
 use crossfire_agent_core::{
     owned_runtime::{
-        Attachment, Input, Inspection, OwnedAdapter, OwnedConnection, Reset, SavedContext,
-        Validation,
+        Attachment, Input, Inspection, NativeActivity, OwnedAdapter, OwnedConnection, Reset,
+        SavedContext, Validation,
     },
     runtime::{
         Admission, Approval, Connection, Hooks, InputPriority, InterruptResult, TurnControl,
@@ -357,7 +357,7 @@ impl<H: Hooks + 'static> Connection for CodexOwnedConnection<H> {
         self.histories.lifetime()
     }
     async fn inspect(&self) -> Result<bool> {
-        self.histories.inspect().await
+        Ok(self.histories.activity().await?.busy)
     }
     async fn deliver(
         &self,
@@ -399,6 +399,9 @@ impl<H: Hooks + 'static> Connection for CodexOwnedConnection<H> {
     }
 }
 impl<H: Hooks + 'static> OwnedConnection for CodexOwnedConnection<H> {
+    async fn activity(&self) -> Result<NativeActivity> {
+        self.histories.activity().await
+    }
     fn attachment(&self) -> Option<Attachment> {
         let mut attachment = self.histories.attachment.clone();
         attachment.session_id = self.session_id().to_owned();

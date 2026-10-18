@@ -1,6 +1,85 @@
 use super::*;
 
 #[tokio::test]
+async fn completed_room_is_cleared_without_erasing_another_room_with_unacknowledged_input()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    for inspect in [true, false] {
+        let state = Arc::new(State::default());
+        let work = Arc::new(Work::default());
+        let owner = Owner::open(
+            Arc::new(Adapter(state.clone())),
+            input(),
+            work.clone(),
+            Time(Arc::new(AtomicI64::new(1))),
+            Initial::Start,
+            CancellationToken::new(),
+            Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
+        )
+        .await?;
+        for (context, session, busy) in [
+            ("!active:fixture", "active-history", true),
+            ("!completed:fixture", "completed-history", false),
+        ] {
+            state
+                .contexts
+                .lock()
+                .map_err(|_| failed())?
+                .push(SavedContext {
+                    context: context.into(),
+                    session_id: session.into(),
+                    runtime: "codex".into(),
+                    workspace: PathBuf::from("/fixture"),
+                });
+            state
+                .context_busy
+                .lock()
+                .map_err(|_| failed())?
+                .insert(context.into(), busy);
+        }
+        let completed = owner
+            .runtime()?
+            .conversation("!completed:fixture", None)
+            .await?;
+        completed
+            .deliver(
+                "Completed room task",
+                "completed",
+                CancellationToken::new(),
+                None,
+            )
+            .await?;
+        completed.acknowledge(&["completed".into()])?;
+        let active = owner
+            .runtime()?
+            .conversation("!active:fixture", None)
+            .await?;
+        active
+            .deliver(
+                "Unfinished room task",
+                "active",
+                CancellationToken::new(),
+                None,
+            )
+            .await?;
+        assert_eq!(work.work()?.len(), 2);
+        if inspect {
+            assert!(owner.runtime()?.inspect().await?);
+        } else {
+            owner.close().await?;
+        }
+        assert_eq!(
+            work.work()?
+                .iter()
+                .map(|value| value.context.as_str())
+                .collect::<Vec<_>>(),
+            vec!["!active:fixture"]
+        );
+        owner.close().await?;
+    }
+    Ok(())
+}
+
+#[tokio::test]
 async fn active_work_is_not_slept_and_explicit_stop_resumes_with_a_checkpointed_reminder()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(State::default());

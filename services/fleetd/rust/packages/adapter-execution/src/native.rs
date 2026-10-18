@@ -2,8 +2,8 @@ use crossfire_adapter_codex::owned::{CodexOwnedConnection, CodexRuntime};
 use crossfire_adapter_pi::owned::{PiOwnedConnection, PiRuntime};
 use crossfire_agent_core::{
     owned_runtime::{
-        Attachment, Input, Inspection, OwnedAdapter, OwnedConnection, Reset, SavedContext,
-        Validation,
+        Attachment, Input, Inspection, NativeActivity, OwnedAdapter, OwnedConnection, Reset,
+        SavedContext, Validation,
     },
     runtime::{
         Admission, Approval, Connection, Hooks, InputPriority, InterruptResult, TurnControl,
@@ -161,6 +161,12 @@ impl<H: Hooks + 'static> TurnControl for Native<H> {
     }
 }
 impl<H: Hooks + 'static> OwnedConnection for Native<H> {
+    async fn activity(&self) -> Result<NativeActivity> {
+        match self {
+            Self::Codex(native) => native.activity().await,
+            Self::Pi(native) => native.activity().await,
+        }
+    }
     fn attachment(&self) -> Option<Attachment> {
         match self {
             Self::Codex(native) => native.attachment(),

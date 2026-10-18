@@ -12,7 +12,8 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
     private readonly CancellationTokenSource lifetime;
     private IReadOnlyList<SavedRuntimeContext> contexts;
     private readonly Dictionary<string, NativeState> observations = new(StringComparer.Ordinal);
-    private readonly HashSet<string> working = new(StringComparer.Ordinal), unsettled = new(StringComparer.Ordinal);
+    private readonly HashSet<string> working = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> unsettled = new(StringComparer.Ordinal);
     private OwnedRuntimeConnection? native;
     private CancellationTokenRegistration nativeClosed;
     private ITimer? idleTimer;
@@ -72,11 +73,20 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
     private async ValueTask<Result<bool>> InspectCurrent(OwnedRuntimeConnection connection)
     {
         long revision; lock (observationGate) revision = workRevision;
-        var status = await connection.Inspect(); if (!status.IsSuccess || status.Value) return status;
+        var activity = await connection.Activity(); if (!activity.IsSuccess) return Result<bool>.Fail(activity.Error);
+        var status = Result<bool>.Success(activity.Value.Busy);
         lock (observationGate)
         {
-            lock (gate) if (!ready || !ReferenceEquals(native, connection) || connection.Lifetime.IsCancellationRequested || revision != workRevision || Volatile.Read(ref activeCalls) != 0 || unsettled.Count != 0) return status;
-            var cleared = services.Work.Clear(); if (!cleared.IsSuccess) return Result<bool>.Fail(cleared.Error);
+            InterruptedContext[] completed;
+            lock (gate)
+            {
+                if (!ready || !ReferenceEquals(native, connection) || connection.Lifetime.IsCancellationRequested || revision != workRevision) return status;
+                var saved = contexts.ToDictionary(value => value.Context, value => value.SessionId, StringComparer.Ordinal);
+                var pending = unsettled.Values.ToHashSet(StringComparer.Ordinal);
+                completed = activity.Value.Contexts.Where(value => !value.Busy && !pending.Contains(value.Context) && saved.GetValueOrDefault(value.Context) == value.SessionId)
+                    .Select(value => new InterruptedContext(value.Context, value.SessionId)).ToArray();
+            }
+            var cleared = services.Work.Clear(completed); if (!cleared.IsSuccess) return Result<bool>.Fail(cleared.Error);
         }
         return status;
     }
@@ -215,7 +225,7 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
     private async Task Close()
     {
         if (Interlocked.Exchange(ref closed, 1) != 0) return;
-        bool inspect; lock (gate) inspect = activeCalls == 0 && unsettled.Count == 0 && inspections == 0;
+        bool inspect; lock (gate) inspect = ready && inspections == 0;
         if (inspect && native is { } current && !current.Lifetime.IsCancellationRequested) await InspectNative(current);
         lock (gate) { recording = false; idleTimer?.Dispose(); idleTimer = null; }
         List<Exception> errors = []; async Task Finish(Func<Task> action) { try { await action(); } catch (Exception error) { errors.Add(error); } }

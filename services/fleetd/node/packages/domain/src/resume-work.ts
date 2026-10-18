@@ -7,8 +7,8 @@ export type ResumeWork = InterruptedContext & { messageId: string; checkpointedA
 export type ResumeWorkStore = {
   read(): Result<ResumeWork[]>;
   capture(contexts: InterruptedContext[]): Result<void>;
-  renew(messageId: string): Result<void>;
-  clear(): Result<void>;
+  renew(messageId: string): Result<ResumeWork>;
+  clear(contexts: InterruptedContext[]): Result<void>;
 };
 
 export function continuationText(work: ResumeWork): string {
@@ -32,11 +32,13 @@ export async function resumeInterruptedWork(connection: OwnedRuntimeConnection, 
   for (const work of pending.value) {
     const target: RuntimeConnection | undefined = work.context === primary ? connection : await connection.conversation?.(work.context);
     if (!target || target.sessionId !== work.sessionId) throw Object.assign(new Error('Interrupted task cannot use a different room history'), { code: 'conflict' });
-    const renewed = store.renew(work.messageId);
-    if (!renewed.ok) throw Object.assign(new Error(renewed.error.message), { code: renewed.error.code });
     await target.settle();
-    const text = continuationText(work);
-    if (!await target.turnControl?.activeTurn() && !await target.recover(text, work.messageId)) await target.deliver(text, work.messageId);
     target.acknowledge([work.messageId]);
+    if (!await target.turnControl?.activeTurn()) {
+      const renewed = store.renew(work.messageId);
+      if (!renewed.ok) throw Object.assign(new Error(renewed.error.message), { code: renewed.error.code });
+      await target.deliver(continuationText(renewed.value), renewed.value.messageId);
+      target.acknowledge([renewed.value.messageId]);
+    }
   }
 }
