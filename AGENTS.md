@@ -98,9 +98,23 @@ Use functional modules, strict types without any, named exports, explicit .js
 relative imports, Result for expected failures and boundary validation. Split
 modules by responsibility near 600 lines. Domain code imports neither transport
 nor concrete storage/adapter/UI modules. Composition roots wire implementations.
+Readability and clear typed object/data structures take priority over marginal
+performance. Use normal, sound ORM queries; do not introduce complex queries,
+opaque layouts or positional representations to chase small timing differences.
+Never compromise domain or API object shapes for performance.
 SQL tables/columns are singular snake_case; normalized domain state uses indexed
 relations. Tinqer owns Node queries, EF Core C# queries and Diesel Rust queries.
-Raw SQL is schema/metadata only.
+Handwritten application and metadata queries are prohibited, including tests.
+Do not route a string through a helper, raw-query API or fixture to evade this
+rule. Query libraries generate execution statements from structured queries.
+Knex remains the sole schema/migration owner; migration fixtures use its builders.
+On 2026-10-18 the owner approved only required schema/control SQL that the pinned
+libraries cannot express: STRICT/trigger DDL, SQLite settings, native backup and
+locking operations. Query-plan inspection may prefix library-generated SQL with
+EXPLAIN QUERY PLAN; it must not introduce a handwritten application query.
+This exception does not permit raw data/metadata queries, a second migration
+owner, weaker constraints or compatibility paths. Keep required statements at
+their schema/control owner, not behind a generic raw-query helper.
 Expected transaction failures roll back. Native operations stay outside transactions.
 
 ## Execution and security
@@ -148,6 +162,11 @@ For isolated changes with confidently local impact, run the affected tests and
 necessary targeted checks. Run the full quality gates for cross-layer changes
 or whenever the impact is uncertain. Never weaken a gate or claim verification
 that was not performed.
+On 2026-10-18 the owner approved one performance exception: managed .NET's
+saved-runtime-observation median and p95 may each be at most 1.30 times Node's
+corresponding measured latency. Throughput, request success and every other
+target/workload retain strict Node comparisons. JSON/HTML reports expose both limits
+and label its use; no implicit tolerance or unreported failed attempt.
 Keep the unified spec and .analysis/20260929-164420-fleet-handover/necessity-ledger.md
 aligned with decisions and evidence. .analysis/MEMORY.md is the local work memory.
 Do not stop at intermediate milestones when completion is authorized. Never
@@ -160,6 +179,12 @@ installation/packaging instructions for Node, C# managed, C# NativeAOT and Rust;
 installed guides must not depend on checkout-relative documentation links.
 
 ## Test execution
+External behavior has one shared executable acceptance suite for crossfire,
+fleetd and fleet. Select Node, managed .NET, NativeAOT and Rust through executable
+configuration, not copied assertions or implementation-specific omissions.
+Run both Codex and Pi. Skipped/unfinished scenarios and differing assertion
+counts fail the shared gate. Language-owned internal/compiler tests supplement
+this suite without defining competing external expectations.
 Runtime verification includes Codex and Pi. Claude remains unimplemented and has
 no product test suite or retained legacy adapter. Prepare pinned native assets
 once before isolated workers; do not select an optional runtime verification path.

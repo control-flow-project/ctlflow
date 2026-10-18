@@ -1,4 +1,4 @@
-import { spawn, execFileSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { writeFileSync, unlinkSync, realpathSync } from 'node:fs';
@@ -10,6 +10,7 @@ import { failureError } from '@ctlflow/crossfire-kernel/result';
 import { inspectInstructionCapability } from './capability.js';
 import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import { refreshAuthentication } from './authentication.js';
+import { guardedProcess } from '@ctlflow/crossfire-adapter-runtime/native-process';
 
 export async function startProcess(home: string, workspace: string, stateDirectory: string, profile: string, stop: AbortSignal, binary = 'codex', questions = false) {
   stop.throwIfAborted();
@@ -40,7 +41,8 @@ async function launchProcess(home: string, workspace: string, stateDirectory: st
   if (!path || path.length > 4096 || /[\x00-\x1f\x7f]/u.test(path)) throw new Error('Codex requires a bounded native executable search path');
   const token = randomBytes(32).toString('hex'), tokenFile = join(privateDir(home), '.crossfire-token-' + randomBytes(12).toString('hex'));
   writeFileSync(tokenFile, token, { flag: 'wx', mode: 0o600 });
-  const child = spawn(binary, ['app-server', '--listen', 'ws://127.0.0.1:0', '--ws-auth', 'capability-token', '--ws-token-file', tokenFile], { cwd: workspace, env: environment, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = guardedProcess(binary, ['app-server', '--listen', 'ws://127.0.0.1:0', '--ws-auth', 'capability-token', '--ws-token-file', tokenFile],
+    { workspace, environment, directory: home, identity: 'codex' });
   const lifetime = new AbortController();
   const ended = once(child, 'close').then(() => { lifetime.abort(new Error('Owned Codex process exited')); }, () => { lifetime.abort(new Error('Owned Codex process could not start')); });
   let closing: Promise<void> | undefined;
@@ -54,7 +56,7 @@ async function launchProcess(home: string, workspace: string, stateDirectory: st
       }
       let rejectEscalation!: (error: unknown) => void;
       const escalation = new Promise<never>((_resolve, reject) => { rejectEscalation = reject; });
-      const timer = setTimeout(() => { try { terminate('SIGKILL'); } catch (error) { rejectEscalation(error); } }, 3000);
+      const timer = setTimeout(() => { try { terminate('SIGKILL'); } catch (error) { rejectEscalation(error); } }, 8000);
       try { terminate('SIGTERM'); await Promise.race([ended, escalation]); unlinkSync(tokenFile); }
       finally { clearTimeout(timer); }
     })();

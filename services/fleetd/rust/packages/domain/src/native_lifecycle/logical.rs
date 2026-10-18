@@ -1,11 +1,5 @@
 use super::*;
 
-struct Call<'a>(&'a AtomicUsize);
-impl Drop for Call<'_> {
-    fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::AcqRel);
-    }
-}
 impl<
     A: OwnedAdapter<LifecycleHooks<H, W, T>>,
     H: Hooks + 'static,
@@ -13,9 +7,9 @@ impl<
     T: Clock + Send + Sync,
 > Logical<A, H, W, T>
 {
-    fn entered(&self) -> Call<'_> {
+    fn entered(&self) -> Operation<'_> {
         self.owner.calls.fetch_add(1, Ordering::AcqRel);
-        Call(&self.owner.calls)
+        Operation(&self.owner.calls)
     }
     async fn select(
         &self,
@@ -62,9 +56,11 @@ impl<
             )
         };
         match native {
-            Some(native) if !native.lifetime().is_cancelled() => Ok(native.inspect().await?
-                || pending
-                || self.owner.calls.load(Ordering::Acquire) != 0),
+            Some(native) if !native.lifetime().is_cancelled() => {
+                Ok(self.owner.inspect_native(&native).await?
+                    || pending
+                    || self.owner.calls.load(Ordering::Acquire) != 0)
+            }
             _ => Ok(matches!(phase, Phase::Waking | Phase::Failed)),
         }
     }
@@ -76,7 +72,10 @@ impl<
         priority: Option<InputPriority>,
     ) -> Result<()> {
         let _call = self.entered();
-        self.owner.touch(Some(message))?;
+        self.owner.touch(
+            message,
+            self.room.as_deref().unwrap_or_else(|| self.owner.primary()),
+        )?;
         if stop.is_cancelled() {
             return Err(unavailable("Native input cancelled before admission"));
         }
@@ -86,6 +85,18 @@ impl<
         });
         let native = self.owner.ensure(admission.as_ref()).await?;
         let selected = self.select(native.as_ref(), admission.as_ref()).await?;
+        if stop.is_cancelled() {
+            return Err(unavailable("Native input cancelled before submission"));
+        }
+        self.owner
+            .tracker
+            .capture_input(crate::model::InterruptedContext {
+                context: self
+                    .room
+                    .clone()
+                    .unwrap_or_else(|| self.owner.primary().to_owned()),
+                session_id: self.session.clone(),
+            })?;
         selected
             .as_ref()
             .unwrap_or(native.as_ref())
@@ -116,7 +127,10 @@ impl<
     }
     async fn recover(&self, text: &str, message: &str, stop: CancellationToken) -> Result<bool> {
         let _call = self.entered();
-        self.owner.touch(Some(message))?;
+        self.owner.touch(
+            message,
+            self.room.as_deref().unwrap_or_else(|| self.owner.primary()),
+        )?;
         let native = self.owner.ensure(None).await?;
         let selected = self.select(native.as_ref(), None).await?;
         let received = selected
@@ -221,6 +235,19 @@ impl<
     T: Clock + Send + Sync,
 > OwnedConnection for Logical<A, H, W, T>
 {
+    async fn activity(&self) -> Result<NativeActivity> {
+        let (native, phase) = {
+            let state = self.owner.state.lock().map_err(|_| ownership())?;
+            (state.native.clone(), state.phase)
+        };
+        match native {
+            Some(native) if !native.lifetime().is_cancelled() => native.activity().await,
+            _ => Ok(NativeActivity {
+                busy: matches!(phase, Phase::Waking | Phase::Failed),
+                contexts: Vec::new(),
+            }),
+        }
+    }
     fn attachment(&self) -> Option<Attachment> {
         self.owner
             .state

@@ -80,74 +80,77 @@ impl Hooks for Capture {
 #[tokio::test]
 async fn real_pi_interrupts_captured_live_execution_and_accepts_the_next_directed_input_without_a_hold_queue()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let directory = tempfile::tempdir()?;
-    let state = directory.path().join("state");
-    let host = directory.path().join("host");
-    PrivateDirectory::open(&state, true)?;
-    let mut provider = Fixture::open().await?;
-    configure(&host, &provider.origin)?;
-    let runtime = PiRuntime {
-        binary: binary()?,
-        host_home: host,
-    };
-    let hooks = Arc::new(Capture::default());
-    let connection = runtime
-        .start(
-            input(directory.path(), &state, &hooks, HistoryMode::Shared, true),
-            CancellationToken::new(),
-        )
-        .await?;
-    let (delivered, held) = tokio::join!(
-        connection.deliver(
-            "Work until interrupted.",
-            "held-message",
-            CancellationToken::new(),
-            None
-        ),
-        provider.next()
-    );
-    delivered?;
-    let held = held?;
-    connection.acknowledge(&["held-message".to_owned()])?;
-    let turn = connection
-        .active_turn(None, None)
-        .await?
-        .ok_or("Actual captured native execution")?;
-    assert_eq!(
-        tokio::time::timeout(
-            Duration::from_secs(5),
-            connection.interrupt(&turn, false, None)
-        )
-        .await??,
-        InterruptResult::Interrupted
-    );
-    held.close()?;
-    let (delivered, served) = tokio::join!(
-        connection.deliver(
-            "Steering: answer this instead.",
-            "steering-message",
-            CancellationToken::new(),
-            Some(InputPriority::Steering)
-        ),
-        async {
-            let call = provider.next().await?;
-            assert!(
-                serde_json::to_string(&call.body)
-                    .map_err(|_| Failure::new(ErrorCode::Invalid, "Invalid provider input"))?
-                    .contains("Steering: answer this instead.")
-            );
-            response(call)
-        }
-    );
-    delivered?;
-    served?;
-    connection.acknowledge(&["steering-message".to_owned()])?;
-    idle(&connection).await?;
-    assert_eq!(
-        connection.interrupt(&turn, false, None).await?,
-        InterruptResult::Inactive
-    );
-    connection.close().await?;
+    for mode in [HistoryMode::Shared, HistoryMode::PerRoom] {
+        let directory = tempfile::tempdir()?;
+        let state = directory.path().join("state");
+        let host = directory.path().join("host");
+        PrivateDirectory::open(&state, true)?;
+        let mut provider = Fixture::open().await?;
+        configure(&host, &provider.origin)?;
+        let runtime = PiRuntime {
+            binary: binary()?,
+            host_home: host,
+        };
+        let hooks = Arc::new(Capture::default());
+        let owner = runtime
+            .start(
+                input(directory.path(), &state, &hooks, mode, true),
+                CancellationToken::new(),
+            )
+            .await?;
+        let connection = owner.conversation("!steering:fixture", None).await?;
+        let (delivered, held) = tokio::join!(
+            connection.deliver(
+                "Work until interrupted.",
+                "held-message",
+                CancellationToken::new(),
+                None
+            ),
+            provider.next()
+        );
+        delivered?;
+        let held = held?;
+        connection.acknowledge(&["held-message".to_owned()])?;
+        let turn = connection
+            .active_turn(None, None)
+            .await?
+            .ok_or("Actual captured native execution")?;
+        assert_eq!(
+            tokio::time::timeout(
+                Duration::from_secs(5),
+                connection.interrupt(&turn, false, None)
+            )
+            .await??,
+            InterruptResult::Interrupted
+        );
+        held.close()?;
+        let (delivered, served) = tokio::join!(
+            connection.deliver(
+                "Steering: answer this instead.",
+                "steering-message",
+                CancellationToken::new(),
+                Some(InputPriority::Steering)
+            ),
+            async {
+                let call = provider.next().await?;
+                assert!(
+                    serde_json::to_string(&call.body)
+                        .map_err(|_| Failure::new(ErrorCode::Invalid, "Invalid provider input"))?
+                        .contains("Steering: answer this instead.")
+                );
+                response(call)
+            }
+        );
+        delivered?;
+        served?;
+        connection.acknowledge(&["steering-message".to_owned()])?;
+        idle(&connection).await?;
+        assert_eq!(
+            connection.interrupt(&turn, false, None).await?,
+            InterruptResult::Inactive
+        );
+        owner.close().await?;
+    }
     Ok(())
 }
 

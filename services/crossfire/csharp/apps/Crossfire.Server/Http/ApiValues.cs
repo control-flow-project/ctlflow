@@ -8,7 +8,10 @@ using Crossfire.Kernel;
 
 namespace Crossfire.Server.Http;
 
-public sealed record ApiState(ServerConfiguration Configuration, string Database, Release Release, AccountAuthority Matrix, PublicationStorage Publications, PlatformDiagnostics Diagnostics, long StartedAt, Func<long> Now);
+public sealed record ApiState(ServerConfiguration Configuration, ManagementStorage Storage, Release Release, AccountAuthority Matrix, PublicationStorage Publications, PlatformDiagnostics Diagnostics, long StartedAt, Func<long> Now)
+{
+    public string Database => Storage.Database;
+}
 public sealed record ApiContext(ApiState State, CrossfireDbContext Database, HttpContext Http, string RequestId, Actor? Identity,
     FleetControllerActor? Controller, AuthenticatedMember? Session, string Cookie, IReadOnlyDictionary<string, string> Query, FleetChanges Changes)
 {

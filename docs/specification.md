@@ -38,6 +38,9 @@ There is no standalone-agent or existing-session-adoption path.
 
 Node, C# and Rust are independently selected implementations of all three products.
 C# targets .NET 11 and produces managed and NativeAOT builds from the same source.
+Managed products optimize methods at first JIT compilation, with tiered
+compilation disabled. NativeAOT compilation remains ahead of time. The performance
+bank measures each installed target's defaults without test-only runtime tuning.
 An executable never substitutes another implementation when its selected one
 fails. Rust is verified separately and in the same explicit four-target matrix;
 Node/C#-only results do not establish Rust readiness.
@@ -104,9 +107,18 @@ Contracts may import pure domain values; domain code does not import contracts.
 | Management UI | Human views/actions using the canonical REST contracts |
 
 Node queries use Tinqer, C# queries use EF Core and Rust queries use Diesel.
-Knex alone creates/migrates
-owned SQL stores. Raw SQL is limited to schema conversion, metadata/configuration
-and query-plan inspection.
+Knex alone creates/migrates owned SQL stores. Handwritten application and metadata
+queries are prohibited, including fixture setup and test assertions. Query libraries
+own statement generation; migration fixtures use Knex builders. Metadata reads use
+the selected implementation's query library.
+
+The owner approved a narrow exception on 2026-10-18 for required schema/control
+SQL unavailable through the pinned libraries: STRICT/trigger DDL, SQLite settings,
+native backup and locking operations. Query-plan inspection prefixes generated
+statements with EXPLAIN QUERY PLAN; the inspected query remains library-generated.
+These statements stay at their existing schema/control owner. The exception
+does not permit handwritten data/metadata queries, a generic raw-query API,
+another migration owner, compatibility paths or removing safety checks.
 
 Use strict types, named exports, explicit TypeScript .js relative imports,
 functional modules and Result for expected failures. Split by responsibility,
@@ -114,6 +126,11 @@ normally before 600 lines. Repository methods expose meaningful facts, not
 arbitrary predicates or driver handles. SQLite transaction callbacks are
 synchronous; expected failures and exceptions roll back. Native/network work
 stays outside transactions. Commit rechecks authority, identity and revisions.
+
+Readability and meaningful typed object/data structures take priority over marginal
+performance. Use normal, sound ORM queries, not complicated queries or opaque
+representations for small timing gains. Domain and API object shapes must not be
+compromised for performance.
 
 The browser-safe client cannot import backend/native modules. All servers serve
 the same content-addressed UI build and Element translation asset.
@@ -200,6 +217,13 @@ match their canonical owners, not introduce alternate validation decisions.
 
 crossfire uses /api, management /manage, and setup/tool assets /onboarding.
 Matrix retains /_matrix. Static reports use a separate origin/listener.
+
+The Node outbound Matrix/coordination adapter uses a pinned published Undici
+dispatcher with HTTP/2 disabled explicitly. This avoids the Node HTTP/2 stream
+error path without patching Node, replacing the global dispatcher or retrying a
+failed protocol with another one. HTTPS certificate/hostname verification,
+bearer authentication, origin restrictions, bounded bodies, cancellation and
+deadlines remain enforced. HTTP/1.1 does not provide HTTP/2 multiplexing.
 
 - Success is `{data, meta: {requestId, ...pagination}}`; failure is
   `{error: {code, message, fieldErrors?}, meta: {requestId}}`.
@@ -310,6 +334,9 @@ Preflight checks the complete roster before native launch. Reusing an existing
 identity/name requires private proof. Preflight is not a reservation.
 Introduction atomically claims the whole roster; collision/capacity races roll it
 all back with a specific error. No suffixing, takeover or hidden successful subset.
+Adding a local instance with an existing key or registered name returns
+`name_collision` without changing the roster or its revision. Stale revisions
+are rejected before evaluating the proposed edit.
 
 The owner reviews exactly the roster, controller and complete item coordination
 policies, including existing identities. Administrators may reject another
@@ -438,12 +465,42 @@ Desired intent is written before start/stop. Orderly shutdown retains intent and
 closes resources. Same-root daemon restart restores desired bindings with at most
 four concurrent attempts. Stop cancels restoration/recovery. No boot service
 starts it after machine failure.
+An unavailable socket is not proof that the previous daemon released its root.
+The installed CLI observes the same private daemon ownership lock before launching
+a replacement, with a finite cancellable deadline. It never starts an overlapping
+controller or treats an authentication/unsafe-state error as an absent controller.
 
 Saved unfinished-work checkpoints bind exact contexts/publications. After restart,
 settle preceding input before one correlated continuation asking the agent to
 reread applicable AGENTS.md and continue unfinished authorized work. It cannot
 approve decisions, infer a reply room or replay completed effects. Idle/sleeping
 contexts receive no synthetic task.
+The lifecycle checkpoints the exact context before submitting input to the native
+adapter, without waiting for asynchronous activity notifications. It also records
+work already observed during activation. Idle notifications cannot erase submitted
+work. Existing native inspection clears completed checkpoints atomically only when
+the generation and activity revision are unchanged and that exact context has no
+input in flight or unacknowledged. Native adapters return one read-only activity
+snapshot containing exact context/history identities and native busy/publication
+state. Aggregate status uses the same snapshot. Another busy room cannot retain
+a completed room's checkpoint. Inspection never opens a native room process.
+Explicit stop reconciles existing work before closing native execution, even
+when another inspection is running. With no unfinished-work checkpoint, shutdown
+does not wait for an unrelated reader.
+A stopped or unavailable reader cannot prove completion or invent
+an unfinished task. A restart first resolves native submission and acknowledges
+its previous reminder, leaving ordinary input confirmations with their producer.
+Only when no native turn is active does it atomically save a new reminder identity
+and submit that exact reminder. The work record retains this identity until
+verified completion, including across repeated controller crashes. Delivering a
+reminder does not complete its task.
+Native owner questions use the currently active listener run. A reporting
+replacement invalidates the preceding run; callers waiting during reconnection
+receive the new run, never the first run cached at initial startup.
+Delivery admission and reporting have distinct cancellation lifetimes. Pausing
+new input retains the authenticated reporting run, native observations, owner
+questions and explicit answers for work already running. Lost controller
+authority closes both. Paused delivery cannot admit scheduled or chat input.
 
 Reset stops selected processes before retiring any selected history. It exports
 available authorized Matrix history/nonsecret configuration to verified private
@@ -457,13 +514,16 @@ overlapping replacement. Permanent configuration, authority, corrupt-state and
 protocol conflicts require action, not unlimited restarts.
 Stop completion requires exact owned-process evidence, not process-name scans.
 
-The Rust process adapter binds its native writer and process group to an exact
-parent pidfd and private lifetime lock through its packaged native guard. Parent
-death terminates that owned group; another writer cannot overlap. Node/C# stock
-Codex parent-death coverage is separately bounded: a surviving writer lock refuses
-another writer. No target guesses process identities, adopts orphans or rewrites
-native history. Unrelated subprocess continuation and arbitrary process escape
-are not product guarantees. Actual per-target coverage is recorded in the review.
+Owned native writers have a parent-lifetime guard and a private process lifetime
+lock in every implementation. Node uses its IPC parent channel on Linux/macOS;
+C# uses the native parent process handle, and Rust uses a parent pidfd on Linux.
+Parent death terminates the exact owned native group. A replacement waits for
+exclusive ownership instead of overlapping the old writer. Guards run only while
+their native engine runs; sleeping fleets retain no native guard processes.
+No target guesses process identities, adopts orphans or rewrites native history.
+Arbitrary subprocess escape from the owned group is not a product guarantee.
+The same executable acceptance scenarios verify idle and in-flight controller
+death, exact retained histories and authorized continuation in every target.
 
 ## 9. Controller admission
 
@@ -475,9 +535,13 @@ Reconnection obtains a fresh generation/current intent.
 A possibly acquired lease survives lost response locally and is released by exact
 identity before reacquisition. Shutdown closes local gates without indefinitely
 waiting for remote release; expiry remains the outage bound.
+An expected remote lease-close refusal cannot prevent local shutdown or
+unregistration after archive revokes the credential. A repeated close reuses
+its completed local outcome; failed remote release is never marked confirmed.
 
 Each reporting run proves exact fleet/connection/credential, active owner/agent,
-immutable instance binding and delivery intent. A run cannot switch generations.
+immutable instance binding. Delivery additionally requires enabled delivery
+intent; native reporting does not. A run cannot switch generations.
 Secrets never enter model context, projections, logs or audit.
 A label/boolean cannot authenticate a controller.
 
@@ -636,6 +700,9 @@ authority, survives reconnect and retries with the same transaction identity.
 Adapters own native options, processes, histories, receipts, instructions,
 permissions, observations and attachment. Orchestration contains no provider
 translation or terminal scraping.
+Turn inspection without an explicit room targets the selected connection's saved
+history. An explicit room selects that room; a room connection never silently
+inspects the primary control history instead.
 
 Codex requires stock 0.158.0+ and actual required protocol capabilities.
 Admission checks config/read and advertised models/efforts, including defaults.
@@ -830,13 +897,25 @@ All implementations directly share management SQLite.
 owns application ID/version and migration filenames. Knex assets own exact columns,
 constraints, indexes and reference data, not a duplicated handwritten schema.
 
+File-backed management storage uses SQLite write-ahead logging and full commit
+durability. A management read snapshot must not block a controller heartbeat
+commit. Node, C# and Rust use the same journal mode; none switch back to a rollback
+journal. Backups use SQLite's backup API or the documented quiescent procedure,
+including committed WAL state. A live main-file copy alone is not a backup.
+
+C# leases independent DbContexts from EF's context pool. Each lease revalidates
+the private database path and retains its connection across that operation's
+queries. Disposal releases the connection and resets tracking and transactions;
+concurrent operations never share a context. Pooling does not cache identities,
+permissions or query results, or remove commit-time authority checks.
+
 Layout is database/<database>/<backend>/{migrations,seeds}, per-database knexfile
 and one-shot migration image, as in Lesser/Snapped. Every future SQL store follows
 that owner/nesting. Unimplemented backends have no placeholder runtime.
 Fleet file state and external Conduit RocksDB are not invented SQL stores.
 
-Current schema is 17: 63 singular application tables plus Knex tracking.
-Fresh stores and supported deployed 13–16 stores advance through Knex.
+Current schema is 18: 63 singular application tables plus Knex tracking.
+Fresh stores and supported deployed 13–17 stores advance through Knex.
 Inventoried schema-17 stores lacking history may be adopted without business
 changes. Unsupported/foreign/future stores fail without mutation.
 Conversion preserves identities, credentials, grants, receipts, usage, audit and
@@ -851,6 +930,10 @@ Historical enrollment archives retain attribution, never live authority.
 Indexes serve concrete queries/FKs. Scope/filter/count/order/page precedes
 hydration; batch labels/settings. Owner shapes do not use administrator-OR-owner
 predicates that prevent seeks. Query-plan/count tests verify actual behavior.
+Listener lifetime totals use a dedicated covering agent/activity index without
+replacing the narrow per-agent lookup index; current native
+status selects the latest run before reading its observations, not a repeated
+newer-run comparison across historical observations.
 Substring search is not constant-time; offsets may scan skipped matches.
 
 Directory, fleet, wake-rule and publication searches use bound SQLite LIKE
@@ -946,6 +1029,13 @@ External behavior has one product-owned assertion bank selected by executable
 matrix. Node, C# managed, actual NativeAOT and Rust execute identical assertions.
 Configured failures/missing targets cannot be skipped. Internal algorithm,
 compiler and injected-failure tests remain language-owned.
+The shared runner requires complete summary counters, no skipped or unfinished
+scenarios and identical assertion counts for every selected implementation.
+Product test directories partition this one acceptance bank by ownership, not
+implementation. Every selected executable set runs crossfire, fleetd and fleet
+scenarios; both controller and CLI scenarios exercise Codex and Pi. Native
+capability differences have explicit shared expectations, not per-backend
+omissions or substituted implementations.
 
 Every REST declaration requires a decoded successful response, not merely an
 unauthenticated refusal. Shared scenarios also cover malformed queries, pagination,
@@ -965,6 +1055,15 @@ applicable unit/native suites, managed/AOT/Rust publication, shared contracts,
 real containers and migration/rollback tests. Coverage inventory distinguishes
 authentication, successful behavior, malformed input, recovery and UI evidence;
 counts alone establish none of them.
+
+The performance bank compares each workload against the measured Node baseline:
+zero request failures, no slower p50/p95 and no lower throughput. On 2026-10-18
+the owner approved only managed .NET's saved-runtime-observation p50 and p95 up to
+1.30 times Node's corresponding latency and throughput at least 0.95 times Node.
+Only that target/workload has these explicitly approved exceptions; every other
+target/workload remains strict. JSON and HTML expose latency and throughput limits
+and label exception use rather than claiming it meets the unmodified baseline.
+Failed earlier attempts remain recorded.
 
 Tests use verified finite aggregate memory/swap/task scopes, all available cores
 for independent files, and once-prepared immutable builds/native/browser assets.

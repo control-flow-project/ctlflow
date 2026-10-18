@@ -105,7 +105,7 @@ test('fleet-gated scheduled delivery cannot continue under paused controller del
   assert.equal(value(validateWake(services, agent.actor, agent.id, pending.deliveryId, attachment)).eligible, false);
   value(acknowledgeWake(services, agent.actor, agent.id, pending.deliveryId, attachment));
   assert.equal(reportListener(services, agent.actor, agent.id, randomUUID(), { statistics: null, release: 'test',
-    messagesDelivered: 0, stopped: false, controller: agent.controller }, 'test').ok, false);
+    messagesDelivered: 0, stopped: false, controller: agent.controller }, 'test').ok, true, 'Native reporting remains available while scheduled delivery is refused');
   const paused = value(services.repositories.fleet.findById(fleet.id))!;
   value(changeFleetDelivery(services, admin.actor, fleet.id, { expectedRevision: paused.revision, enabled: true }, randomUUID()));
   const resumed = report(fixture, agent);

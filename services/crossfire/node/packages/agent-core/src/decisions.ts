@@ -13,7 +13,7 @@ import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 const journal = check.list(check.object({ id: check.identifier, native: check.text(1000),
   status: check.choice('pending', 'responded', 'cancelled') }), 4096);
 export function decisions(options: { clock: Clock; client: Matrix; coordination: Coordination; settings: Settings;
-  agent: string; matrixUserId: string; run: () => Promise<string>; storage: LocalState; file: string }, stop: AbortSignal) {
+  agent: string; matrixUserId: string; run: (signal: AbortSignal) => Promise<string>; storage: LocalState; file: string }, stop: AbortSignal) {
   let receipts: check.Parsed<typeof journal>;
   try {
     const loaded = journal(options.storage.exists(options.file) ? options.storage.read(options.file) : []);
@@ -77,7 +77,8 @@ export function decisions(options: { clock: Clock; client: Matrix; coordination:
     let offered = false;
     try {
       signal.throwIfAborted();
-      const runId = await options.run();
+      const runId = await options.run(signal);
+      signal.throwIfAborted();
       start();
       receipts.push(receipt); save();
       const questions = decision.questions ?? [{ id: 'decision', title: decision.action, prompt: 'Review the complete native scope before selecting a choice.',

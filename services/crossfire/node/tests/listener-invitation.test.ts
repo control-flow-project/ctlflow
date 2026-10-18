@@ -52,7 +52,7 @@ test('a resumed shared listener recovers pending rooms and owner DMs without rep
   assert.equal(ready, false); assert.equal(runtime.requests().length, 0, 'Inactive binding cannot start the native runtime');
   assert.equal(readJson(cursorFile + '.sync'), previous.next_batch, 'Inactive acquisition preserves the consumed timeline cursor');
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId })), null, 'Inactive fleet listeners do not accept room invitations');
-  control.update({ active: true, input: null });
+  control.update({ connected: true, active: true, input: null });
   await until(() => ready || ended !== undefined, 'Native listener was not initialized', 30000);
   assert.equal(ended, undefined);
   await until(() => admitted(roomId) || ended !== undefined, 'Pending room invitation was not accepted', 30000);

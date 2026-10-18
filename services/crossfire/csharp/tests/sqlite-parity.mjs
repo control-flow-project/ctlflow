@@ -5,24 +5,28 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { randomBytes, createHash } from 'node:crypto';
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
+import { databaseIdentity, foreignKeyViolations, integrityResults } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { createDirectoryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/directory/index';
-import definition from '@ctlflow/crossfire-data/management/sqlite/schema' with { type: 'json' };
 import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
+import { migrationQuery, migrationRows } from '../../dist/tests/support/migration-data.js';
+import { openTestStore } from '../../dist/tests/support/storage.js';
+import { schema15Store } from '../../dist/tests/support/schema15.js';
+import { restoreSchema16Logging } from '../../dist/tests/support/schema16.js';
 
 const [nativeBinary, managedAssembly, dotnetBinary] = process.argv.slice(2);
 assert(nativeBinary && managedAssembly && dotnetBinary && process.argv.length === 5, 'Provide native acceptance executable, managed assembly and dotnet executable');
 const directory = mkdtempSync(join(tmpdir(), 'crossfire-sqlite-parity-')); chmodSync(directory, 0o700);
 
 function checkDatabase(database) {
-  const rows = database.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' AND name NOT LIKE 'knex_%' ORDER BY type,name").all();
+  const rows = migrationRows(database, migrationQuery('sqlite_schema').select('type', 'name', 'tbl_name', 'sql')
+    .where('name', 'not like', 'sqlite_%').where('name', 'not like', 'knex_%').orderBy(['type', 'name']));
   assert.equal(rows.filter(row => row.type === 'table').length, 63);
-  assert.equal(rows.filter(row => row.type === 'index').length, 93);
+  assert.equal(rows.filter(row => row.type === 'index').length, 94);
   assert.equal(rows.filter(row => row.type === 'trigger').length, 26);
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
-  assert.equal(database.pragma('application_id', { simple: true }), 1129465426);
-  assert.equal(database.pragma('user_version', { simple: true }), 17);
-  assert.deepEqual(database.pragma('integrity_check'), [{ integrity_check: 'ok' }]);
+  assert.deepEqual(foreignKeyViolations(database), []);
+  assert.deepEqual(databaseIdentity(database), { application: 1129465426, version: 18 });
+  assert.deepEqual(integrityResults(database), [{ integrity_check: 'ok' }]);
   return rows;
 }
 
@@ -69,16 +73,10 @@ try {
   run(true, path); run(false, path);
   for (const native of [true, false]) for (const version of [15, 16]) {
     const path = join(directory, 'schema-' + version + '-' + (native ? 'aot' : 'managed') + '.sqlite');
-    await migrateDatabase(path);
-    const database = openStore(path);
+    const database = version === 15 ? schema15Store(path) : openTestStore(path);
     let canonical;
     try {
-      canonical = checkDatabase(database);
-      for (const index of definition.parts.loggingSchema.matchAll(/CREATE INDEX (\w+)/gu)) database.exec('DROP INDEX ' + index[1]);
-      for (const table of ['enrollment_archive', 'enrollment_archive_item', 'enrollment_archive_policy', 'enrollment_archive_permission', 'enrollment_archive_wake_sender', 'enrollment_archive_metadata'])
-        database.exec('CREATE TRIGGER protect_' + table + '_delete BEFORE DELETE ON ' + table + " BEGIN SELECT RAISE(ABORT, 'Archived enrollment history is immutable'); END;");
-      database.exec('DELETE FROM knex_migrations');
-      database.pragma('user_version=' + version);
+      if (version === 16) restoreSchema16Logging(database);
     } finally { database.close(); }
     const expectedPath = path + '.node-reference'; copyFileSync(path, expectedPath); chmodSync(expectedPath, 0o600);
     await migrateDatabase(expectedPath);

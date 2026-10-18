@@ -20,7 +20,7 @@ fn retirement_requires_exact_live_controller_native_close_and_settled_receipts_b
     let mut database = scenario.database()?;
     assert_eq!(
         crossfire_adapter_sqlite::schema::pragma(database.connection(), "user_version")?,
-        17
+        crossfire_adapter_sqlite::schema::SCHEMA_VERSION
     );
     let controller = authority::authenticate_controller(
         &mut scenario.store,

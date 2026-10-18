@@ -88,11 +88,12 @@ execution, not a proven process exit.
 
 ## Abrupt controller death
 
-Killing Node/C# fleetd can leave a native app-server alive. Its history writer
-lock rejects a competing writer; those adapters do not enforce the controller's
-lifetime after SIGKILL. Rust's Linux process adapter instead uses its packaged
-guard, exact parent pidfd and native-group lock to terminate the owned engine
-group after controller death. It does not contain tools that escape that group.
+Every implementation guards the owned native engine group against controller
+death, including SIGKILL. Node observes its private parent IPC connection, C# an
+exact parent process handle and Rust an exact parent pidfd. Each guard retains
+the private native-group lock while stopping its owned group. A replacement
+cannot bypass an existing writer lock. Tools that escape the owned group are
+outside this protection.
 No implementation uses process-name scanning, orphan adoption or copied history.
 
 A full host restart removes old processes, but retained bindings still require

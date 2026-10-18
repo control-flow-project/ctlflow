@@ -11,7 +11,7 @@
     <AnalysisLevel>latest</AnalysisLevel>
     <Deterministic>true</Deterministic>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <Version>0.1.21</Version>
+    <Version>0.1.22</Version>
     <Authors>Jeswin P Kumar</Authors>
     <Company>Control Flow</Company>
     <Copyright>Copyright 2026 Jeswin P Kumar (jeswinpk@agilehead.com)</Copyright>
@@ -19,6 +19,7 @@
     <IsPackable>false</IsPackable>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <OptimizationPreference>Speed</OptimizationPreference>
+    <TieredCompilation>false</TieredCompilation>
     <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.EntityFrameworkCore.GeneratedInterceptors</InterceptorsNamespaces>
   </PropertyGroup>
   <PropertyGroup Condition="'$(PublishAot)' == 'true'">

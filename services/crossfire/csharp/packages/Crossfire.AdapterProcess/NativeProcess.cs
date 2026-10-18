@@ -14,6 +14,7 @@ public sealed partial class NativeProcess : IAsyncDisposable
 {
     private readonly Process process;
     private readonly bool input;
+    private readonly int shutdownMilliseconds;
     private readonly object gate = new();
     private Task? closing;
     private Task? stopping;
@@ -23,22 +24,22 @@ public sealed partial class NativeProcess : IAsyncDisposable
     public StreamWriter Input => input ? process.StandardInput : throw new InvalidOperationException("Native input is not a terminal stream");
     public Task Ended { get; }
     public int ExitCode => process.ExitCode;
-    private NativeProcess(Process process, bool input) { this.process = process; this.input = input; Id = process.Id; Ended = process.WaitForExitAsync(); }
+    private NativeProcess(Process process, bool input, int shutdownMilliseconds) { this.process = process; this.input = input; this.shutdownMilliseconds = shutdownMilliseconds; Id = process.Id; Ended = process.WaitForExitAsync(); }
     [LibraryImport("libc", EntryPoint = "kill", SetLastError = true)]
     private static partial int Kill(int pid, int signal);
     [LibraryImport("libc", EntryPoint = "getpgid", SetLastError = true)]
     private static partial int Group(int pid);
 
-    public static Result<NativeProcess> Start(NativeCommand command)
+    public static Result<NativeProcess> Start(NativeCommand command, int shutdownMilliseconds = 3000, bool isolate = true)
     {
         if (!OperatingSystem.IsLinux()) return Results.Fail<NativeProcess>("invalid", "Owned native process groups require Linux");
-        if (string.IsNullOrEmpty(command.Binary) || command.Binary.Contains('\0') || !Path.IsPathFullyQualified(command.Workspace)
+        if (shutdownMilliseconds is < 1000 or > 10000 || string.IsNullOrEmpty(command.Binary) || command.Binary.Contains('\0') || !Path.IsPathFullyQualified(command.Workspace)
             || command.Arguments.Any(value => value.Contains('\0')) || command.Arguments.Sum(value => (long)Encoding.UTF8.GetByteCount(value)) > 1048576)
             return Results.Fail<NativeProcess>("invalid", "Invalid native executable, workspace or arguments");
-        var start = new ProcessStartInfo("/usr/bin/setsid") { UseShellExecute = false, RedirectStandardInput = true,
+        var start = new ProcessStartInfo(isolate ? "/usr/bin/setsid" : command.Binary) { UseShellExecute = false, RedirectStandardInput = true,
             RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = command.Workspace,
             StandardOutputEncoding = new UTF8Encoding(false, true), StandardErrorEncoding = new UTF8Encoding(false, true) };
-        start.ArgumentList.Add("--"); start.ArgumentList.Add(command.Binary);
+        if (isolate) { start.ArgumentList.Add("--"); start.ArgumentList.Add(command.Binary); }
         foreach (var argument in command.Arguments) start.ArgumentList.Add(argument);
         foreach (var value in command.Environment)
         { if (value.Value is null) start.Environment.Remove(value.Key); else start.Environment[value.Key] = value.Value; }
@@ -46,7 +47,7 @@ public sealed partial class NativeProcess : IAsyncDisposable
         {
             var process = Process.Start(start) ?? throw new IOException("Native process was not created");
             if (!command.Input) process.StandardInput.Close();
-            return Result<NativeProcess>.Success(new(process, command.Input));
+            return Result<NativeProcess>.Success(new(process, command.Input, shutdownMilliseconds));
         }
         catch (Exception error) when (error is Win32Exception or IOException or UnauthorizedAccessException or ArgumentException)
         { return Results.Fail<NativeProcess>("native", "Cannot start the native executable in its owned Linux process group; verify the executable and /usr/bin/setsid"); }
@@ -115,7 +116,7 @@ public sealed partial class NativeProcess : IAsyncDisposable
             else if (group < 0 && Marshal.GetLastPInvokeError() != 3) throw new IOException("Native process ownership inspection failed");
             try
             {
-                await Ended.WaitAsync(TimeSpan.FromSeconds(3));
+                await Ended.WaitAsync(TimeSpan.FromMilliseconds(shutdownMilliseconds));
                 if (Kill(-Id, 9) != 0 && Marshal.GetLastPInvokeError() != 3) throw new IOException("Remaining native group members could not be stopped");
             }
             catch (TimeoutException)

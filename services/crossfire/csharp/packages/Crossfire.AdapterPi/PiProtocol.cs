@@ -56,8 +56,9 @@ public sealed class PiProtocol : IAsyncDisposable
             if (!version.IsSuccess || version.Value.ExitCode != 0 || version.Value.Output.Trim() != "1.0.0") return Results.Fail<PiProtocol>("invalid", "Pi requires verified @earendil-works/pi-coding-agent 1.0.0; other native protocols have not been admitted");
             var extension = Path.Combine(home, "crossfire-extension.mjs"); var prompt = Path.Combine(home, "crossfire-instructions.txt");
             PrivateFiles.Write(extension, Encoding.UTF8.GetBytes(PiValues.Extension()), 1048576); PrivateFiles.Write(prompt, Encoding.UTF8.GetBytes(instructions), 8388608);
-            var native = NativeProcess.Start(new(binary, ["--mode", "rpc", "--offline", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--no-approve",
-                "--session", history, "--append-system-prompt", prompt, "--extension", extension], workspace, environment, Input: true));
+            var native = Crossfire.AdapterRuntime.NativeGuard.Start(new(binary, ["--mode", "rpc", "--offline", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--no-approve",
+                "--session", history, "--append-system-prompt", prompt, "--extension", extension], workspace, environment, Input: true), home,
+                Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(history))));
             return native.IsSuccess ? Result<PiProtocol>.Success(new(native.Value, events, timeoutMs, time ?? TimeProvider.System, cancellation)) : Result<PiProtocol>.Fail(native.Error);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or OperationCanceledException)

@@ -182,7 +182,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   const host = await createListenerHost();
   cleanup(t, host.close);
   const controller = createListenerControl(async () => {}, () => CONTROLLER);
-  controller.update({ active: true, input: null });
+  controller.update({ connected: true, active: true, input: null });
   cleanup(t, controller.close);
   const settings: Settings = { instance: 'test', server_name: 'test.localhost',
     homeserver: '', owner: OBSERVER, max_upload_bytes: 1024 };

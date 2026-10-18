@@ -1,10 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Crossfire.AdapterSqlite.Entities;
-using Crossfire.AdapterFilesystem;
 
 namespace Crossfire.AdapterSqlite;
 
-public sealed partial class CrossfireDbContext(string database) : DbContext
+public sealed partial class CrossfireDbContext(DbContextOptions<CrossfireDbContext> options) : DbContext(options)
 {
     public DbSet<PrincipalRow> Principal => Set<PrincipalRow>();
     public DbSet<MemberRow> Member => Set<MemberRow>();
@@ -70,13 +69,6 @@ public sealed partial class CrossfireDbContext(string database) : DbContext
     public DbSet<EnrollmentArchiveMetadataRow> EnrollmentArchiveMetadata => Set<EnrollmentArchiveMetadataRow>();
     public DbSet<FleetNativeStopRow> FleetNativeStop => Set<FleetNativeStopRow>();
 
-    protected override void OnConfiguring(DbContextOptionsBuilder options)
-        => options.UseSqlite(new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
-        {
-            DataSource = PrivateFiles.Database(database), ForeignKeys = true, DefaultTimeout = 5, Pooling = false,
-            Mode = database == ":memory:" ? Microsoft.Data.Sqlite.SqliteOpenMode.Memory : Microsoft.Data.Sqlite.SqliteOpenMode.ReadWrite
-        }.ToString());
-
     protected override void OnModelCreating(ModelBuilder model)
     {
         ConfigureTables0(model);
@@ -87,5 +79,6 @@ public sealed partial class CrossfireDbContext(string database) : DbContext
         ConfigureTables5(model);
         ConfigureTables6(model);
         ConfigureForeignKeys(model);
+        ConfigureMetadata(model);
     }
 }

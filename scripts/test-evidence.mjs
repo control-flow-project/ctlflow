@@ -7,7 +7,7 @@ export function testEvidence(file, limits = {}) {
   const descriptor = openSync(file, 'wx', 0o600), counters = {}, streams = new Map();
   let bytes = 0, retainedBytes = 0, tail = Buffer.alloc(0), closed = false, invalidCounters = false;
   function line(value) {
-    const matched = /^ℹ (tests|fail|cancelled) (\d+)\r?$/u.exec(value);
+    const matched = /^ℹ (tests|fail|cancelled|skipped|todo) (\d+)\r?$/u.exec(value);
     if (!matched) return;
     const count = Number(matched[2]);
     if (!Number.isSafeInteger(count) || Object.hasOwn(counters, matched[1])) invalidCounters = true;
@@ -48,8 +48,9 @@ export function testEvidence(file, limits = {}) {
       const truncatedBytes = bytes - retainedBytes;
       if (truncatedBytes) writeSync(descriptor, '\n[Evidence byte limit reached; omitted ' + truncatedBytes + ' bytes. Summary counters parsed from complete streams.]\n');
       closeSync(descriptor); closed = true;
-      const complete = !invalidCounters && ['tests', 'fail', 'cancelled'].every(key => Object.hasOwn(counters, key));
+      const complete = !invalidCounters && ['tests', 'fail', 'cancelled', 'skipped', 'todo'].every(key => Object.hasOwn(counters, key));
       return { tests: counters.tests ?? 0, failed: counters.fail ?? 0, cancelled: counters.cancelled ?? 0,
+        skipped: counters.skipped ?? 0, todo: counters.todo ?? 0,
         complete, bytes, retainedBytes, truncatedBytes, tail: tail.toString('utf8') };
     },
   };

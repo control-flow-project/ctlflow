@@ -37,13 +37,14 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   const stop = new AbortController(), lifetime = AbortSignal.any([signal, stop.signal]);
   const observations = new Map<string, Observation>();
   const working = new Set<string>();
-  const unsettled = new Set<string>();
+  const unsettled = new Map<string, string>();
   let phase: NativeSessionState['phase'] = 'sleeping';
   let native: OwnedRuntimeConnection | undefined, opening: Promise<OwnedRuntimeConnection> | undefined, closingNative: Promise<void> | undefined;
   let recovery: Promise<void> | undefined, closing: Promise<void> | undefined;
   let preparing: Promise<OwnedRuntimeConnection> | undefined;
   let activeCalls = 0, idleSeconds = 1800, lastActivityAt = services.clock.now();
   let observationGeneration = 0;
+  let workRevision = 0;
   let cancelIdle: (() => void) | undefined;
   let failedEpisode = false;
   let inspectionUncertain = false;
@@ -56,6 +57,21 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     if (result.ok) return;
     report(nativeError(result.error.code, result.error.message));
     stop.abort(nativeError(result.error.code, result.error.message));
+  }
+  function completeIdleWork(connection: OwnedRuntimeConnection, revision: number, idle: { context: string; sessionId: string }[]): void {
+    if (!continuationReady || native !== connection || connection.signal.aborted || revision !== workRevision) return;
+    const pending = new Set(unsettled.values());
+    const saved = new Map(contexts.map(item => [item.context, item.sessionId]));
+    const completed = idle.filter(item => !pending.has(item.context) && saved.get(item.context) === item.sessionId)
+      .map(({ context, sessionId }) => ({ context, sessionId }));
+    const cleared = services.work.clear(completed);
+    if (!cleared.ok) throw nativeError(cleared.error.code, cleared.error.message);
+  }
+  async function inspectNative(connection: OwnedRuntimeConnection): Promise<{ busy: boolean }> {
+    const revision = workRevision;
+    const status = await connection.activity();
+    completeIdleWork(connection, revision, status.contexts.filter(item => !item.busy));
+    return { busy: status.busy };
   }
 
   function report(error: unknown): void {
@@ -90,12 +106,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       if (['working', 'waiting-answer', 'waiting-approval'].includes(event.observation.state)) working.add(event.observation.sessionId);
       else if (event.observation.state === 'idle' || event.observation.state === 'sleeping') working.delete(event.observation.sessionId);
       if (recordingWork) {
-        if (working.has(event.observation.sessionId)) checkpoint(services.work.capture([{ context: event.observation.roomId ?? services.primary, sessionId: event.observation.sessionId }]));
-        else if (event.observation.state === 'idle') {
-          const pending = services.work.read();
-          if (!pending.ok) checkpoint(pending);
-          else for (const item of pending.value.filter(item => item.sessionId === event.observation.sessionId)) checkpoint(services.work.acknowledge(item.messageId));
-        }
+        if (working.has(event.observation.sessionId)) { workRevision++; checkpoint(services.work.capture([{ context: event.observation.roomId ?? services.primary, sessionId: event.observation.sessionId }])); }
       }
       if (['working', 'waiting-answer', 'waiting-approval'].includes(event.observation.state)
         || event.observation.state === 'idle' && previous && ['working', 'waiting-answer', 'waiting-approval'].includes(previous.state)) touch();
@@ -246,7 +257,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     const connection = native;
     if (activeCalls || opening || preparing || unsettled.size || services.hooks.pendingDecisions?.() || services.hooks.pendingInput?.()) { touch(); return; }
     let status: { busy: boolean };
-    try { status = await connection.inspect(); await refreshContexts(); }
+    try { status = await inspectNative(connection); await refreshContexts(); }
     catch (error) {
       if (lifetime.aborted || native !== connection || connection.signal.aborted) return;
       if (!inspectionUncertain) {
@@ -287,16 +298,25 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       } },
       inspect: async () => {
         if (!native || native.signal.aborted) return { busy: phase === 'waking' || phase === 'failed' || !!opening || activeCalls > 0 };
-        return { busy: activeCalls > 0 || unsettled.size > 0 || (await native.inspect()).busy };
+        const connection = native, status = await inspectNative(connection);
+        return { busy: activeCalls > 0 || unsettled.size > 0 || native !== connection || connection.signal.aborted || status.busy };
       },
       deliver: async (text, messageId, cancelled, priority) => {
         cancelled?.throwIfAborted();
-        unsettled.add(messageId);
-        await call(async connection => { cancelled?.throwIfAborted(); await (await selected(connection, priority ? { priority, signal: cancelled ?? lifetime } : undefined)).deliver(text, messageId, cancelled, priority); }, true,
+        unsettled.set(messageId, context);
+        await call(async connection => {
+          cancelled?.throwIfAborted();
+          const target = await selected(connection, priority ? { priority, signal: cancelled ?? lifetime } : undefined);
+          workRevision++;
+          const captured = services.work.capture([{ context, sessionId: expectedSession }]);
+          if (!captured.ok) throw nativeError(captured.error.code, captured.error.message);
+          lifetime.throwIfAborted();
+          await target.deliver(text, messageId, cancelled, priority);
+        }, true,
           priority ? { priority, signal: cancelled ?? lifetime } : undefined);
       },
       recover: async (text, messageId, cancelled) => {
-        unsettled.add(messageId);
+        unsettled.set(messageId, context);
         const received = await call(async connection => (await selected(connection)).recover(text, messageId, cancelled), true);
         if (!received) { unsettled.delete(messageId); schedule(); }
         return received;
@@ -313,9 +333,11 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         schedule();
       },
       turnControl: {
-        activeTurn: async (room, admission) => admission
-          ? call(connection => connection.turnControl.activeTurn(room, admission), false, admission, openNative)
-          : native && !native.signal.aborted ? native.turnControl.activeTurn(room) : null,
+        activeTurn: async (room, admission) => {
+          const selectedRoom = room ?? (context === services.primary ? undefined : context);
+          return admission ? call(connection => connection.turnControl.activeTurn(selectedRoom, admission), false, admission, openNative)
+            : native && !native.signal.aborted ? native.turnControl.activeTurn(selectedRoom) : null;
+        },
         interrupt: async (turn, recovery, admission) => call(connection => connection.turnControl.interrupt(turn, recovery, admission), true, admission, openNative),
       },
       conversation: async (room, admission) => call(async connection => {
@@ -329,7 +351,11 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   }
   function close(): Promise<void> {
     return closing ??= (async () => {
-      const checkpoint = services.work.capture(contexts.filter(context => working.has(context.sessionId)).map(({ context, sessionId }) => ({ context, sessionId })));
+      if (native && !native.signal.aborted && continuationReady) {
+        const work = services.work.read();
+        if (!work.ok || work.value.length > 0) await inspectNative(native).catch(() => undefined);
+      }
+      recordingWork = false;
       stop.abort(new Error('Native listener binding stopped'));
       cancelIdle?.(); cancelIdle = undefined;
       await opening?.catch(() => undefined);
@@ -337,7 +363,6 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       if (native) await discard(native);
       await closingNative;
       await recovery;
-      if (!checkpoint.ok) throw nativeError(checkpoint.error.code, checkpoint.error.message);
     })();
   }
   try {

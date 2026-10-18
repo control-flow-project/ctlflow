@@ -10,7 +10,7 @@ public static class LoggingMaintenance
     public static LoggingProgress Run(ApiState state, LoggingProgress progress)
     {
         var now = state.Now(); if (now < progress.NextAt) return progress;
-        using var context = new CrossfireDbContext(state.Database);
+        using var context = state.Storage.Open();
         var cutoff = checked(now - state.Configuration.LoggingRetentionDays * 86400000);
         var result = LoggingRetention.Prune(context, cutoff, 500, progress.Scan); var files = state.Diagnostics.Prune();
         var error = !result.IsSuccess ? "Database logging cleanup remains pending: " + result.Error.Code : !files.IsSuccess ? files.Error.Message : null;

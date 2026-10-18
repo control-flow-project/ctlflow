@@ -66,7 +66,7 @@ test('exact authenticated controller generations, not fleet metadata or agent to
   assert.equal(JSON.stringify(events).includes(agent.controller.credential), false);
 });
 
-test('publication admission follows the current bound run, fleet intent and live controller lease', async scope => {
+test('publication follows the current authenticated reporting run independently of new-input admission', async scope => {
   const fixture = await applicationFixture(scope), agent = await fixture.agent(fixture.admin.actor, 'publication-authority');
   const publish = () => createPublication(fixture.services, agent.actor, reportManifest, randomUUID());
   assert.equal(publish().ok, false, 'Ordinary enrolled account authority alone is insufficient');
@@ -74,7 +74,7 @@ test('publication admission follows the current bound run, fleet intent and live
   value(publish());
   const fleet = value(fixture.services.repositories.fleet.findById(agent.controller.fleetId))!;
   const pause = value(changeFleetDelivery(fixture.services, fixture.admin.actor, fleet.id, { expectedRevision: fleet.revision, enabled: false }, randomUUID()));
-  assert.equal(publish().ok, false);
+  value(publish());
   value(changeFleetDelivery(fixture.services, fixture.admin.actor, fleet.id, { expectedRevision: pause.revision, enabled: true }, randomUUID()));
   value(publish());
   fixture.advance(30001);

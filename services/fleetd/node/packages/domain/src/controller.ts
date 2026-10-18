@@ -211,7 +211,7 @@ export function createController(services: Services) {
     try {
     const { configuration } = current.value;
     const existing = configuration.roster.instances.find(instance => instance.key === (action.kind === 'add' ? action.instance.key : action.instanceKey));
-    if (action.kind === 'add' && existing) return failure('conflict', 'Instance key is already registered');
+    if (action.kind === 'add' && (existing || configuration.roster.instances.some(instance => instance.name === action.instance.name))) return failure('name_collision', 'Instance key or agent name is already registered');
     if (action.kind !== 'add' && !existing) return failure('missing', 'Instance does not exist');
     if (action.kind === 'remove') {
       const removed = await services.execution.remove(configuration, existing!);

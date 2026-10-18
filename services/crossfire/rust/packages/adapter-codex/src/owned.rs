@@ -13,8 +13,8 @@ use crossfire_adapter_process::NativeCommand;
 use crossfire_adapter_runtime::clock;
 use crossfire_agent_core::{
     owned_runtime::{
-        Attachment, Input, Inspection, OwnedAdapter, OwnedConnection, Reset, SavedContext,
-        Validation,
+        Attachment, Input, Inspection, NativeActivity, OwnedAdapter, OwnedConnection, Reset,
+        SavedContext, Validation,
     },
     runtime::{
         Admission, Approval, Connection, Hooks, InputPriority, InterruptResult, TurnControl,
@@ -40,6 +40,7 @@ pub struct CodexRuntime {
 pub struct CodexOwnedConnection<H> {
     histories: Arc<Histories<H>>,
     connection: Arc<NativeConnection<H>>,
+    context: String,
     root: bool,
 }
 
@@ -279,6 +280,7 @@ impl CodexRuntime {
             histories.close().await?;
         }
         Ok(CodexOwnedConnection {
+            context: histories.primary().to_owned(),
             histories,
             connection: primary?,
             root: true,
@@ -357,7 +359,7 @@ impl<H: Hooks + 'static> Connection for CodexOwnedConnection<H> {
         self.histories.lifetime()
     }
     async fn inspect(&self) -> Result<bool> {
-        self.histories.inspect().await
+        Ok(self.histories.activity().await?.busy)
     }
     async fn deliver(
         &self,
@@ -387,6 +389,7 @@ impl<H: Hooks + 'static> Connection for CodexOwnedConnection<H> {
         Ok(Self {
             histories: Arc::clone(&self.histories),
             connection,
+            context: self.histories.context(Some(room)).to_owned(),
             root: false,
         })
     }
@@ -399,6 +402,9 @@ impl<H: Hooks + 'static> Connection for CodexOwnedConnection<H> {
     }
 }
 impl<H: Hooks + 'static> OwnedConnection for CodexOwnedConnection<H> {
+    async fn activity(&self) -> Result<NativeActivity> {
+        self.histories.activity().await
+    }
     fn attachment(&self) -> Option<Attachment> {
         let mut attachment = self.histories.attachment.clone();
         attachment.session_id = self.session_id().to_owned();
@@ -414,7 +420,7 @@ impl<H: Hooks + 'static> TurnControl for CodexOwnedConnection<H> {
         room: Option<&str>,
         admission: Option<&Admission>,
     ) -> Result<Option<String>> {
-        let context = self.histories.context(room);
+        let context = self.histories.context(room.or(Some(&self.context)));
         let connection = if admission.is_some() {
             Some(self.histories.open(context, admission).await?)
         } else {

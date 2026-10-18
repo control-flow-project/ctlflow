@@ -12,13 +12,14 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
     private readonly CancellationTokenSource lifetime;
     private IReadOnlyList<SavedRuntimeContext> contexts;
     private readonly Dictionary<string, NativeState> observations = new(StringComparer.Ordinal);
-    private readonly HashSet<string> working = new(StringComparer.Ordinal), unsettled = new(StringComparer.Ordinal);
+    private readonly HashSet<string> working = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> unsettled = new(StringComparer.Ordinal);
     private OwnedRuntimeConnection? native;
     private CancellationTokenRegistration nativeClosed;
     private ITimer? idleTimer;
     private Task? recovery, idleWork, closing;
     private string session, phase = "sleeping";
-    private long lastActivity, generation;
+    private long lastActivity, generation, workRevision;
     private int idleSeconds = 1800, activeCalls, closed;
     private bool activated, ready, recording, failedEpisode, inspectionUncertain;
     private Failure? initializationFailure;
@@ -59,6 +60,30 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
         bool report; lock (gate) { if (lifetime.IsCancellationRequested) return; phase = "failed"; report = !failedEpisode; failedEpisode = true; initializationFailure = error; }
         if (report) services.Failed(session.Length == 0 ? null : session, error);
     }
+    private Result<Unit> CaptureInput(string context, string sessionId)
+    {
+        lock (observationGate) { workRevision++; return services.Work.Capture([new(context, sessionId)]); }
+    }
+    private async ValueTask<Result<bool>> InspectNative(OwnedRuntimeConnection connection)
+    {
+        long revision; lock (observationGate) revision = workRevision;
+        var activity = await connection.Activity(); if (!activity.IsSuccess) return Result<bool>.Fail(activity.Error);
+        var status = Result<bool>.Success(activity.Value.Busy);
+        lock (observationGate)
+        {
+            InterruptedContext[] completed;
+            lock (gate)
+            {
+                if (!ready || !ReferenceEquals(native, connection) || connection.Lifetime.IsCancellationRequested || revision != workRevision) return status;
+                var saved = contexts.ToDictionary(value => value.Context, value => value.SessionId, StringComparer.Ordinal);
+                var pending = unsettled.Values.ToHashSet(StringComparer.Ordinal);
+                completed = activity.Value.Contexts.Where(value => !value.Busy && !pending.Contains(value.Context) && saved.GetValueOrDefault(value.Context) == value.SessionId)
+                    .Select(value => new InterruptedContext(value.Context, value.SessionId)).ToArray();
+            }
+            var cleared = services.Work.Clear(completed); if (!cleared.IsSuccess) return Result<bool>.Fail(cleared.Error);
+        }
+        return status;
+    }
     private void Observe(RuntimeObservationEvent value, long epoch)
     {
         Failure? failure = null; var forward = true;
@@ -78,8 +103,7 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
             }
             if (capture && value is NativeState observed)
             {
-                Result<Unit> stored = Results.Done(); if (active) stored = services.Work.Capture([new(observed.RoomId ?? services.Primary, observed.SessionId)]);
-                else if (observed.State == "idle") { var pending = services.Work.Read(); if (!pending.IsSuccess) stored = Result<Unit>.Fail(pending.Error); else foreach (var item in pending.Value.Where(item => item.SessionId == observed.SessionId)) { stored = services.Work.Acknowledge(item.MessageId); if (!stored.IsSuccess) break; } }
+                Result<Unit> stored = Results.Done(); if (active) { workRevision++; stored = services.Work.Capture([new(observed.RoomId ?? services.Primary, observed.SessionId)]); }
                 if (!stored.IsSuccess) failure = stored.Error;
             }
         }
@@ -174,7 +198,7 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
                 if (Now < lastActivity + idleSeconds * 1000L) { Schedule(); return; }
                 if (activeCalls != 0 || unsettled.Count != 0 || pending) { Touch(); return; }
             }
-            var status = await connection.Inspect(); var refreshed = RefreshContexts(); if (!status.IsSuccess || !refreshed.IsSuccess)
+            var status = await InspectNative(connection); var refreshed = RefreshContexts(); if (!status.IsSuccess || !refreshed.IsSuccess)
             {
                 var error = status.IsSuccess ? refreshed.Error : status.Error; if (!inspectionUncertain) { inspectionUncertain = true; services.Failed(session, error); Emit("unavailable", error.Message); } Touch(); return;
             }
@@ -194,9 +218,16 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
     }
     private async Task Close()
     {
-        if (Interlocked.Exchange(ref closed, 1) != 0) return; InterruptedContext[] active; lock (gate) { recording = false; active = contexts.Where(context => working.Contains(context.SessionId)).Select(context => new InterruptedContext(context.Context, context.SessionId)).ToArray(); idleTimer?.Dispose(); idleTimer = null; }
+        if (Interlocked.Exchange(ref closed, 1) != 0) return;
+        bool inspect; lock (gate) inspect = ready;
+        if (inspect && native is { } current && !current.Lifetime.IsCancellationRequested)
+        {
+            var work = services.Work.Read();
+            if (!work.IsSuccess || work.Value.Count > 0) await InspectNative(current);
+        }
+        lock (gate) { recording = false; idleTimer?.Dispose(); idleTimer = null; }
         List<Exception> errors = []; async Task Finish(Func<Task> action) { try { await action(); } catch (Exception error) { errors.Add(error); } }
-        var checkpoint = services.Work.Capture(active); if (!checkpoint.IsSuccess) errors.Add(new InvalidOperationException(checkpoint.Error.Message)); await Finish(lifetime.CancelAsync);
+        await Finish(lifetime.CancelAsync);
         await transition.WaitAsync(); try { if (native is { } connection) await Finish(async () => { var discarded = await Discard(connection); if (!discarded.IsSuccess) throw new InvalidOperationException(discarded.Error.Message); }); } finally { transition.Release(); }
         var recovering = recovery; if (recovering is not null) await Finish(() => recovering); var idle = idleWork; if (idle is not null) await Finish(() => idle); transition.Dispose(); lifetime.Dispose(); if (errors.Count != 0) throw new AggregateException("Native lifecycle shutdown requires inspection", errors);
     }

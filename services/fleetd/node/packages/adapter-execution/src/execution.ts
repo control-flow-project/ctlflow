@@ -168,10 +168,10 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
       let done: Promise<void> | undefined;
       let bindingControl: ReturnType<FleetControlConnection['listener']> | undefined;
       let activity: NativeStopActivity | undefined;
-      let enrolledId: string | undefined, reported = false;
+      let enrolledId: string | undefined, reported = false, deliberatelyClosing = false;
       const stop = new AbortController(), lifetime = AbortSignal.any([signal, stop.signal]);
       const report = (error: unknown) => {
-        if (reported || !enrolledId || signal.aborted || stop.signal.aborted || isListenerStop(error)) return;
+        if (reported || deliberatelyClosing || !enrolledId || signal.aborted || stop.signal.aborted || isListenerStop(error)) return;
         reported = true;
         reporters.get(configuration.directory)?.record(enrolledId, destination?.runtime.sessionId ?? null, error);
       };
@@ -259,7 +259,10 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
         reporters.get(configuration.directory)?.recovered(identity.agentId);
         let closing: Promise<void> | undefined;
         const unlock = release;
-        const close = () => closing ??= (async () => { stop.abort(new Error('Instance stopped')); await done; await destination?.close();
+        const close = () => closing ??= (async () => {
+          deliberatelyClosing = true;
+          try { await destination?.close(); }
+          finally { stop.abort(new Error('Instance stopped')); await done; }
           if (activity) stops.get(configuration.directory)?.closed(activity);
           bindingControl?.close(); await unlock(); })();
         return success({ sessionId: destination.runtime.sessionId, signal: stop.signal, attachment: destination.attachment,

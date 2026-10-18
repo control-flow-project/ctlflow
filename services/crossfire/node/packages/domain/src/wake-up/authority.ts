@@ -31,7 +31,7 @@ export function liveReceiver(services: Services, actor: Actor, agentId: string, 
   const run = scheduledReceiver(services, actor, agentId, runId); if (!run.ok) return run;
   if (run.value.stoppedAt !== null || run.value.disconnectRequestedAt !== null
     || run.value.lastSeenAt < services.clock.now() - HEARTBEAT_EXPIRY_MS) return success(false);
-  return controllerAdmission(services, run.value);
+  return controllerAdmission(services, run.value, 'delivery');
 }
 export function ruleCanWake(services: Services, rule: WakeRule, agentId: string) {
   if (!rule.enabled) return success(false);

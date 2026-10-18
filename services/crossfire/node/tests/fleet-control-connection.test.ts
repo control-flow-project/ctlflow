@@ -1,13 +1,62 @@
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createServer } from 'node:http';
+import { createServer, type ServerResponse } from 'node:http';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { createFleetControlConnection } from '@ctlflow/crossfire-adapter-crossfire/fleet-control';
 import { until } from '../scripts/test-support/listener.js';
 import { success } from '@ctlflow/crossfire-kernel/result';
+
+test('delivery revisions close input until the matching snapshot without replacing authenticated reporting', async scope => {
+  const fleetId = randomUUID(), agentId = randomUUID(), held = new Set<ServerResponse>(), errors: unknown[] = [];
+  let revision = 0, enabled = true, initialized = false;
+  const view = () => ({ fleetId, revision, deliveryEnabled: enabled, connection: { status: 'online', lastSeenAt: Date.now() } });
+  function reply(response: ServerResponse, snapshot = false): void {
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end(JSON.stringify({ data: snapshot ? { ...view(), agentIds: [agentId], messages: [], runtimeOperations: [] } : view(), meta: { requestId: randomUUID() } }));
+  }
+  const server = createServer(async (request, response) => {
+    try {
+      assert.equal(request.headers.authorization, 'Bearer private-fixture');
+      const url = new URL(request.url!, 'http://127.0.0.1');
+      if (request.method === 'PUT') {
+        const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
+        const body: unknown = JSON.parse(Buffer.concat(chunks).toString());
+        if (url.pathname.endsWith('/delivery')) {
+          const parsed = operations.changeFleetDelivery.input(body); assert(parsed.ok);
+          assert.equal(parsed.value.expectedRevision, revision); enabled = parsed.value.enabled; revision++;
+        } else assert(operations.reportFleetConnection.input(body).ok);
+        reply(response); return;
+      }
+      assert.equal(url.pathname, '/api/fleets/' + fleetId + '/control');
+      if (!initialized) { initialized = true; reply(response, true); return; }
+      held.add(response); response.once('close', () => held.delete(response));
+    } catch (error) { errors.push(error); response.destroy(); }
+  });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  cleanup(scope, () => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
+  const address = server.address(); assert(address && typeof address !== 'string');
+  const connection = createFleetControlConnection({ origin: 'http://127.0.0.1:' + address.port, credential: 'private-fixture',
+    fleetId, owner: '@owner:fixture.localhost', signal: scope.signal, execute: async () => success({ status: 'succeeded', errorMessage: null }), acknowledged: () => success(undefined) });
+  cleanup(scope, () => connection.close());
+  const listener = connection.listener(agentId);
+  await until(() => listener.control.current().active && held.size > 0);
+  const original = listener.control.current();
+  const paused = await connection.delivery({ expectedRevision: 0, enabled: false }); assert(paused.ok);
+  assert.equal(listener.control.current().connected, true); assert.equal(listener.control.current().active, false);
+  assert.equal(original.connection.aborted, false); assert.equal(original.signal.aborted, true);
+  assert.equal(listener.control.current().connection, original.connection);
+  const resumed = await connection.delivery({ expectedRevision: 1, enabled: true }); assert(resumed.ok);
+  assert.equal(listener.control.current().connected, true); assert.equal(original.connection.aborted, false);
+  assert.equal(listener.control.current().active, false, 'New input still requires the current delivery revision');
+  for (const response of held) reply(response, true);
+  await until(() => listener.control.current().active);
+  assert.equal(listener.control.current().connection, original.connection, 'Revision synchronization never replaces a live native reporting generation');
+  assert.notEqual(listener.control.current().signal, original.signal);
+  await connection.close(); assert.deepEqual(errors, []);
+});
 
 test('controller retains uncertain acquisition ownership and closes that exact generation before reconnecting', async scope => {
   const fleetId = randomUUID(), agentId = randomUUID(), stop = new AbortController();

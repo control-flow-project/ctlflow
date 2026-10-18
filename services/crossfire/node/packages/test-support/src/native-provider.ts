@@ -24,7 +24,7 @@ export async function nativeProvider(context: TestContext, home: string) {
   let toolArguments = '{}';
   function finish(response: ServerResponse, tool = false): void {
     const item = tool
-      ? { type: "function_call", id: "fc-probe", call_id: "call-probe", name: toolName, arguments: toolArguments }
+      ? { type: "function_call", id: "fc-probe-" + requests.length, call_id: "call-probe-" + requests.length, name: toolName, arguments: toolArguments }
       : { type: "message", id: "message-" + requests.length, role: "assistant", status: "completed",
         content: [{ type: "output_text", text: "Fixture complete." }] };
     response.write("event: response.output_item.done\ndata: " + JSON.stringify({ type: "response.output_item.done", output_index: 0, item }) + "\n\n");

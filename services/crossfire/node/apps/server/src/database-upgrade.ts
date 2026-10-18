@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { validateSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/validate-schema';
+import { databaseIdentity, databaseValid } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { admitDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 
 export type UpgradePorts = {
@@ -19,9 +20,7 @@ export async function prepareDatabaseUpgrade(ports: UpgradePorts): Promise<void>
 }
 
 function verify(database: Database.Database): void {
-  const violations: unknown = database.pragma('foreign_key_check');
-  if (database.pragma('application_id', { simple: true }) !== 1129465426
-    || database.pragma('integrity_check', { simple: true }) !== 'ok' || !Array.isArray(violations) || violations.length)
+  if (databaseIdentity(database).application !== 1129465426 || !databaseValid(database))
     throw new Error('Management backup integrity or preserved relationships failed; migration is blocked');
 }
 
@@ -35,7 +34,7 @@ export async function backupBeforeMigration(directory: string): Promise<string |
   let backup: string | undefined;
   try {
     admitDatabase(database);
-    if (database.pragma('application_id', { simple: true }) === 0) return null;
+    if (databaseIdentity(database).application === 0) return null;
     try { validateSchema(database); return null; } catch {}
     verify(database);
     const parent = privateDir(join(directory, 'backups'));
@@ -45,7 +44,7 @@ export async function backupBeforeMigration(directory: string): Promise<string |
     const copy = new Database(backup, { readonly: true, fileMustExist: true });
     try {
       verify(copy);
-      if (copy.pragma('user_version', { simple: true }) !== database.pragma('user_version', { simple: true }))
+      if (databaseIdentity(copy).version !== databaseIdentity(database).version)
         throw new Error('Management backup schema identity differs; migration is blocked');
     } finally { copy.close(); }
     return backup;

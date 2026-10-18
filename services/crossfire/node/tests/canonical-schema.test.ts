@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { openTestStore } from './support/storage.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,6 +8,8 @@ import { createUnitOfWork } from '@ctlflow/crossfire-adapter-sqlite/unit-of-work
 import { createDiscoveryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/discovery/index';
 import { createListenerReadRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/listener-read/index';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
+import { metadataSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 
 function value<T>(result: Result<T>): T { if (!result.ok) assert.fail(result.error.message); return result.value; }
 
@@ -16,11 +19,13 @@ test('canonical schema has singular normalized tables and enforced identity/role
     const repositories = createRepositories(database);
     const directory = createDirectoryRepository(database);
     const unit = createUnitOfWork(database);
-    const tables = database.prepare("SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('knex_migrations','knex_migrations_lock')").all() as { name: string; sql: string }[];
+    const tables = executeSelect(database, metadataSchema, query => query.from('sqlite_schema')
+      .where(row => row.type === 'table' && !row.name.startsWith('sqlite_') && row.name !== 'knex_migrations' && row.name !== 'knex_migrations_lock')
+      .select(row => ({ name: row.name, sql: row.sql })));
     assert.equal(tables.length, 63);
-    assert(tables.every(table => !/json_valid/iu.test(table.sql)));
-    assert.deepEqual(database.pragma('foreign_key_check'), []);
-    assert.deepEqual(database.pragma('integrity_check'), [{ integrity_check: 'ok' }]);
+    assert(tables.every(table => table.sql !== null && !/json_valid/iu.test(table.sql)));
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
+    assert.deepEqual(sqliteMetadata.integrityResults(database), [{ integrity_check: 'ok' }]);
     assert.equal(unit.run(() => {
       const inserted = repositories.principal.insert({ id: 'rolled-back', matrixUserId: '@rolled-back:test', kind: 'human', status: 'active', revision: 0, createdAt: 1 });
       if (!inserted.ok) return inserted;
@@ -71,6 +76,6 @@ test('canonical schema has singular normalized tables and enforced identity/role
     assert.equal(value(repositories.agentRoomGrant.find({ agentId: 'agent', roomId: '!room:test' }))?.muted, false);
     assert.equal(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'policy.manage', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }).ok, false);
     value(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'room.agent.invite', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }));
-    assert.deepEqual(database.pragma('foreign_key_check'), []);
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   } finally { database.close(); }
 });

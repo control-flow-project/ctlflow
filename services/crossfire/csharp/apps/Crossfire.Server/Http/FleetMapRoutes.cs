@@ -12,7 +12,7 @@ public static class FleetMapRoutes
     {
         async ValueTask<Result<RoomDetails>> Room(string room, string agent, CancellationToken cancellation)
         {
-            using var database = new CrossfireDbContext(context.State.Database);
+            using var database = context.State.Storage.Open();
             return await RoomReads.Read(RoomGrantCommands.Ports(database, context.State.Now, context.State.Matrix.Room), context.State.Matrix.Ports(), context.Actor, room, agent, cancellation);
         }
         var ports = new FleetMapPorts(FleetReadQueries.Ports(context.Database, context.State.Now), () => AgentRoutingQueries.Identities(context.Database), ids => FleetMapQueries.Relations(context.Database, ids), Room);

@@ -80,7 +80,11 @@ public static class DecisionAcceptance
         credential.RevokedAt = null; context.SaveChanges();
         var fleet = context.Fleet.Single(row => row.Id == fixture.FleetId);
         fleet.DeliveryEnabled = 0; context.SaveChanges();
-        Equal(ListenerQueries.Live(context, fixture.AgentId, fixture.RunId, now).Error.Code, "conflict", "paused delivery invalidates run authority");
+        Equal(ListenerQueries.Live(context, fixture.AgentId, fixture.RunId, now).IsSuccess, true, "paused delivery retains native decision reporting");
+        var reporting = ListenerQueries.Find(context, fixture.RunId).Value!;
+        var facts = ListenerQueries.Facts(context, fixture.AgentId, fixture.FleetId, fixture.CredentialId).Value;
+        Equal(ControllerAdmission.Admits(reporting, facts, now, ControllerPurpose.Reporting), true, "paused reporting retains exact controller authority");
+        Equal(ControllerAdmission.Admits(reporting, facts, now, ControllerPurpose.Delivery), false, "paused reporting cannot authorize new scheduled input");
         fleet.DeliveryEnabled = 1; context.SaveChanges();
         var run = context.ListenerRun.Single(row => row.Id == fixture.RunId);
         run.DisconnectRequestedAt = now; context.SaveChanges();

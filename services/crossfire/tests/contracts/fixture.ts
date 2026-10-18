@@ -81,7 +81,7 @@ export async function contractClient(host: ContractHost) {
     let ready: Record<string, unknown> = {}; await observe(async () => { ready = record((await operation(operations.exchangeEnrollment, { enrollmentId }, { claimSecret })).data); return ready.status === 'ready'; }, 'Approved enrollment must reconcile through actual Matrix');
     const enrolled = record(list(ready.instances)[0]); const account = record(enrolled.account); const fleet = record(ready.fleet); return { id: text(enrolled.agentId), name, matrixUserId: text(account.matrixUserId), token: text(account.accessToken), fleetId: text(fleet.fleetId), credential: text(fleet.controllerCredential), connectionId: randomUUID(), enrollmentId, claimSecret };
   }
-  return { directory, state, origin, contentOrigin, native, configuration, owner, targets, release, headers, operation, login, member, agent, failure, restart,
+  return { directory, state, origin, contentOrigin, native, configuration, owner, targets, release, releaseDirectory: release.directory, headers, operation, login, member, agent, failure, restart,
     assertOperationCoverage() { assert.deepEqual(Object.entries(operations).filter(([_name, operation]) => !successful.has(operation.method + ' ' + operation.path)).map(([name]) => name), [], 'Every canonical operation needs a successful wire-schema-validated shared scenario'); },
     async approve(enrollmentId: string, code: string) { await operation(operations.decideEnrollment, { enrollmentId }, { expectedRevision: 0, decision: 'approve', verificationCode: code }); },
     close, current,

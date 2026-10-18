@@ -24,8 +24,8 @@ export function reportListener(services: Pick<Services, 'statistics' | 'reposito
       return failure('conflict', 'A listener run cannot change its controller generation');
     if (!previous.value && input.release !== currentRelease) return failure('conflict', 'Update the project-local Crossfire client and skill before reconnecting. Current release: ' + currentRelease);
     const now = services.clock.now();
-    const admitted = controllerAdmission(services, { agentId, controller: controller.value }); if (!admitted.ok) return admitted;
-    if (!previous.value && !admitted.value) return failure('conflict', 'An active authenticated controller lease and delivery intent are required');
+    const admitted = controllerAdmission(services, { agentId, controller: controller.value }, 'reporting'); if (!admitted.ok) return admitted;
+    if (!previous.value && !admitted.value) return failure('conflict', 'An active authenticated controller lease is required');
     const elapsed = previous.value ? Math.max(0, now - previous.value.lastSeenAt) : 0;
     const record = { id: runId, agentId, release: input.release, controller: controller.value, startedAt: previous.value?.startedAt ?? now,
       lastSeenAt: Math.max(now, previous.value?.lastSeenAt ?? now),

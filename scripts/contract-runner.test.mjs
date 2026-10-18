@@ -21,7 +21,7 @@ test('isolated target',()=>{assert(process.env.CROSSFIRE_CONTRACT_TARGET);writeF
   const result = await runContractTargets({ ...setup, environment: { CROSSFIRE_RUNNER_PROBE: setup.directory, CROSSFIRE_CONTRACT_TARGET: 'must-not-override-selection' } });
   scope.after(() => rmSync(result.evidence, { recursive: true }));
   const summary = JSON.parse(readFileSync(join(result.evidence, 'summary.json'), 'utf8'));
-  assert.equal(summary.results.length, 4); assert(summary.results.every(value => value.complete && value.tests === 1 && !value.failed && !value.cancelled && !value.failure));
+  assert.equal(summary.results.length, 4); assert(summary.results.every(value => value.complete && value.tests === 1 && !value.failed && !value.cancelled && !value.skipped && !value.todo && !value.failure));
   const probes = result.targets.map(name => JSON.parse(readFileSync(join(setup.directory, name + '.json'), 'utf8')));
   assert.equal(new Set(probes.map(value => value.pid)).size, 4); assert.deepEqual(probes.map(value => value.target), result.targets);
   assert(BigInt(summary.resources['memory.max']) > 0n); assert(BigInt(summary.resources['pids.max']) > 0n);
@@ -45,6 +45,34 @@ test('the shared matrix runner rejects invalid worker paths, banks and deadlines
   for (const change of [{ worker: 'relative' }, { bank: '../escape' }, { testTimeoutMs: 0 }, { deadlineMs: 20000 }, { cleanupMs: Infinity }])
     await assert.rejects(runContractTargets({ ...setup, ...change }), /absolute worker|finite ordered deadlines/u);
   assert.deepEqual(readdirSync(setup.directory), ['matrix.json']);
+});
+
+test('the shared matrix runner refuses skipped and unfinished scenarios even when the worker exits successfully', async scope => {
+  scope.mock.method(console, 'error', () => {});
+  for (const disposition of ['skip', 'todo']) {
+    const setup = fixture(scope, ['node']);
+    writeFileSync(setup.worker, "import test from 'node:test'; test('unexecuted required scenario',{ " + disposition + ": true },()=>{});\n");
+    await assert.rejects(runContractTargets(setup), error => {
+      const evidence = /inspect (.+)$/u.exec(error.message)?.[1]; assert(evidence); scope.after(() => rmSync(evidence, { recursive: true }));
+      const summary = JSON.parse(readFileSync(join(evidence, 'summary.json'), 'utf8'));
+      assert.equal(summary.results[0][disposition === 'skip' ? 'skipped' : 'todo'], 1);
+      assert.equal(summary.results[0].failure, 'Incomplete or failed shared contract assertions');
+      return true;
+    });
+  }
+});
+
+test('the shared matrix runner refuses different assertion counts across selected implementations', async scope => {
+  const setup = fixture(scope, ['node', 'rust']);
+  writeFileSync(setup.worker, "import test from 'node:test'; test('shared scenario',()=>{}); if(process.env.CROSSFIRE_CONTRACT_TARGET==='node')test('not shared',()=>{});\n");
+  await assert.rejects(runContractTargets(setup), error => {
+    assert.match(error.message, /^Shared contract assertion counts differ/u);
+    const evidence = /inspect (.+)$/u.exec(error.message)?.[1]; assert(evidence); scope.after(() => rmSync(evidence, { recursive: true }));
+    const summary = JSON.parse(readFileSync(join(evidence, 'summary.json'), 'utf8'));
+    assert(summary.results.every(value => value.failure === null));
+    assert.deepEqual(summary.results.map(value => value.tests).sort(), [1, 2]);
+    return true;
+  });
 });
 
 test('the shared matrix runner reaps a cancelled worker and cannot report it as passed', async scope => {

@@ -1,6 +1,7 @@
 import { openTestStore } from './storage.js';
 import { restoreSchema14EnrollmentItems } from './schema14.js';
 import { restoreSchema16Logging } from './schema16.js';
+import { migrationChange, migrationQuery } from './migration-data.js';
 
 export const schema13Tables = ["agent","agent_wake_sender","enrollment_item_policy","enrollment_item_wake_sender","enrollment_archive_policy","enrollment_archive_wake_sender"];
 export const schema13Wake = `
@@ -65,7 +66,7 @@ export function schema13Store() {
   restoreSchema16Logging(database);
   restoreSchema14EnrollmentItems(database);
   database.pragma('foreign_keys = OFF');
-  for (const table of schema13Tables) database.exec('DROP TABLE ' + table);
+  for (const table of schema13Tables) migrationChange(database, migrationQuery.schema.dropTable(table));
   database.exec(schema13Wake);
   for (const table of ['enrollment_archive_policy', 'enrollment_archive_wake_sender']) {
     for (const action of ['UPDATE', 'DELETE']) database.exec('CREATE TRIGGER protect_' + table + '_' + action.toLowerCase()

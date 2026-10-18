@@ -24,15 +24,16 @@ public sealed record ListenerRun(string Id, string AgentId, string? Release, Lis
 public sealed record ControllerAdmissionFacts(string OwnerStatus, string BindingOwnerId, string BindingFleetKey, long? RetiredAt,
     string FleetId, string FleetOwnerId, string FleetKey, long? ArchivedAt, bool DeliveryEnabled,
     string ConnectionId, string CredentialId, long? ClosedAt, long ExpiresAt, string CredentialFleetId, long? CredentialRevokedAt);
+public enum ControllerPurpose { Reporting, Delivery }
 
 public static class ControllerAdmission
 {
     public const long HeartbeatExpiryMs = 90000;
 
-    public static bool Admits(ListenerRun run, ControllerAdmissionFacts? facts, long now)
+    public static bool Admits(ListenerRun run, ControllerAdmissionFacts? facts, long now, ControllerPurpose purpose)
         => run.Controller is not null && facts is not null && facts.OwnerStatus == "active" && facts.RetiredAt is null && facts.ArchivedAt is null
             && facts.BindingOwnerId == facts.FleetOwnerId && facts.BindingFleetKey == facts.FleetKey
-            && facts.FleetId == run.Controller.FleetId && facts.DeliveryEnabled
+            && facts.FleetId == run.Controller.FleetId && (purpose == ControllerPurpose.Reporting || facts.DeliveryEnabled)
             && facts.ConnectionId == run.Controller.ConnectionId && facts.CredentialId == run.Controller.CredentialId
             && facts.ClosedAt is null && facts.ExpiresAt > now && facts.CredentialFleetId == facts.FleetId && facts.CredentialRevokedAt is null;
 }

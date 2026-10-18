@@ -28,7 +28,7 @@ fn only_shared_knex_migrates_and_a_verified_snapshot_precedes_an_upgrade()
         schema::pragma(&mut checked, "table_count")?,
         schema::pragma(&mut original, "table_count")?
     );
-    original.batch_execute("PRAGMA user_version=18")?;
+    original.batch_execute("PRAGMA user_version=19")?;
     let future = std::fs::read(prepared.path())?;
     assert!(backup_before_migration(directory).is_err());
     assert_eq!(std::fs::read(prepared.path())?, future);

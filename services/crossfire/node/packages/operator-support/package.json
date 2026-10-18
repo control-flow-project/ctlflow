@@ -1,10 +1,10 @@
 {
   "name": "@ctlflow/crossfire-operator-support",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
   "type": "module",
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
-  "dependencies": { "@ctlflow/crossfire-kernel": "0.1.21", "@ctlflow/crossfire-contracts": "0.1.21", "@ctlflow/crossfire-adapter-filesystem": "0.1.21" }
+  "dependencies": { "@ctlflow/crossfire-kernel": "0.1.22", "@ctlflow/crossfire-contracts": "0.1.22", "@ctlflow/crossfire-adapter-filesystem": "0.1.22" }
 }

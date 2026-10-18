@@ -1,13 +1,14 @@
 mod logical;
 use crate::{
     lifecycle_observer::{LifecycleHooks, Tracker},
-    model::InterruptedContext,
     resume_work::{self, WorkStore},
 };
 use crossfire_agent_core::synchronization::{CancellationToken, Mutex as AsyncMutex};
 use crossfire_agent_core::{
     listener_budget::{Budget, Work},
-    owned_runtime::{Attachment, Input, Inspection, OwnedAdapter, OwnedConnection, SavedContext},
+    owned_runtime::{
+        Attachment, Input, Inspection, NativeActivity, OwnedAdapter, OwnedConnection, SavedContext,
+    },
     runtime::{
         Admission, Approval, Connection, Hooks, InputPriority, InterruptResult, Lifecycle,
         ObservationEvent, Phase, SessionState, TurnControl,
@@ -17,7 +18,7 @@ use crossfire_agent_core::{
 use crossfire_domain::runtime::values::{HistoryMode, Runtime, State as NativeState};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, time::Clock};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     sync::{
         Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
@@ -35,7 +36,7 @@ struct State<N> {
     idle_seconds: i64,
     session: String,
     contexts: Vec<SavedContext>,
-    unsettled: BTreeSet<String>,
+    unsettled: BTreeMap<String, String>,
 }
 pub struct Owner<
     A: OwnedAdapter<LifecycleHooks<H, W, T>>,
@@ -64,6 +65,12 @@ pub struct Logical<
     owner: Arc<Owner<A, H, W, T>>,
     room: Option<String>,
     session: String,
+}
+struct Operation<'scope>(&'scope AtomicUsize);
+impl Drop for Operation<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, Ordering::AcqRel);
+    }
 }
 fn unavailable(message: &str) -> Failure {
     Failure::new(ErrorCode::Unavailable, message)
@@ -131,7 +138,7 @@ impl<
                 idle_seconds: 1800,
                 session,
                 contexts,
-                unsettled: BTreeSet::new(),
+                unsettled: BTreeMap::new(),
             }),
             transition: AsyncMutex::new(()),
             calls: AtomicUsize::new(0),
@@ -175,9 +182,14 @@ impl<
         let native = self.state.lock().map_err(|_| ownership())?.native.clone().filter(|native| !native.lifetime().is_cancelled())
             .ok_or_else(|| Failure::new(ErrorCode::Conflict,"Resume this agent before attaching its terminal; reading a pointer never starts a session"))?;
         let context = context.unwrap_or(self.primary());
-        native
-            .attachments()
-            .await?
+        let attachments = native.attachments().await?;
+        if attachments.is_empty() {
+            return Err(Failure::new(
+                ErrorCode::Unavailable,
+                "This native runtime does not support terminal attachment",
+            ));
+        }
+        attachments
             .into_iter()
             .find(|(key, _)| key == context)
             .map(|(_, attachment)| attachment)
@@ -256,7 +268,7 @@ impl<
         input.allow_new_history &= original.is_empty();
         self.state.lock().map_err(|_| ownership())?.phase = Phase::Waking;
         self.observe(NativeState::Waking, None)?;
-        self.tracker.recording.store(false, Ordering::Release);
+        self.tracker.suspend()?;
         let generation = self
             .tracker
             .generation
@@ -307,8 +319,10 @@ impl<
                 self.primary(),
                 &contexts,
                 self.work.as_ref(),
+                self.clock.now()?,
             )
             .await?;
+            self.tracker.checkpoint(&contexts, true)?;
             Ok(contexts)
         }
         .await;
@@ -327,11 +341,10 @@ impl<
         state.native = Some(connected.clone());
         state.phase = Phase::Running;
         self.tracker.touch()?;
-        self.tracker.recording.store(true, Ordering::Release);
         Ok(connected)
     }
     async fn discard(&self, native: &Arc<A::Connection>) -> Result<()> {
-        self.tracker.recording.store(false, Ordering::Release);
+        self.tracker.suspend()?;
         native.close().await.map_err(|_| {
             if let Ok(mut state) = self.state.lock() {
                 state.phase = Phase::Failed;
@@ -351,6 +364,46 @@ impl<
             state.native = None;
         }
         Ok(())
+    }
+    async fn inspect_native(&self, native: &Arc<A::Connection>) -> Result<bool> {
+        let revision = self.tracker.revision()?;
+        let generation = self.tracker.generation.load(Ordering::Acquire);
+        let activity = native.activity().await?;
+        self.tracker.complete_idle(revision, || {
+            let state = self.state.lock().map_err(|_| ownership())?;
+            if generation != self.tracker.generation.load(Ordering::Acquire)
+                || native.lifetime().is_cancelled()
+                || state.phase != Phase::Running
+                || !state
+                    .native
+                    .as_ref()
+                    .is_some_and(|current| Arc::ptr_eq(current, native))
+            {
+                return Ok(Vec::new());
+            }
+            let pending = state.unsettled.values().collect::<BTreeSet<_>>();
+            let saved = state
+                .contexts
+                .iter()
+                .map(|value| (&value.context, &value.session_id))
+                .collect::<BTreeMap<_, _>>();
+            Ok(activity
+                .contexts
+                .iter()
+                .filter(|value| {
+                    !value.busy
+                        && !pending.contains(&value.context)
+                        && saved
+                            .get(&value.context)
+                            .is_some_and(|session| **session == value.session_id)
+                })
+                .map(|value| crate::model::InterruptedContext {
+                    context: value.context.clone(),
+                    session_id: value.session_id.clone(),
+                })
+                .collect())
+        })?;
+        Ok(activity.busy)
     }
     pub async fn maintain(&self) -> Result<()> {
         self.tracker.check()?;
@@ -385,7 +438,7 @@ impl<
         if !due
             || self.input.hooks.pending_decisions()
             || self.input.hooks.pending_input()
-            || native.inspect().await?
+            || self.inspect_native(&native).await?
         {
             return Ok(());
         }
@@ -414,21 +467,14 @@ impl<
         let Some(native) = self.state.lock().map_err(|_| ownership())?.native.clone() else {
             return Ok(());
         };
-        if preserve_work && !native.lifetime().is_cancelled() {
-            let contexts = self.contexts().await?;
-            let uncertain = native.inspect().await.is_err();
-            let mut interrupted = Vec::new();
-            for context in contexts {
-                let room = (context.context != self.primary()).then_some(context.context.as_str());
-                let active = native.active_turn(room, None).await;
-                if uncertain || active.is_err() || active?.is_some() {
-                    interrupted.push(InterruptedContext {
-                        context: context.context,
-                        session_id: context.session_id,
-                    });
-                }
+        if preserve_work {
+            if !self.stop.is_cancelled()
+                && !native.lifetime().is_cancelled()
+                && !self.work.work().is_ok_and(|work| work.is_empty())
+            {
+                let _ = self.inspect_native(&native).await;
             }
-            resume_work::capture(self.work.as_ref(), &interrupted, self.clock.now()?)?;
+            self.tracker.suspend()?;
         }
         self.discard(&native).await?;
         self.state.lock().map_err(|_| ownership())?.phase = Phase::Sleeping;
@@ -436,15 +482,25 @@ impl<
         Ok(())
     }
     pub async fn close(&self) -> Result<()> {
+        let unfinished = !self.work.work().is_ok_and(|work| work.is_empty());
+        let native = {
+            let state = self.state.lock().map_err(|_| ownership())?;
+            (state.phase == Phase::Running && unfinished)
+                .then(|| state.native.clone())
+                .flatten()
+        };
+        if let Some(native) = native {
+            let _ = self.inspect_native(&native).await;
+        }
         self.stop.cancel();
         self.stop_native(true).await
     }
-    fn touch(&self, message: Option<&str>) -> Result<()> {
+    fn touch(&self, message: &str, context: &str) -> Result<()> {
         let mut state = self.state.lock().map_err(|_| ownership())?;
         self.tracker.touch()?;
-        if let Some(message) = message {
-            state.unsettled.insert(message.to_owned());
-        }
+        state
+            .unsettled
+            .insert(message.to_owned(), context.to_owned());
         Ok(())
     }
 }

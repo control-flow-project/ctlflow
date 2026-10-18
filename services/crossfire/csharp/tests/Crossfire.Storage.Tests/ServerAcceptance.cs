@@ -24,7 +24,8 @@ public static class ServerAcceptance
         var release = Releases.Load(releaseDirectory);
         using var reports = new PublicationStore(database + ".publications", configuration.PublicationBudget.Uploads, path => new StateLock(path));
         using var diagnostics = new DiagnosticStore(database + ".logs", configuration.LoggingRetentionDays, Identity.Now);
-        var state = new ApiState(configuration, database, release, matrix, reports, diagnostics, Identity.Now(), Identity.Now);
+        using var storage = new ManagementStorage(database);
+        var state = new ApiState(configuration, storage, release, matrix, reports, diagnostics, Identity.Now(), Identity.Now);
         var wakeCount = 0;
         await using var application = ApiApplication.Build(state, "http://127.0.0.1:0", () => wakeCount++);
         await application.StartAsync();
@@ -131,7 +132,7 @@ public static class ServerAcceptance
         await Request("POST", "/api/enrollments/" + enrollmentId + "/decision", "decideEnrollment", decision);
         var exchanged = await Request("POST", "/api/enrollments/" + enrollmentId + "/exchange", "exchangeEnrollment", JsonValues.Object(writer => writer.WriteString("claimSecret", claim)));
         var agentId = exchanged.GetProperty("instances")[0].GetProperty("agentId").GetString()!;
-        using (var context = new CrossfireDbContext(database))
+        using (var context = new CrossfireDbContext(DatabaseConnections.Options(database)))
             Equal((await PrincipalApplications.Reconcile(PrincipalApplicationCommands.Ports(context, Identity.Now, matrix.Ports(), matrix.RoomOperation), agentId)).IsSuccess, true, "HTTP fixture provisions an actual native agent");
         exchanged = await Request("POST", "/api/enrollments/" + enrollmentId + "/exchange", "exchangeEnrollment", JsonValues.Object(writer => writer.WriteString("claimSecret", claim)));
         var controller = exchanged.GetProperty("fleet").GetProperty("controllerCredential").GetString()!;
@@ -236,7 +237,7 @@ public static class ServerAcceptance
         var mentionedEvent = await Mention(); var noticePath = "/api/agents/" + agentId + "/wake-notices/" + Uri.EscapeDataString(mentionedEvent); var noticeBody = JsonValues.Object(writer => writer.WriteString("roomId", roomId));
         var blocked = await Request("PUT", noticePath, "wakeNotice", noticeBody, bearer: agentToken, nativeOnly: true);
         Equal(blocked.GetProperty("outcome").GetString(), "pending", "blocked source gets an ordinary-code queued notice instead of a model turn");
-        using (var noticeDatabase = new CrossfireDbContext(database))
+        using (var noticeDatabase = new CrossfireDbContext(DatabaseConnections.Options(database)))
         {
             var ports = WakeNoticeQueries.Ports(noticeDatabase, Identity.Now, matrix.Ports());
             Equal((await WakeNotices.Publish(ports, agentId, mentionedEvent)).IsSuccess, true, "native blocked notice is published through the same Matrix authority");

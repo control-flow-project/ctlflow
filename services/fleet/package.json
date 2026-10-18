@@ -1,16 +1,16 @@
 {
   "name": "@ctlflow/fleet",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": false,
   "publishConfig": { "access": "public" },
   "type": "module",
-  "devDependencies": { "@ctlflow/crossfire-test-support": "0.1.21" },
+  "devDependencies": { "@ctlflow/crossfire-test-support": "0.1.22" },
   "bin": { "fleet": "./dist/bin/fleet.mjs" },
   "files": ["LICENSE", "dist/bin", "docs", "README.md"],
   "exports": { "./executable": "./dist/bin/fleet.mjs", "./package.json": "./package.json" },
-  "dependencies": { "@ctlflow/fleetd": "0.1.21" },
+  "dependencies": { "@ctlflow/fleetd": "0.1.22" },
   "engines": {
     "node": ">=26.0.0",
     "npm": ">=11.17.0"

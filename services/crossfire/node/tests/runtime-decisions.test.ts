@@ -124,6 +124,20 @@ test('a newer intentional stop suppresses false lost-contact notices from an old
   assert.deepEqual(value(services.runtime.activeIncidents()), []);
 });
 
+test('runs with identical start times select only the greatest ID for contact monitoring', async scope => {
+  const { services, agent, advance, advanceConnected } = await fixture(scope);
+  advance(1);
+  const first = '11111111-1111-4111-8111-111111111110', last = '11111111-1111-4111-8111-11111111111f';
+  for (const id of [first, last]) value(reportListener(services, agent.actor, agent.id, id,
+    { statistics: null, release: 'fixture', stopped: false, controller: agent.controller, messagesDelivered: 0 }, 'fixture'));
+  value(reportListener(services, agent.actor, agent.id, last,
+    { statistics: null, release: 'fixture', stopped: true, controller: agent.controller, messagesDelivered: 0 }, 'fixture'));
+  assert.deepEqual(value(services.runtime.watchedRuns()).filter(run => run.agentId === agent.id).map(run => run.id), [last]);
+  advanceConnected(90001, agent.controller);
+  value(await reconcileRuntime(services, () => false));
+  assert.deepEqual(value(services.runtime.activeIncidents()), []);
+});
+
 test('management DMs cannot admit agents through discovery, grants, invitations or direct storage', async scope => {
   const { services, native, owner, admin, agent, runId } = await fixture(scope);
   value(await native.matrix.provision(services.instance.serviceMatrixId, 'fixture-secret', 'fixture'));

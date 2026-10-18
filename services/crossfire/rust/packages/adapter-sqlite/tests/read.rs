@@ -72,7 +72,7 @@ fn discovery_is_paginated_filtered_and_resolves_unknown_identities_without_adopt
     let mut database = scenario.database()?;
     assert_eq!(
         crossfire_adapter_sqlite::schema::pragma(database.connection(), "user_version")?,
-        17
+        crossfire_adapter_sqlite::schema::SCHEMA_VERSION
     );
     let guest = scenario.add_human("@guest:example.test")?;
     let query = DiscoveryFilter {
@@ -235,12 +235,12 @@ fn agent_and_fleet_details_use_current_controller_authority_not_stale_activity()
         &scenario.agent.principal_id,
         NOW,
     )?;
-    assert_eq!(details.activity.status, ActivityState::Offline);
+    assert_eq!(details.activity.status, ActivityState::Online);
     assert_eq!(details.activity.last_seen_at, Some(NOW));
-    assert!(details.activity.active_runs.is_empty());
+    assert_eq!(details.activity.active_runs.len(), 1);
     assert_eq!(
         read::agent::list(&mut scenario.store, &scenario.owner, &filter, NOW)?.total_items,
-        0
+        1
     );
     assert_eq!(
         read::agent::list(
@@ -253,7 +253,7 @@ fn agent_and_fleet_details_use_current_controller_authority_not_stale_activity()
             NOW
         )?
         .total_items,
-        1
+        0
     );
     let history = read::agent::history(
         &mut scenario.store,

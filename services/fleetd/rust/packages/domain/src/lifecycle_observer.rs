@@ -3,6 +3,7 @@ use crate::{
     resume_work::{self, WorkStore},
 };
 use crossfire_agent_core::{
+    owned_runtime::SavedContext,
     runtime::{Decision, Hooks, ObservationEvent},
     synchronization::CancellationToken,
 };
@@ -16,7 +17,7 @@ use std::{
     collections::BTreeMap,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
+        atomic::{AtomicI64, AtomicU64, Ordering},
     },
 };
 
@@ -26,11 +27,16 @@ pub struct Tracker<H, W, T> {
     clock: Arc<T>,
     primary: &'static str,
     pub activity: AtomicI64,
-    pub recording: AtomicBool,
     pub generation: AtomicU64,
-    settings: Mutex<BTreeMap<String, (State, Vec<Setting>)>>,
+    observations: Mutex<Observations>,
     error: Mutex<Option<Failure>>,
     stop: CancellationToken,
+}
+#[derive(Default)]
+struct Observations {
+    recording: bool,
+    revision: u64,
+    settings: BTreeMap<String, (State, Vec<Setting>)>,
 }
 pub struct LifecycleHooks<H, W, T> {
     pub(crate) tracker: Arc<Tracker<H, W, T>>,
@@ -51,9 +57,8 @@ impl<H: Hooks, W: WorkStore, T: Clock> Tracker<H, W, T> {
             clock,
             primary,
             activity: AtomicI64::new(now),
-            recording: AtomicBool::new(false),
             generation: AtomicU64::new(0),
-            settings: Mutex::new(BTreeMap::new()),
+            observations: Mutex::new(Observations::default()),
             error: Mutex::new(None),
             stop,
         }
@@ -76,7 +81,7 @@ impl<H: Hooks, W: WorkStore, T: Clock> Tracker<H, W, T> {
     }
     pub fn settings(&self, session: &str, configured: &[Setting]) -> Result<Vec<Setting>> {
         Ok(self
-            .settings
+            .observations
             .lock()
             .map_err(|_| {
                 Failure::new(
@@ -84,6 +89,7 @@ impl<H: Hooks, W: WorkStore, T: Clock> Tracker<H, W, T> {
                     "Native settings observation ownership failed",
                 )
             })?
+            .settings
             .get(session)
             .map(|(_, settings)| settings.clone())
             .unwrap_or_else(|| configured.to_vec()))
@@ -91,6 +97,67 @@ impl<H: Hooks, W: WorkStore, T: Clock> Tracker<H, W, T> {
     pub fn touch(&self) -> Result<()> {
         self.activity.store(self.clock.now()?, Ordering::Release);
         self.check()
+    }
+    pub fn suspend(&self) -> Result<()> {
+        self.observations
+            .lock()
+            .map_err(|_| self.ownership())?
+            .recording = false;
+        Ok(())
+    }
+    pub fn capture_input(&self, context: InterruptedContext) -> Result<()> {
+        let mut observed = self.observations.lock().map_err(|_| self.ownership())?;
+        observed.revision = observed.revision.wrapping_add(1);
+        resume_work::capture(self.work.as_ref(), &[context], self.clock.now()?)
+    }
+    pub fn revision(&self) -> Result<u64> {
+        Ok(self
+            .observations
+            .lock()
+            .map_err(|_| self.ownership())?
+            .revision)
+    }
+    pub fn complete_idle(
+        &self,
+        revision: u64,
+        completed: impl FnOnce() -> Result<Vec<InterruptedContext>>,
+    ) -> Result<()> {
+        let observed = self.observations.lock().map_err(|_| self.ownership())?;
+        if !observed.recording || observed.revision != revision {
+            return Ok(());
+        }
+        resume_work::clear(self.work.as_ref(), &completed()?)
+    }
+    pub fn checkpoint(&self, contexts: &[SavedContext], recording: bool) -> Result<()> {
+        let mut observed = self.observations.lock().map_err(|_| self.ownership())?;
+        observed.recording = false;
+        let active = contexts
+            .iter()
+            .filter(|context| {
+                observed
+                    .settings
+                    .get(&context.session_id)
+                    .is_some_and(|(state, _)| {
+                        matches!(
+                            state,
+                            State::Working | State::WaitingAnswer | State::WaitingApproval
+                        )
+                    })
+            })
+            .map(|context| InterruptedContext {
+                context: context.context.clone(),
+                session_id: context.session_id.clone(),
+            })
+            .collect::<Vec<_>>();
+        resume_work::capture(self.work.as_ref(), &active, self.clock.now()?)?;
+        observed.recording = recording;
+        Ok(())
+    }
+    fn ownership(&self) -> Failure {
+        Failure::new(
+            ErrorCode::Unavailable,
+            "Native observation ownership failed",
+        )
     }
     fn observe(&self, event: &ObservationEvent) -> Result<()> {
         match event {
@@ -102,20 +169,18 @@ impl<H: Hooks, W: WorkStore, T: Clock> Tracker<H, W, T> {
                 settings,
                 ..
             } => {
+                let mut observed = self.observations.lock().map_err(|_| self.ownership())?;
                 let previous = {
-                    let mut observed = self.settings.lock().map_err(|_| {
-                        Failure::new(
-                            ErrorCode::Unavailable,
-                            "Native settings observation ownership failed",
-                        )
-                    })?;
-                    if !observed.contains_key(session_id) && observed.len() >= 2002 {
+                    if !observed.settings.contains_key(session_id)
+                        && observed.settings.len() >= 2002
+                    {
                         return Err(Failure::new(
                             ErrorCode::Limit,
                             "Native context observations exceed their bounded saved history count",
                         ));
                     }
                     observed
+                        .settings
                         .insert(session_id.clone(), (*state, settings.clone()))
                         .map(|(state, _)| state)
                 };
@@ -134,26 +199,16 @@ impl<H: Hooks, W: WorkStore, T: Clock> Tracker<H, W, T> {
                 {
                     self.touch()?;
                 }
-                if self.recording.load(Ordering::Acquire) {
-                    if working {
-                        resume_work::capture(
-                            self.work.as_ref(),
-                            &[InterruptedContext {
-                                context: room_id.clone().unwrap_or_else(|| self.primary.to_owned()),
-                                session_id: session_id.clone(),
-                            }],
-                            self.clock.now()?,
-                        )?;
-                    } else if *state == State::Idle {
-                        for work in self
-                            .work
-                            .work()?
-                            .into_iter()
-                            .filter(|work| &work.session_id == session_id)
-                        {
-                            resume_work::acknowledge(self.work.as_ref(), &work.message_id)?;
-                        }
-                    }
+                if observed.recording && working {
+                    observed.revision = observed.revision.wrapping_add(1);
+                    resume_work::capture(
+                        self.work.as_ref(),
+                        &[InterruptedContext {
+                            context: room_id.clone().unwrap_or_else(|| self.primary.to_owned()),
+                            session_id: session_id.clone(),
+                        }],
+                        self.clock.now()?,
+                    )?;
                 }
             }
         }

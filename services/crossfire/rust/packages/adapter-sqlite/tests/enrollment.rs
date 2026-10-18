@@ -210,7 +210,7 @@ async fn enrollment_expiration_releases_names_and_rejection_never_creates_agents
     let mut database = scenario.database()?;
     assert_eq!(
         crossfire_adapter_sqlite::schema::pragma(database.connection(), "user_version")?,
-        17
+        crossfire_adapter_sqlite::schema::SCHEMA_VERSION
     );
     let repository = SharedStore::new(scenario.store);
     let native = Native {
@@ -280,7 +280,7 @@ async fn global_name_collisions_reject_an_entire_fleet_with_an_explicit_error_be
     let mut metadata = scenario.database()?;
     assert_eq!(
         crossfire_adapter_sqlite::schema::pragma(metadata.connection(), "user_version")?,
-        17
+        crossfire_adapter_sqlite::schema::SCHEMA_VERSION
     );
     assert_eq!(scenario.report.messages_delivered, 0);
     let repository = SharedStore::new(scenario.store);

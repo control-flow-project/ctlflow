@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
+import { databaseIdentity, foreignKeyViolations, integrityResults } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
+import { migrationQuery, migrationRows } from '../../dist/tests/support/migration-data.js';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { createDirectoryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/directory/index';
 import { createRuntimeRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/runtime/index';
@@ -25,11 +27,11 @@ function native(binary, ...arguments_) {
   return JSON.parse(execFileSync(resolve(binary), arguments_, {encoding:'utf8', timeout:30_000, maxBuffer:1_048_576}).trim());
 }
 function schema(database) {
-  assert.equal(database.pragma('application_id', {simple:true}), 1129465426);
-  assert.equal(database.pragma('user_version', {simple:true}), 17);
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
-  assert.deepEqual(database.pragma('integrity_check'), [{integrity_check:'ok'}]);
-  return database.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%' ORDER BY type,name").all();
+  assert.deepEqual(databaseIdentity(database), {application:1129465426, version:18});
+  assert.deepEqual(foreignKeyViolations(database), []);
+  assert.deepEqual(integrityResults(database), [{integrity_check:'ok'}]);
+  return migrationRows(database, migrationQuery('sqlite_schema').select('type', 'name', 'tbl_name', 'sql')
+    .where('name', 'not like', 'sqlite_%').orderBy(['type', 'name']));
 }
 
 let database;
@@ -38,7 +40,7 @@ try {
   const before = schema(database);
   database.close(); database = null;
   const ownerId = randomUUID(); const rustIdentity = native(identityBinary, 'write', path, ownerId);
-  assert.equal(rustIdentity.id, ownerId); assert.equal(rustIdentity.version, 17);
+  assert.equal(rustIdentity.id, ownerId); assert.equal(rustIdentity.version, 18);
   database = new Database(path, {fileMustExist:true}); database.pragma('foreign_keys=ON');
   const repositories = createRepositories(database), directoryReader = createDirectoryRepository(database), runtime = createRuntimeRepository(database), statistics = createStatisticsRepository(database);
   const member = value(directoryReader.member(ownerId)); assert(member);

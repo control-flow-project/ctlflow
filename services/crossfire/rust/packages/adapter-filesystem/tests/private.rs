@@ -1,8 +1,54 @@
 use crossfire_adapter_filesystem::PrivateDirectory;
+use crossfire_kernel::failure::ErrorCode;
 use std::{
     fs,
     os::unix::fs::{PermissionsExt, symlink},
 };
+
+#[test]
+fn absent_socket_is_unavailable_without_relaxing_private_socket_validation()
+-> Result<(), Box<dyn std::error::Error>> {
+    let fixture = tempfile::tempdir()?;
+    let private = fixture.path().join("private");
+    let directory = PrivateDirectory::open(&private, true)?;
+    assert_eq!(
+        directory
+            .socket("missing.sock")
+            .err()
+            .map(|error| error.code),
+        Some(ErrorCode::Unavailable)
+    );
+    fs::write(private.join("regular.sock"), b"not a socket")?;
+    assert_eq!(
+        directory
+            .socket("regular.sock")
+            .err()
+            .map(|error| error.code),
+        Some(ErrorCode::Forbidden)
+    );
+    let path = private.join("native.sock");
+    let socket = crossfire_adapter_filesystem::socket::Socket::prepare(&path)?;
+    let _listener = std::os::unix::net::UnixListener::bind(socket.endpoint())?;
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
+    directory.socket("native.sock")?;
+    symlink(&path, private.join("linked.sock"))?;
+    assert_eq!(
+        directory
+            .socket("linked.sock")
+            .err()
+            .map(|error| error.code),
+        Some(ErrorCode::Forbidden)
+    );
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o666))?;
+    assert_eq!(
+        directory
+            .socket("native.sock")
+            .err()
+            .map(|error| error.code),
+        Some(ErrorCode::Forbidden)
+    );
+    Ok(())
+}
 
 #[test]
 fn private_files_are_atomic_owned_and_bounded() -> Result<(), Box<dyn std::error::Error>> {

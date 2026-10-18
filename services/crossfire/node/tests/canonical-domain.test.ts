@@ -158,7 +158,7 @@ test('listener activity is monotonic, controller pause and owner visibility are 
   assert.equal(reportListener(services, foreign.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 4, controller: owned.controller, stopped: false }, release).ok, false);
   const fleet = value(services.repositories.fleet.findById(owned.controller.fleetId))!;
   value(changeFleetDelivery(services, admin.actor, fleet.id, { expectedRevision: fleet.revision, enabled: false }, randomUUID()));
-  assert.equal(value(reportListener(services, owned.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 3, stopped: true, controller: owned.controller }, release)).disconnect, true);
+  assert.equal(value(reportListener(services, owned.actor, owned.id, runId, { statistics: null, release, messagesDelivered: 3, stopped: true, controller: owned.controller }, release)).disconnect, false);
   const paused = value(services.repositories.fleet.findById(fleet.id))!;
   value(changeFleetDelivery(services, admin.actor, fleet.id, { expectedRevision: paused.revision, enabled: true }, randomUUID()));
   const newRun = randomUUID();

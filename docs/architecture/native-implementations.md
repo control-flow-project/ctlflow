@@ -97,7 +97,7 @@ and out-of-range values. Empty collections have one logical page.
 
 ## Database
 
-Management SQLite uses application ID `1129465426`, schema 17 and the applied
+Management SQLite uses application ID `1129465426`, schema 18 and the applied
 Knex migration contract. Current metadata describes 63 application tables.
 Knex's own bookkeeping tables are separate. File state and Conduit's externally
 owned RocksDB are not management SQL databases.
@@ -108,11 +108,25 @@ No import/export is needed when changing between verified implementations.
 
 ## .NET dependencies
 
-The SDK is pinned to `11.0.100-rc.1.26425.128`; EF/SQLite packages are pinned
-to `11.0.0-rc.1.26425.128`. Managed initial deployment is permitted.
+The SDK is pinned to `11.0.100-rc.2.26504.105`; EF/SQLite packages are pinned
+to `11.0.0-rc.2.26504.105`. Managed initial deployment is permitted.
 There is no automatic managed fallback inside a NativeAOT executable.
 
+Both managed and NativeAOT publication precompile the fixed EF models and queries
+through the same build owner. Managed publication does not leave query expression
+compilation on the request path. Development builds retain the ordinary EF build
+cycle; neither publication uses a second query implementation or a result cache.
+
 NativeAOT publication emits IL diagnostics from EF/BCL reflection and generic
+paths. The SQLite adapter's standard EF options constructor emits IL2026 and
+IL3050 at C# compilation as well as linking; these remain visible warnings,
+consistent with the existing linker policy. Its fixed model and queries are
+compiled at publication. Managed and actual NativeAOT acceptance exercise the
+pooled constructor, independent concurrent leases, reset, rollback, connection
+release and privacy revalidation. Passing those checks does not establish that
+arbitrary EF models or query shapes are NativeAOT-compatible.
+
+NativeAOT publication also emits diagnostics from other EF/BCL reflection and generic
 paths. They remain visible. Prior server publication emitted 1,007 diagnostics;
 that count is a run observation, not a count of independent defects or a fixed
 budget. Supported fixed queries use generated model/query metadata and run in

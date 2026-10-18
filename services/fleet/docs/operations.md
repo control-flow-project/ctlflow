@@ -51,9 +51,9 @@ Pending decisions and unconfirmed delivery remain recovery state, not logs.
 | Server unavailable | Delivery gate closes; retained unread state resumes after authenticated reconnection |
 | Old terminal pointer | Obtain a new attachment descriptor for the current generation |
 
-A killed Node/C# controller may leave a native process alive. Rust's Linux guard
-terminates its owned native group on parent death; it does not contain tools
-that escape that group. Process-name scanning and history copying are not
+Each implementation's packaged guard terminates its owned native group on
+controller death; it does not contain tools that escape that group. A retained
+native-group/history lock blocks a competing writer. Process-name scanning and history copying are not
 recovery methods. No target guarantees arbitrary subprocess cleanup after SIGKILL.
 
 - [Controller failure boundaries](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/docs/operations.md)

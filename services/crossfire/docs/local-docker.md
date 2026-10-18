@@ -171,7 +171,12 @@ node --test services/crossfire/docker/local/containers.test.mjs
 ```
 
 Set the exact `CTLFLOW_FLEET_IMAGE` for the independent fleet-container check.
-Set `CROSSFIRE_RUNTIME_IMAGE`, `CROSSFIRE_MIGRATION_IMAGE` and
-`CTLFLOW_FLEET_IMAGE` for the complete local-stack check. Tests require the repository's verified cgroup-v2
+Set `CROSSFIRE_RUNTIME_IMAGE`, `CROSSFIRE_MIGRATION_IMAGE`,
+`CTLFLOW_FLEET_IMAGE` and `CROSSFIRE_RUNTIME_BACKEND` for the complete local-stack
+check. Run the same test for `node`, `csharp-managed`, `csharp-nativeaot` and
+`rust`, selecting each backend's exact image and its matching migration image.
+Backend and source/release labels must match; assertions are not skipped for a
+selected implementation. Run local-stack cases sequentially because they bind
+the documented loopback ports. Tests require the repository's verified cgroup-v2
 Docker resource controls; they are not an unbounded Docker Desktop test recipe.
 Paid-provider login and task quality are separate acceptance requirements.

@@ -19,7 +19,8 @@ export function openStore(path: string): Database.Database {
     validateSchema(database);
     database.pragma('foreign_keys = ON');
     database.pragma('busy_timeout = 5000');
-    database.pragma('journal_mode = DELETE');
+    database.pragma('journal_mode = WAL');
+    database.pragma('synchronous = FULL');
     return database;
   } catch (error) { database.close(); throw error; }
 }

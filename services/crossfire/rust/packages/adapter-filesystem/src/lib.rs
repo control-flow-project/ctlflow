@@ -279,8 +279,14 @@ impl PrivateDirectory {
 
     pub fn socket(&self, name: &str) -> Result<()> {
         Self::leaf(name)?;
-        let info = rustix::fs::statat(&self.descriptor, name, AtFlags::SYMLINK_NOFOLLOW)
-            .map_err(|_| denied())?;
+        let info = rustix::fs::statat(&self.descriptor, name, AtFlags::SYMLINK_NOFOLLOW).map_err(
+            |error| match error {
+                rustix::io::Errno::NOENT => {
+                    Failure::new(ErrorCode::Unavailable, "Private socket is not available")
+                }
+                _ => denied(),
+            },
+        )?;
         if rustix::fs::FileType::from_raw_mode(info.st_mode) != rustix::fs::FileType::Socket
             || info.st_uid != rustix::process::getuid().as_raw()
             || info.st_mode & 0o077 != 0

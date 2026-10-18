@@ -65,7 +65,7 @@ public sealed class RegistrationTransport(ApiState state)
         if (http.Request.Method != "POST") { http.Response.Headers.Allow = "POST"; await NativeResponses.Error(http, requestId, 405, "M_UNRECOGNIZED", "Use POST"); return; }
         var body = await Transport.Read(http.Request, 2097152, http.RequestAborted);
         if (!body.IsSuccess) { await NativeResponses.Error(http, requestId, 400, "M_BAD_JSON", body.Error.Message); return; }
-        using var database = new CrossfireDbContext(state.Database);
+        using var database = state.Storage.Open();
         var policy = PolicyQueries.Find(database);
         if (!policy.IsSuccess || policy.Value is null) { await NativeResponses.Error(http, requestId, 503, "M_UNKNOWN", "Signup policy unavailable"); return; }
         if (String(body.Value, "kind") == "guest" || http.Request.QueryString.Value?.Contains("kind=guest", StringComparison.Ordinal) == true)
@@ -121,7 +121,7 @@ public sealed class RegistrationTransport(ApiState state)
         if (http.Request.Method is not ("GET" or "POST"))
         { http.Response.Headers.Allow = "GET, POST"; await RegistrationPage.Error(http, 405, "Use the invitation confirmation in Element."); return; }
         var invitation = InvitationCookies.Read(http.Request);
-        using var database = new CrossfireDbContext(state.Database);
+        using var database = state.Storage.Open();
         var policy = PolicyQueries.Find(database);
         if (!policy.IsSuccess || policy.Value is null) { await RegistrationPage.Error(http, 503, "Signup policy is unavailable. Try again later."); return; }
         if (invitation is not null ? !Invitations.Verify(InvitationCommands.Ports(database, state.Now), invitation.Id, invitation.Secret).IsSuccess : policy.Value.SignupMode != "open")

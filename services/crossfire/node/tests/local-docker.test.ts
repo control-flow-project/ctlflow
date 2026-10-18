@@ -15,7 +15,7 @@ const service = (name: string) => record(services[name]);
 
 test('local stack uses the existing runtime and the common one-shot migration owner', () => {
   assert.deepEqual(Object.keys(services).sort(), ['crossfire', 'fleetd', 'initialize', 'migrate']);
-  assert.match(String(service('crossfire').image), /CROSSFIRE_RUNTIME_IMAGE:\?Set the exact csharp-nativeaot/u);
+  assert.match(String(service('crossfire').image), /CROSSFIRE_RUNTIME_IMAGE:\?Set the exact selected runtime image/u);
   assert.equal(service('migrate').image, service('initialize').image);
   assert.match(String(service('migrate').image), /CROSSFIRE_MIGRATION_IMAGE:\?/u);
   assert.deepEqual(service('initialize').entrypoint, ['node', '/app/services/crossfire/crossfire']);

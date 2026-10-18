@@ -136,7 +136,11 @@ public static class OwnedPiAcceptance
         }
         finally { await current.DisposeAsync(); }
         var resumedInput = isolated with { AllowNewHistory = false }; current = await Start(adapter, resumedInput, cancellation);
-        try { foreach (var binding in saved.Where(value => value.Context != "control")) Equal((await current.Conversation(binding.Context)).Value.SessionId, binding.SessionId, "Pi restart resumes every exact retained room identity"); }
+        try
+        {
+            Equal(adapter.SavedContexts(isolated.Workspace, isolated.StateDirectory).Value.SequenceEqual(saved), true, "Pi primary restart preserves the complete saved context order and identities");
+            foreach (var binding in saved.Where(value => value.Context != "control")) Equal((await current.Conversation(binding.Context)).Value.SessionId, binding.SessionId, "Pi restart resumes every exact retained room identity");
+        }
         finally { await current.DisposeAsync(); }
         var reset = Identity.Identifier(); Equal(adapter.Reset(new(isolated.Workspace, isolated.StateDirectory, reset)).IsSuccess, true, "Pi explicit reset archives native histories"); Equal(adapter.Reset(new(isolated.Workspace, isolated.StateDirectory, reset)).IsSuccess, true, "Pi reset is idempotent by reset identity");
         Equal(Directory.GetFiles(Path.Combine(isolated.StateDirectory, ".pi/archive", reset, "histories")).Length, 3, "Pi reset preserves every native history in its private archive");

@@ -10,6 +10,8 @@ mkdirSync(join(root, 'dist', 'bin'), { recursive: true });
 await build({ entryPoints: [join(root, 'node/apps', 'daemon', 'src', 'main.ts')], outfile: output,
   bundle: true, platform: 'node', format: 'esm', target: 'node26', conditions: ['source'],
   banner: { js: 'import { createRequire as ctlflowCreateRequire } from "node:module";const require=ctlflowCreateRequire(import.meta.url);' } });
+await build({ entryPoints: [fileURLToPath(import.meta.resolve('@ctlflow/crossfire-adapter-runtime/native-guard'))],
+  outfile: join(root, 'dist/bin/native-guard.js'), bundle: true, platform: 'node', format: 'esm', target: 'node26', conditions: ['source'] });
 rmSync(join(root, 'dist', 'assets'), { recursive: true, force: true });
 await buildAgentArtifacts(join(root, 'dist', 'assets'), version);
 chmodSync(output, 0o755);

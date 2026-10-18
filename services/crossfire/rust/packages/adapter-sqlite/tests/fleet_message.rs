@@ -18,7 +18,7 @@ fn fleet_messages_are_authorized_bounded_repeatable_attributed_and_receipted_by_
     let mut database = scenario.database()?;
     assert_eq!(
         crossfire_adapter_sqlite::schema::pragma(database.connection(), "user_version")?,
-        17
+        crossfire_adapter_sqlite::schema::SCHEMA_VERSION
     );
     let owner = FleetActor::Principal(scenario.owner.clone());
     let controller = authority::authenticate_controller(
@@ -265,7 +265,7 @@ fn expired_deliveries_and_suspended_agents_do_not_grow_the_current_controller_qu
     let mut database = scenario.database()?;
     assert_eq!(
         crossfire_adapter_sqlite::schema::pragma(database.connection(), "user_version")?,
-        17
+        crossfire_adapter_sqlite::schema::SCHEMA_VERSION
     );
     assert_eq!(scenario.report.messages_delivered, 0);
     Ok(())

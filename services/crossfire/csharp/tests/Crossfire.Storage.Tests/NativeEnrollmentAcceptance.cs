@@ -11,7 +11,7 @@ public static class NativeEnrollmentAcceptance
 {
     public static async Task Verify(AccountAuthority authority, string database, string ownerMatrixId, string serverName)
     {
-        using var context = new CrossfireDbContext(database);
+        using var context = new CrossfireDbContext(DatabaseConnections.Options(database));
         Equal(Schema.Validate(context).IsSuccess, true, "native enrollment uses the real Knex management schema");
         Equal(PrincipalValues.Initialize(PolicyQueries.Ports(context, Identity.Now), ownerMatrixId).IsSuccess, true, "native owner registration");
         var owner = MemberQueries.ByMatrixId(context, ownerMatrixId).Value!;

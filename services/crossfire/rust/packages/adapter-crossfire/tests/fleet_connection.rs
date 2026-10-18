@@ -23,6 +23,8 @@ struct Network {
     with_message: bool,
     blocked: AtomicBool,
     fail_receipt: AtomicBool,
+    release_error: Mutex<Option<ErrorCode>>,
+    block_release: AtomicBool,
     changed: Notify,
     calls: Mutex<Vec<(OperationId, Option<Value>)>>,
 }
@@ -36,7 +38,22 @@ impl Coordination for Network {
             .map_err(|_| error())?
             .push((call.operation, call.body.clone()));
         match call.operation {
-            OperationId::ReportFleetConnection => Ok(json!({"revision":1})),
+            OperationId::ReportFleetConnection => {
+                if call
+                    .body
+                    .as_ref()
+                    .is_some_and(|body| body["stopped"] == true)
+                {
+                    if self.block_release.load(Ordering::SeqCst) {
+                        stop.cancelled().await;
+                        return Err(error());
+                    }
+                    if let Some(code) = *self.release_error.lock().map_err(|_| error())? {
+                        return Err(Failure::new(code, "Fixture lease close refused"));
+                    }
+                }
+                Ok(json!({"revision":1}))
+            }
             OperationId::FleetControl => {
                 if self.blocked.load(Ordering::SeqCst) {
                     stop.cancelled().await;
@@ -88,9 +105,118 @@ fn network(with_message: bool) -> Arc<Network> {
         with_message,
         blocked: AtomicBool::new(false),
         fail_receipt: AtomicBool::new(false),
+        release_error: Mutex::new(None),
+        block_release: AtomicBool::new(false),
         changed: Notify::new(),
         calls: Mutex::new(Vec::new()),
     })
+}
+#[tokio::test(start_paused = true)]
+async fn remote_release_refusal_cannot_block_idempotent_local_shutdown()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    for code in [
+        ErrorCode::Unauthorized,
+        ErrorCode::Forbidden,
+        ErrorCode::Unavailable,
+    ] {
+        let network = network(false);
+        let fleet = Fleet::open(
+            network.clone(),
+            &network.fleet,
+            Secret::new("private".to_owned()),
+            "@owner:example.test",
+            Arc::new(Operations),
+            CancellationToken::new(),
+        )?;
+        let control = fleet.bind(&network.agent)?;
+        fleet.start().await?;
+        observe(|| Ok(control.current()?.active)).await?;
+        *network.release_error.lock().map_err(|_| error())? = Some(code);
+        fleet.close().await?;
+        fleet.close().await?;
+        assert!(!fleet.status()?.connected);
+        assert!(!control.current()?.active);
+        assert_eq!(
+            network
+                .calls
+                .lock()
+                .map_err(|_| error())?
+                .iter()
+                .filter(
+                    |(operation, body)| *operation == OperationId::ReportFleetConnection
+                        && body.as_ref().is_some_and(|body| body["stopped"] == true)
+                )
+                .count(),
+            1,
+            "A repeated close cannot repeat an uncertain remote release"
+        );
+    }
+    Ok(())
+}
+#[tokio::test(start_paused = true)]
+async fn a_stalled_remote_release_has_a_two_second_local_shutdown_bound()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let network = network(false);
+    let fleet = Fleet::open(
+        network.clone(),
+        &network.fleet,
+        Secret::new("private".to_owned()),
+        "@owner:example.test",
+        Arc::new(Operations),
+        CancellationToken::new(),
+    )?;
+    let control = fleet.bind(&network.agent)?;
+    fleet.start().await?;
+    observe(|| Ok(control.current()?.active)).await?;
+    network.block_release.store(true, Ordering::SeqCst);
+    let started = tokio::time::Instant::now();
+    fleet.close().await?;
+    assert_eq!(started.elapsed(), Duration::from_secs(2));
+    assert!(!control.current()?.active);
+    Ok(())
+}
+#[tokio::test(start_paused = true)]
+async fn cancelling_a_close_waiter_cannot_cancel_owned_shutdown_or_repeat_release()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let network = network(false);
+    let fleet = Fleet::open(
+        network.clone(),
+        &network.fleet,
+        Secret::new("private".to_owned()),
+        "@owner:example.test",
+        Arc::new(Operations),
+        CancellationToken::new(),
+    )?;
+    let control = fleet.bind(&network.agent)?;
+    fleet.start().await?;
+    observe(|| Ok(control.current()?.active)).await?;
+    network.block_release.store(true, Ordering::SeqCst);
+    let closing = fleet.clone();
+    let waiter = tokio::spawn(async move { closing.close().await });
+    let releases = || -> Result<usize> {
+        Ok(network
+            .calls
+            .lock()
+            .map_err(|_| error())?
+            .iter()
+            .filter(|(operation, body)| {
+                *operation == OperationId::ReportFleetConnection
+                    && body.as_ref().is_some_and(|body| body["stopped"] == true)
+            })
+            .count())
+    };
+    observe(|| Ok(releases()? == 1)).await?;
+    waiter.abort();
+    assert!(waiter.await.is_err());
+    tokio::time::advance(Duration::from_secs(2)).await;
+    fleet.close().await?;
+    assert!(!control.current()?.active);
+    assert_eq!(
+        releases()?,
+        1,
+        "Shutdown remains owned after its first caller disconnects"
+    );
+    Ok(())
 }
 #[tokio::test(start_paused = true)]
 async fn transient_skipped_receipt_failure_reconnects_without_killing_the_controller_loop()

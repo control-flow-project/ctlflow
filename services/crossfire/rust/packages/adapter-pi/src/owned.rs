@@ -6,8 +6,8 @@ use crossfire_adapter_filesystem::{PrivateDirectory, lock::StateLock};
 use crossfire_adapter_runtime::clock;
 use crossfire_agent_core::{
     owned_runtime::{
-        Attachment, Input, Inspection, OwnedAdapter, OwnedConnection, Reset, SavedContext,
-        Validation,
+        Attachment, Input, Inspection, NativeActivity, OwnedAdapter, OwnedConnection, Reset,
+        SavedContext, Validation,
     },
     runtime::{
         Admission, Approval, Connection, Decision, Hooks, InputPriority, InterruptResult,
@@ -39,6 +39,7 @@ struct Owner<H> {
 pub struct PiOwnedConnection<H> {
     owner: Arc<Owner<H>>,
     connection: Arc<NativeConnection<H>>,
+    context: String,
     root: bool,
 }
 fn invalid(message: &str) -> Failure {
@@ -155,6 +156,7 @@ impl PiRuntime {
         }
         Ok(PiOwnedConnection {
             connection: connection?,
+            context: histories.primary().to_owned(),
             owner: Arc::new(Owner {
                 histories,
                 lock: Mutex::new(Some(lock)),
@@ -247,7 +249,7 @@ impl<H: Hooks + 'static> Connection for PiOwnedConnection<H> {
         self.owner.histories.lifetime()
     }
     async fn inspect(&self) -> Result<bool> {
-        self.owner.histories.inspect().await
+        Ok(self.owner.histories.activity().await?.busy)
     }
     async fn deliver(
         &self,
@@ -272,6 +274,7 @@ impl<H: Hooks + 'static> Connection for PiOwnedConnection<H> {
     async fn conversation(&self, room: &str, admission: Option<&Admission>) -> Result<Self> {
         Ok(Self {
             owner: Arc::clone(&self.owner),
+            context: self.owner.histories.context(Some(room)).to_owned(),
             connection: self
                 .owner
                 .histories
@@ -295,6 +298,9 @@ impl<H: Hooks + 'static> Connection for PiOwnedConnection<H> {
     }
 }
 impl<H: Hooks + 'static> OwnedConnection for PiOwnedConnection<H> {
+    async fn activity(&self) -> Result<NativeActivity> {
+        self.owner.histories.activity().await
+    }
     fn attachment(&self) -> Option<Attachment> {
         None
     }
@@ -308,7 +314,7 @@ impl<H: Hooks + 'static> TurnControl for PiOwnedConnection<H> {
         room: Option<&str>,
         admission: Option<&Admission>,
     ) -> Result<Option<String>> {
-        let context = self.owner.histories.context(room);
+        let context = self.owner.histories.context(room.or(Some(&self.context)));
         let connection = if admission.is_some() {
             Some(self.owner.histories.open(context, admission).await?)
         } else {

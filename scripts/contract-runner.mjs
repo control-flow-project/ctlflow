@@ -41,12 +41,13 @@ export async function runContractTargets({ manifest, worker, bank, testTimeoutMs
       clearTimeout(timer); clearTimeout(escalation); signal?.removeEventListener('abort', cancel);
       const { tail, ...counts } = output.finish();
       const result = { target: target.name, implementation: target.implementation, elapsedMs: Math.round(performance.now() - started),
-        failure: failure ?? (!counts.complete || !counts.tests || counts.failed || counts.cancelled ? 'Incomplete or failed shared contract assertions' : null), log, ...counts };
+        failure: failure ?? (!counts.complete || !counts.tests || counts.failed || counts.cancelled || counts.skipped || counts.todo ? 'Incomplete or failed shared contract assertions' : null), log, ...counts };
       results.push(result); console.log((result.failure ? 'FAIL ' : 'PASS ') + target.name); if (result.failure) console.error(tail);
     }
   }));
   writeFileSync(join(evidence, 'summary.json'), JSON.stringify({ resources, workers, manifest, assertions: 'one shared contract suite', results }, null, 2) + '\n');
   if (results.length !== targets.length || results.some(result => result.failure)) throw new Error('Unified contract matrix failed; inspect ' + evidence);
+  if (new Set(results.map(result => result.tests)).size !== 1) throw new Error('Shared contract assertion counts differ; inspect ' + evidence);
   const result = { status: 'passed', implementations: [...new Set(targets.map(target => target.implementation))], targets: targets.map(target => target.name), evidence };
   console.log(JSON.stringify(result)); return result;
 }

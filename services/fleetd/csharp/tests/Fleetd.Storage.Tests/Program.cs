@@ -53,4 +53,8 @@ try
     Reject(() => Authentication.Read(file), "Symlink rejected"); File.Delete(file); File.CreateSymbolicLink(file, Path.Combine(directory, "absent")); Reject(() => Authentication.Read(file), "Dangling symlink rejected");
 }
 finally { Directory.Delete(directory, true); }
+var resumeDirectory = Path.Combine(Path.GetTempPath(), "fleetd-resume-" + Guid.NewGuid().ToString("N"));
+Directory.CreateDirectory(resumeDirectory); File.SetUnixFileMode(resumeDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+try { Fleetd.Storage.Tests.ResumeAcceptance.Run(resumeDirectory, Check); }
+finally { Directory.Delete(resumeDirectory, true); }
 Console.WriteLine("{\"status\":\"passed\",\"scope\":\"fleetd authentication storage\",\"assertions\":" + assertions + ",\"dynamicCode\":" + (RuntimeFeature.IsDynamicCodeSupported ? "true" : "false") + "}");

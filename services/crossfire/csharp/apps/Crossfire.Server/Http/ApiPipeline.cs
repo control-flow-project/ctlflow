@@ -66,7 +66,7 @@ public static class ApiPipeline
                     var admitted = rate(http);
                     if (!admitted.IsSuccess) { if (admitted.Error.Code == "rate_limit") http.Response.Headers.RetryAfter = "60"; await Transport.Send(http, requestId, Result<ApiReply>.Fail(admitted.Error), 200); return; }
                 }
-                using var database = new CrossfireDbContext(state.Database);
+                using var database = state.Storage.Open();
                 var authenticated = await ApiAuthentication.Authenticate(state, database, http, selected, requestId, changes);
                 if (!authenticated.IsSuccess) { await Transport.Send(http, requestId, Result<ApiReply>.Fail(authenticated.Error), selected.Operation.Status); return; }
                 var query = Transport.Query(http.Request, selected.QueryFields ?? []);

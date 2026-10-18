@@ -52,12 +52,59 @@ pub fn capture(store: &impl WorkStore, contexts: &[InterruptedContext], now: i64
     }
     Ok(())
 }
-pub fn acknowledge(store: &impl WorkStore, message_id: &str) -> Result<()> {
+pub fn renew(store: &impl WorkStore, message_id: &str, now: i64) -> Result<ResumeWork> {
     let mut previous = store.work()?;
-    let length = previous.len();
-    previous.retain(|value| value.message_id != message_id);
-    if length != previous.len() {
-        store.save_work(&previous)?;
+    let work = previous
+        .iter_mut()
+        .find(|value| value.message_id == message_id)
+        .ok_or_else(|| {
+            Failure::new(
+                ErrorCode::Conflict,
+                "Interrupted work changed before exact-history resume",
+            )
+        })?;
+    work.message_id = identity::id();
+    work.checkpointed_at = now;
+    let renewed = work.clone();
+    store.save_work(&previous)?;
+    Ok(renewed)
+}
+pub fn clear(store: &impl WorkStore, contexts: &[InterruptedContext]) -> Result<()> {
+    if contexts.len() > 2002
+        || contexts
+            .iter()
+            .map(|value| &value.context)
+            .collect::<BTreeSet<_>>()
+            .len()
+            != contexts.len()
+    {
+        return Err(Failure::new(
+            ErrorCode::Invalid,
+            "Duplicate or excessive completed native histories",
+        ));
+    }
+    let selected = contexts
+        .iter()
+        .map(|value| (&value.context, &value.session_id))
+        .collect::<BTreeMap<_, _>>();
+    let previous = store.work()?;
+    if previous.iter().any(|value| {
+        selected
+            .get(&value.context)
+            .is_some_and(|session| **session != value.session_id)
+    }) {
+        return Err(Failure::new(
+            ErrorCode::Conflict,
+            "Completed work belongs to another saved native history",
+        ));
+    }
+    let next = previous
+        .iter()
+        .filter(|value| !selected.contains_key(&value.context))
+        .cloned()
+        .collect::<Vec<_>>();
+    if next.len() != previous.len() {
+        store.save_work(&next)?;
     }
     Ok(())
 }
@@ -84,6 +131,7 @@ pub async fn resume<
     primary: &str,
     contexts: &[crossfire_agent_core::owned_runtime::SavedContext],
     store: &S,
+    now: i64,
 ) -> Result<()> {
     let pending = store.work()?;
     if pending.iter().any(|work| {
@@ -98,10 +146,10 @@ pub async fn resume<
     }
     for work in pending {
         if work.context == primary {
-            continue_context(connection, &work, store).await?;
+            continue_context(connection, &work, store, now).await?;
         } else {
             let target = connection.conversation(&work.context, None).await?;
-            continue_context(&target, &work, store).await?;
+            continue_context(&target, &work, store, now).await?;
         }
     }
     Ok(())
@@ -113,6 +161,7 @@ async fn continue_context<
     connection: &C,
     work: &ResumeWork,
     store: &S,
+    now: i64,
 ) -> Result<()> {
     if connection.session_id() != work.session_id {
         return Err(Failure::new(
@@ -123,21 +172,18 @@ async fn continue_context<
     connection
         .settle(connection.lifetime().child_token())
         .await?;
-    let text = continuation_text(work)?;
-    if connection.active_turn(None, None).await?.is_none()
-        && !connection
-            .recover(&text, &work.message_id, connection.lifetime().child_token())
-            .await?
-    {
+    connection.acknowledge(std::slice::from_ref(&work.message_id))?;
+    if connection.active_turn(None, None).await?.is_none() {
+        let renewed = renew(store, &work.message_id, now)?;
         connection
             .deliver(
-                &text,
-                &work.message_id,
+                &continuation_text(&renewed)?,
+                &renewed.message_id,
                 connection.lifetime().child_token(),
                 None,
             )
             .await?;
+        connection.acknowledge(std::slice::from_ref(&renewed.message_id))?;
     }
-    acknowledge(store, &work.message_id)?;
-    connection.acknowledge(std::slice::from_ref(&work.message_id))
+    Ok(())
 }

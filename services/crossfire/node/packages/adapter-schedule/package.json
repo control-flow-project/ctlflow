@@ -1,11 +1,11 @@
 {
   "name": "@ctlflow/crossfire-adapter-schedule",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
   "type": "module",
   "engines": { "node": ">=26.0.0", "npm": ">=11.17.0" },
-  "dependencies": { "@ctlflow/crossfire-domain": "0.1.21", "@ctlflow/crossfire-kernel": "0.1.21", "cron-parser": "5.10.1" },
+  "dependencies": { "@ctlflow/crossfire-domain": "0.1.22", "@ctlflow/crossfire-kernel": "0.1.22", "cron-parser": "5.10.1" },
   "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } }
 }

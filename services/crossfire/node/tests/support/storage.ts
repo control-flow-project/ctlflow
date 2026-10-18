@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import Database from 'better-sqlite3';
 import knex from 'knex';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -9,6 +10,7 @@ import { admitDatabase, databaseConfiguration } from '@ctlflow/crossfire-data/ma
 import schemaDefinition from '@ctlflow/crossfire-data/management/sqlite/schema' with { type: 'json' };
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { validateSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/validate-schema';
+import { migrationChange, migrationQuery } from './migration-data.js';
 
 export const loggingSchema = schemaDefinition.parts.loggingSchema;
 export const statisticsSchema = schemaDefinition.parts.statisticsSchema;
@@ -48,12 +50,12 @@ export function applicationDatabase(scope: TestContext, path = ':memory:'): stri
 }
 
 export function forgetFixtureMigrations(database: Database.Database): void {
-  database.exec('DELETE FROM knex_migrations');
+  migrationChange(database, migrationQuery('knex_migrations').delete());
 }
 
 export async function migrateFixture(database: Database.Database): Promise<void> {
   admitDatabase(database);
-  const foreignKeys = database.pragma('foreign_keys', { simple: true });
+  const foreignKeys = sqliteMetadata.foreignKeys(database);
   database.pragma('foreign_keys=OFF');
   const fixtureKnex = knex({ ...databaseConfiguration(':memory:'), pool: { min: 0, max: 1 } });
   fixtureKnex.client.acquireConnection = () => Promise.resolve(database);

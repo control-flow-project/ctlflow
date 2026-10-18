@@ -8,16 +8,20 @@ import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { readJson } from "@ctlflow/crossfire-adapter-filesystem/index";
 import { loadControl } from "@ctlflow/crossfire-agent-core/control";
 import { createListenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
-import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, THREAD, CONTROLLER } from "./test-support/listener.js";
+import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, OWNER_DM, THREAD, CONTROLLER } from "./test-support/listener.js";
 
 test("one bounded reconciliation receiver recovers missed notifications and important state exactly once", withClock(async (scope, clock) => {
 
   const native = await fakeCodex(scope);
   const matrix = await matrixFixture(scope, native.directory, clock);
   const stop = new AbortController();
-  const result = listen({ ...matrix, reconcileMs: 1000, limit: 2, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
+  const result = listen({ ...matrix, reconcileMs: 1000, limit: 2, pollMs: 1000, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
   cleanup(scope, async () => { stop.abort(); await clock.complete(result); });
-  await clock.observe(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
+  await clock.observe(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1
+    && !existsSync(matrix.cursorFile + '.snapshot') && !existsSync(matrix.cursorFile + '.ack')
+    && !existsSync(matrix.cursorFile + '.chat-publication')
+    && readJson<Record<string, string>>(matrix.cursorFile)[OWNER_DM] === 'sync-0');
+  assert.equal(matrix.requests.filter(request => request.path.endsWith('/sync') && Number(request.query.get('timeout')) > 0).at(-1)!.query.get('timeout'), '500');
   const before = readJson(matrix.cursorFile);
   matrix.syncUpdates.enabled = false;
   matrix.add(ROOM, message("$missed"), { ...message("$rename", OBSERVER), type: "m.room.name", state_key: "", content: { name: "Coffee Day" } },
@@ -66,7 +70,7 @@ test("reconciliation respects human pause, mute and suspension without empty mod
 test('server admission loss pauses delivery and rebinds the same desired receiver rather than treating it as an owner stop', withClock(async (scope, clock) => {
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock), stop = new AbortController();
   const notices: string[] = [], binding = createListenerControl(async () => {}, () => matrix.reporting.controller, reason => notices.push(reason));
-  binding.update({ active: true, input: null });
+  binding.update({ connected: true, active: true, input: null });
   matrix.reporting.disconnect = true;
   let finished = false;
   const result = listen({ ...matrix, control: binding.connection, reconcileMs: 1000, limit: 100, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal)
@@ -77,7 +81,7 @@ test('server admission loss pauses delivery and rebinds the same desired receive
   matrix.add(ROOM, message('$unread-after-admission-loss')); await clock.advance(20);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
   matrix.reporting.disconnect = false; matrix.reporting.controller = { ...CONTROLLER, connectionId: 'dddddddd-bbbb-cccc-dddd-eeeeeeeeeeee' };
-  binding.update({ active: true, input: null });
+  binding.update({ connected: true, active: true, input: null });
   await clock.until(() => existsSync(matrix.cursorFile) && readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === '1');
   assert.equal(native.requests().filter(request => request.method === 'thread/resume').length, 1);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 1); assert.equal(finished, false);

@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/workspace",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
@@ -34,7 +34,8 @@
     "publish:rust": "node scripts/publish-rust.mjs",
     "package:containers": "node scripts/container-packages.mjs",
     "verify:contracts": "node scripts/verify-contracts.mjs",
-    "verify:parity": "node scripts/verify-parity.mjs"
+    "verify:parity": "node scripts/verify-parity.mjs",
+    "verify:performance": "node scripts/verify-performance.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

@@ -49,7 +49,7 @@ public sealed class CodexSession : IAsyncDisposable
     {
         var initialized = CodexJson.ObjectReply(await Protocol.Request("initialize", CodexJson.Object(writer =>
         {
-            writer.WriteStartObject("clientInfo"); writer.WriteString("name", "crossfire"); writer.WriteString("title", "crossfire listener"); writer.WriteString("version", "0.1.21"); writer.WriteEndObject();
+            writer.WriteStartObject("clientInfo"); writer.WriteString("name", "crossfire"); writer.WriteString("title", "crossfire listener"); writer.WriteString("version", "0.1.22"); writer.WriteEndObject();
             writer.WriteStartObject("capabilities"); writer.WriteBoolean("experimentalApi", true); writer.WriteEndObject();
         }), cancellation));
         if (!initialized.IsSuccess) return Result<Unit>.Fail(initialized.Error);

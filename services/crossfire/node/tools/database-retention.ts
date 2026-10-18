@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
+import { tableColumns } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { DAY_MS, loggingRetentionDays } from '@ctlflow/crossfire-kernel/logging';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 
@@ -38,7 +39,7 @@ export function retentionProof(database: Database.Database, input?: RetentionPro
 
 export function recordIdentity(database: Database.Database, table: string) {
   if (!/^[a-z][a-z_]*$/u.test(table)) throw new Error('Invalid protected table');
-  const columns = database.pragma('table_info(' + table + ')') as { name: string; pk: number }[];
+  const columns = tableColumns(database, table);
   const keys = columns.filter(column => column.pk > 0).sort((left, right) => left.pk - right.pk).map(column => column.name);
   if (!keys.length) throw new Error('Protected records need a primary key');
   return (row: object) => JSON.stringify(keys.map(key => (row as Record<string, unknown>)[key]));

@@ -3,6 +3,15 @@
 Each product owns external assertions under `tests/contracts/`.
 The root coordinates builds, process limits and target selection.
 Tests send the same requests and expect the same results for every target.
+These directories are ownership boundaries within one acceptance suite, not
+separate Node, C# or Rust suites. Each selected executable set runs the same
+server, fleetd, fleet, UI and ingress scenarios. Both controller and installed
+CLI scenarios run with actual Codex and Pi processes and inert local providers.
+Language-local compiler and algorithm tests supplement this bank; they cannot
+replace it or establish another set of externally observable expectations.
+The shared native question flow includes upstream reconnection, pending decisions
+across delivery pause and new native questions while chat admission remains
+paused. Answers must reach the exact original native tool request and history.
 
 ## Targets
 
@@ -33,6 +42,9 @@ npm run verify:parity -- /absolute/new-evidence-directory
 It runs architecture, Node tests, C# tests, Rust tests, both C# distributions,
 Rust publication, matrix generation, installed-product tests, container tests
 and migration-container tests. Failure stops subsequent phases. Configured targets cannot be skipped.
+The runner rejects missing summary counters, skipped/unfinished scenarios and
+different assertion counts between selected implementations, even when every
+worker exits successfully.
 
 Within the installed and container banks, targets run in independent test
 processes concurrently up to the available CPU count in the verified aggregate
@@ -60,21 +72,28 @@ omitted; each worker still runs the complete other container/recovery scenarios.
 | Input boundaries | Canonical pagination, duplicate/unknown fields, host, origin, CSRF and request bounds |
 | Authorization | Owner/admin scope, native room authority, delegated invitations and recorded addition provenance |
 | Coordination | Enrollment, controller leases, exact lifecycle claims/receipts, stop evidence and retirement |
-| Decisions | Exact owner review/answer, generation-bound publication and no answer on GET |
+| Decisions | Actual Codex/Pi question through fleetd and crossfire to exact owner review/answer and original native tool output; generation-bound publication, no consent on GET or agent self-answer |
 | Scheduled input | Rule CRUD, due claim, eligibility and exact-session acknowledgment |
 | Publications | Manifest/upload/commit, opaque-origin execution, inventory and deletion fence |
 | UI | Durable management routes, wake selection, stale edits, room delegation, schedules, decisions, confirmations and reports at mobile/desktop widths |
-| Native execution | Actual Codex/Pi chat, attribution, interruption, receipts, file-backed input, history and stop/resume |
-| CLI/transport | Local daemon ownership, noninteractive setup, stopped intent, SSH host verification |
+| Native execution | Actual Codex/Pi chat, attribution, interruption, receipts, file-backed input, history, stop/resume, idle/in-flight controller death and upstream outage recovery |
+| Controller API | Every declaration has a decoded success or a checked native capability refusal; roster CRUD, revisions, operation replay, explicit updates and read-only readiness |
+| CLI/transport | Both native engines; exact daemon ownership handoff, noninteractive setup, per-agent/fleet resume/reset/update, messages, delivery, restart and strict SSH host verification |
+| CLI/controller interoperability | Every selected CLI reads every selected controller through the same private authenticated API; all 16 ordered four-target pairs run |
 | Containers | Actual images/operators, Element room/media, same-file backend changes, concurrent starts and owned orphan recovery |
 | Data | Knex initialization, historical conversion, rollback, unsupported-schema rejection and same-file access |
 
 - [Scenario inventory](../../services/crossfire/tests/contracts/README.md)
+- [Cross-runtime performance and offline reports](performance.md)
 
 An operation response check is not proof of every possible business-state
 combination. Internal suites cover additional failure injection and state
 transitions. Authentication-only coverage is never reported as successful
 operation coverage. Fixture assertions do not certify paid providers.
+Pi deliberately has no live terminal attachment. Every implementation must
+return the same explicit unavailable result, without creating another writer;
+that capability refusal is recorded separately from successful operations.
+There are no implementation-specific test omissions or relaxed assertions.
 
 ## Operator recovery checks
 

@@ -1,5 +1,9 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { openTestStore } from './support/storage.js';
 import assert from 'node:assert/strict';
+import { defineSelect } from '@tinqerjs/tinqer';
+import { toSql } from '@tinqerjs/better-sqlite3-adapter';
+import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
@@ -109,8 +113,10 @@ test('hourly normalized summaries are idempotent, paginated in SQL, token-baseli
   const restarted = randomUUID(); assert(heartbeat({ ...second, sequence: 1, flows: [], usage: [sample(session, 200, 50)] }, restarted).statisticsAccepted);
   assert.equal(read().tokens!.input, 100, 'A new reporting run retains the original native session counter');
   const database = fixture.database;
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
-  const plan = database.prepare('EXPLAIN QUERY PLAN SELECT * FROM listener_stat_interval WHERE agent_id = ? AND captured_at >= ?').all(agent.id, 0) as { detail: string }[];
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
+  const generated = toSql(defineSelect(schema, (query, params: { agentId: string; cutoff: number }) => query.from('listener_stat_interval')
+    .where(row => row.agent_id === params.agentId && row.captured_at >= params.cutoff)), { agentId: agent.id, cutoff: 0 });
+  const plan = database.prepare<[Record<string, unknown>], { detail: string }>('EXPLAIN QUERY PLAN ' + generated.sql).all(generated.params);
   assert(plan.some(row => row.detail.includes('ix_listener_stat_interval_agent_captured')));
   fixture.advance(8 * 86400000); value(maintainLogging(fixture.services)); fixture.renewController(agent.controller);
   assert(heartbeat({ ...second, sequence: 2, flows: [], usage: [sample(session, 200, 50)] }, randomUUID()).statisticsAccepted);

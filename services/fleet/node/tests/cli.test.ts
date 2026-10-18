@@ -41,8 +41,8 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   assert.equal(repeated.controller.name, 'native-test');
   assert.equal(repeated.startedAt, value(await client.call(operations.status, {}, {})).data.startedAt);
   mkdirSync(join(fleet, 'agents', 'analyst'), { recursive: true, mode: 0o700 });
-  let preflight = false;
-  const waiting = createServer(incoming => { if (incoming.url === '/api/enrollments/preflight') preflight = true; });
+  const waiting = createServer(incoming => { if (incoming.url === '/api/enrollments/preflight') waiting.emit('preflight'); });
+  const preflight = once(waiting, 'preflight', { signal: scope.signal });
   waiting.listen(0, '127.0.0.1'); await once(waiting, 'listening');
   cleanup(scope, async () => { waiting.closeAllConnections(); await new Promise<void>(resolve => waiting.close(() => resolve())); });
   const address = waiting.address(); assert(address && typeof address !== 'string');
@@ -59,10 +59,18 @@ test('CLI manages a private named daemon through its typed Unix API and survives
   assert.equal((await client.call(operations.attachment, { fleetId: added.fleetId, instanceKey: 'missing' }, {})).ok, false);
   const starter = spawn(process.execPath, [entry, 'start', 'research'], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const ended = once(starter, 'close'); let output = '', errors = '';
-  starter.stdout.on('data', chunk => { output += String(chunk); }); starter.stderr.on('data', chunk => { errors += String(chunk); });
+  const accepted = once(starter, 'operation', { signal: scope.signal });
+  starter.stdout.on('data', chunk => {
+    output += String(chunk);
+    try {
+      const result: unknown = JSON.parse(output);
+      if (typeof result === 'object' && result !== null && 'operationId' in result && typeof result.operationId === 'string') starter.emit('operation');
+    } catch (error) { if (!(error instanceof SyntaxError)) throw error; }
+  });
+  starter.stderr.on('data', chunk => { errors += String(chunk); });
   cleanup(scope, async () => { starter.kill('SIGKILL'); await ended; });
-  for (let attempt = 0; !preflight && attempt < 100; attempt++) await delay(30);
-  assert(preflight, errors || 'No enrollment preflight was observed'); assert(output.includes('operationId'));
+  await Promise.race([Promise.all([preflight, accepted]), ended.then(() => assert.fail(errors || 'CLI ended before enrollment preflight and its operation response'))]);
+  assert(output.includes('operationId'));
   const operationId = (JSON.parse(output) as { operationId: string }).operationId;
   starter.kill('SIGTERM'); await ended;
   assert.equal(value(await client.call(operations.status, {}, {})).data.stopping, false);

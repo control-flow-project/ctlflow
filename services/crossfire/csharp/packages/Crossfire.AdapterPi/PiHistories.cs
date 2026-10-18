@@ -67,7 +67,9 @@ public sealed class PiHistories : OwnedRuntimeConnection, TurnControl
         lock (gate)
         {
             if (binding.SessionId is not null && registry.Bindings.Any(value => value.Context != binding.Context && value.SessionId == binding.SessionId)) return Results.Fail<Unit>("conflict", "Pi reused another native context identity");
-            var next = new PiRegistry(Mode(input.HistoryMode), [.. registry.Bindings.Where(value => value.Context != binding.Context), binding]);
+            var bindings = registry.Bindings.ToList(); var position = bindings.FindIndex(value => value.Context == binding.Context);
+            if (position < 0) bindings.Add(binding); else bindings[position] = binding;
+            var next = new PiRegistry(Mode(input.HistoryMode), bindings);
             var saved = PiState.Write(home, next); if (saved.IsSuccess) registry = next; return saved;
         }
     }
@@ -122,17 +124,27 @@ public sealed class PiHistories : OwnedRuntimeConnection, TurnControl
             finally { lock (gate) starting.Remove(context); completion.TrySetResult(result); }
         }
     }
-    public async ValueTask<Result<bool>> Inspect()
+    public async ValueTask<Result<bool>> Inspect() => (await Activity()).Map(value => value.Busy);
+    public async ValueTask<Result<NativeActivity>> Activity()
     {
-        if (Lifetime.IsCancellationRequested) return Results.Fail<bool>("unavailable", "Pi history owner stopped");
-        Opened[] initial; lock (gate) { if (starting.Count != 0 || input.Hooks.PendingDecisions?.Invoke() == true) return Result<bool>.Success(true); initial = opened.Values.ToArray(); }
+        if (Lifetime.IsCancellationRequested) return Results.Fail<NativeActivity>("unavailable", "Pi history owner stopped");
+        Opened[] initial; lock (gate) { if (starting.Count != 0) return Result<NativeActivity>.Success(new(true, [])); initial = opened.Values.ToArray(); }
+        List<NativeContextActivity> activity = [];
         foreach (var context in Contexts())
         {
             Opened? current; lock (gate) opened.TryGetValue(context, out current);
-            if (current is not null) { if (current.Context.Connection.Unsettled) return Result<bool>.Success(true); var busy = await current.Context.Connection.Inspect(); if (!busy.IsSuccess || busy.Value) return busy; }
-            else { var pending = Unacknowledged(context); if (!pending.IsSuccess || pending.Value) return pending; }
+            string? session; lock (gate) { if (starting.Count != 0) return Result<NativeActivity>.Success(new(true, [])); session = registry.Bindings.FirstOrDefault(value => value.Context == context)?.SessionId; }
+            if (session is null) return Results.Fail<NativeActivity>("invalid", "Pi activity has no exact native history");
+            var busy = current is not null ? current.Context.Connection.Unsettled ? Result<bool>.Success(true) : await current.Context.Connection.Inspect() : Unacknowledged(context);
+            if (!busy.IsSuccess) return Result<NativeActivity>.Fail(busy.Error);
+            activity.Add(new(context, session, busy.Value));
         }
-        lock (gate) return Result<bool>.Success(starting.Count != 0 || opened.Count != initial.Length || opened.Values.Any(value => value.Context.Connection.Unsettled));
+        lock (gate)
+        {
+            if (starting.Count != 0 || opened.Count != initial.Length) return Result<NativeActivity>.Success(new(true, []));
+            var current = activity.Select(value => value with { Busy = value.Busy || opened.GetValueOrDefault(value.Context)?.Context.Connection.Unsettled == true }).ToArray();
+            return Result<NativeActivity>.Success(new(input.Hooks.PendingDecisions?.Invoke() == true || current.Any(value => value.Busy), current));
+        }
     }
     public async ValueTask<Result<bool>> Settle(CancellationToken cancellation = default)
     {

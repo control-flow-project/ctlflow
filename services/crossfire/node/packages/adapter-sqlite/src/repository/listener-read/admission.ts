@@ -1,12 +1,11 @@
-import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
+import { toSql } from '@tinqerjs/better-sqlite3-adapter';
+import { defineSelect, type SelectPlanHandle } from '@tinqerjs/tinqer';
 import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapListenerRun } from '../listener-run/map.js';
 
-export function readAdmissionCandidates(database: Database.Database, agentIds: string[], since: number) {
-  if (!agentIds.length) return [];
-  const rows = executeSelect(database, schema, (query, params) => query.from('listener_run')
-    .where(run => params.agentIds.includes(run.agent_id) && run.stopped_at === null && run.last_seen_at > params.since)
+const admissions = defineSelect(schema, (query, params: { since: number }) => query.from('listener_run')
+    .where(run => run.stopped_at === null && run.last_seen_at > params.since)
     .join(query.from('fleet_instance'), run => run.agent_id, binding => binding.agent_id, (run, binding) => ({ run, binding }))
     .join(query.from('fleet')
       .join(query.from('principal'), fleet => fleet.owner_id, owner => owner.id, (fleet, owner) => ({ fleet, owner }))
@@ -26,7 +25,14 @@ export function readAdmissionCandidates(database: Database.Database, agentIds: s
       archivedAt: row.fleet.archived_at, deliveryEnabled: row.fleet.delivery_enabled,
       connectionId: row.connection.connection_id, credentialId: row.connection.credential_id,
       closedAt: row.connection.closed_at, expiresAt: row.connection.expires_at,
-      credentialFleetId: row.credential.fleet_id, revokedAt: row.credential.revoked_at, ownerStatus: row.fleet.owner_status })), { agentIds, since });
+      credentialFleetId: row.credential.fleet_id, revokedAt: row.credential.revoked_at, ownerStatus: row.fleet.owner_status })));
+type Candidate = typeof admissions extends SelectPlanHandle<infer Row, { since: number }> ? Row : never;
+const selectedAdmissions = admissions.where<{ agentIds: string[] }>((row, params) => params.agentIds.includes(row.agent_id));
+
+export function readAdmissionCandidates(database: Database.Database, agentIds: string[] | null, since: number) {
+  if (agentIds !== null && !agentIds.length) return [];
+  const statement = agentIds === null ? toSql(admissions, { since }) : toSql(selectedAdmissions, { since, agentIds });
+  const rows = database.prepare(statement.sql).all(statement.params) as Candidate[];
   return rows.map(row => ({ run: mapListenerRun(row), facts: {
     binding: { ownerId: row.bindingOwnerId, fleetKey: row.bindingFleetKey, retiredAt: row.retiredAt },
     fleet: { id: row.fleetId, ownerId: row.fleetOwnerId, fleetKey: row.fleetKey, archivedAt: row.archivedAt, deliveryEnabled: row.deliveryEnabled === 1 },

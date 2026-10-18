@@ -85,7 +85,13 @@ pub fn live_receiver(
     {
         return Ok(false);
     }
-    listener::controller_admission(repo, id, run.controller.as_ref(), now)
+    listener::controller_admission(
+        repo,
+        id,
+        run.controller.as_ref(),
+        now,
+        listener::ControllerPurpose::Delivery,
+    )
 }
 
 pub fn rule_can_wake(repo: &mut impl RuleRepository, rule: &Rule, id: &str) -> Result<bool> {

@@ -27,16 +27,20 @@ public sealed partial class NativeLifecycle
         public async ValueTask<Result<bool>> Inspect()
         {
             var connection = owner.native; if (connection is null || connection.Lifetime.IsCancellationRequested) return Result<bool>.Success(owner.phase is "waking" or "failed" || Volatile.Read(ref owner.activeCalls) > 0);
-            var result = await connection.Inspect(); bool unsettled; lock (owner.gate) unsettled = owner.unsettled.Count != 0; return result.Map(value => value || Volatile.Read(ref owner.activeCalls) > 0 || unsettled);
+            var result = await owner.InspectNative(connection); bool unsettled; lock (owner.gate) unsettled = owner.unsettled.Count != 0 || !ReferenceEquals(owner.native, connection) || connection.Lifetime.IsCancellationRequested; return result.Map(value => value || Volatile.Read(ref owner.activeCalls) > 0 || unsettled);
         }
         public ValueTask<Result<Unit>> Deliver(string text, string messageId, CancellationToken cancellation = default, InputPriority? priority = null)
         {
-            cancellation.ThrowIfCancellationRequested(); lock (owner.gate) owner.unsettled.Add(messageId); InputAdmission? admission = priority is null ? null : new(priority.Value, cancellation);
-            return Call(async connection => { var selected = await Select(connection, admission); return selected.IsSuccess ? await selected.Value.Deliver(text, messageId, cancellation, priority) : Result<Unit>.Fail(selected.Error); }, true, admission);
+            cancellation.ThrowIfCancellationRequested(); lock (owner.gate) owner.unsettled[messageId] = context; InputAdmission? admission = priority is null ? null : new(priority.Value, cancellation);
+            return Call(async connection => {
+                var selected = await Select(connection, admission); if (!selected.IsSuccess) return Result<Unit>.Fail(selected.Error);
+                cancellation.ThrowIfCancellationRequested(); var captured = owner.CaptureInput(context, session); if (!captured.IsSuccess) return captured;
+                return await selected.Value.Deliver(text, messageId, cancellation, priority);
+            }, true, admission);
         }
         public async ValueTask<Result<bool>> Recover(string text, string messageId, CancellationToken cancellation = default)
         {
-            lock (owner.gate) owner.unsettled.Add(messageId); var result = await Call(async connection => { var selected = await Select(connection); return selected.IsSuccess ? await selected.Value.Recover(text, messageId, cancellation) : Result<bool>.Fail(selected.Error); }, true);
+            lock (owner.gate) owner.unsettled[messageId] = context; var result = await Call(async connection => { var selected = await Select(connection); return selected.IsSuccess ? await selected.Value.Recover(text, messageId, cancellation) : Result<bool>.Fail(selected.Error); }, true);
             if (result.IsSuccess && !result.Value) lock (owner.gate) { owner.unsettled.Remove(messageId); owner.Schedule(); } return result;
         }
         public ValueTask<Result<bool>> Settle(CancellationToken cancellation = default)
@@ -51,8 +55,9 @@ public sealed partial class NativeLifecycle
         }
         public ValueTask<Result<string?>> ActiveTurn(string? room = null, InputAdmission? admission = null)
         {
-            if (admission is not null) return Call(connection => connection.TurnControl is null ? ValueTask.FromResult(Results.Fail<string?>("invalid", "Native turn control is unavailable")) : connection.TurnControl.ActiveTurn(room, admission), admission: admission, prepare: false);
-            var connection = owner.native; return connection is not null && !connection.Lifetime.IsCancellationRequested && connection.TurnControl is not null ? connection.TurnControl.ActiveTurn(room) : ValueTask.FromResult(Result<string?>.Success(null));
+            var selectedRoom = room ?? (context == owner.services.Primary ? null : context);
+            if (admission is not null) return Call(connection => connection.TurnControl is null ? ValueTask.FromResult(Results.Fail<string?>("invalid", "Native turn control is unavailable")) : connection.TurnControl.ActiveTurn(selectedRoom, admission), admission: admission, prepare: false);
+            var connection = owner.native; return connection is not null && !connection.Lifetime.IsCancellationRequested && connection.TurnControl is not null ? connection.TurnControl.ActiveTurn(selectedRoom) : ValueTask.FromResult(Result<string?>.Success(null));
         }
         public ValueTask<Result<string>> Interrupt(string turnId, bool recovery = false, InputAdmission? admission = null)
             => Call(connection => connection.TurnControl is null ? ValueTask.FromResult(Results.Fail<string>("invalid", "Native turn control is unavailable")) : connection.TurnControl.Interrupt(turnId, recovery, admission), true, admission, false);

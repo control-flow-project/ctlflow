@@ -75,11 +75,12 @@ establish paid-model quality, sustained-load capacity, every power-loss boundary
 or unselected platforms. The .NET 11/EF pins are previews; NativeAOT dependency
 diagnostics remain visible.
 
-Rust's packaged Linux guard observes the exact controller lifetime and terminates
-its owned process group. Node/C# can retain a native writer after SIGKILL and
-refuse a competing writer through the native lock. A subprocess that deliberately
-escapes its group is outside the guard's protection. These are documented native
-target differences, not competing backends or a universal crash guarantee.
+The current process adapters all guard the owned native group against controller
+death. Rust uses a parent pidfd, Node its private parent IPC connection and C# an
+exact parent process handle. Each guard retains its native-group lock throughout
+cleanup; the native history lock also refuses a competing writer. A subprocess
+that escapes the group is outside this protection. These target-specific native
+mechanisms implement one ownership contract, not a universal crash guarantee.
 
 The deliverable is one non-main branch prepared for manual PR creation.
 Local builds and passing fixtures are not publication or deployment.

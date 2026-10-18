@@ -51,7 +51,7 @@ public static class PublicAcceptance
             Equal(configuration.RootElement.GetProperty("default_server_config").GetProperty("m.homeserver").GetProperty("base_url").GetString(), state.Configuration.PublicOrigin, "site configuration cannot replace native identity authority");
         }
         await Read("HEAD", "/config.127.0.0.1.json", 200);
-        using (var context = new CrossfireDbContext(state.Database))
+        using (var context = state.Storage.Open())
         {
             var principal = MemberQueries.ByMatrixId(context, owner).Value!;
             var created = Invitations.Create(InvitationCommands.Ports(context, state.Now), new(principal.Id, "human", new NativeAuthentication(owner)), "member", 600, Crossfire.Kernel.Identity.Identifier());

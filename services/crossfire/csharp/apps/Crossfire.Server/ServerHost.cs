@@ -33,7 +33,8 @@ public static class ServerHost
         using var configuration = JsonDocument.Parse(PrivateFiles.Read(Path.Combine(input.Directory, "config.json"), 65536));
         var parsed = Configurations.Parse(configuration.RootElement); if (!parsed.IsSuccess) throw new ArgumentException(parsed.Error.Message);
         var config = parsed.Value; var release = Releases.Load(input.Release); var database = Path.Combine(input.Directory, "management.sqlite");
-        using (var validation = new CrossfireDbContext(database)) { var schema = Schema.Validate(validation); if (!schema.IsSuccess) throw new IOException(schema.Error.Message); }
+        using var storage = new ManagementStorage(database);
+        using (var validation = storage.Open()) { var schema = Schema.Validate(validation); if (!schema.IsSuccess) throw new IOException(schema.Error.Message); }
         using var bootstrap = JsonDocument.Parse(PrivateFiles.Read(Path.Combine(input.Directory, "bootstrap.json"), 16384));
         var secrets = Bootstrap.Parse(bootstrap.RootElement); if (!secrets.IsSuccess) throw new ArgumentException(secrets.Error.Message);
         using var diagnostics = new DiagnosticStore(database + ".logs", config.LoggingRetentionDays, Identity.Now);
@@ -48,7 +49,7 @@ public static class ServerHost
             using var matrix = new AccountAuthority(new(config.MatrixOrigin, config.ServerName, config.JwtSecret, config.RegistrationSecret, config.ServiceMatrixId));
             var initialized = await Bootstrap.Apply(config, secrets.Value, matrix, stop.Token); if (!initialized.IsSuccess) throw new IOException(initialized.Error.Message);
             using var reports = new PublicationStore(database + ".publications", config.PublicationBudget.Uploads, path => new StateLock(path));
-            var state = new ApiState(config, database, release, matrix, reports, diagnostics, Identity.Now(), Identity.Now);
+            var state = new ApiState(config, storage, release, matrix, reports, diagnostics, Identity.Now(), Identity.Now);
             await using var worker = new ApiWorker(state); using var proxy = new MatrixProxy();
             await using var content = ContentApplication.Build(state, input.ContentListen);
             await using var application = PublicApplication.Build(state, input.Listen, input.Web, input.Element, proxy, worker.Wake);

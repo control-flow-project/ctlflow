@@ -1,8 +1,8 @@
 # Pinned EF query compiler
 
 Build-only source is pinned to dotnet/efcore tag
-`v11.0.0-rc.1.26425.128`, commit
-`c22dd77aa7f7392f997cf779f0c23e0b9aab1988`.
+`v11.0.0-rc.2.26504.105`, commit
+`f05a97f83d8fe43366d92d561cce59f02c6dd102`.
 Original .NET Foundation MIT headers/notices remain.
 This project is not a production runtime dependency.
 
@@ -13,7 +13,7 @@ This project is not a production runtime dependency.
 | Generated annotations | Generator emits nullable annotations; output is not patched afterward |
 | Query location | Typed DbContext parameters, locals, fields and properties are recognized |
 | Context scope | Only the selected context produces its query interceptors |
-| Captures | Actual caller parameters remain native query parameters |
+| Captures | Actual caller parameters, including enclosing parameters read inside local functions, remain native query parameters |
 | Syntax/conversions | Anonymous shorthand, numeric literals and CLR conversions retain their carriers |
 | File scope | Namespace/constant/accessor/translator state resets per generated file |
 | Build-time objects | Constructor-free typed placeholders; user constructors never execute |

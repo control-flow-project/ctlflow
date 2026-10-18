@@ -3,7 +3,7 @@ use crate::{
     authorization::{AgentAction, authorize_agent},
     fleet::native_stop::{self, Selection},
     identity::{Actor, Page},
-    listener::{HEARTBEAT_EXPIRY_MS, admits_controller},
+    listener::{ControllerPurpose, HEARTBEAT_EXPIRY_MS, admits_controller},
     permission::Permission,
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
@@ -26,6 +26,7 @@ pub fn activity(
             candidate.run.controller.as_ref(),
             candidate.facts.as_ref(),
             now,
+            ControllerPurpose::Reporting,
         ) {
             runs.entry(candidate.run.agent_id.clone())
                 .or_default()
@@ -163,6 +164,7 @@ pub fn list(
                     candidate.run.controller.as_ref(),
                     candidate.facts.as_ref(),
                     now,
+                    ControllerPurpose::Reporting,
                 )
             });
             let reporting: std::collections::BTreeSet<_> = candidates

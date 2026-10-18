@@ -1,7 +1,7 @@
 import { lstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import type { OwnedRuntimeInput } from '@ctlflow/crossfire-agent-core/owned-runtime';
+import type { OwnedRuntimeInput, NativeActivity, NativeContextActivity } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import type { InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
 import { captureHistory } from '@ctlflow/crossfire-adapter-runtime/native-file';
 import { deliveryJournalExists, readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal';
@@ -129,14 +129,23 @@ export function piHistories(input: OwnedRuntimeInput, home: string, binary: stri
     try { return await pending; } finally { starting.delete(context); admission?.signal.removeEventListener('abort', cancelled); }
   }
   return { open, signal: lifetime,
-    async inspect() {
+    async activity(): Promise<NativeActivity> {
       lifetime.throwIfAborted();
-      if (starting.size || input.hooks.pendingDecisions?.()) return { busy: true };
+      if (starting.size) return { busy: true, contexts: [] };
+      const count = opened.size, activity: NativeContextActivity[] = [];
       for (const context of contexts()) {
         const connection = opened.get(context);
-        if (connection ? connection.unsettled() || (await connection.inspect()).busy : unacknowledged(context)) return { busy: true };
+        const binding = retained(context);
+        if (!binding?.sessionId) {
+          if (starting.size) return { busy: true, contexts: [] };
+          throw new Error('Pi activity has no exact native history');
+        }
+        activity.push({ context, sessionId: binding.sessionId,
+          busy: connection ? connection.unsettled() || (await connection.inspect()).busy : unacknowledged(context) });
       }
-      return { busy: starting.size > 0 || [...opened.values()].some(connection => connection.unsettled()) };
+      if (starting.size || opened.size !== count) return { busy: true, contexts: [] };
+      for (const item of activity) item.busy ||= opened.get(item.context)?.unsettled() === true;
+      return { busy: input.hooks.pendingDecisions?.() === true || activity.some(item => item.busy), contexts: activity };
     },
     async settle(cancelled?: AbortSignal) {
       for (const context of contexts()) if (!opened.has(context) && unacknowledged(context)) await open(context);

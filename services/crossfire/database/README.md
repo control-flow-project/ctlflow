@@ -19,6 +19,7 @@ services/crossfire/
         migrations/
           20261014000000_initial_schema.mjs
           20261014000001_initial_data.mjs
+          20261018000000_listener_activity_index.mjs
           assets/
             schema-17.json
             sqlite.mjs
@@ -39,7 +40,7 @@ knexfile; unsupported backends do not get placeholder implementations.
 
 ## Current contract
 
-The store uses application ID 1129465426 and schema 17.
+The store uses application ID 1129465426 and schema 18.
 Its baseline has 63 singular STRICT application tables with normalized relations.
 Knex owns its tracking/locking tables separately.
 Roles and permissions are versioned reference data, not development demo seeds.
@@ -65,7 +66,9 @@ The migration-make script creates the next ESM migration.
 Runtime deployment uses the same one-shot migration image for Node, both C#
 outputs and Rust. It needs no provider/model work or Matrix credentials.
 
-Supported deployed versions 13–16 convert transactionally to 17.
+Supported deployed versions 13–17 convert transactionally to 18.
+The activity-index migration replaces one index without rewriting application
+rows. File-backed stores use WAL and full synchronous durability across all runtimes.
 A current schema without Knex history is adopted without changing application
 rows. Foreign, future and unsupported older stores are rejected before mutation.
 Rollback/reset is not an upgrade strategy.

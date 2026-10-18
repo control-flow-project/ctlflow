@@ -4,7 +4,10 @@ import type { RuntimeAttachment } from './terminal.js';
 import type { RuntimeObservation } from '@ctlflow/crossfire-contracts/runtime';
 export type ListenerOptions = { historyMode?: 'shared' | 'per-room' };
 export type SavedRuntimeContext = { context: string; runtime: string; sessionId: string; workspace: string };
+export type NativeContextActivity = { context: string; sessionId: string; busy: boolean };
+export type NativeActivity = { busy: boolean; contexts: NativeContextActivity[] };
 export type OwnedRuntimeConnection = RuntimeConnection & { attachment: RuntimeAttachment | null; turnControl: TurnControl;
+  activity: () => Promise<NativeActivity>;
   attachments: () => Promise<{ context: string; attachment: RuntimeAttachment }[]> };
 export type OwnedRuntimeInput = {
   profile: string; name: string; workspace: string; stateDirectory: string; instructions: string;

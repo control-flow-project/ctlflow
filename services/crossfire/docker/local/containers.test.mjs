@@ -27,6 +27,7 @@ test('local Docker retains exact fleet history, stop intent, credentials and bro
   for (const variable of ['CROSSFIRE_RUNTIME_IMAGE', 'CROSSFIRE_MIGRATION_IMAGE', 'CTLFLOW_FLEET_IMAGE']) {
     assert.match(process.env[variable] ?? '', /^sha256:[a-f0-9]{64}$/u, variable + ' must identify an exact prebuilt image');
   }
+  assert(['node', 'csharp-managed', 'csharp-nativeaot', 'rust'].includes(process.env.CROSSFIRE_RUNTIME_BACKEND), 'Select the exact runtime backend for the shared Docker assertions');
   await withDockerTestResources(async cgroupParent => {
     const project = 'ctlflow-local-test-' + randomUUID().slice(0, 8);
     const environment = { ...process.env, CTLFLOW_CGROUP_PARENT: cgroupParent };
@@ -56,10 +57,10 @@ test('local Docker retains exact fleet history, stop intent, credentials and bro
     const json = text => JSON.parse(text);
     let browser;
     try {
-      await scope.test('selected NativeAOT and common Knex images agree on release identity', async () => {
+      await scope.test('the selected runtime and common Knex images agree on backend and release identity', async () => {
         const runtime = json(await command(['image', 'inspect', environment.CROSSFIRE_RUNTIME_IMAGE]).ended)[0];
         const migrations = json(await command(['image', 'inspect', environment.CROSSFIRE_MIGRATION_IMAGE]).ended)[0];
-        assert.equal(runtime.Config.Labels['org.crossfire.backend'], 'csharp-nativeaot');
+        assert.equal(runtime.Config.Labels['org.crossfire.backend'], environment.CROSSFIRE_RUNTIME_BACKEND);
         assert.equal(migrations.Config.Labels['org.crossfire.backend'], 'migrations');
         for (const label of ['org.crossfire.source', 'org.opencontainers.image.version', 'org.crossfire.package']) {
           assert.equal(runtime.Config.Labels[label], migrations.Config.Labels[label]);

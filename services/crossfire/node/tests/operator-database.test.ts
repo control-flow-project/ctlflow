@@ -2,11 +2,12 @@ import { migrateFixture } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, copyFileSync, readFileSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
-import { executeInsert, executeUpdate, executeDelete } from '@tinqerjs/better-sqlite3-adapter';
+import { executeInsert, executeUpdate, executeDelete, executeSelect } from '@tinqerjs/better-sqlite3-adapter';
+import { migrationChange, migrationQuery } from './support/migration-data.js';
 import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
 import { SCHEMA_VERSION } from '@ctlflow/crossfire-adapter-sqlite/schema/validate-schema';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
@@ -39,7 +40,9 @@ test('operator database inspection is readonly, complete and proves protected re
   value(decideEnrollment(fixture.services, fixture.admin.actor, request.enrollmentId, {
     expectedRevision: introduced.request.revision, verificationCode: introduced.request.verificationCode, decision: 'approve',
   }, randomUUID()));
-  copyFileSync(current, before);
+  const snapshot = new Database(current, { readonly: true, fileMustExist: true });
+  try { await snapshot.backup(before); } finally { snapshot.close(); }
+  chmodSync(before, 0o600);
   const bytes = readFileSync(current);
   const report = value(inspectDatabase(current, { schemaVersion: SCHEMA_VERSION, counts: { agent: 1, management_conversation: 0, fleet_instance_permission: 1 } }, true));
   assert.equal(Object.keys(report.counts).length, 63);
@@ -101,7 +104,7 @@ test('operator preservation covers immutable archived children and exact native-
       executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_metadata').values({ enrollment_id: params.requestId,
         key: 'private-label', value: 'Archived private metadata' }), record);
     }).immediate();
-    copyFileSync(current, before);
+    await database.backup(before); chmodSync(before, 0o600);
     const relationNames = ['enrollment_archive', 'enrollment_archive_item', 'enrollment_archive_policy', 'enrollment_archive_permission',
       'enrollment_archive_wake_sender', 'enrollment_archive_metadata', 'fleet_native_stop'] as const;
     const bytes = readFileSync(current), report = value(inspectDatabase(current, {
@@ -125,15 +128,15 @@ test('operator preservation proves schema 15 conversion without modifying either
   const current = join(directory, 'current.sqlite'), before = join(directory, 'before.sqlite');
   const database = schema15Store(current);
   try {
-    chmodSync(current, 0o600); copyFileSync(current, before);
-    const originalBytes = readFileSync(before), originalUsage = database.prepare('SELECT * FROM runtime_usage_checkpoint').all();
+    chmodSync(current, 0o600); await database.backup(before); chmodSync(before, 0o600);
+    const originalBytes = readFileSync(before), originalUsage = executeSelect(database, schema, query => query.from('runtime_usage_checkpoint'));
     await migrateFixture(database);
     const currentBytes = readFileSync(current), report = value((await verifyPreservation(before, current)));
     assert.equal(report.beforeSchema, 15); assert.equal(report.afterSchema, SCHEMA_VERSION); assert.equal(report.forwardMigration, true);
     assert.equal(report.preserved.agent, 1); assert.equal(report.preserved.member, 1);
-    assert.deepEqual(database.prepare('SELECT * FROM runtime_usage_checkpoint').all(), originalUsage);
+    assert.deepEqual(executeSelect(database, schema, query => query.from('runtime_usage_checkpoint')), originalUsage);
     assert.deepEqual(readFileSync(before), originalBytes); assert.deepEqual(readFileSync(current), currentBytes);
-    database.prepare("UPDATE member SET display_name='Changed' WHERE principal_id='owner'").run();
+    executeUpdate(database, schema, query => query.update('member').set({ display_name: 'Changed' }).where(row => row.principal_id === 'owner'));
     assert.equal((await verifyPreservation(before, current)).ok, false, 'Forward conversion never excuses changed protected records');
     assert.deepEqual(readFileSync(before), originalBytes);
   } finally { database.close(); }
@@ -146,16 +149,16 @@ test('operator preservation proves schema 14 conversion including exact prior au
   const fixture = await applicationFixture(scope, current), agent = await fixture.agent(fixture.admin.actor, 'registered');
   const database = new Database(current);
   try {
-    database.exec('ALTER TABLE agent ADD COLUMN display_name_override TEXT');
+    migrationChange(database, migrationQuery.schema.alterTable('agent', table => table.text('display_name_override')));
     restoreSchema14EnrollmentItems(database);
-    database.prepare('UPDATE agent SET display_name_override=? WHERE principal_id=?').run('Retired caption', agent.id);
-    restoreSchema16Logging(database); database.pragma('user_version=14'); copyFileSync(current, before);
+    migrationChange(database, migrationQuery('agent').update({ display_name_override: 'Retired caption' }).where('principal_id', agent.id));
+    restoreSchema16Logging(database); database.pragma('user_version=14'); await database.backup(before); chmodSync(before, 0o600);
     await migrateFixture(database);
     const report = value((await verifyPreservation(before, current)));
     assert.equal(report.forwardMigration, true); assert.equal(report.preserved.agent, 1);
-    database.prepare("DELETE FROM audit_event WHERE action='agent.name.canonicalized'").run();
+    executeDelete(database, schema, query => query.deleteFrom('audit_event').where(row => row.action === 'agent.name.canonicalized'));
     assert.equal((await verifyPreservation(before, current)).ok, false, 'Independent labels must be preserved in immutable migration evidence');
-    database.prepare("UPDATE audit_event SET message='changed' WHERE action<>'agent.name.canonicalized'").run();
+    executeUpdate(database, schema, query => query.update('audit_event').set({ message: 'changed' }).where(row => row.action !== 'agent.name.canonicalized'));
     assert.equal((await verifyPreservation(before, current)).ok, false, 'Every original audit record remains exactly protected');
   } finally { database.close(); }
 });
@@ -176,7 +179,7 @@ test('forward preservation applies explicit retention to prior name audits but p
   const remove = (id: string) => executeDelete(database, schema, (query, params) => query.deleteFrom('audit_event').where(row => row.id === params.id), { id });
   try {
     insert(expired, cutoff - 1); insert(boundary, cutoff); insert(fresh, cutoff + 1);
-    restoreSchema16Logging(database); copyFileSync(current, before); await migrateFixture(database);
+    restoreSchema16Logging(database); await database.backup(before); chmodSync(before, 0o600); await migrateFixture(database);
     const original = readFileSync(before), retention = { loggingRetentionDays: 7, at };
     remove(expired);
     assert.equal((await verifyPreservation(before, current)).ok, false, 'Absent audit requires explicit retention proof');

@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { openTestStore, migrateFixture } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
@@ -26,9 +27,9 @@ function audit(id: string, message: string): AuditEvent {
 
 test('management storage retains native SQLite capacity for memory and every supported page size', async scope => {
   const native = new Database(':memory:'); cleanup(scope, () => native.close());
-  const expected = native.pragma('max_page_count', { simple: true });
+  const expected = sqliteMetadata.maximumPageCount(native);
   const memory = openTestStore(':memory:'); cleanup(scope, () => memory.close());
-  assert.equal(memory.pragma('max_page_count', { simple: true }), expected);
+  assert.equal(sqliteMetadata.maximumPageCount(memory), expected);
   const root = directory(scope);
   for (const pageSize of [512, 1024, 2048, 4096, 8192, 16384, 32768, 65536]) {
     const path = join(root, 'pages-' + pageSize + '.sqlite'); writeFileSync(path, '', { mode: 0o600 });
@@ -37,10 +38,10 @@ test('management storage retains native SQLite capacity for memory and every sup
     finally { initialized.close(); }
     const database = openTestStore(path);
     try {
-      assert.equal(database.pragma('page_size', { simple: true }), pageSize);
-      assert.equal(database.pragma('max_page_count', { simple: true }), expected);
-      assert.equal(database.pragma('foreign_keys', { simple: true }), 1);
-      assert.equal(database.pragma('journal_mode', { simple: true }), 'delete');
+      assert.equal(sqliteMetadata.pageSize(database), pageSize);
+      assert.equal(sqliteMetadata.maximumPageCount(database), expected);
+      assert.equal(sqliteMetadata.foreignKeys(database), 1);
+      assert.equal(sqliteMetadata.journalMode(database), 'wal');
     } finally { database.close(); }
   }
 });
@@ -57,7 +58,7 @@ test('a full 256 MiB management store reopens and registers listeners without lo
   let database = new Database(path);
   cleanup(scope, () => { if (database.open) database.close(); });
   database.pragma('foreign_keys = ON');
-  const pageSize = database.pragma('page_size', { simple: true }); assert.equal(typeof pageSize, 'number');
+  const pageSize = sqliteMetadata.pageSize(database); assert.equal(typeof pageSize, 'number');
   const maximum = 256 * 1024 * 1024;
   database.pragma('max_page_count = ' + maximum / Number(pageSize));
   const repositories = createRepositories(database);
@@ -74,8 +75,9 @@ test('a full 256 MiB management store reopens and registers listeners without lo
     assert.equal(exhausted, true, 'The disposable capacity fixture must remain bounded');
   }
   assert.ok(first && last);
+  assert.deepEqual(database.pragma('wal_checkpoint(TRUNCATE)'), [{ busy: 0, log: 0, checkpointed: 0 }]);
   assert.equal(statSync(path).size, maximum);
-  assert.equal(database.pragma('freelist_count', { simple: true }), 0);
+  assert.equal(sqliteMetadata.freePageCount(database), 0);
   database.close();
 
   const reopened = await applicationFixture(scope, path);
@@ -90,12 +92,13 @@ test('a full 256 MiB management store reopens and registers listeners without lo
     const retained = value(reopened.services.repositories.auditEvent.find({ id: record.id }));
     assert.equal(retained?.message === record.message, true, 'Committed audit bytes remain identical');
   }
-  value(reopened.services.repositories.auditEvent.insert(audit('after-capacity', 'New audit after listener registration')));
+  value(reopened.services.repositories.auditEvent.insert(audit('after-capacity', 'New audit after listener registration\n' + 'x'.repeat(128 * 1024))));
   reopened.application.close();
   database = openTestStore(path);
+  assert.deepEqual(database.pragma('wal_checkpoint(TRUNCATE)'), [{ busy: 0, log: 0, checkpointed: 0 }]);
   assert.ok(statSync(path).size > maximum, 'The original database must grow beyond its former ceiling');
-  assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.equal(sqliteMetadata.integrityResult(database), 'ok');
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   value(createRepositories(database).auditEvent.insert(audit('after-second-open', 'Growth remains enabled after another reopen')));
 });
 
@@ -105,8 +108,8 @@ test('native storage exhaustion is retryable and rolls back the complete transac
   const principal = { id: 'capacity-owner', matrixUserId: '@capacity-owner:test', kind: 'human' as const,
     status: 'active' as const, revision: 0, createdAt: 1 };
   value(repositories.principal.insert(principal));
-  const maximum = database.pragma('max_page_count', { simple: true });
-  const pages = database.pragma('page_count', { simple: true });
+  const maximum = sqliteMetadata.maximumPageCount(database);
+  const pages = sqliteMetadata.pageCount(database);
   database.pragma('max_page_count = ' + pages);
   const record = audit('capacity-retry', 'x'.repeat(128 * 1024));
   function write() {
@@ -123,8 +126,8 @@ test('native storage exhaustion is retryable and rolls back the complete transac
   value(write());
   assert.deepEqual(value(repositories.principal.find({ id: principal.id })), { ...principal, revision: 1 });
   assert.equal(value(repositories.auditEvent.find({ id: record.id }))?.message === record.message, true, 'The exact retry commits its original bytes');
-  assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.equal(sqliteMetadata.integrityResult(database), 'ok');
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
 });
 
 for (const stage of ['start', 'finish']) {
@@ -155,7 +158,7 @@ for (const stage of ['start', 'finish']) {
     value(write());
     assert.deepEqual(value(repositories.principal.find({ id: principal.id })), { ...principal, revision: 1 });
     assert.deepEqual(value(repositories.auditEvent.find({ id: record.id })), record);
-    assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
-    assert.deepEqual(database.pragma('foreign_key_check'), []);
+    assert.equal(sqliteMetadata.integrityResult(database), 'ok');
+    assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   });
 }

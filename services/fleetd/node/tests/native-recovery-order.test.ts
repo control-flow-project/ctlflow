@@ -43,6 +43,7 @@ async function fixture(scope: TestContext, originalReceipt: NativeReceipt = true
     }, input, { journal, pollMs: 100 });
     observe?.({ kind: 'state', observation: { sessionId, roomId, runtime: 'fixture', state: 'idle', observedAt: 1000, settings: [], errorMessage: null } });
     return { ...delivery, attachment: { runtime: 'fixture', sessionId, workspace: directory, connection: {} }, attachments: async () => [],
+      activity: async () => { const busy = delivery.unsettled() || (await delivery.inspect()).busy; return { busy, contexts: [{ context, sessionId, busy }] }; },
       turnControl: { activeTurn: async () => null, interrupt: async () => 'inactive' } };
   }
   const first = open(scope.signal);
@@ -59,16 +60,17 @@ for (const outcome of [true, 'cancelled', 'interrupted'] as const) {
     cleanup(scope, () => connection.close());
     const reminder = value(current.store.read())[0]!;
     await resumeInterruptedWork(connection, 'shared', current.contexts, current.store);
-    assert.deepEqual(current.submitted.map(message => message.messageId), [current.original.messageId, reminder.messageId]);
-    assert(current.order.indexOf('receipt:' + current.original.messageId) < current.order.indexOf('publish:' + reminder.messageId));
+    const renewed = value(current.store.read())[0]!;
+    assert.notEqual(renewed.messageId, reminder.messageId);
+    assert.deepEqual(current.submitted.map(message => message.messageId), [current.original.messageId, renewed.messageId]);
+    assert(current.order.indexOf('receipt:' + current.original.messageId) < current.order.indexOf('publish:' + renewed.messageId));
     assert(current.submitted[1]!.text.startsWith('[Crossfire session restarted]'));
-    assert.deepEqual(value(current.store.read()), []);
+    assert.equal(value(current.store.read()).length, 1);
+    assert.notEqual(value(current.store.read())[0]!.messageId, reminder.messageId);
     const journal = readDeliveryJournal(current.journal, current.sessionId, input);
     assert.equal(journal.pending, null);
     assert.deepEqual(journal.confirmed.map(message => message.messageId), outcome === true ? [current.original.messageId] : []);
     assert.equal(await connection.recover(current.original.text, current.original.messageId), outcome === true);
-    await resumeInterruptedWork(connection, 'shared', current.contexts, current.store);
-    assert.equal(current.submitted.length, 2, 'Continuation cannot replay the original input or itself');
   });
 }
 
@@ -82,9 +84,10 @@ test('per-room continuations settle only each exact room receipt and retain orig
   const checkpoints = value(first.store.read());
   const connection: OwnedRuntimeConnection = { ...primary, conversation: async room => rooms.get(room) ?? assert.fail('Cannot create another room history') };
   await resumeInterruptedWork(connection, 'control', contexts, first.store);
-  assert.deepEqual(value(first.store.read()), []);
+  assert.equal(value(first.store.read()).length, 2);
+  assert(value(first.store.read()).every(work => !checkpoints.some(before => before.messageId === work.messageId)), 'Both room tasks remain checkpointed with new restart identities');
   for (const current of [first, second]) {
-    const checkpoint = checkpoints.find(work => work.sessionId === current.sessionId)!;
+    const checkpoint = value(first.store.read()).find(work => work.sessionId === current.sessionId)!;
     assert.deepEqual(current.submitted.map(message => message.messageId), [current.original.messageId, checkpoint.messageId]);
     assert(current.order.indexOf('receipt:' + current.original.messageId) < current.order.indexOf('publish:' + checkpoint.messageId));
     assert(current.submitted[1]!.text.includes(current.contexts[0]!.context));
@@ -94,6 +97,28 @@ test('per-room continuations settle only each exact room receipt and retain orig
   assert.equal(readDeliveryJournal(control.journal, control.sessionId, input).pending!.messageId, control.original.messageId);
 });
 
+test('a crash after receiving a restart reminder cannot strand its native confirmation', async scope => {
+  const current = await fixture(scope), first = current.open(scope.signal);
+  const interrupted: OwnedRuntimeConnection = { ...first, deliver: async (...input) => {
+    await first.deliver(...input);
+    throw new Error('Controlled crash before acknowledging the reminder');
+  } };
+  await assert.rejects(resumeInterruptedWork(interrupted, 'shared', current.contexts, current.store), /Controlled crash/);
+  const before = value(current.store.read())[0]!;
+  assert.deepEqual(readDeliveryJournal(current.journal, current.sessionId, input).confirmed.map(message => message.messageId),
+    [current.original.messageId, before.messageId]);
+  await first.close();
+  const restarted = current.open(scope.signal); cleanup(scope, () => restarted.close());
+  await resumeInterruptedWork(restarted, 'shared', current.contexts, current.store);
+  const after = value(current.store.read())[0]!;
+  assert.notEqual(after.messageId, before.messageId);
+  assert.equal(current.submitted.at(-1)!.messageId, after.messageId, 'The stored identity owns the actual next reminder');
+  assert.deepEqual(readDeliveryJournal(current.journal, current.sessionId, input).confirmed.map(message => message.messageId),
+    [current.original.messageId], 'Only the ordinary producer retains its own native confirmation');
+  restarted.acknowledge([current.original.messageId]);
+  assert.deepEqual(readDeliveryJournal(current.journal, current.sessionId, input).confirmed, []);
+});
+
 test('unverifiable original input retains both checkpoints and blocks continuation publication', async scope => {
   const current = await fixture(scope), connection = current.open(scope.signal);
   cleanup(scope, () => connection.close());
@@ -101,11 +126,13 @@ test('unverifiable original input retains both checkpoints and blocks continuati
   current.setReceipt(async () => { throw failureError({ code: 'unavailable', message: 'Original receipt is temporarily unavailable' }); });
   await assert.rejects(resumeInterruptedWork(connection, 'shared', current.contexts, current.store), /Original receipt is temporarily unavailable/);
   assert.deepEqual(readFileSync(current.journal), nativeBefore);
-  assert.deepEqual(value(current.store.read()), workBefore);
+  assert.equal(value(current.store.read()).length, workBefore.length);
+  assert.equal(value(current.store.read())[0]!.sessionId, workBefore[0]!.sessionId);
+  assert.equal(value(current.store.read())[0]!.messageId, workBefore[0]!.messageId, 'Unresolved native evidence cannot advance the restart identity');
   assert.deepEqual(current.submitted.map(message => message.messageId), [current.original.messageId]);
   current.setReceipt(async () => true);
   await resumeInterruptedWork(connection, 'shared', current.contexts, current.store);
-  assert.equal(current.submitted.length, 2); assert.deepEqual(value(current.store.read()), []);
+  assert.equal(current.submitted.length, 2); assert.equal(value(current.store.read()).length, 1);
 });
 
 test('native recovery cannot report success before original receipt and continuation readiness', async scope => {
@@ -135,6 +162,8 @@ test('native recovery cannot report success before original receipt and continua
   assert.equal(current.submitted.length, 2);
   assert.equal(await managed.runtime.recover(current.original.text, current.original.messageId), true);
   managed.runtime.acknowledge([current.original.messageId]);
+  assert.equal((await managed.runtime.inspect()).busy, false, 'Native activity projects only exact context identity into validated storage');
+  assert.deepEqual(value(current.store.read()), []);
 });
 
 test('live turn controls stay available while original saved input is being checked', async scope => {
@@ -163,7 +192,7 @@ test('live turn controls stay available while original saved input is being chec
 
 test('saved input without unfinished-work checkpoint is settled before the resumed generation is ready', async scope => {
   const current = await fixture(scope), observed: RuntimeObservationEvent[] = [];
-  for (const work of value(current.store.read())) value(current.store.acknowledge(work.messageId));
+  value(current.store.clear([{ context: 'shared', sessionId: current.sessionId }]));
   let release!: () => void, enter!: () => void, recovered = 0;
   const pending = new Promise<void>(resolve => { release = resolve; }), entered = new Promise<void>(resolve => { enter = resolve; });
   current.setReceipt(async () => { enter(); await pending; return true; });

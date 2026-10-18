@@ -18,7 +18,7 @@ Directory.CreateDirectory(directory);
 try
 {
     var database = ArgumentsDatabase(args);
-    using var context = new CrossfireDbContext(database);
+    using var context = new CrossfireDbContext(DatabaseConnections.Options(database));
     Equal(Schema.Validate(context).IsSuccess, true, "Knex-created canonical schema validation");
     Equal(Stored.Read<Unit>(() => throw new Microsoft.Data.Sqlite.SqliteException("busy", 5)).Error.Code, "unavailable", "expected storage contention remains a typed failure");
     Equal(Stored.Read<Unit>(() => throw new Microsoft.Data.Sqlite.SqliteException("full", 13)).Error.Message,
@@ -42,6 +42,8 @@ try
     Equal(AuthorizationQueries.Principal(context, ownerId).Value?.MatrixUserId, matrixId, "precompiled context-parameter projection");
     Equal(AuthorizationQueries.Principal(context, Identity.Identifier()).Value is null, true, "query parameters are not reused");
     Equal(AuthorizationQueries.Permissions(context, ownerId).Value.Contains("member.invite"), true, "precompiled role-permission join");
+    StorageConcurrencyAcceptance.Verify(context, ownerId);
+    await ManagementStorageAcceptance.Verify(context, ownerId);
     var rolledBack = Transactions.Run(context, () =>
     {
         var record = context.Member.Single(value => value.PrincipalId == ownerId);
@@ -75,6 +77,7 @@ try
     });
     Equal(nested.IsSuccess, true, "outer transaction commits after handled nested failure");
     await DomainAcceptance.Verify(context, ownerId, matrixId);
+    LatestListenerAcceptance.Verify(context, ownerId);
     await ContainerCommandAcceptance.Verify();
     PublicRequestBudgetAcceptance.Verify();
     await HttpAcceptance.Verify();

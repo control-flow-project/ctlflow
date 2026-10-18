@@ -17,7 +17,7 @@ test('per-file inventory names every language owner without pretending shared as
   assert(value.rustFiles > 0);
   assert.match(value.basis, /not behavioral certification/u);
   const map = ['file\tcounterpart\tdisposition', ...value.files.map(row => [row.file, row.counterpart, row.disposition].join('\t'))].join('\n') + '\n';
-  assert.equal(readFileSync(new URL('../docs/architecture/native-file-map.tsv', import.meta.url), 'utf8'), map, 'The reviewed per-file map must cover the complete current source set');
+  assert.equal(readFileSync(new URL('../docs/architecture/native-file-map.tsv', import.meta.url), 'utf8') === map, true, 'The reviewed per-file map must cover the complete current source set');
 });
 
 test('file associations reject new unreviewed owners and retain concrete framework boundaries', () => {

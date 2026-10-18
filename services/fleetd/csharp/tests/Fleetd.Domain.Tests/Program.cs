@@ -27,4 +27,5 @@ await using (var fixture = new ControllerFixture())
     Check(fixture.Starting.IsCancellationRequested, "Daemon shutdown cancels restoration"); Check(!shutdown.IsCompleted, "Daemon shutdown waits for unresolved startup ownership");
     fixture.Release(); await shutdown.WaitAsync(TimeSpan.FromSeconds(5)); Check(fixture.First.Disposed, "Daemon shutdown disposes a late native result"); Check(fixture.Starts == 1, "Shutdown never schedules replacement work");
 }
+await NativeWorkAcceptance.Run(Check);
 Console.WriteLine("{\"status\":\"passed\",\"scope\":\"controller state transitions\",\"assertions\":" + assertions + ",\"dynamicCode\":" + (RuntimeFeature.IsDynamicCodeSupported ? "true" : "false") + "}");

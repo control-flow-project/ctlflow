@@ -1,3 +1,4 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { migrateFixture } from './support/storage.js';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
@@ -170,7 +171,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
     const runPlan = database.prepare('EXPLAIN QUERY PLAN ' + statements[0]).all() as { detail: string }[];
     assert(runPlan.some(step => step.detail.includes('ix_listener_run_agent_started')), JSON.stringify(runPlan));
   }
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
 });
 
 test('sender identity batches seek exact Matrix indexes across large human and agent populations', async scope => {
@@ -207,7 +208,7 @@ test('sender identity batches seek exact Matrix indexes across large human and a
       assert(!plan.includes('SCAN '), 'Exact sender resolution must not scan the principal or agent tables');
     }
   }
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
 });
 
 test('fleet enrollment review hydrates the entire roster and selected identities in three indexed queries', async scope => {
@@ -258,5 +259,5 @@ test('fleet enrollment review hydrates the entire roster and selected identities
   statements = [];
   assert.deepEqual(value(repositories.fleetPolicy.requested('missing')), []);
   assert.equal(statements.length, 1);
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
 });

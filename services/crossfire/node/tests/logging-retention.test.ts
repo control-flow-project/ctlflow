@@ -1,9 +1,10 @@
+import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { openTestStore } from './support/storage.js';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { TestContext } from 'node:test';
 import { randomUUID } from 'node:crypto';
-import { mkdtempSync, rmSync, copyFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, chmodSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { executeInsert, executeSelect, executeUpdate } from '@tinqerjs/better-sqlite3-adapter';
@@ -71,8 +72,8 @@ test('idle cleanup removes expired run/status/settings families but retains curr
   assert.equal(value(fixture.services.runtime.observation(agent.id))[0]?.sessionId, sessionId);
   assert.equal(value(fixture.services.repositories.agentCredential.find({ agentId: agent.id }))?.accessToken, agent.token);
   assert.equal(executeSelect(fixture.database, schema, query => query.from('audit_event').count()), 0);
-  assert.deepEqual(fixture.database.pragma('foreign_key_check'), []);
-  assert.equal(fixture.database.pragma('integrity_check', { simple: true }), 'ok');
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(fixture.database), []);
+  assert.equal(sqliteMetadata.integrityResult(fixture.database), 'ok');
   fixture.advance(20 * DAY_MS); value(maintainLogging(fixture.services));
   assert(value(fixture.services.repositories.listenerRun.find({ id: current.runId })), 'The single current-state projection is not historical logging');
 });
@@ -94,7 +95,7 @@ test('outstanding native questions and unsent owner notices retain their require
   assert.equal(value(fixture.services.runtime.decision(decisionId))?.questions[0]?.options.length, 2);
   assert(value(fixture.services.runtime.incident(incidentId)));
   assert(value(fixture.services.repositories.listenerRun.find({ id: run.runId })));
-  assert.deepEqual(fixture.database.pragma('foreign_key_check'), []);
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(fixture.database), []);
 });
 
 test('age boundaries and configured retention apply to every retained traffic/token summary while idle', async scope => {
@@ -170,7 +171,7 @@ test('settled decisions, notifications, deliveries, operation receipts, invitati
   executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_permission').values({ request_id: params.archive, instance_key: 'workflow', permission_code: 'room.agent.invite', grant_scope: 'agent_room' }), { archive });
   executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_wake_sender').values({ request_id: params.archive, instance_key: 'workflow', sender_principal_id: params.owner, include_agents: 0 }), { archive, owner: admin.actor.principalId });
   executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_metadata').values({ enrollment_id: params.archive, key: 'label', value: 'Archived diagnostic metadata' }), { archive });
-  const backup = fixture.file + '.backup'; copyFileSync(fixture.file, backup); const backupBytes = readFileSync(backup);
+  const backup = fixture.file + '.backup'; await database.backup(backup); chmodSync(backup, 0o600); const backupBytes = readFileSync(backup);
   fixture.advance(8 * DAY_MS); value(maintainLogging(services));
   assert.equal(value(services.runtime.decision(question.id)), null); assert.equal(value(services.runtime.decision(permission.id)), null);
   assert.equal(executeSelect(database, schema, query => query.from('runtime_decision_question').count()), 0);
@@ -188,7 +189,7 @@ test('settled decisions, notifications, deliveries, operation receipts, invitati
   assert(value(services.repositories.enrollmentRequest.find({ id: source.id })), 'Approved exchange identity is not logging');
   assert.equal(value(services.repositories.nativeStop.receipt(agent.id, oldStop)), null);
   assert.equal(value(services.repositories.nativeStop.find(agent.id))?.receiptId, currentStop);
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   assert.equal((await verifyPreservation(backup, fixture.file)).ok, false, 'Strict preservation cannot excuse deleted history without explicit retention evidence');
   const proof = value((await verifyPreservation(backup, fixture.file, { loggingRetentionDays: 7, at: fixture.now() })));
   assert.equal(proof.expired.enrollment_archive, 1); assert.equal(proof.expired.fleet_native_stop, 1); assert.equal(proof.preserved.fleet_native_stop, 1);
@@ -224,7 +225,7 @@ test('reconnect-heavy history is cleaned in bounded batches and expected cleanup
   const result = maintainLogging(fixture.services); assert.equal(result.ok, false);
   assert(value(fixture.services.repositories.listenerRun.find({ id: old.id })), 'An expected transaction failure cannot partially remove the parent');
   assert.equal(executeSelect(fixture.database, schema, query => query.from('runtime_observation').where(row => row.session_id === 'rollback-history').count()), 1);
-  assert.deepEqual(fixture.database.pragma('foreign_key_check'), []);
+  assert.deepEqual(sqliteMetadata.foreignKeyViolations(fixture.database), []);
 });
 
 test('current whole-fleet and individual stop evidence survives history expiry without starving older completed operations', async scope => {
