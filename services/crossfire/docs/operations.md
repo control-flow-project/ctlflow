@@ -41,8 +41,8 @@ as proof that no writer exists. Concurrent starts cannot overlap migrations.
 
 ## Persistent data
 
-Knex is the only SQL migration owner. Schema 17 accepts the inventoried
-13–16 forward conversion and current-schema adoption; foreign/future or older
+Knex is the only SQL migration owner. Schema 18 accepts the inventoried
+13–17 forward migrations and current-schema validation; foreign/future or older
 unsupported stores are refused. Application startup validates schema identity,
 version and applied migration names without creating or upgrading tables.
 
