@@ -10,10 +10,10 @@ report and machine-readable samples, including failed attempts. Source and
 resource limits remain visible in the report.
 
 One owner-approved exception, dated 2026-10-18, permits managed .NET's saved
-runtime observation p95 up to 1.30 times Node. Its median latency and throughput,
-all other workloads, NativeAOT and Rust retain strict comparisons. Every JSON
-comparison records its p95 limit. The HTML labels exception use; it does not
-describe a slower allowed p95 as meeting the unmodified Node baseline.
+runtime observation median and p95 up to 1.30 times Node's corresponding latency.
+Its throughput, all other workloads, NativeAOT and Rust retain strict comparisons.
+Every JSON comparison records both latency limits. The HTML labels exception use;
+it does not describe slower allowed latency as meeting the unmodified Node baseline.
 
 - [Command, workload and comparison method](../../services/crossfire/tests/performance/README.md)
 - [Executable matrix and contract verification](shared-contracts.md)

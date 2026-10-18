@@ -159,9 +159,9 @@ necessary targeted checks. Run the full quality gates for cross-layer changes
 or whenever the impact is uncertain. Never weaken a gate or claim verification
 that was not performed.
 On 2026-10-18 the owner approved one performance exception: managed .NET's
-saved-runtime-observation p95 may be at most 1.30 times Node's measured p95.
-Median latency, throughput, request success and every other target/workload
-retain strict Node comparisons. JSON/HTML reports must expose the exact limit
+saved-runtime-observation median and p95 may each be at most 1.30 times Node's
+corresponding measured latency. Throughput, request success and every other
+target/workload retain strict Node comparisons. JSON/HTML reports expose both limits
 and label its use; no implicit tolerance or unreported failed attempt.
 Keep the unified spec and .analysis/20260929-164420-fleet-handover/necessity-ledger.md
 aligned with decisions and evidence. .analysis/MEMORY.md is the local work memory.

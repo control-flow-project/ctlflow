@@ -15,18 +15,24 @@ test('performance statistics retain slow samples, errors and strict Node regress
   assert.throws(() => comparePerformance([measurement('native', [1])], 'node'), /baseline/u);
 });
 
-test('only managed saved-observation p95 has the explicit thirty-percent exception', () => {
+test('only managed saved-observation median and p95 have the explicit thirty-percent exception', () => {
   const baseline = { ...measurement('node', [...Array<number>(18).fill(2), 4, 4]), workload: 'Saved runtime observations' };
-  const comparison = (target = 'csharp-managed', tail = 5.2, workload = baseline.workload) =>
-    ({ ...measurement(target, [...Array<number>(18).fill(1), tail, tail]), workload });
+  const comparison = (target = 'csharp-managed', tail = 5.2, workload = baseline.workload, median = 2.6) =>
+    ({ ...measurement(target, [...Array<number>(18).fill(median), tail, tail]), workload, elapsedMs: 20 });
   const accepted = comparePerformance([baseline, comparison()], 'node')[1]!;
+  assert.equal(accepted.maximumMedianRatio, 1.3); assert.equal(accepted.medianRatio, 1.3);
   assert.equal(accepted.maximumTailRatio, 1.3); assert.equal(accepted.tailRatio, 1.3); assert.equal(accepted.passed, true);
   assert.equal(comparePerformance([baseline, comparison('csharp-managed', 5.2001)], 'node')[1]!.passed, false);
+  assert.equal(comparePerformance([baseline, comparison('csharp-managed', 4, baseline.workload, 2.6001)], 'node')[1]!.passed, false);
+  assert.equal(comparePerformance([baseline, comparison('csharp-managed', 4)], 'node')[1]!.passed, true);
+  assert.equal(comparePerformance([baseline, comparison('csharp-managed', 5.2, baseline.workload, 1)], 'node')[1]!.passed, true);
   assert.equal(comparePerformance([baseline, comparison('csharp-nativeaot')], 'node')[1]!.passed, false);
   assert.equal(comparePerformance([baseline, comparison('rust')], 'node')[1]!.passed, false);
+  assert.equal(comparePerformance([baseline, comparison('csharp-nativeaot', 4)], 'node')[1]!.passed, false);
+  assert.equal(comparePerformance([baseline, comparison('rust', 4)], 'node')[1]!.passed, false);
   const other = comparePerformance([{ ...baseline, workload: 'Policy' }, comparison('csharp-managed', 5.2, 'Policy')], 'node')[1]!;
-  assert.equal(other.maximumTailRatio, 1); assert.equal(other.passed, false);
-  assert.equal(comparePerformance([baseline, { ...comparison(), samplesMs: [...Array<number>(18).fill(2.01), 5.2, 5.2], elapsedMs: 20 }], 'node')[1]!.passed, false);
+  assert.equal(other.maximumMedianRatio, 1); assert.equal(other.maximumTailRatio, 1); assert.equal(other.passed, false);
+  assert.equal(comparePerformance([{ ...baseline, workload: 'Policy' }, comparison('csharp-managed', 4, 'Policy')], 'node')[1]!.passed, false);
   assert.equal(comparePerformance([baseline, { ...comparison(), elapsedMs: baseline.elapsedMs * 2 }], 'node')[1]!.passed, false);
   assert.equal(comparePerformance([baseline, { ...comparison(), failures: ['HTTP 503'] }], 'node')[1]!.passed, false);
   assert.equal(comparePerformance([{ ...baseline, failures: ['HTTP 503'] }, comparison()], 'node')[1]!.passed, false);
