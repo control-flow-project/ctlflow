@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import Database from 'better-sqlite3';
+import { databaseIdentity, foreignKeyViolations, integrityResults } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { migrationQuery, migrationRows } from '../../dist/tests/support/migration-data.js';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { createDirectoryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/directory/index';
@@ -26,10 +27,9 @@ function native(binary, ...arguments_) {
   return JSON.parse(execFileSync(resolve(binary), arguments_, {encoding:'utf8', timeout:30_000, maxBuffer:1_048_576}).trim());
 }
 function schema(database) {
-  assert.equal(database.pragma('application_id', {simple:true}), 1129465426);
-  assert.equal(database.pragma('user_version', {simple:true}), 18);
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
-  assert.deepEqual(database.pragma('integrity_check'), [{integrity_check:'ok'}]);
+  assert.deepEqual(databaseIdentity(database), {application:1129465426, version:18});
+  assert.deepEqual(foreignKeyViolations(database), []);
+  assert.deepEqual(integrityResults(database), [{integrity_check:'ok'}]);
   return migrationRows(database, migrationQuery('sqlite_schema').select('type', 'name', 'tbl_name', 'sql')
     .where('name', 'not like', 'sqlite_%').orderBy(['type', 'name']));
 }

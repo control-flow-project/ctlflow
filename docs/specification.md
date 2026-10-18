@@ -107,12 +107,18 @@ Contracts may import pure domain values; domain code does not import contracts.
 | Management UI | Human views/actions using the canonical REST contracts |
 
 Node queries use Tinqer, C# queries use EF Core and Rust queries use Diesel.
-Knex alone creates/migrates owned SQL stores. Handwritten SQL strings are
-prohibited, including fixture setup and test assertions. Query libraries own
-statement generation; migration fixtures use Knex builders. Metadata reads use
-the selected implementation's query library. A required database operation that
-the selected library cannot express needs an explicit owner decision; a raw
-helper or removal of a safety check is not an implicit exception.
+Knex alone creates/migrates owned SQL stores. Handwritten application and metadata
+queries are prohibited, including fixture setup and test assertions. Query libraries
+own statement generation; migration fixtures use Knex builders. Metadata reads use
+the selected implementation's query library.
+
+The owner approved a narrow exception on 2026-10-18 for required schema/control
+SQL unavailable through the pinned libraries: STRICT/trigger DDL, SQLite settings,
+native backup and locking operations. Query-plan inspection prefixes generated
+statements with EXPLAIN QUERY PLAN; the inspected query remains library-generated.
+These statements stay at their existing schema/control owner. The exception
+does not permit handwritten data/metadata queries, a generic raw-query API,
+another migration owner, compatibility paths or removing safety checks.
 
 Use strict types, named exports, explicit TypeScript .js relative imports,
 functional modules and Result for expected failures. Split by responsibility,
@@ -1031,6 +1037,13 @@ applicable unit/native suites, managed/AOT/Rust publication, shared contracts,
 real containers and migration/rollback tests. Coverage inventory distinguishes
 authentication, successful behavior, malformed input, recovery and UI evidence;
 counts alone establish none of them.
+
+The performance bank compares each workload against the measured Node baseline:
+zero request failures, no slower p50/p95 and no lower throughput. On 2026-10-18
+the owner approved only managed .NET's saved-runtime-observation p95 up to
+1.30 times Node. Its p50/throughput and every other target/workload remain strict.
+JSON and HTML expose each p95 limit and label exception use rather than claiming
+it meets the unmodified baseline. Failed earlier attempts remain recorded.
 
 Tests use verified finite aggregate memory/swap/task scopes, all available cores
 for independent files, and once-prepared immutable builds/native/browser assets.

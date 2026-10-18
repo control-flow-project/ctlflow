@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import { randomBytes, createHash } from 'node:crypto';
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
+import { databaseIdentity, foreignKeyViolations, integrityResults } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { createDirectoryRepository } from '@ctlflow/crossfire-adapter-sqlite/repository/directory/index';
 import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
@@ -23,10 +24,9 @@ function checkDatabase(database) {
   assert.equal(rows.filter(row => row.type === 'table').length, 63);
   assert.equal(rows.filter(row => row.type === 'index').length, 94);
   assert.equal(rows.filter(row => row.type === 'trigger').length, 26);
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
-  assert.equal(database.pragma('application_id', { simple: true }), 1129465426);
-  assert.equal(database.pragma('user_version', { simple: true }), 18);
-  assert.deepEqual(database.pragma('integrity_check'), [{ integrity_check: 'ok' }]);
+  assert.deepEqual(foreignKeyViolations(database), []);
+  assert.deepEqual(databaseIdentity(database), { application: 1129465426, version: 18 });
+  assert.deepEqual(integrityResults(database), [{ integrity_check: 'ok' }]);
   return rows;
 }
 

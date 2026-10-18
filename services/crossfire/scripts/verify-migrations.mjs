@@ -12,6 +12,7 @@ import { packageLabels } from '../dist/apps/server/src/container-package.js';
 import { migrationArguments } from '../dist/apps/server/src/container-commands.js';
 import { ownedDocker } from '../dist/apps/server/src/container-lifecycle.js';
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
+import { databaseIdentity, foreignKeyViolations, integrityResult } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { schema13Store } from '../dist/tests/support/schema13.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -59,9 +60,9 @@ try {
       await ownedDocker(migrationArguments(selected, image, parent), AbortSignal.timeout(60000));
       const database = openStore(path);
       try {
-        assert.equal(database.pragma('user_version', { simple: true }), 18);
-        assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
-        assert.deepEqual(database.pragma('foreign_key_check'), []);
+        assert.equal(databaseIdentity(database).version, 18);
+        assert.equal(integrityResult(database), 'ok');
+        assert.deepEqual(foreignKeyViolations(database), []);
       } finally { database.close(); }
       outcomes.push({ version, status: 'passed' });
     }

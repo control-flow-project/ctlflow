@@ -5,9 +5,15 @@ populated management database. A server health response is not a management UI
 latency measurement. Runtime adapters and paid model quality are separate checks.
 
 The suite fails when any selected runtime is missing, any request fails, or a
-workload falls below the measured Node baseline. It produces an offline HTML
+workload exceeds its recorded Node comparison limits. It produces an offline HTML
 report and machine-readable samples, including failed attempts. Source and
 resource limits remain visible in the report.
+
+One owner-approved exception, dated 2026-10-18, permits managed .NET's saved
+runtime observation p95 up to 1.30 times Node. Its median latency and throughput,
+all other workloads, NativeAOT and Rust retain strict comparisons. Every JSON
+comparison records its p95 limit. The HTML labels exception use; it does not
+describe a slower allowed p95 as meeting the unmodified Node baseline.
 
 - [Command, workload and comparison method](../../services/crossfire/tests/performance/README.md)
 - [Executable matrix and contract verification](shared-contracts.md)

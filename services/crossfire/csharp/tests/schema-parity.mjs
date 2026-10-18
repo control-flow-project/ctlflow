@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import Database from 'better-sqlite3';
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
+import { databaseIdentity, foreignKeyViolations, integrityResult } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 import { deployedMigrationFixture } from '../../dist/tests/support/deployed-migration.js';
 import { migrationChange, migrationQuery, migrationRows } from '../../dist/tests/support/migration-data.js';
@@ -34,9 +35,9 @@ function snapshot(database) {
     });
     return [value.name, entries.map(entry => JSON.stringify(entry)).sort()];
   }));
-  assert.deepEqual(database.pragma('foreign_key_check'), []);
-  assert.equal(database.pragma('integrity_check', { simple: true }), 'ok');
-  return { metadata, rows, application: database.pragma('application_id', { simple: true }), version: database.pragma('user_version', { simple: true }) };
+  assert.deepEqual(foreignKeyViolations(database), []);
+  assert.equal(integrityResult(database), 'ok');
+  return { metadata, rows, ...databaseIdentity(database) };
 }
 
 function verifiedBackup(native, path) {

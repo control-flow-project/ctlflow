@@ -30,10 +30,14 @@ from percentiles. Setup/warm-up failures stop measurement and fail the run.
 
 Nearest-rank p50/p95/p99 and requests/second are calculated per round. The median
 round statistic is compared to Node for the same workload. Every non-Node target
-must have zero failures, p50/p95 no higher than Node, and throughput no lower.
-There is no hidden tolerance, runtime exclusion, best-round selection or claim
-that results on one machine establish arbitrary production capacity. Keep other
-builds and benchmark runs off the machine while measuring.
+must have zero failures, p50 no higher than Node, and throughput no lower.
+p95 must not exceed the recorded per-comparison limit. The owner approved one
+exception on 2026-10-18: managed .NET saved-observation p95 may reach 1.30 times
+Node. Every other p95 comparison remains at 1.00 times Node. The report labels
+exception use and retains earlier failed attempts. There is no hidden tolerance,
+runtime exclusion, best-round selection or claim that results on one machine
+establish arbitrary production capacity. Keep other builds and benchmark runs
+off the machine while measuring.
 
 `results.json` contains samples, failures, resource ceilings and source provenance.
 `report.html` is an offline, responsive report with comparison tables and median

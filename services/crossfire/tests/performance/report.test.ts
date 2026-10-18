@@ -15,6 +15,23 @@ test('performance statistics retain slow samples, errors and strict Node regress
   assert.throws(() => comparePerformance([measurement('native', [1])], 'node'), /baseline/u);
 });
 
+test('only managed saved-observation p95 has the explicit thirty-percent exception', () => {
+  const baseline = { ...measurement('node', [...Array<number>(18).fill(2), 4, 4]), workload: 'Saved runtime observations' };
+  const comparison = (target = 'csharp-managed', tail = 5.2, workload = baseline.workload) =>
+    ({ ...measurement(target, [...Array<number>(18).fill(1), tail, tail]), workload });
+  const accepted = comparePerformance([baseline, comparison()], 'node')[1]!;
+  assert.equal(accepted.maximumTailRatio, 1.3); assert.equal(accepted.tailRatio, 1.3); assert.equal(accepted.passed, true);
+  assert.equal(comparePerformance([baseline, comparison('csharp-managed', 5.2001)], 'node')[1]!.passed, false);
+  assert.equal(comparePerformance([baseline, comparison('csharp-nativeaot')], 'node')[1]!.passed, false);
+  assert.equal(comparePerformance([baseline, comparison('rust')], 'node')[1]!.passed, false);
+  const other = comparePerformance([{ ...baseline, workload: 'Policy' }, comparison('csharp-managed', 5.2, 'Policy')], 'node')[1]!;
+  assert.equal(other.maximumTailRatio, 1); assert.equal(other.passed, false);
+  assert.equal(comparePerformance([baseline, { ...comparison(), samplesMs: [...Array<number>(18).fill(2.01), 5.2, 5.2], elapsedMs: 20 }], 'node')[1]!.passed, false);
+  assert.equal(comparePerformance([baseline, { ...comparison(), elapsedMs: baseline.elapsedMs * 2 }], 'node')[1]!.passed, false);
+  assert.equal(comparePerformance([baseline, { ...comparison(), failures: ['HTTP 503'] }], 'node')[1]!.passed, false);
+  assert.equal(comparePerformance([{ ...baseline, failures: ['HTTP 503'] }, comparison()], 'node')[1]!.passed, false);
+});
+
 test('a performance HTML report escapes all text and loads no active or external content', () => {
   const measurements = [measurement('node', [2, 3]), measurement('<script>native</script>', [1, 2], ['<img src=x onerror=alert(1)>'])];
   const report: PerformanceReport = { schemaVersion: 1, generatedAt: '2026-10-18', source: { commit: 'candidate', dirty: true }, host: { platform: 'linux', architecture: 'x64', processors: 8, resources: {} },

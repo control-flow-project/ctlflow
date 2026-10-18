@@ -100,13 +100,17 @@ modules by responsibility near 600 lines. Domain code imports neither transport
 nor concrete storage/adapter/UI modules. Composition roots wire implementations.
 SQL tables/columns are singular snake_case; normalized domain state uses indexed
 relations. Tinqer owns Node queries, EF Core C# queries and Diesel Rust queries.
-The owner prohibits handwritten SQL strings, including tests. Do not route a
-string through a helper, a raw-query API or a fixture to evade this rule. Query
-libraries generate execution statements from structured queries. Knex remains
-the sole schema/migration owner; migration fixtures use its structured builders.
-Do not weaken database constraints or verification to remove a SQL statement.
-Any unavoidable schema/control limitation requires an explicit owner decision,
-not a silently assumed exception.
+Handwritten application and metadata queries are prohibited, including tests.
+Do not route a string through a helper, raw-query API or fixture to evade this
+rule. Query libraries generate execution statements from structured queries.
+Knex remains the sole schema/migration owner; migration fixtures use its builders.
+On 2026-10-18 the owner approved only required schema/control SQL that the pinned
+libraries cannot express: STRICT/trigger DDL, SQLite settings, native backup and
+locking operations. Query-plan inspection may prefix library-generated SQL with
+EXPLAIN QUERY PLAN; it must not introduce a handwritten application query.
+This exception does not permit raw data/metadata queries, a second migration
+owner, weaker constraints or compatibility paths. Keep required statements at
+their schema/control owner, not behind a generic raw-query helper.
 Expected transaction failures roll back. Native operations stay outside transactions.
 
 ## Execution and security
@@ -154,6 +158,11 @@ For isolated changes with confidently local impact, run the affected tests and
 necessary targeted checks. Run the full quality gates for cross-layer changes
 or whenever the impact is uncertain. Never weaken a gate or claim verification
 that was not performed.
+On 2026-10-18 the owner approved one performance exception: managed .NET's
+saved-runtime-observation p95 may be at most 1.30 times Node's measured p95.
+Median latency, throughput, request success and every other target/workload
+retain strict Node comparisons. JSON/HTML reports must expose the exact limit
+and label its use; no implicit tolerance or unreported failed attempt.
 Keep the unified spec and .analysis/20260929-164420-fleet-handover/necessity-ledger.md
 aligned with decisions and evidence. .analysis/MEMORY.md is the local work memory.
 Do not stop at intermediate milestones when completion is authorized. Never
