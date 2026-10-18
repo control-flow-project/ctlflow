@@ -46,11 +46,13 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     await call(operations.changeFleetDelivery, { fleetId }, { expectedRevision: integer(record(fleet.connection).revision), enabled });
     await observe(async () => record(list(record((await call(operations.fleet, { fleetId })).data).instances)[0]).listenerActive === enabled, 'Controller applies delivery intent');
   }
+  let nativeInspection: unknown = null;
   async function idle(): Promise<boolean> {
     const file = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/listener.json');
     const endpoint = record(JSON.parse(readFileSync(file, 'utf8')) as unknown);
     const response = await contractHttp('http://127.0.0.1:' + String(endpoint.port), 'POST', '/bindings/' + text(endpoint.binding) + '/control',
       { action: 'test' }, { Authorization: 'Bearer ' + text(endpoint.secret) });
+    nativeInspection = { status: response.status, body: response.body };
     return response.status === 200 && record(record(response.body).test).busy === false;
   }
   await scope.test('Unix transport, strict contracts and private ownership are identical', async () => {
@@ -388,7 +390,19 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
         assert(lastUser(provider.requests.at(-1)).includes('[Crossfire session restarted]'));
         assert(!JSON.stringify(provider.requests.at(-1)).includes(completed), 'The unfinished room never receives another room task history');
       } finally { if (provider.held()) provider.finish(); await resuming; }
-      await observe(idle, 'Per-room resume settles to native idle');
+      try { await observe(idle, 'Per-room resume settles to native idle'); }
+      catch (error) {
+        try {
+          const home = join(fleetDirectory, 'agents/analyst/workarea/analyst', runtime === 'pi' ? '.pi/receipts' : '.codex');
+          const journals = readdirSync(home).filter(name => runtime === 'pi' ? name.endsWith('.json') : name.endsWith('.receipt')).map(name => {
+            const journal = record(JSON.parse(readFileSync(join(home, name), 'utf8')) as unknown);
+            return { file: name, sessionId: journal.sessionId, pending: journal.pending === null ? null : record(journal.pending).messageId,
+              confirmed: list(journal.confirmed).map(value => record(value).messageId) };
+          });
+          scope.diagnostic(JSON.stringify({ nativeInspection, work: JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, journals }).slice(0, 8192));
+        } catch (diagnosticError) { scope.diagnostic(String(diagnosticError).slice(0, 1024)); }
+        throw error;
+      }
       assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, histories, 'Every room retains its exact saved native history');
       assert.deepEqual(JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, []);
     } finally {
