@@ -49,3 +49,19 @@ test('a performance HTML report escapes all text and loads no active or external
   assert(!/<script\b|<iframe\b|<link\b|<img\b|https?:\/\//iu.test(html));
   assert(html.includes('Performance gates failed')); assert(html.includes('50,000')); assert(html.includes('Content-Security-Policy'));
 });
+
+test('only managed saved-observation throughput permits the explicit five-percent exception', () => {
+  const baseline = { ...measurement('node', [2, 2]), workload: 'Saved runtime observations', elapsedMs: 95 };
+  const candidate = { ...measurement('csharp-managed', [2, 2]), workload: baseline.workload, elapsedMs: 100 };
+  const accepted = comparePerformance([baseline, candidate], 'node')[1]!;
+  assert.equal(accepted.minimumThroughputRatio, 0.95); assert.equal(accepted.throughputRatio, 0.95);
+  assert.equal(accepted.passed, true);
+  assert.equal(comparePerformance([baseline, { ...candidate, elapsedMs: 100.001 }], 'node')[1]!.passed, false);
+  for (const target of ['csharp-nativeaot', 'rust']) {
+    const strict = comparePerformance([baseline, { ...candidate, target }], 'node')[1]!;
+    assert.equal(strict.minimumThroughputRatio, 1); assert.equal(strict.passed, false);
+  }
+  const other = comparePerformance([{ ...baseline, workload: 'Policy' }, { ...candidate, workload: 'Policy' }], 'node')[1]!;
+  assert.equal(other.minimumThroughputRatio, 1); assert.equal(other.passed, false);
+  assert.equal(comparePerformance([baseline, { ...candidate, failures: ['HTTP 503'] }], 'node')[1]!.passed, false);
+});

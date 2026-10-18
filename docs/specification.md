@@ -1059,9 +1059,11 @@ counts alone establish none of them.
 The performance bank compares each workload against the measured Node baseline:
 zero request failures, no slower p50/p95 and no lower throughput. On 2026-10-18
 the owner approved only managed .NET's saved-runtime-observation p50 and p95 up to
-1.30 times Node's corresponding latency. Its throughput and every other
-target/workload remain strict. JSON and HTML expose both latency limits and label exception use rather than claiming
-it meets the unmodified baseline. Failed earlier attempts remain recorded.
+1.30 times Node's corresponding latency and throughput at least 0.95 times Node.
+Only that target/workload has these explicitly approved exceptions; every other
+target/workload remains strict. JSON and HTML expose latency and throughput limits
+and label exception use rather than claiming it meets the unmodified baseline.
+Failed earlier attempts remain recorded.
 
 Tests use verified finite aggregate memory/swap/task scopes, all available cores
 for independent files, and once-prepared immutable builds/native/browser assets.
