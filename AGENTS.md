@@ -98,6 +98,10 @@ Use functional modules, strict types without any, named exports, explicit .js
 relative imports, Result for expected failures and boundary validation. Split
 modules by responsibility near 600 lines. Domain code imports neither transport
 nor concrete storage/adapter/UI modules. Composition roots wire implementations.
+Readability and clear typed object/data structures take priority over marginal
+performance. Use normal, sound ORM queries; do not introduce complex queries,
+opaque layouts or positional representations to chase small timing differences.
+Never compromise domain or API object shapes for performance.
 SQL tables/columns are singular snake_case; normalized domain state uses indexed
 relations. Tinqer owns Node queries, EF Core C# queries and Diesel Rust queries.
 Handwritten application and metadata queries are prohibited, including tests.

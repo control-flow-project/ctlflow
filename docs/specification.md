@@ -127,6 +127,11 @@ arbitrary predicates or driver handles. SQLite transaction callbacks are
 synchronous; expected failures and exceptions roll back. Native/network work
 stays outside transactions. Commit rechecks authority, identity and revisions.
 
+Readability and meaningful typed object/data structures take priority over marginal
+performance. Use normal, sound ORM queries, not complicated queries or opaque
+representations for small timing gains. Domain and API object shapes must not be
+compromised for performance.
+
 The browser-safe client cannot import backend/native modules. All servers serve
 the same content-addressed UI build and Element translation asset.
 
