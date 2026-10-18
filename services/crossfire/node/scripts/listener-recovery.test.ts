@@ -8,16 +8,20 @@ import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { readJson } from "@ctlflow/crossfire-adapter-filesystem/index";
 import { loadControl } from "@ctlflow/crossfire-agent-core/control";
 import { createListenerControl } from '@ctlflow/crossfire-agent-core/listener-control';
-import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, THREAD, CONTROLLER } from "./test-support/listener.js";
+import { fakeCodex, matrixFixture, message, OBSERVER, ROOM, OWNER_DM, THREAD, CONTROLLER } from "./test-support/listener.js";
 
 test("one bounded reconciliation receiver recovers missed notifications and important state exactly once", withClock(async (scope, clock) => {
 
   const native = await fakeCodex(scope);
   const matrix = await matrixFixture(scope, native.directory, clock);
   const stop = new AbortController();
-  const result = listen({ ...matrix, reconcileMs: 1000, limit: 2, pollMs: 100, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
+  const result = listen({ ...matrix, reconcileMs: 1000, limit: 2, pollMs: 1000, debounceMs: 0, runtime: native.runtime }, stop.signal).catch(error => error);
   cleanup(scope, async () => { stop.abort(); await clock.complete(result); });
-  await clock.observe(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
+  await clock.observe(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1
+    && !existsSync(matrix.cursorFile + '.snapshot') && !existsSync(matrix.cursorFile + '.ack')
+    && !existsSync(matrix.cursorFile + '.chat-publication')
+    && readJson<Record<string, string>>(matrix.cursorFile)[OWNER_DM] === 'sync-0');
+  assert.equal(matrix.requests.filter(request => request.path.endsWith('/sync') && Number(request.query.get('timeout')) > 0).at(-1)!.query.get('timeout'), '500');
   const before = readJson(matrix.cursorFile);
   matrix.syncUpdates.enabled = false;
   matrix.add(ROOM, message("$missed"), { ...message("$rename", OBSERVER), type: "m.room.name", state_key: "", content: { name: "Coffee Day" } },
