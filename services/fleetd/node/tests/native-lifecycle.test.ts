@@ -520,3 +520,20 @@ test('inspection and stop clear a completed room without clearing another room w
     } finally { await managed.close(); }
   }
 });
+
+test('a selected room defaults native turn inspection to that room while preserving an explicit room override', async scope => {
+  const current = fixture(), start = current.services.start, room = '!selected:test';
+  current.saved.push({ context: room, runtime: 'fixture', sessionId: 'selected-history', workspace: '/fixture' });
+  const captured: (string | undefined)[] = [];
+  current.services.start = async (...input) => {
+    const result = await start(...input); if (!result.ok) return result;
+    result.value.turnControl.activeTurn = async requested => { captured.push(requested); return null; };
+    result.value.conversation = async () => ({ ...result.value, sessionId: 'selected-history' });
+    return result;
+  };
+  const managed = value(await initializedLifecycle(current.services, scope.signal)); scope.after(() => managed.close());
+  const selected = await managed.runtime.conversation!(room);
+  await selected.turnControl!.activeTurn(); await selected.turnControl!.activeTurn('!explicit:test');
+  await managed.runtime.turnControl!.activeTurn();
+  assert.deepEqual(captured, [room, '!explicit:test', undefined]);
+});

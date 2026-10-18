@@ -336,9 +336,11 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         schedule();
       },
       turnControl: {
-        activeTurn: async (room, admission) => admission
-          ? call(connection => connection.turnControl.activeTurn(room, admission), false, admission, openNative)
-          : native && !native.signal.aborted ? native.turnControl.activeTurn(room) : null,
+        activeTurn: async (room, admission) => {
+          const selectedRoom = room ?? (context === services.primary ? undefined : context);
+          return admission ? call(connection => connection.turnControl.activeTurn(selectedRoom, admission), false, admission, openNative)
+            : native && !native.signal.aborted ? native.turnControl.activeTurn(selectedRoom) : null;
+        },
         interrupt: async (turn, recovery, admission) => call(connection => connection.turnControl.interrupt(turn, recovery, admission), true, admission, openNative),
       },
       conversation: async (room, admission) => call(async connection => {

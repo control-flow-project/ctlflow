@@ -55,8 +55,9 @@ public sealed partial class NativeLifecycle
         }
         public ValueTask<Result<string?>> ActiveTurn(string? room = null, InputAdmission? admission = null)
         {
-            if (admission is not null) return Call(connection => connection.TurnControl is null ? ValueTask.FromResult(Results.Fail<string?>("invalid", "Native turn control is unavailable")) : connection.TurnControl.ActiveTurn(room, admission), admission: admission, prepare: false);
-            var connection = owner.native; return connection is not null && !connection.Lifetime.IsCancellationRequested && connection.TurnControl is not null ? connection.TurnControl.ActiveTurn(room) : ValueTask.FromResult(Result<string?>.Success(null));
+            var selectedRoom = room ?? (context == owner.services.Primary ? null : context);
+            if (admission is not null) return Call(connection => connection.TurnControl is null ? ValueTask.FromResult(Results.Fail<string?>("invalid", "Native turn control is unavailable")) : connection.TurnControl.ActiveTurn(selectedRoom, admission), admission: admission, prepare: false);
+            var connection = owner.native; return connection is not null && !connection.Lifetime.IsCancellationRequested && connection.TurnControl is not null ? connection.TurnControl.ActiveTurn(selectedRoom) : ValueTask.FromResult(Result<string?>.Success(null));
         }
         public ValueTask<Result<string>> Interrupt(string turnId, bool recovery = false, InputAdmission? admission = null)
             => Call(connection => connection.TurnControl is null ? ValueTask.FromResult(Results.Fail<string>("invalid", "Native turn control is unavailable")) : connection.TurnControl.Interrupt(turnId, recovery, admission), true, admission, false);

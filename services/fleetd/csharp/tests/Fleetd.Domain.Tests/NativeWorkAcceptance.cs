@@ -61,6 +61,7 @@ public static class NativeWorkAcceptance
                 check((await completed.Deliver("Completed room task", "completed")).IsSuccess, "Room submission has an exact durable checkpoint"); completed.Acknowledge(["completed"]);
                 var active = (await owner.Runtime.Conversation("!active:fixture")).Value;
                 check((await active.Deliver("Unfinished room task", "active")).IsSuccess && fixture.Work.Count == 2, "Both room tasks are independently checkpointed");
+                await active.TurnControl!.ActiveTurn(); check(fixture.CapturedRooms[^1] == "!active:fixture", "A room defaults turn inspection to its own native history");
                 if (inspect) check((await owner.Runtime.Inspect()).Value, "Another room remains busy after exact-context inspection");
                 else await owner.DisposeAsync();
                 check(fixture.Work.Count == 1 && fixture.Work[0].Context == "!active:fixture", "Inspection and stop clear only the verified completed room");
@@ -78,6 +79,7 @@ public static class NativeWorkAcceptance
         public HashSet<string> Receipts { get; } = new(StringComparer.Ordinal);
         public List<SavedRuntimeContext> Contexts { get; } = [new("shared", "codex", Session, "/fixture")];
         public Dictionary<string, bool> ContextBusy { get; } = new(StringComparer.Ordinal);
+        public List<string?> CapturedRooms { get; } = [];
         public bool FailCapture { get; set; }
         public Action<RuntimeObservationEvent>? Observe { get; private set; }
         public Probe? Native { get; private set; }
@@ -140,7 +142,7 @@ public static class NativeWorkAcceptance
         public ValueTask<Result<RuntimeConnection>> Conversation(string room, InputAdmission? admission = null)
             => ValueTask.FromResult(fixture.Contexts.FirstOrDefault(value => value.Context == room) is { } context
                 ? Result<RuntimeConnection>.Success(new Probe(fixture, context.SessionId)) : Results.Fail<RuntimeConnection>("missing", "No room history in this fixture"));
-        public ValueTask<Result<string?>> ActiveTurn(string? room = null, InputAdmission? admission = null) => ValueTask.FromResult(Result<string?>.Success(null));
+        public ValueTask<Result<string?>> ActiveTurn(string? room = null, InputAdmission? admission = null) { fixture.CapturedRooms.Add(room); return ValueTask.FromResult(Result<string?>.Success(null)); }
         public ValueTask<Result<string>> Interrupt(string turnId, bool recovery = false, InputAdmission? admission = null) => ValueTask.FromResult(Result<string>.Success("inactive"));
         public ValueTask DisposeAsync() { stop.Cancel(); return ValueTask.CompletedTask; }
     }

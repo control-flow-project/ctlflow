@@ -676,6 +676,9 @@ authority, survives reconnect and retries with the same transaction identity.
 Adapters own native options, processes, histories, receipts, instructions,
 permissions, observations and attachment. Orchestration contains no provider
 translation or terminal scraping.
+Turn inspection without an explicit room targets the selected connection's saved
+history. An explicit room selects that room; a room connection never silently
+inspects the primary control history instead.
 
 Codex requires stock 0.158.0+ and actual required protocol capabilities.
 Admission checks config/read and advertised models/efforts, including defaults.

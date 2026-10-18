@@ -38,7 +38,8 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   const role = join(fleetDirectory, 'agents/analyst'); mkdirSync(role, { recursive: true, mode: 0o700 });
   const effort = runtime === 'codex' ? 'model_reasoning_effort' : 'thinking_level'; const defaults = runtime === 'codex' ? 'sandbox_mode = "read-only"\napproval_policy = "never"\nfeatures = { default_mode_request_user_input = true }\n' : 'provider = "fixture"\nmodel = "fixture-model"\n';
   writeFileSync(join(role, 'agent.toml'), 'name = "Contract analyst"\nruntime = ' + JSON.stringify(runtime) + '\n[runtime_options]\n' + defaults + effort + ' = "medium"\n', { mode: 0o600 }); writeFileSync(join(role, 'AGENTS.md'), 'Only obey the authorized shared contract fixture. Use explicit tools for room replies.\n', { mode: 0o600 });
-  writeFileSync(join(fleetDirectory, 'runtime.toml'), 'fleet = "shared-' + runtime + '"\n[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(platform.origin) + '\nowner = ' + JSON.stringify(platform.owner.matrixUserId) + '\n[[instances]]\nkey = "analyst"\nname = "shared-analyst-' + runtime + '"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/analyst"\n[instances.runtime_options]\n' + effort + ' = "high"\n', { mode: 0o600 });
+  const runtimeSource = 'fleet = "shared-' + runtime + '"\n[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(platform.origin) + '\nowner = ' + JSON.stringify(platform.owner.matrixUserId) + '\n[[instances]]\nkey = "analyst"\nname = "shared-analyst-' + runtime + '"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/analyst"\n[instances.runtime_options]\n' + effort + ' = "high"\n';
+  writeFileSync(join(fleetDirectory, 'runtime.toml'), runtimeSource, { mode: 0o600 });
   let fleetId = '', revision = 0, saved: unknown, agentId = '', matrixUserId = '', token = '';
   async function delivery(enabled: boolean): Promise<void> {
     const fleet = record((await call(operations.fleet, { fleetId })).data);
@@ -343,8 +344,9 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   await scope.test('per-room stop and resume continue only unfinished work in its exact history', async () => {
     const configuration = join(fleetDirectory, 'runtime.toml'), original = readFileSync(configuration, 'utf8');
     await operate('stop');
-    assert(original.includes('[instances.runtime_options]'));
-    writeFileSync(configuration, original.replace('[instances.runtime_options]', '[instances.listener_options]\nhistory_mode = "per-room"\n[instances.runtime_options]'), { mode: 0o600 });
+    const roster = list(record((await call(operations.fleet, { fleetId })).data).instances);
+    assert.equal(roster.length, 1); assert.equal(record(record(roster[0]).instance).key, 'analyst');
+    writeFileSync(configuration, runtimeSource.replace('[instances.runtime_options]', '[instances.listener_options]\nhistory_mode = "per-room"\n[instances.runtime_options]'), { mode: 0o600 });
     try {
       await operate('reset');
       async function matrix(method: string, path: string, body?: unknown) {
