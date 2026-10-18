@@ -119,10 +119,12 @@ readers, SQL migration owners or permission to reset a database.
   other targets. The graph names these dependencies explicitly; unknown external
   libraries and concrete Tokio/std filesystem, transport and process operations
   remain rejected. No facade hides such operations behind a purported pure port.
-- Rust owns a Linux pidfd-based readiness reactor and native process-group guard.
-  The guard is a process-adapter executable, not another product, listener or
-  service. It runs only with an active engine, holds an exact private lock and
-  terminates the owned native group if fleetd exits, including SIGKILL.
+- Each process adapter owns its native engine-group guard. Node observes its
+  parent IPC connection, C# an exact parent process handle and Rust a Linux
+  parent pidfd. Rust also owns its pidfd-based readiness reactor. Guards are
+  process-adapter executables, not another product, listener or service. They
+  run only with an active engine, retain the exact private native-group lock
+  and terminate the owned group if fleetd exits, including SIGKILL.
   No terminal scraping, history rewriting, global service or unsafe first-party
   Rust is introduced.
 - Runtime container images select the shared pinned IANA timezone data explicitly.
