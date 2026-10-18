@@ -54,7 +54,8 @@ test('only managed saved-observation throughput permits the explicit five-percen
   const baseline = { ...measurement('node', [2, 2]), workload: 'Saved runtime observations', elapsedMs: 95 };
   const candidate = { ...measurement('csharp-managed', [2, 2]), workload: baseline.workload, elapsedMs: 100 };
   const accepted = comparePerformance([baseline, candidate], 'node')[1]!;
-  assert.equal(accepted.minimumThroughputRatio, 0.95); assert.equal(accepted.throughputRatio, 0.95);
+  assert.equal(accepted.minimumThroughputRatio, 0.95);
+  assert(Math.abs(accepted.throughputRatio - 0.95) <= Number.EPSILON);
   assert.equal(accepted.passed, true);
   assert.equal(comparePerformance([baseline, { ...candidate, elapsedMs: 100.001 }], 'node')[1]!.passed, false);
   for (const target of ['csharp-nativeaot', 'rust']) {
