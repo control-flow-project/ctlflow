@@ -188,6 +188,13 @@ install the pinned Node @ctlflow/fleet CLI with Node fleetd, independent of the
 server backend. The setup harness's own process/history is never adopted.
 Images own readiness and entrypoints; site-specific branding uses build stages,
 not language-specific commands injected into another backend's runtime.
+Docker runs only crossfire, Conduit Matrix, shared UI/content and one-shot Knex
+initialization/migrations. It does not run fleetd or native agents. The execution
+host installs pinned Node fleet/fleetd and supplies its own supported Codex/Pi
+installation and native provider login. Setup never installs or upgrades those
+harnesses or copies host credentials into a container. There is no fleet image,
+fleet Compose service or container relay. Server and host fleet use the same
+public origin; native Matrix/backend listeners remain private to the server.
 Container removal is complete only after the exact immutable container identity
 is absent. An already-removing container is observed, not stopped/deleted again.
 All three operators bound that observation and preserve explicit cleanup failures.

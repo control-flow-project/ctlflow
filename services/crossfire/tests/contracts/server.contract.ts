@@ -35,6 +35,13 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
     }
     for (const path of ['/config.json/../bootstrap.json', '/manage/assets/%2e%2e%2fpackage.json', '/_coord/install.mjs']) assert.equal((await fixture.raw(path)).status, 404, 'Unsafe or removed public asset: ' + path);
     const descriptor = await fixture.raw('/onboarding/setup.json?ownerMatrixId=' + encodeURIComponent(fixture.owner.matrixUserId), 'GET', undefined, fixture.headers()); assert.equal(descriptor.status, 200); assert.equal(record(descriptor.body).ownerMatrixId, fixture.owner.matrixUserId);
+    const guide = await fixture.raw('/onboarding/setup?ownerMatrixId=' + encodeURIComponent(fixture.owner.matrixUserId));
+    assert.equal(guide.status, 200);
+    const instructions = text(guide.body);
+    for (const required of ['Docker hosts the server only.', 'The selected Codex/Pi installation and native login must already exist there.',
+      'Never install or upgrade Codex/Pi as part of these instructions.', 'Earendil Pi requires explicit ordinary fleet configuration.',
+      'Do not attach this coding session; fleetd starts a separate managed native session.']) assert(instructions.includes(required), required);
+    assert(!instructions.includes('command -v codex'), 'The installer must not reject an explicitly configured Pi-only host');
   });
   await scope.test('malformed UTF-8 is rejected without changing identity text or revision', async () => {
     const before = await fixture.data(operations.member, { memberId: fixture.owner.memberId });

@@ -10,9 +10,10 @@ function SetupPicture({ step }: { step: number }) {
 }
 export function Connect() {
   const { member } = useSession(), guide = onboardingUrl(location.origin, member.matrixUserId);
-  return <Page title="Set up an agent" description="Create a managed Codex agent in your project. One agent or several, setup follows the same steps.">
+  return <Page title="Set up an agent" description="Create a fleet-managed agent in your project using your existing coding harness and login.">
     <section className="setup-step" aria-labelledby="setup-instruction"><SetupPicture step={1}/><div><span className="step-label">STEP 1</span><h2 id="setup-instruction">Paste this into your coding assistant</h2>
       <p>Open the project you want the new agent to work in. Your assistant reads the guide and runs setup with saved defaults—no configuration questions.</p>
+      <p>Run setup on the computer where your agents will execute. Docker runs the server; fleetd and your agents run on that computer, not in the server container.</p>
       <CopyText rows={2} label="Instructions for your agent" value={'Follow the setup instructions at ' + guide + '.'}/>
       <p className="support">Setup starts or reuses a private fleet controller. It creates a separate managed conversation; your current coding session stays independent.</p></div></section>
     <section className="setup-step" aria-labelledby="setup-approval"><SetupPicture step={2}/><div><span className="step-label">STEP 2</span><h2 id="setup-approval">Approve the enrollment</h2>
@@ -24,7 +25,8 @@ export function Connect() {
       <p>Agents sleep after the configured idle period and resume their saved histories for eligible messages. Stopped sessions stay stopped until you explicitly resume them.</p>
       <div className="actions"><a className="button" href="/manage/agents">View agents →</a><a className="button" href="/manage/fleets">View fleets →</a><a className="button" href="/">Open Element →</a></div></div></section>
     <details className="setup-details"><summary>Requirements &amp; advanced configuration</summary>
-      <p>The guide checks Node.js, npm and Codex, with installation and native login steps if anything is missing. Packages install privately; setup does not require sudo or a global service.</p>
+      <p>The guide installs only the pinned fleet and fleetd npm packages into private user-owned storage. Node.js, npm, Git and the selected Codex or Pi harness must already be available. Setup does not install or upgrade a harness.</p>
+      <p>Use the selected harness’s native login on that computer. Missing software or authentication is reported before agent enrollment; do not put provider credentials into Docker, room messages or setup instructions. No sudo or global service is required.</p>
       <p>Codex is the default runtime. Earendil Pi is available through an explicit fleet configuration. The controller runs on Linux or macOS. Provider authentication uses the selected runtime’s native login, never passwords or tokens pasted into chat.</p>
       <p><code>fleet setup</code> uses the current project and persisted defaults. An optional configuration file supplies explicit overrides through the same setup path. Model and effort use the native defaults unless configured.</p>
       <p>New Codex agents default to <code>danger-full-access</code> and <code>on-request</code> approvals, without approval bypass. Pi has no implemented permission sandbox. Review the requested scope before approving.</p>

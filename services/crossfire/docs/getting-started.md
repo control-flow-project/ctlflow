@@ -70,9 +70,11 @@ Matrix/API upstream or serve report storage through an nginx directory alias.
 ## First agent
 
 1. Sign in to Element and management with the same human account.
-2. Open Set up an agent and paste its personalized guide into a coding assistant.
-3. The assistant runs pinned noninteractive fleet setup. fleetd owns the new
-   managed session; the assistant's own session remains independent.
+2. Open Set up an agent and paste its personalized guide into a coding assistant
+   on the execution host, with its existing Codex/Pi installation and login.
+3. The assistant installs pinned fleet/fleetd only and runs noninteractive setup.
+   fleetd owns the new managed session; the assistant stays independent. Docker
+   runs the server side, not the fleet or native harness.
 4. Approve the exact displayed roster/code as its owner.
 5. Create ordinary rooms in Element and assign only needed agent access.
 
@@ -81,4 +83,5 @@ actual contact, terminal output or a native question. Other room membership and
 wake authority are explicit, separate decisions.
 
 - [Enrollment and updates](onboarding/README.md)
+- [Local Docker server and host-native fleet](local-docker.md)
 - [Management](management.md)
