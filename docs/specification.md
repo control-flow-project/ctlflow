@@ -213,6 +213,13 @@ match their canonical owners, not introduce alternate validation decisions.
 crossfire uses /api, management /manage, and setup/tool assets /onboarding.
 Matrix retains /_matrix. Static reports use a separate origin/listener.
 
+The Node outbound Matrix/coordination adapter uses a pinned published Undici
+dispatcher with HTTP/2 disabled explicitly. This avoids the Node HTTP/2 stream
+error path without patching Node, replacing the global dispatcher or retrying a
+failed protocol with another one. HTTPS certificate/hostname verification,
+bearer authentication, origin restrictions, bounded bodies, cancellation and
+deadlines remain enforced. HTTP/1.1 does not provide HTTP/2 multiplexing.
+
 - Success is `{data, meta: {requestId, ...pagination}}`; failure is
   `{error: {code, message, fieldErrors?}, meta: {requestId}}`.
 - Request IDs are UUIDs. Audit correlation separately permits bounded opaque

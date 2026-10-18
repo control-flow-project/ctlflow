@@ -1,6 +1,7 @@
 import { failure, success, type Result } from "@ctlflow/crossfire-kernel/result";
 import { object } from "@ctlflow/crossfire-contracts/validation";
 import type { Readable } from "node:stream";
+import { Agent, fetch } from 'undici';
 import { MAX_JSON_BYTES } from "@ctlflow/crossfire-contracts/limits";
 
 import type { Json, JsonObject } from '@ctlflow/crossfire-contracts/json';
@@ -11,6 +12,8 @@ import { endpoint } from '@ctlflow/crossfire-contracts/origin';
 import { markdownMessage } from './message.js';
 import { roomState, type RoomStateEvent } from '@ctlflow/crossfire-contracts/matrix-room';
 import { truncateUtf16 } from '@ctlflow/crossfire-kernel/text';
+
+const dispatcher = new Agent({ allowH2: false });
 
 export async function nativeOpen(client: Native, method: string, path: string, body?: Buffer | Readable,
   contentType = "application/json"): Promise<Result<Response>> {
@@ -27,6 +30,7 @@ export async function nativeOpen(client: Native, method: string, path: string, b
     const deadline = AbortSignal.timeout(timeout);
     return success(await fetch(destination, {
       method, redirect: "error", signal: client.signal ? AbortSignal.any([client.signal, deadline]) : deadline,
+      dispatcher,
       headers: { "Content-Type": contentType, ...(client.token ? { Authorization: "Bearer " + client.token } : {}) },
       ...(body === undefined ? {} : { body, duplex: "half" as const }),
     }));

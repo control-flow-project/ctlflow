@@ -5,6 +5,8 @@ import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:https';
+import { createSecureServer, type Http2ServerRequest, type Http2ServerResponse, type ServerHttp2Session } from 'node:http2';
+import type { Socket } from 'node:net';
 import { createServer as createHttpServer, request as forward, type Server } from 'node:http';
 import { getCACertificates, setDefaultCACertificates } from 'node:tls';
 import { cleanup } from './cleanup.js';
@@ -114,6 +116,22 @@ export async function secureRouter(scope: Scope, router: Server) {
   const server = createServer({ cert: certificate, key, requestTimeout: 30000, headersTimeout: 10000 },
     (request, response) => { router.emit('request', request, response); });
   cleanup(scope, async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
+  server.listen(0, '127.0.0.1'); await once(server, 'listening');
+  const address = server.address(); assert(address && typeof address !== 'string');
+  return { server, origin: 'https://127.0.0.1:' + address.port };
+}
+
+export async function secureHttp2Router(scope: Scope, listener: (request: Http2ServerRequest, response: Http2ServerResponse) => void) {
+  trustCertificate(scope);
+  const server = createSecureServer({ cert: certificate, key, allowHTTP1: true }, listener);
+  const sessions = new Set<ServerHttp2Session>(), sockets = new Set<Socket>();
+  server.on('session', session => { sessions.add(session); session.once('close', () => sessions.delete(session)); });
+  server.on('connection', socket => { sockets.add(socket); socket.once('close', () => sockets.delete(socket)); });
+  cleanup(scope, async () => {
+    for (const session of sessions) session.destroy();
+    for (const socket of sockets) socket.destroy();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  });
   server.listen(0, '127.0.0.1'); await once(server, 'listening');
   const address = server.address(); assert(address && typeof address !== 'string');
   return { server, origin: 'https://127.0.0.1:' + address.port };
