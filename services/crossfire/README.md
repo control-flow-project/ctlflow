@@ -8,6 +8,7 @@ Node source is under `node/`, C# under `csharp/` and Rust under `rust/`.
 The React project, database migrations and external test scenarios are shared.
 
 - [Installation](docs/getting-started.md)
+- [Local Docker server and host-native fleet](docs/local-docker.md)
 - [Configuration and trusted ingress](docs/configuration.md)
 - [Management UI](docs/management.md)
 - [Operations and backup](docs/operations.md)

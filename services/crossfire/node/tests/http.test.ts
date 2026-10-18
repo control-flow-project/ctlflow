@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -26,6 +27,13 @@ test("HTTP management enforces cookie, origin, CSRF, strict requests and removed
   assert.equal(setup.headers.get('x-content-type-options'), 'nosniff');
   const guide = await setup.text();
   assert(guide.includes(onboardingCommand(origin, ctx.config.administrator, release.manifest)));
+  for (const required of ['Docker hosts the server only.', 'The selected Codex/Pi installation and native login must already exist there.',
+    'Never install or upgrade Codex/Pi as part of these instructions.', 'Earendil Pi requires explicit ordinary fleet configuration.']) assert(guide.includes(required), required);
+  const installer = onboardingCommand(origin, ctx.config.administrator, release.manifest);
+  assert(!installer.includes('command -v codex'), 'An explicit Pi configuration cannot require Codex');
+  assert(!installer.includes('@earendil-works/pi'));
+  assert(!installer.includes('@openai/codex'));
+  execFileSync('bash', ['-n'], { input: installer });
   assert(!guide.includes(ctx.config.jwtSecret));
   assert(!guide.includes(ctx.config.registrationSecret));
   const head = await fetch(setupUrl, { method: 'HEAD' });
@@ -44,6 +52,7 @@ test("HTTP management enforces cookie, origin, CSRF, strict requests and removed
   const quoted = await fetch(onboardingUrl(origin, quotedOwner));
   assert.equal(quoted.status, 200, 'The guide verifies a real active human owner without granting enrollment authority');
   assert((await quoted.text()).includes(onboardingCommand(origin, quotedOwner, release.manifest)));
+  execFileSync('bash', ['-n'], { input: onboardingCommand(origin, quotedOwner, release.manifest) });
   const descriptor = await fetch(setupDescriptorUrl(origin, ctx.config.administrator));
   assert.equal(descriptor.status, 200);
   assert.equal(descriptor.headers.get('content-type'), 'application/json; charset=utf-8');

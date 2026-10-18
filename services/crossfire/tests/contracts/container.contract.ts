@@ -152,7 +152,9 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
         const guideText = await guide.text();
         const descriptorUrl = setupDescriptorUrl(origin, account.user_id);
         assert(guideText.includes('@ctlflow/fleet@' + health.version));
-        assert(guideText.includes('Always install the Node.js @ctlflow/fleet CLI and its Node.js fleetd dependency, regardless of the server implementation.'));
+        assert(guideText.includes('Install only the pinned Node.js @ctlflow/fleet CLI and its exact Node.js fleetd dependency into private user-owned storage.'));
+        assert(guideText.includes('Docker hosts the server only.'));
+        assert(guideText.includes('Never install or upgrade Codex/Pi as part of these instructions.'));
         assert(guideText.includes('Do not attach this coding session; fleetd starts a separate managed native session.'));
         assert(!guideText.includes('dotnet '), 'Server selection cannot switch fleet setup to a .NET command');
         assert(guideText.includes('setup --descriptor ' + "'" + descriptorUrl + "'"));

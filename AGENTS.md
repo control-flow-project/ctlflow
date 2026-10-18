@@ -140,6 +140,12 @@ fleetd alone initializes the persistent random key; fleet reads the same private
 OS-native file locally or through strict SSH. No anonymous or compatibility path.
 Normal harness-facing setup always uses pinned npm fleet/fleetd, independent of
 server implementation; do not require .NET/Rust on ordinary setup hosts.
+On 2026-10-18 the owner selected server-only Docker: crossfire, Matrix, shared
+UI/content and one-shot Knex maintenance. fleet/fleetd and native agents run on
+the user's execution host, using an existing supported Codex/Pi installation and
+native login. Setup installs only the pinned fleet/fleetd packages, never a
+harness or provider credentials. Do not retain fleet-container images, services,
+network relays or an alternative container onboarding workflow.
 No systemd/global services, global skills, unrequested host changes, production
 resets or unrequested deployment. Preserve credentials and shared source work.
 Do not delegate or start subagents without explicit authorization.

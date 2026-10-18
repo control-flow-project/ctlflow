@@ -1,7 +1,7 @@
 # Container deployment packages
 
 crossfire packages a selected server backend and the common Knex migration image.
-For a local server and Node fleet container, see the [local Docker quickstart](local-docker.md).
+For a local Docker server and host-native fleet, see the [local Docker quickstart](local-docker.md).
 The deployment host needs rootless Docker and an installed crossfire operator;
 it does not build source or install that server backend's language runtime.
 Node, C# and Rust operators consume the same format and can run any server backend.
@@ -55,8 +55,9 @@ code; the archive checksum is not authentication of this helper.
 
 Verified generic images may be published to GHCR under
 `ghcr.io/control-flow-project/crossfire-node`, `crossfire-csharp-managed`,
-`crossfire-csharp-nativeaot`, `crossfire-rust`, `crossfire-migrations` and
-`fleetd-node`. Publish a coordinated version only after its applicable gates
+`crossfire-csharp-nativeaot`, `crossfire-rust` and `crossfire-migrations`.
+These are server images; fleet/fleetd and native agents run on the execution host,
+not in Docker. Publish a coordinated version only after its applicable gates
 pass. Do not overwrite an existing version with different bytes or publish
 site-specific source, instructions, data, configuration or credentials.
 Record the registry manifest digest separately from Docker's local image ID;

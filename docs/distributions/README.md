@@ -4,6 +4,14 @@ Choose one implementation for each product. All implementations use the same
 management UI, HTTP contracts and Knex-created SQLite database. C# managed and
 C# NativeAOT are two build modes of the same implementation.
 
+Docker runs the server side only. The personalized management guide installs
+pinned npm fleet/fleetd on the execution host, using its existing Codex/Pi
+installation and login, regardless of the chosen server backend. It does not
+install a harness or move credentials into Docker. Native fleet distributions
+listed here are explicit packaging choices, not a second onboarding workflow.
+
+- [Local Docker server and host-native fleet](../../services/crossfire/docs/local-docker.md)
+
 | Target | Server installation | Fleet/controller installation | Build command |
 | --- | --- | --- | --- |
 | Node | Private source checkout and its built dependencies | Exact `@ctlflow/fleet` and `@ctlflow/fleetd` npm archives | `npm run build`, then `npm pack` |

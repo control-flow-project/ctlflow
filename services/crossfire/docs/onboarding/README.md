@@ -16,6 +16,11 @@ No default deployment account or inferred owner is used.
 
 All server implementations emit pinned npm setup for @ctlflow/fleet and Node
 fleetd on Linux/macOS. The calling Codex/Pi harness does not need .NET or Rust.
+The user runs that guide on the machine where native agents will execute. Docker
+hosts crossfire/Matrix/UI/content and Knex maintenance only. The guide installs
+fleet/fleetd, not Codex/Pi; the selected harness and native login must already be
+available on the execution host. Missing prerequisites fail without automatic
+harness installation, credential copying or a container setup alternative.
 fleetd creates private OS-native authentication configuration automatically;
 fleet reads it and authenticates private API calls without asking for a key.
 

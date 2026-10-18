@@ -33,10 +33,15 @@ export async function checkEnrollmentInstructions(page: Page, origin: string, ow
   assert(guide.includes('fleet setup'));
   assert(/readiness|ready/iu.test(guide));
   assert(guide.includes('Linux or macOS'));
+  assert(guide.includes('Docker hosts the server only.'));
+  assert(guide.includes('Never install or upgrade Codex/Pi as part of these instructions.'));
   assert(guide.includes('https://nodejs.org/en/download'));
   assert(guide.includes(owner));
   await expect(page.getByRole('link', { name: 'Read the full guide for your account →', exact: true })).not.toBeVisible();
   await details.locator('summary').click();
+  await expect(page.getByText('Docker runs the server;', { exact: false })).toBeVisible();
+  await expect(page.getByText('The guide installs only the pinned fleet and fleetd npm packages', { exact: false })).toBeVisible();
+  await expect(page.getByText('Setup does not install or upgrade a harness.', { exact: false })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Read the full guide for your account →', exact: true })).toHaveAttribute('href', setupUrl);
   await expect(page.getByRole('link', { name: 'Download optional runcodex.sh' })).toHaveCount(0);
   const names = ['manifest.json', ...ARTIFACTS];

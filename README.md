@@ -20,6 +20,9 @@ assistant that runs setup.
 Personalized setup always installs pinned npm fleet and Node fleetd, independent
 of server backend. Setup hosts do not need .NET or Rust. fleetd creates a private
 OS-native authentication file automatically; fleet reads it.
+Docker runs the server side only: crossfire, Matrix, Element, management and
+content. fleetd and its agents run on the user's execution host with an existing
+Codex/Pi installation and native login. Setup installs fleet/fleetd, not a harness.
 
 Node, C# and Rust implement the same products. C# targets .NET 11 with managed and
 NativeAOT outputs. They share the React UI, wire contracts and SQLite database.
@@ -31,7 +34,7 @@ combined gate selects Node, C# managed, C# NativeAOT and Rust explicitly.
 - [Documentation index](docs/README.md)
 - [Installation and packaging by target](docs/distributions/README.md)
 - [crossfire installation](services/crossfire/docs/getting-started.md)
-- [Local server and fleet containers](services/crossfire/docs/local-docker.md)
+- [Local Docker server and host-native fleet](services/crossfire/docs/local-docker.md)
 - [Agent and fleet setup](services/fleet/docs/getting-started.md)
 - [Controller operation](services/fleetd/docs/operations.md)
 - [Architecture and contracts](docs/specification.md)

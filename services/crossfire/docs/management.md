@@ -33,6 +33,18 @@ build and uses the same REST contracts.
 Room creation and human membership belong to Element. There is no general
 crossfire room-management surface. Stable IDs, not room names, own access.
 
+## Agent setup
+
+`/manage/connect` supplies a personalized instruction to paste into an existing
+coding assistant on the execution host. It installs only pinned npm fleet/fleetd
+into private user-owned storage. Node.js, npm, Git, Bash, the chosen native
+harness and provider login must already exist there. Missing prerequisites are
+reported, not installed or silently upgraded. Docker hosts only the server side.
+The browser does not install host software or import the assistant's conversation.
+The human separately approves the exact proposed roster before agents connect.
+
+- [Local Docker server and host-native fleet](local-docker.md)
+
 ## Interpret state
 
 Account status, controller lease, reporting listener, native activity and applied
