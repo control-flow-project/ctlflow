@@ -88,5 +88,5 @@ export async function serverPerformance(scope: TestContext, targets: readonly Co
   scope.diagnostic('Performance HTML and JSON: ' + output);
   assert.equal(problem, null, 'Performance setup and requests must complete');
   assert.equal(complete, true, 'Every runtime must complete every rotated workload');
-  assert.equal(passed, true, 'Every workload must meet measured Node p50, p95 and throughput with zero failures; inspect report.html');
+  assert.equal(passed, true, 'Every workload must meet its recorded Node comparison limits with zero failures; inspect report.html');
 }
