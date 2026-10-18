@@ -11,9 +11,9 @@ public static class RuntimeQueries
 {
     public static Result<IReadOnlyList<RuntimeObservation>> Observations(CrossfireDbContext context, string agentId)
     {
-        var rows = Stored.Read(() => context.ListenerRun.AsNoTracking().Where(row => row.AgentId == agentId)
-            .OrderByDescending(row => row.StartedAt).ThenByDescending(row => row.Id).Take(1)
-            .Join(context.RuntimeObservation, run => run.Id, observation => observation.RunId, (run, observation) => observation)
+        var rows = Stored.Read(() => context.RuntimeObservation.AsNoTracking()
+            .Where(row => row.RunId == context.ListenerRun.Where(run => run.AgentId == agentId)
+                .OrderByDescending(run => run.StartedAt).ThenByDescending(run => run.Id).Select(run => run.Id).FirstOrDefault())
             .OrderByDescending(row => row.ObservedAt).ThenBy(row => row.SessionId).ToArray());
         if (!rows.IsSuccess) return Result<IReadOnlyList<RuntimeObservation>>.Fail(rows.Error);
         if (rows.Value.Length == 0) return Result<IReadOnlyList<RuntimeObservation>>.Success([]);
