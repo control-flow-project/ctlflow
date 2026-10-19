@@ -22,7 +22,7 @@ cannot be selected by whichever remote instance connected first.
 | Scheduled deliveries | Delivered time, or cancelled creation time; pending remains |
 | Fleet messages/outcomes | Message expiry plus retention |
 | Session operations | Completion time; pending/running and required latest successful Stop remain |
-| Enrollment archives | Creation time; rejected/expired requests use decision/expiry once claims release |
+| Rejected/expired enrollment requests and children | Decision/expiry once name claims release; approved exchange identities remain |
 | Member invitations | Expiry after unconsumed native signup claims clear |
 | Native-close receipts | Native stop time; latest sequence per agent remains |
 | fleetd operation files | Completion time; unfinished/unacknowledged remain |
@@ -77,10 +77,9 @@ execution admission. Existing ownership/generation conflicts still fail.
 
 Verify production backup before the forward migration.
 Migration retains rows; later maintenance applies the policy.
-Prior name-canonicalization audit records use the same audit retention rule.
-They are historical logging, not another agent-name authority. Without explicit
-retention proof, preservation still requires their exact content. Cutoff equality,
-fresh migration evidence and changed retained rows remain failures.
+Without explicit retention proof, preservation requires exact record content.
+Cutoff equality, fresh migration evidence and changed retained rows remain
+failures.
 
 Strict operator preservation may explicitly allow absent age-eligible logging:
 

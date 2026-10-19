@@ -32,7 +32,6 @@ test('the one pure controller admission predicate refuses every contradictory or
   for (const purpose of ['reporting', 'delivery'] as const) {
     for (const [index, deniedFacts] of denied.entries()) assert.equal(admitsController(run, deniedFacts, 100, purpose), false, 'Authority fence ' + purpose + ':' + index);
     assert.equal(admitsController(run, null, 100, purpose), false);
-    assert.equal(admitsController({ controller: null }, facts, 100, purpose), false);
   }
 });
 

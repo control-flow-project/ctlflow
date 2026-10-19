@@ -82,11 +82,9 @@ pub fn can_retire(agent: &RetirementAgent, now: i64) -> bool {
         && proof.agent_id == agent.agent_id
         && proof.fleet_id == agent.fleet_id
         && proof.run_id == run.id
-        && run.controller.as_ref().is_some_and(|run| {
-            run.fleet_id == agent.fleet_id
-                && run.connection_id == proof.connection_id
-                && run.credential_id == proof.credential_id
-        })
+        && run.controller.fleet_id == agent.fleet_id
+        && run.controller.connection_id == proof.connection_id
+        && run.controller.credential_id == proof.credential_id
         && controller.closed_at.is_none()
         && controller.expires_at > now
         && controller.fleet_id == agent.fleet_id
@@ -163,11 +161,9 @@ pub fn record(
             .listener_run(input.run)?
             .filter(|run| {
                 run.agent_id == input.agent
-                    && run.controller.as_ref().is_some_and(|run| {
-                        run.fleet_id == input.fleet
-                            && run.connection_id == input.connection
-                            && run.credential_id == connection.credential_id
-                    })
+                    && run.controller.fleet_id == input.fleet
+                    && run.controller.connection_id == input.connection
+                    && run.controller.credential_id == connection.credential_id
             })
             .ok_or_else(|| {
                 Failure::new(

@@ -25,7 +25,7 @@ export function canRetireAgent(agent: RetirementAgent, now: number): boolean {
   const run = agent.latestRun, proof = agent.nativeStop, controller = agent.controller;
   return agent.ownerActive && run !== null && run.stoppedAt !== null && proof !== null && proof.invalidatedAt === null
     && proof.agentId === agent.agentId && proof.fleetId === agent.fleetId && proof.runId === run.id
-    && run.controller !== null && run.controller.fleetId === agent.fleetId
+    && run.controller.fleetId === agent.fleetId
     && run.controller.connectionId === proof.connectionId && run.controller.credentialId === proof.credentialId
     && controller !== null && controller.closedAt === null && controller.expiresAt > now && controller.fleetId === agent.fleetId
     && controller.connectionId === proof.connectionId && controller.credentialId === proof.credentialId
@@ -66,7 +66,7 @@ export function recordNativeStop(services: Pick<Services, 'repositories' | 'runt
     if (!binding.value || binding.value.retiredAt !== null || binding.value.ownerId !== current.value.fleet.ownerId || binding.value.fleetKey !== current.value.fleet.fleetKey)
       return failure('forbidden', 'Native stop proof must cover this current fleet instance');
     const run = services.repositories.listenerRun.find({ id: input.runId }); if (!run.ok) return run;
-    if (!run.value || run.value.agentId !== agentId || run.value.controller?.fleetId !== fleetId
+    if (!run.value || run.value.agentId !== agentId || run.value.controller.fleetId !== fleetId
       || run.value.controller.connectionId !== input.connectionId || run.value.controller.credentialId !== current.value.connection.credentialId)
       return failure('conflict', 'Native stop proof requires the current authenticated listener generation');
     if (run.value.stoppedAt === null) return failure('conflict', 'Stop delivery for this listener generation before recording native close');

@@ -61,12 +61,6 @@ public sealed partial class CrossfireDbContext(DbContextOptions<CrossfireDbConte
     public DbSet<FleetRuntimeOperationRow> FleetRuntimeOperation => Set<FleetRuntimeOperationRow>();
     public DbSet<PublicationRow> Publication => Set<PublicationRow>();
     public DbSet<PublicationFileRow> PublicationFile => Set<PublicationFileRow>();
-    public DbSet<EnrollmentArchiveRow> EnrollmentArchive => Set<EnrollmentArchiveRow>();
-    public DbSet<EnrollmentArchiveItemRow> EnrollmentArchiveItem => Set<EnrollmentArchiveItemRow>();
-    public DbSet<EnrollmentArchivePolicyRow> EnrollmentArchivePolicy => Set<EnrollmentArchivePolicyRow>();
-    public DbSet<EnrollmentArchivePermissionRow> EnrollmentArchivePermission => Set<EnrollmentArchivePermissionRow>();
-    public DbSet<EnrollmentArchiveWakeSenderRow> EnrollmentArchiveWakeSender => Set<EnrollmentArchiveWakeSenderRow>();
-    public DbSet<EnrollmentArchiveMetadataRow> EnrollmentArchiveMetadata => Set<EnrollmentArchiveMetadataRow>();
     public DbSet<FleetNativeStopRow> FleetNativeStop => Set<FleetNativeStopRow>();
 
     protected override void OnModelCreating(ModelBuilder model)
@@ -77,7 +71,6 @@ public sealed partial class CrossfireDbContext(DbContextOptions<CrossfireDbConte
         ConfigureTables3(model);
         ConfigureTables4(model);
         ConfigureTables5(model);
-        ConfigureTables6(model);
         ConfigureForeignKeys(model);
         ConfigureMetadata(model);
     }

@@ -104,8 +104,8 @@ respective application queries over the exact same schema. Generated entities,
 tables and precompiled queries remain inside the SQLite adapter. No native ORM
 creates a schema or silently migrates on startup. The shared one-shot migration
 container runs after writers stop and a required backup is verified.
-Filesystem-state conversions are explicit operations, not alternate runtime
-readers, SQL migration owners or permission to reset a database.
+Filesystem state has one current reader and writer per selected implementation.
+There are no historical conversion commands or alternate runtime readers.
 
 ## Required target differences
 

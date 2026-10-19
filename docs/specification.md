@@ -763,17 +763,18 @@ Default-mode structured questions need their advertised feature; no silent
 collaboration-mode switch or imitation replaces it.
 
 Pi requires verified native 1.0.0 RPC, the explicitly loaded owned extension and
-native-created session files. Each open context has a process, with one agent/
-listener. Native entries/branches own instruction/input correlation, not history
+native-created session files. Each open context has one native Pi process;
+fleetd's shared listener owns its agent bindings. Native entries/branches own
+instruction/input correlation, not history
 rewriting. Thinking/tool arguments are excluded from observations.
 Provider/model/thinking settings are Pi-native. It has no emulated sandbox or
 permission gate; tools run with controller-user privileges.
 Unsupported live TUI attachment fails without starting another writer.
 
 The private context registry owns distinct opaque shared/control/room bindings.
-Established IDs/files cannot be substituted. Explicit offline conversions
-validate/backup inventoried state under writer locks; current runtime readers
-accept no obsolete form.
+Established IDs/files cannot be substituted. Each reader validates its current
+format. No historical file inspection, conversion command or alternate reader
+exists.
 
 Actual native permission and structured-question requests use one owner review
 path. A sentence resembling a question or arbitrary subprocess prompt is not
@@ -933,7 +934,7 @@ Receipt-only acknowledgments consistently return {recorded:boolean}.
 Authorized expired-history acknowledgment may be false without replay or claims
 of a prior outcome; live authority/generation/outcome conflicts still fail.
 
-- [Retention families and conversions](../services/crossfire/docs/logging.md)
+- [Retention families](../services/crossfire/docs/logging.md)
 - [Traffic and usage semantics](../services/crossfire/docs/statistics.md)
 
 ## 17. SQLite
@@ -960,7 +961,7 @@ and one-shot migration image, as in Lesser/Snapped. Every future SQL store follo
 that owner/nesting. Unimplemented backends have no placeholder runtime.
 Fleet file state and external Conduit RocksDB are not invented SQL stores.
 
-Current schema is 1: 63 singular application tables plus Knex tracking.
+Current schema is 1: 57 singular application tables plus Knex tracking.
 One 00_initial migration creates the final schema, constraints, indexes and reference
 data directly. No historical schema admission, conversion or special obsolete-store
 handling exists. Runtime adapters validate the current contract; Node, C# and Rust
@@ -971,7 +972,11 @@ Tables are STRICT with enabled FKs, singular snake_case fields, integer UTC time
 and checked revisions/counters. Relations own permissions, selections, rosters,
 settings and questions. Backend-owned native account/access objects are bounded
 opaque JSON, never interpreted by generic domain, persistence or UI code.
-Historical enrollment archives retain attribution, never live authority.
+Enrollment requests and their normalized items retain current workflow attribution.
+Every listener run stores its immutable fleet, connection and credential binding
+and a required installed release. Stopped runs retain that binding even when no
+current controller connection exists. Controller admission still rechecks the
+current lease and credential; stored attribution does not confer live authority.
 
 Indexes serve concrete queries/FKs. Scope/filter/count/order/page precedes
 hydration; batch labels/settings. Owner shapes do not use administrator-OR-owner
@@ -1119,7 +1124,7 @@ Keep concise counts/durations/bounded logs and remove inactive regenerated
 fixtures/builds/caches after their last use.
 
 Evidence identifies source, outputs, selected platforms and limitations.
-Current documentation links are checked as repository paths; historical proposals/
+Current documentation links are checked as repository paths; dated verification
 reports are not alternate current instructions.
 Build/pack/test/fixture success is not deployment or registry publication.
 Production activation is separate, authorized, backed up and forward-migrated.

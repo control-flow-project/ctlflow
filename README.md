@@ -47,7 +47,7 @@ Other messaging backends are not implemented.
 - [C# build and distribution](services/crossfire/csharp/README.md)
 - [Rust build and distribution](services/crossfire/rust/README.md)
 - [Native ownership layout](docs/architecture/native-layout.md)
-- [Rust integration review](docs/architecture/rust-review.md)
+- [Historical Rust integration review](docs/verification/20261017-rust-integration-review.md)
 - [Development and verification](docs/development.md)
 - [Shared executable tests](docs/verification/shared-contracts.md)
 - [Implementation boundaries](docs/architecture/native-implementations.md)

@@ -161,16 +161,7 @@ test('settled decisions, notifications, deliveries, operation receipts, invitati
     fleetKey: 'rejected', controller: { name: 'Rejected controller' }, instances: [{ instanceKey: 'rejected', name: 'rejected', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.backendUserId) }] };
   const proposed = value(await introduceEnrollment(services, introduction));
   value(decideEnrollment(services, admin.actor, introduction.enrollmentId, { expectedRevision: 0, decision: 'reject', verificationCode: proposed.request.verificationCode }, randomUUID()));
-  const source = executeSelect(database, schema, query => query.from('enrollment_request').where(row => row.status === 'approved').take(1))[0]!, archive = randomUUID();
-  executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive').values({ controller_name: params.controller_name, controller_credential_hash: params.controller_credential_hash,
-    fleet_key: params.fleet_key, id: params.id, owner_id: params.owner_id, verification_code: params.verification_code, claim_hash: params.claim_hash, roster_digest: params.roster_digest,
-    status: params.status, revision: params.revision, created_at: params.created_at, expires_at: params.expires_at, decided_by_member_id: params.decided_by_member_id, decided_at: params.decided_at }), { ...source, id: archive });
-  executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_item').values({ request_id: params.archive, instance_key: 'workflow', requested_name: 'workflow',
-    outcome: 'existing', agent_id: params.agent, failure_code: null }), { archive, agent: agent.id });
-  executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_policy').values({ request_id: params.archive, instance_key: 'workflow', wake_mode: 'selected', expected_agent_revision: null }), { archive });
-  executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_permission').values({ request_id: params.archive, instance_key: 'workflow', permission_code: 'room.agent.invite', grant_scope: 'agent_room' }), { archive });
-  executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_wake_sender').values({ request_id: params.archive, instance_key: 'workflow', sender_principal_id: params.owner, include_agents: 0 }), { archive, owner: admin.actor.principalId });
-  executeInsert(database, schema, (query, params) => query.insertInto('enrollment_archive_metadata').values({ enrollment_id: params.archive, key: 'label', value: 'Archived diagnostic metadata' }), { archive });
+  const source = executeSelect(database, schema, query => query.from('enrollment_request').where(row => row.status === 'approved').take(1))[0]!;
   const backup = fixture.file + '.backup'; await database.backup(backup); chmodSync(backup, 0o600); const backupBytes = readFileSync(backup);
   fixture.advance(8 * DAY_MS); value(maintainLogging(services));
   assert.equal(value(services.runtime.decision(question.id)), null); assert.equal(value(services.runtime.decision(permission.id)), null);
@@ -184,7 +175,6 @@ test('settled decisions, notifications, deliveries, operation receipts, invitati
   assert(value(services.repositories.memberInvitation.find({ id: claimed.invitationId })), 'Unsettled native signup cleanup is retained');
   assert.deepEqual(executeSelect(database, schema, query => query.from('wake_notice').select(row => ({ status: row.status }))), [{ status: 'pending' }]);
   assert.equal(executeSelect(database, schema, query => query.from('wake_delivery').count()), 0);
-  assert.equal(executeSelect(database, schema, query => query.from('enrollment_archive').count()), 0);
   assert.equal(value(services.repositories.enrollmentRequest.find({ id: introduction.enrollmentId })), null);
   assert(value(services.repositories.enrollmentRequest.find({ id: source.id })), 'Approved exchange identity is not logging');
   assert.equal(value(services.repositories.nativeStop.receipt(agent.id, oldStop)), null);
@@ -192,7 +182,7 @@ test('settled decisions, notifications, deliveries, operation receipts, invitati
   assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   assert.equal((await verifyPreservation(backup, fixture.file)).ok, false, 'Strict preservation cannot excuse deleted history without explicit retention evidence');
   const proof = value((await verifyPreservation(backup, fixture.file, { loggingRetentionDays: 7, at: fixture.now() })));
-  assert.equal(proof.expired.enrollment_archive, 1); assert.equal(proof.expired.fleet_native_stop, 1); assert.equal(proof.preserved.fleet_native_stop, 1);
+  assert.equal(proof.expired.fleet_native_stop, 1); assert.equal(proof.preserved.fleet_native_stop, 1);
   assert.deepEqual(readFileSync(backup), backupBytes);
   fixture.renewController(agent.controller);
   assert.equal(value(receiptDecision(services, agent.actor, agent.id, question.id, 'responded')).recorded, false);

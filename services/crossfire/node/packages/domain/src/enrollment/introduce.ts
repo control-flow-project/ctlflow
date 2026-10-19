@@ -80,12 +80,11 @@ export async function introduceEnrollment(services: Dependencies, input: Enrollm
       const added = services.repositories.enrollmentItem.insert(record);
       if (!added.ok) return added;
       const requestedPolicy = verified.value.policies.find(entry => entry.instanceKey === item.instanceKey)?.policy;
-      if (requestedPolicy) {
-        const valid = validateWakeSenders(services, existing?.agentId ?? null, requestedPolicy.wakeMode, requestedPolicy.senders);
-        if (!valid.ok) return valid;
-        const savedPolicy = services.repositories.fleetPolicy.insertRequested(record, requestedPolicy);
-        if (!savedPolicy.ok) return savedPolicy;
-      }
+      if (!requestedPolicy) return failure('invalid', 'Fleet instance coordination policy is missing');
+      const valid = validateWakeSenders(services, existing?.agentId ?? null, requestedPolicy.wakeMode, requestedPolicy.senders);
+      if (!valid.ok) return valid;
+      const savedPolicy = services.repositories.fleetPolicy.insertRequested(record, requestedPolicy);
+      if (!savedPolicy.ok) return savedPolicy;
       if (record.outcome === 'claimed' || existing && existing.name !== item.name) {
         const claimed = services.repositories.agentName.insert({ name: item.name, requestId: request.id, instanceKey: item.instanceKey, agentId: null });
         if (!claimed.ok) return claimed;

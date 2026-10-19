@@ -112,6 +112,6 @@ Optional private `config.json` contains `loggingRetentionDays`, default seven.
 Completed operation/diagnostic history expires by age; pending/unacknowledged
 work, credentials, histories and stop selections remain protected.
 
-- [Storage and conversions](storage.md)
+- [Storage ownership](storage.md)
 - [Logging policy](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/logging.md)
 - [Fleet session controls](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/docs/sessions.md)

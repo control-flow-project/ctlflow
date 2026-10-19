@@ -58,7 +58,6 @@ public static class ListenerReporting
                 var active = 0;
                 foreach (var run in runs.Value.Where(value => value.StoppedAt is null && value.LastSeenAt + ControllerAdmission.HeartbeatExpiryMs > now))
                 {
-                    if (run.Controller is null) continue;
                     var runFacts = ports.Facts(agentId, run.Controller.FleetId, run.Controller.CredentialId);
                     if (!runFacts.IsSuccess) return Result<ListenerReportResult>.Fail(runFacts.Error);
                     if (ControllerAdmission.Admits(run, runFacts.Value, now, ControllerPurpose.Reporting)) active++;
@@ -80,7 +79,6 @@ public static class ListenerReporting
         var now = ports.Fleet.Authorization.Now(); var active = new List<ListenerRun>();
         foreach (var run in runs.Value.Where(value => value.StoppedAt is null && value.LastSeenAt + ControllerAdmission.HeartbeatExpiryMs > now))
         {
-            if (run.Controller is null) continue;
             var facts = ports.Facts(agentId, run.Controller.FleetId, run.Controller.CredentialId);
             if (!facts.IsSuccess) return Result<ListenerActivity>.Fail(facts.Error);
             if (ControllerAdmission.Admits(run, facts.Value, now, ControllerPurpose.Reporting)) active.Add(run);

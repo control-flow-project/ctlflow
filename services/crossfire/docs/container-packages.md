@@ -220,4 +220,4 @@ also crosses all installed operators and backend packages. A passing build is no
 an end-to-end certification; current evidence and unresolved owner findings are
 recorded in the native review.
 
-- [Rust integration review](../../../docs/architecture/rust-review.md)
+- [Historical Rust integration review](../../../docs/verification/20261017-rust-integration-review.md)

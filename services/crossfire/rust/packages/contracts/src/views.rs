@@ -36,7 +36,7 @@ pub fn member(value: &MemberView) -> Value {
     "status":status(value.principal.status),"revision":value.principal.revision,"createdAt":value.principal.created_at,"application":application(&value.application)})
 }
 pub fn listener(value: &Run) -> Value {
-    json!({"runId":value.id,"agentId":value.agent_id,"release":value.release,"controller":value.controller.as_ref().map(|value|json!({"fleetId":value.fleet_id,"connectionId":value.connection_id,"credentialId":value.credential_id})),
+    json!({"runId":value.id,"agentId":value.agent_id,"release":value.release,"controller":json!({"fleetId":value.controller.fleet_id,"connectionId":value.controller.connection_id,"credentialId":value.controller.credential_id}),
     "startedAt":value.started_at,"lastSeenAt":value.last_seen_at,"activeMs":value.active_ms,"messagesDelivered":value.messages_delivered,"stoppedAt":value.stopped_at,"disconnectRequestedAt":value.disconnect_requested_at})
 }
 pub fn activity(value: &Activity) -> Value {

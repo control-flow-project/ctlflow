@@ -8,13 +8,13 @@ import { documentationLanguage, documentationLinks, verifyDocumentation } from '
 test('current guide links reject missing and escaping targets without treating code or historical records as guides', () => {
   const root = mkdtempSync(join(tmpdir(), 'crossfire-doc-links-'));
   try {
-    mkdirSync(join(root, 'docs/verification'), { recursive: true }); mkdirSync(join(root, 'docs/plans')); mkdirSync(join(root, 'node_modules'));
-    mkdirSync(join(root, 't/native-home/.tmp/plugins'), { recursive: true });
-    writeFileSync(join(root, 't/native-home/.tmp/plugins/README.md'), '[Third-party fixture](missing-upstream-path.md)');
+    mkdirSync(join(root, 'docs/verification'), { recursive: true }); mkdirSync(join(root, 'node_modules'));
+    mkdirSync(join(root, '.temp/native-home/.tmp/plugins'), { recursive: true });
+    writeFileSync(join(root, '.temp/native-home/.tmp/plugins/README.md'), '[Third-party fixture](missing-upstream-path.md)');
     writeFileSync(join(root, 'README.md'), '[Guide](docs/guide.md#heading)\n[External](https://example.test/)\n```md\n[Example](missing.md)\n```\n');
     writeFileSync(join(root, 'docs/guide.md'), '# Heading\n[Root](../README.md)\n');
     writeFileSync(join(root, 'docs/verification/20261015-history.md'), '[Old path](no-longer-present.md)');
-    writeFileSync(join(root, 'docs/plans/old.md'), '[Old path](absent.md)'); writeFileSync(join(root, 'node_modules/README.md'), '[Dependency](absent.md)');
+    writeFileSync(join(root, 'node_modules/README.md'), '[Dependency](absent.md)');
     assert.equal(verifyDocumentation(root).files, 2);
     writeFileSync(join(root, 'docs/guide.md'), '[Missing](missing.md)'); assert.throws(() => verifyDocumentation(root), /docs\/guide.md:1: missing repository target/u);
     writeFileSync(join(root, 'docs/guide.md'), '[Escape](../../outside.md)'); assert.throws(() => verifyDocumentation(root), /missing repository target/u);

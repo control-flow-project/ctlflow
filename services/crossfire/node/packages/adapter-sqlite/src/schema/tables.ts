@@ -1,25 +1,6 @@
 import { createSchema } from '@tinqerjs/tinqer';
 
 export type Tables = {
-  enrollment_archive: {
-    controller_name: string | null; controller_credential_hash: string | null; fleet_key: string | null;
-    id: string; owner_id: string; verification_code: string; claim_hash: string; roster_digest: string;
-    status: 'pending' | 'approved' | 'rejected' | 'expired'; revision: number; created_at: number; expires_at: number;
-    decided_by_member_id: string | null; decided_at: number | null;
-  };
-  enrollment_archive_item: {
-    request_id: string; instance_key: string; requested_name: string; outcome: 'existing' | 'claimed' | 'failed';
-    agent_id: string | null; failure_code: string | null;
-  };
-  enrollment_archive_policy: {
-    request_id: string; instance_key: string; wake_mode: 'humans' | 'everyone' | 'selected';
-    expected_agent_revision: number | null;
-  };
-  enrollment_archive_permission: {
-    request_id: string; instance_key: string; permission_code: 'room.agent.invite'; grant_scope: 'agent_room';
-  };
-  enrollment_archive_wake_sender: { request_id: string; instance_key: string; sender_principal_id: string; include_agents: number };
-  enrollment_archive_metadata: { enrollment_id: string; key: string; value: string };
   fleet_native_stop: { agent_id: string; receipt_id: string; sequence: number; fleet_id: string; run_id: string; connection_id: string;
     credential_id: string; native_stopped_at: number; invalidated_at: number | null };
   publication: { id: string; agent_id: string; public_key: string; title: string; state: 'staging' | 'published' | 'deleted';
@@ -245,12 +226,12 @@ export type Tables = {
     expires_at: number;
   };
   listener_run: {
-    controller_fleet_id: string | null;
-    controller_connection_id: string | null;
-    controller_credential_id: string | null;
+    controller_fleet_id: string;
+    controller_connection_id: string;
+    controller_credential_id: string;
     id: string;
     agent_id: string;
-    release: string | null;
+    release: string;
     started_at: number;
     last_seen_at: number;
     active_ms: number;

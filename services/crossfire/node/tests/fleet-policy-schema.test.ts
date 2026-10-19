@@ -30,7 +30,7 @@ function policyStore() {
   return database;
 }
 
-test('normalized requested and approved policies enforce principal, catalog, owner and fleet boundaries while preserving retired policy history', () => {
+test('current policy schema enforces principal, catalog, owner and fleet boundaries while preserving retired policy history', () => {
   const database = policyStore();
   try {
     const repositories = createRepositories(database);

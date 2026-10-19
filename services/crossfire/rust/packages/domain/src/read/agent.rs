@@ -23,7 +23,7 @@ pub fn activity(
         repo.admission_candidates(Some(ids), now.saturating_sub(HEARTBEAT_EXPIRY_MS))?
     {
         if admits_controller(
-            candidate.run.controller.as_ref(),
+            &candidate.run.controller,
             candidate.facts.as_ref(),
             now,
             ControllerPurpose::Reporting,
@@ -161,7 +161,7 @@ pub fn list(
                 repo.admission_candidates(None, now.saturating_sub(HEARTBEAT_EXPIRY_MS))?;
             candidates.retain(|candidate| {
                 admits_controller(
-                    candidate.run.controller.as_ref(),
+                    &candidate.run.controller,
                     candidate.facts.as_ref(),
                     now,
                     ControllerPurpose::Reporting,

@@ -19,7 +19,7 @@ export function reportListener(services: Pick<Services, 'statistics' | 'reposito
     if (previous.value && previous.value.agentId !== agentId) return failure('missing', 'Listener run not found');
     if (previous.value && previous.value.stoppedAt !== null) return success({ disconnect: true, currentRelease, closed: true });
     if (previous.value && previous.value.release !== input.release) return failure('conflict', 'A running listener cannot change its software version');
-    if (previous.value && (previous.value.controller?.fleetId !== controller.value.fleetId
+    if (previous.value && (previous.value.controller.fleetId !== controller.value.fleetId
       || previous.value.controller.connectionId !== controller.value.connectionId || previous.value.controller.credentialId !== controller.value.credentialId))
       return failure('conflict', 'A listener run cannot change its controller generation');
     if (!previous.value && input.release !== currentRelease) return failure('conflict', 'Update the project-local Crossfire client and skill before reconnecting. Current release: ' + currentRelease);

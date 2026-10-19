@@ -1,8 +1,7 @@
 # Native implementation file audit
 
-Baseline: main `7378d12`, integrated on the isolated Rust feature branch.
-The parent review includes confirmed fixes in every affected crossfire owner.
-No other repository or deployed data is changed.
+This document describes current file ownership and review boundaries. Dated
+verification reports identify the revisions and executions they actually tested.
 
 ## Coverage
 
@@ -12,14 +11,15 @@ reads each complete file and emits its identity, declarations, size and owner.
 Structure verification rejects unclassified packages, missing counterparts and
 stale maps. Association alone does not prove functional equivalence.
 
-| Product | Node files | C# files | Coverage |
-| --- | ---: | ---: | --- |
-| crossfire | 711 | 480 | Server, domain, contracts, adapters, queries, assets, tests, operators and build |
-| fleetd | 74 | 39 | Daemon, lifecycle, execution composition, state, setup, authentication and tests |
-| fleet | 26 | 13 | CLI, daemon client, setup, SSH, packaging and tests |
-| Total | 811 | 532 | 1,343 files, with no source/test/manifest/guide exclusions |
+| Product | Coverage |
+| --- | --- |
+| crossfire | Server, domain, contracts, adapters, queries, assets, tests, operators and build |
+| fleetd | Daemon, lifecycle, execution composition, state, setup, authentication and tests |
+| fleet | CLI, daemon client, setup, SSH, packaging and tests |
 
-The current inventory maps these owners to 594 Rust files or explicit shared assets. Review follows
+The inventory command emits current per-target file counts; this guide does not
+duplicate counts that change with source edits. Every mapped file names its Rust
+owner or an explicit shared asset. Review follows
 configuration/validation, authorization/transactions, filter/count/order/page,
 input/receipt/restart, process/lock/cleanup and declaration/generator/package
 paths. Public behavior uses one external assertion bank.
@@ -68,4 +68,4 @@ complete four-target gate. No deployment, registry publication or paid-provider
 certification is implied.
 
 - [Parent quality gate](../verification/20261016-rust-quality-gate.md)
-- [Integration review and native limits](rust-review.md)
+- [Historical integration review](../verification/20261017-rust-integration-review.md)

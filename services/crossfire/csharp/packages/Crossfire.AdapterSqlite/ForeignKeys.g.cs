@@ -298,36 +298,6 @@ public sealed partial class CrossfireDbContext
         model.Entity<PublicationFileRow>().HasOne<PublicationRow>().WithMany()
             .HasForeignKey("PublicationId")
             .HasPrincipalKey("Id").OnDelete(DeleteBehavior.Cascade);
-        model.Entity<EnrollmentArchiveRow>().HasOne<MemberRow>().WithMany()
-            .HasForeignKey("DecidedByMemberId")
-            .HasPrincipalKey("PrincipalId").OnDelete(DeleteBehavior.NoAction);
-        model.Entity<EnrollmentArchiveRow>().HasOne<MemberRow>().WithMany()
-            .HasForeignKey("OwnerId")
-            .HasPrincipalKey("PrincipalId").OnDelete(DeleteBehavior.NoAction);
-        model.Entity<EnrollmentArchiveItemRow>().HasOne<AgentRow>().WithMany()
-            .HasForeignKey("AgentId")
-            .HasPrincipalKey("PrincipalId").OnDelete(DeleteBehavior.NoAction);
-        model.Entity<EnrollmentArchiveItemRow>().HasOne<EnrollmentArchiveRow>().WithMany()
-            .HasForeignKey("RequestId")
-            .HasPrincipalKey("Id").OnDelete(DeleteBehavior.NoAction);
-        model.Entity<EnrollmentArchivePolicyRow>().HasOne<EnrollmentArchiveItemRow>().WithMany()
-            .HasForeignKey("RequestId", "InstanceKey")
-            .HasPrincipalKey("RequestId", "InstanceKey").OnDelete(DeleteBehavior.NoAction);
-        model.Entity<EnrollmentArchivePermissionRow>().HasOne<PermissionRow>().WithMany()
-            .HasForeignKey("PermissionCode", "GrantScope")
-            .HasPrincipalKey("Code", "GrantScope").OnDelete(DeleteBehavior.NoAction);
-        model.Entity<EnrollmentArchivePermissionRow>().HasOne<EnrollmentArchivePolicyRow>().WithMany()
-            .HasForeignKey("RequestId", "InstanceKey")
-            .HasPrincipalKey("RequestId", "InstanceKey").OnDelete(DeleteBehavior.NoAction);
-        model.Entity<EnrollmentArchiveWakeSenderRow>().HasOne<EnrollmentArchivePolicyRow>().WithMany()
-            .HasForeignKey("RequestId", "InstanceKey")
-            .HasPrincipalKey("RequestId", "InstanceKey").OnDelete(DeleteBehavior.NoAction);
-        model.Entity<EnrollmentArchiveWakeSenderRow>().HasOne<PrincipalRow>().WithMany()
-            .HasForeignKey("SenderPrincipalId")
-            .HasPrincipalKey("Id").OnDelete(DeleteBehavior.NoAction);
-        model.Entity<EnrollmentArchiveMetadataRow>().HasOne<EnrollmentArchiveRow>().WithMany()
-            .HasForeignKey("EnrollmentId")
-            .HasPrincipalKey("Id").OnDelete(DeleteBehavior.NoAction);
         model.Entity<FleetNativeStopRow>().HasOne<FleetCredentialRow>().WithMany()
             .HasForeignKey("CredentialId", "FleetId")
             .HasPrincipalKey("Id", "FleetId").OnDelete(DeleteBehavior.NoAction);

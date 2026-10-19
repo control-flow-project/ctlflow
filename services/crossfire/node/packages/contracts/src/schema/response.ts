@@ -27,8 +27,8 @@ export const application = check.object({ appliedRevision: check.nullable(check.
 export const member = check.object({ memberId: check.identifier, backendUserId: check.backendUserId, displayName: check.text(HUMAN_SIGNUP.labelMax),
   roleCode: check.choice('member', 'administrator'), status: check.status, revision: check.integer(), createdAt: check.integer(), application });
 export const session = check.object({ member, csrfSecret: check.secret, permissions: check.list(check.text(100), 100) });
-export const listenerRun = check.object({ runId: check.identifier, agentId: check.identifier, release: check.nullable(check.text(200)),
-  controller: check.nullable(check.object({ fleetId: check.identifier, connectionId: check.identifier, credentialId: check.identifier })),
+export const listenerRun = check.object({ runId: check.identifier, agentId: check.identifier, release: check.text(200),
+  controller: check.object({ fleetId: check.identifier, connectionId: check.identifier, credentialId: check.identifier }),
   startedAt: check.integer(), lastSeenAt: check.integer(), activeMs: check.integer(), messagesDelivered: check.integer(),
   stoppedAt: check.nullable(check.integer()), disconnectRequestedAt: check.nullable(check.integer()) });
 export const activity = check.object({ status: check.choice('online', 'offline', 'disconnecting'), activeMs: check.integer(),

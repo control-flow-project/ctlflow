@@ -23,7 +23,7 @@ public static class ListenerBatchQueries
             .Join(context.FleetCredential, joined => joined.run.ControllerCredentialId, credential => credential.Id, (joined, credential) => new { joined.run, joined.binding, joined.fleet, joined.owner, joined.connection, credential })
             .OrderBy(joined => joined.run.AgentId).ThenByDescending(joined => joined.run.LastSeenAt).ThenBy(joined => joined.run.Id)
             .Select(joined => new ListenerCandidate(new ListenerRun(joined.run.Id, joined.run.AgentId, joined.run.Release,
-                joined.run.ControllerFleetId == null || joined.run.ControllerConnectionId == null || joined.run.ControllerCredentialId == null ? null : new ListenerController(joined.run.ControllerFleetId, joined.run.ControllerConnectionId, joined.run.ControllerCredentialId),
+                new ListenerController(joined.run.ControllerFleetId, joined.run.ControllerConnectionId, joined.run.ControllerCredentialId),
                 joined.run.StartedAt, joined.run.LastSeenAt, joined.run.ActiveMs, joined.run.MessagesDelivered, joined.run.StoppedAt, joined.run.DisconnectRequestedAt),
                 new ControllerAdmissionFacts(joined.owner.Status, joined.binding.OwnerId, joined.binding.FleetKey, joined.binding.RetiredAt, joined.fleet.Id, joined.fleet.OwnerId, joined.fleet.FleetKey, joined.fleet.ArchivedAt,
                     joined.fleet.DeliveryEnabled == 1, joined.connection.ConnectionId, joined.connection.CredentialId, joined.connection.ClosedAt, joined.connection.ExpiresAt, joined.credential.FleetId, joined.credential.RevokedAt))).ToArray());

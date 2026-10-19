@@ -169,8 +169,7 @@ fn invalidated_native_stop_proofs_are_not_reported_as_current_stop_evidence()
         .store
         .listener_run(&run_id)?
         .ok_or("Missing run")?
-        .controller
-        .ok_or("Missing controller")?;
+        .controller;
     let mut database = scenario.database()?;
     diesel::insert_into(fleet_native_stop::table)
         .values((

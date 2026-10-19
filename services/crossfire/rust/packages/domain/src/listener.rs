@@ -14,8 +14,8 @@ pub const HEARTBEAT_EXPIRY_MS: i64 = 90_000;
 pub struct Run {
     pub id: String,
     pub agent_id: String,
-    pub controller: Option<Controller>,
-    pub release: Option<String>,
+    pub controller: Controller,
+    pub release: String,
     pub started_at: i64,
     pub last_seen_at: i64,
     pub active_ms: i64,
@@ -74,12 +74,12 @@ pub enum ControllerPurpose {
 }
 
 pub fn admits_controller(
-    controller: Option<&Controller>,
+    controller: &Controller,
     facts: Option<&AdmissionFacts>,
     now: i64,
     purpose: ControllerPurpose,
 ) -> bool {
-    let (Some(controller), Some(facts)) = (controller, facts) else {
+    let Some(facts) = facts else {
         return false;
     };
     facts.owner_status == Status::Active
@@ -146,13 +146,10 @@ pub fn controller_proof(
 pub fn controller_admission(
     repo: &mut impl ListenerRepository,
     id: &str,
-    controller: Option<&Controller>,
+    controller: &Controller,
     now: i64,
     purpose: ControllerPurpose,
 ) -> Result<bool> {
-    let Some(controller) = controller else {
-        return Ok(false);
-    };
     let binding = repo.fleet_instance_by_agent(id)?;
     let fleet = repo.fleet(&controller.fleet_id)?;
     let connection = repo.fleet_connection(&controller.fleet_id)?;
@@ -167,7 +164,7 @@ pub fn controller_admission(
         return Ok(false);
     };
     Ok(admits_controller(
-        Some(controller),
+        controller,
         Some(&AdmissionFacts {
             binding: Binding {
                 owner_id: binding.owner_id,
@@ -213,15 +210,15 @@ pub fn report(
         if previous.as_ref().is_some_and(|run| run.stopped_at.is_some()) {
             return Ok(ReportOutcome { disconnect: true, current_release: current_release.to_owned(), closed: true, statistics_accepted: false });
         }
-        if previous.as_ref().is_some_and(|run| run.release.as_deref() != Some(input.release.as_str())) { return Err(Failure::new(ErrorCode::Conflict, "A running listener cannot change its software version")); }
-        if previous.as_ref().is_some_and(|run| run.controller.as_ref() != Some(&controller)) { return Err(Failure::new(ErrorCode::Conflict, "A listener run cannot change its controller generation")); }
+        if previous.as_ref().is_some_and(|run| run.release != input.release) { return Err(Failure::new(ErrorCode::Conflict, "A running listener cannot change its software version")); }
+        if previous.as_ref().is_some_and(|run| run.controller != controller) { return Err(Failure::new(ErrorCode::Conflict, "A listener run cannot change its controller generation")); }
         if previous.is_none() && input.release != current_release { return Err(Failure::new(ErrorCode::Conflict, format!("Update the project-local Crossfire client and skill before reconnecting. Current release: {current_release}"))); }
-        let admitted = controller_admission(repo, id, Some(&controller), now, ControllerPurpose::Reporting)?;
+        let admitted = controller_admission(repo, id, &controller, now, ControllerPurpose::Reporting)?;
         if previous.is_none() && !admitted { return Err(Failure::new(ErrorCode::Conflict, "An active authenticated controller lease is required")); }
         let elapsed = previous.as_ref().map_or(0, |run| now.saturating_sub(run.last_seen_at).max(0));
         let active_ms = previous.as_ref().map_or(0, |run| run.active_ms).checked_add(if elapsed <= HEARTBEAT_EXPIRY_MS { elapsed } else { 0 })
             .filter(|value| *value <= 9_007_199_254_740_991).ok_or_else(|| Failure::new(ErrorCode::Limit, "Listener active duration exceeds the exact integer range"))?;
-        let run = Run { id: input.run_id.clone(), agent_id: id.to_owned(), controller: Some(controller), release: Some(input.release.clone()),
+        let run = Run { id: input.run_id.clone(), agent_id: id.to_owned(), controller, release: input.release.clone(),
             started_at: previous.as_ref().map_or(now, |run| run.started_at), last_seen_at: previous.as_ref().map_or(now, |run| now.max(run.last_seen_at)), active_ms,
             messages_delivered: previous.as_ref().map_or(input.messages_delivered, |run| run.messages_delivered.max(input.messages_delivered)), stopped_at: input.stopped.then_some(now),
             disconnect_requested_at: previous.as_ref().and_then(|run| run.disconnect_requested_at).or_else(|| (!admitted).then_some(now)) };

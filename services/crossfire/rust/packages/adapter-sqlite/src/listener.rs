@@ -10,12 +10,12 @@ use diesel::prelude::*;
 #[derive(Queryable, Selectable, Insertable, AsChangeset)]
 #[diesel(table_name = listener_run, treat_none_as_null = true)]
 pub(crate) struct ListenerRow {
-    controller_fleet_id: Option<String>,
-    controller_connection_id: Option<String>,
-    controller_credential_id: Option<String>,
+    controller_fleet_id: String,
+    controller_connection_id: String,
+    controller_credential_id: String,
     id: String,
     agent_id: String,
-    release: Option<String>,
+    release: String,
     started_at: i64,
     last_seen_at: i64,
     active_ms: i64,
@@ -32,22 +32,13 @@ impl ListenerRepository for Store {
             .first::<ListenerRow>(self.database.connection())
             .optional()
             .map_err(failure)?;
-        row.map(Run::try_from).transpose()
+        Ok(row.map(Run::from))
     }
     fn save_listener_run(&mut self, value: &Run, insert: bool) -> Result<()> {
         let row = ListenerRow {
-            controller_fleet_id: value
-                .controller
-                .as_ref()
-                .map(|controller| controller.fleet_id.clone()),
-            controller_connection_id: value
-                .controller
-                .as_ref()
-                .map(|controller| controller.connection_id.clone()),
-            controller_credential_id: value
-                .controller
-                .as_ref()
-                .map(|controller| controller.credential_id.clone()),
+            controller_fleet_id: value.controller.fleet_id.clone(),
+            controller_connection_id: value.controller.connection_id.clone(),
+            controller_credential_id: value.controller.credential_id.clone(),
             id: value.id.clone(),
             agent_id: value.agent_id.clone(),
             release: value.release.clone(),
@@ -79,17 +70,10 @@ impl ListenerRepository for Store {
         listener_run::table
             .inner_join(
                 fleet_connection::table.on(fleet_connection::fleet_id
-                    .nullable()
                     .eq(listener_run::controller_fleet_id)
+                    .and(fleet_connection::connection_id.eq(listener_run::controller_connection_id))
                     .and(
-                        fleet_connection::connection_id
-                            .nullable()
-                            .eq(listener_run::controller_connection_id),
-                    )
-                    .and(
-                        fleet_connection::credential_id
-                            .nullable()
-                            .eq(listener_run::controller_credential_id),
+                        fleet_connection::credential_id.eq(listener_run::controller_credential_id),
                     )),
             )
             .filter(
@@ -109,29 +93,14 @@ impl ListenerRepository for Store {
     }
 }
 
-impl TryFrom<ListenerRow> for Run {
-    type Error = Failure;
-    fn try_from(row: ListenerRow) -> Result<Self> {
-        let controller = match (
-            row.controller_fleet_id,
-            row.controller_connection_id,
-            row.controller_credential_id,
-        ) {
-            (Some(fleet_id), Some(connection_id), Some(credential_id)) => Some(Controller {
-                fleet_id,
-                connection_id,
-                credential_id,
-            }),
-            (None, None, None) if row.stopped_at.is_some() => None,
-            _ => {
-                return Err(Failure::new(
-                    ErrorCode::Unavailable,
-                    "Stored controller generation is invalid",
-                ));
-            }
-        };
-        Ok(Self {
-            controller,
+impl From<ListenerRow> for Run {
+    fn from(row: ListenerRow) -> Self {
+        Self {
+            controller: Controller {
+                fleet_id: row.controller_fleet_id,
+                connection_id: row.controller_connection_id,
+                credential_id: row.controller_credential_id,
+            },
             id: row.id,
             agent_id: row.agent_id,
             release: row.release,
@@ -141,6 +110,6 @@ impl TryFrom<ListenerRow> for Run {
             messages_delivered: row.messages_delivered,
             stopped_at: row.stopped_at,
             disconnect_requested_at: row.disconnect_requested_at,
-        })
+        }
     }
 }

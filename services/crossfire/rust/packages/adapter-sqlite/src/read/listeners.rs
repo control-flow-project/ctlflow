@@ -60,8 +60,8 @@ pub(super) fn history(store: &mut Store, agent: &str, pagination: Pagination) ->
         .load::<ListenerRow>(store.database.connection())
         .map_err(failure)?
         .into_iter()
-        .map(Run::try_from)
-        .collect::<Result<Vec<_>>>()?;
+        .map(Run::from)
+        .collect();
     Ok(pagination.finish(items, total))
 }
 pub(super) fn candidates(
@@ -74,17 +74,15 @@ pub(super) fn candidates(
     }
     let mut query = listener_run::table
         .inner_join(fleet_instance::table.on(fleet_instance::agent_id.eq(listener_run::agent_id)))
-        .inner_join(fleet::table.on(fleet::id.nullable().eq(listener_run::controller_fleet_id)))
+        .inner_join(fleet::table.on(fleet::id.eq(listener_run::controller_fleet_id)))
         .inner_join(principal::table.on(principal::id.eq(fleet::owner_id)))
         .inner_join(
-            fleet_connection::table.on(fleet_connection::fleet_id
-                .nullable()
-                .eq(listener_run::controller_fleet_id)),
+            fleet_connection::table
+                .on(fleet_connection::fleet_id.eq(listener_run::controller_fleet_id)),
         )
         .inner_join(
-            fleet_credential::table.on(fleet_credential::id
-                .nullable()
-                .eq(listener_run::controller_credential_id)),
+            fleet_credential::table
+                .on(fleet_credential::id.eq(listener_run::controller_credential_id)),
         )
         .filter(
             listener_run::stopped_at
@@ -140,7 +138,7 @@ pub(super) fn candidates(
                 status,
             )| {
                 Ok(AdmissionCandidate {
-                    run: Run::try_from(run)?,
+                    run: Run::from(run),
                     facts: Some(AdmissionFacts {
                         binding: Binding {
                             owner_id,

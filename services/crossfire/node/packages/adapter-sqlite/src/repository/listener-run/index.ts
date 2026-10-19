@@ -30,7 +30,7 @@ export function createListenerRunRepository(database: Database.Database): Listen
       messages_delivered: params.messagesDelivered,
       stopped_at: params.stoppedAt,
       disconnect_requested_at: params.disconnectRequestedAt,
-        }), { ...value, controllerFleetId: value.controller?.fleetId ?? null, controllerConnectionId: value.controller?.connectionId ?? null, controllerCredentialId: value.controller?.credentialId ?? null });
+        }), { ...value, controllerFleetId: value.controller.fleetId, controllerConnectionId: value.controller.connectionId, controllerCredentialId: value.controller.credentialId });
         return success(undefined);
       });
     },
@@ -48,7 +48,7 @@ export function createListenerRunRepository(database: Database.Database): Listen
       messages_delivered: params.messagesDelivered,
       stopped_at: params.stoppedAt,
       disconnect_requested_at: params.disconnectRequestedAt,
-        }).where(row => row.id === params.id), { ...value, controllerFleetId: value.controller?.fleetId ?? null, controllerConnectionId: value.controller?.connectionId ?? null, controllerCredentialId: value.controller?.credentialId ?? null });
+        }).where(row => row.id === params.id), { ...value, controllerFleetId: value.controller.fleetId, controllerConnectionId: value.controller.connectionId, controllerCredentialId: value.controller.credentialId });
         return changed === 1 ? success(undefined) : failure('missing', 'ListenerRun not found');
       });
     },

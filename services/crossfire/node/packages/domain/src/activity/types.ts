@@ -23,10 +23,10 @@ export type MemberSession = {
 };
 
 export type ListenerRun = {
-  controller: { fleetId: string; connectionId: string; credentialId: string } | null;
+  controller: { fleetId: string; connectionId: string; credentialId: string };
   id: string;
   agentId: string;
-  release: string | null;
+  release: string;
   startedAt: number;
   lastSeenAt: number;
   activeMs: number;

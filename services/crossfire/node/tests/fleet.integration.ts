@@ -76,6 +76,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   await worker.drain();
   const [code] = await ended; assert.equal(code, 0, output + errors);
   const first = JSON.parse((await cli('show', 'research')).stdout) as Fleet;
+  scope.diagnostic('Enrollment and initial native startup completed');
   assert.equal(first.phase, 'running'); assert(first.instances.every(instance => instance.phase === 'running' && instance.sessionId));
   assert(providers.every(provider => provider.requests.length === 0), 'Enrollment, native startup, release installation and ready heartbeats are model-free');
   const binding = JSON.parse(readFileSync(join(fleet, '.fleet/binding.json'), 'utf8')) as Binding;
@@ -134,6 +135,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const terminal = openTerminal(scope, pointer, { ...env, CODEX_HOME: northHome });
   await terminal.until(output => output.includes('gpt-5.1'));
   await terminal.quit();
+  scope.diagnostic('Same-history resume and native TUI attachment completed');
   assert(providers.every(provider => provider.requests.length === 0), 'TUI pointer and native attachment make no model calls');
   assert((JSON.parse((await cli('show', 'research')).stdout) as Fleet).instances.every(instance => instance.phase === 'running'));
   value(await invitations.change(guest.id, roomId, { accessMode: 'reply', nativeAccess: null })); await worker.drain();
@@ -179,8 +181,10 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
     return status.value.test?.busy === false;
   });
   const delivered = providers[0]!.requests.length;
+  scope.diagnostic('Room delivery and native full-access tool execution completed');
   await cli('stop', 'research'); await cli('start', 'research');
   await acquired(); await acknowledged();
+  scope.diagnostic('Acknowledged delivery survived stop and resume');
   assert.equal(providers[0]!.requests.length, delivered, 'Restart does not duplicate an acknowledged room input');
   assert.equal(value(services.directory.activeAgentCount()), 3, 'Restarts preserve the two fleet identities and the invited guest');
   const sessions = (JSON.parse((await cli('show', 'research')).stdout) as Fleet).instances.map(instance => instance.sessionId);
@@ -200,6 +204,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
     }
   }
   const paused = await observe(current => current.instances.every(instance => !instance.listenerActive));
+  scope.diagnostic('Delivery pause observed');
   assert.equal(paused.phase, 'running'); assert.deepEqual(paused.instances.map(instance => instance.sessionId), sessions);
   const beforePause = providers.map(provider => provider.requests.length);
   value(await nativeOk(ownerNative, 'PUT', roomPath + '/send/m.room.message/while-disabled', { msgtype: 'm.text', body: 'Retained while fleet is deactivated' }));
@@ -208,6 +213,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   await cli('activate', 'research');
   await observe(current => current.instances.every(instance => instance.listenerActive));
   await until(() => providers[0]!.requests.length === beforePause[0]! + 1);
+  scope.diagnostic('Delivery activation and retained message pickup completed');
   assert(JSON.stringify(providers[0]!.requests.at(-1)).includes('Retained while fleet is deactivated'));
   const messageId = randomUUID();
   await cli('message', 'research', '--text', 'Explicit controller task to the whole fleet', '--message-id', messageId);
@@ -218,13 +224,16 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const beforeRepeat = providers.map(provider => provider.requests.length);
   await cli('message', 'research', '--text', 'Explicit controller task to the whole fleet', '--message-id', messageId);
   await acquired(); await acknowledged(); assert.deepEqual(providers.map(provider => provider.requests.length), beforeRepeat);
+  scope.diagnostic('Explicit fleet message delivery and idempotent replay completed');
   const address = fixture.router.address(); assert(address && typeof address !== 'string');
   const originalLease = value(services.repositories.fleetConnection.find(binding.fleetId))!;
   fixture.router.closeAllConnections(); await new Promise<void>(resolve => fixture.router.close(() => resolve()));
+  scope.diagnostic('Coordination router closed');
   const disconnected = await observe(current => !current.connection.connected && current.instances.every(instance => !instance.listenerActive));
   assert.equal(disconnected.phase, 'running'); assert.deepEqual(disconnected.instances.map(instance => instance.sessionId), sessions);
   fixture.router.listen(address.port, '127.0.0.1'); await once(fixture.router, 'listening');
   await observe(current => current.connection.connected && current.instances.every(instance => instance.listenerActive));
+  scope.diagnostic('Controller reconnected after coordination outage');
   const reconnectedLease = value(services.repositories.fleetConnection.find(binding.fleetId))!;
   assert.notEqual(reconnectedLease.connectionId, originalLease.connectionId, 'Reconnection uses a fresh generation');
   assert(services.clock.now() < originalLease.expiresAt, 'The exact held lease is released before reconnecting, not left to expire');

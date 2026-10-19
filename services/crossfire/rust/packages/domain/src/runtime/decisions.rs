@@ -32,7 +32,7 @@ pub fn live_run(
     if !listener::controller_admission(
         repo,
         agent_id,
-        run.controller.as_ref(),
+        &run.controller,
         now,
         listener::ControllerPurpose::Reporting,
     )? {
