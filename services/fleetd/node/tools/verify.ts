@@ -78,7 +78,7 @@ export async function verifyFleet(input: { root: string; directory: string; runn
       signal.throwIfAborted();
       const role = configuration.definitions[instance.instance.definition];
       const configured = configuration.roster.instances.find(item => item.key === instance.instance.key);
-      if (!role || !configured || !isDeepStrictEqual(configured, instance.instance)) return failure('conflict', 'Controller instance differs from its exact current definition/roster');
+      if (!role || !configured || !isDeepStrictEqual(configured, instance.instance, { skipPrototype: true })) return failure('conflict', 'Controller instance differs from its exact current definition/roster: ' + instance.instance.key);
       const identity = binding.identities.find(item => item.instanceKey === instance.instance.key && item.name === instance.instance.name);
       if (!identity) return failure('conflict', 'Registered instance has no exact enrolled account');
       const workspace = configured.workspace ?? join(input.directory, configured.workarea), boundary = await projectBoundary(workspace, signal);
