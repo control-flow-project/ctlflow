@@ -13,7 +13,7 @@ import { success } from '@ctlflow/crossfire-kernel/result';
 import { withHuman } from '../tools/auth.js';
 import { verifyServer } from '../tools/server.js';
 import { verifyRelease } from '../tools/release.js';
-import { reviewEnrollment } from '../tools/enrollment.js';
+import { enrollmentPlan, reviewEnrollment } from '../tools/enrollment.js';
 import { operatorFixture } from './support/operator.js';
 import { value, secret } from './support/application.js';
 
@@ -58,6 +58,9 @@ test('operator enrollment is read-only until explicit execution and verifies the
     fleetKey: 'research', controller: { name: 'laptop', metadata: {} }, instances: [{ instanceKey: 'helper', name: 'helper', coordinationPolicy: defaultCoordinationPolicy(ownerBackendUserId) }] }));
   const plan = { enrollmentId, ownerBackendUserId, verificationCode: introduced.request.verificationCode, fleetKey: 'research', controllerName: 'laptop',
     instances: [{ instanceKey: 'helper', currentName: null, requestedName: 'helper', coordinationPolicy: defaultCoordinationPolicy(ownerBackendUserId) }] };
+  assert.equal(enrollmentPlan(plan).ok, true);
+  for (const field of ['fleetKey', 'controllerName']) assert.equal(enrollmentPlan({ ...plan, [field]: null }).ok, false, field);
+  assert.equal(enrollmentPlan({ ...plan, instances: [{ ...plan.instances[0]!, coordinationPolicy: null }] }).ok, false);
   value(await reviewEnrollment(fixture.origin, fixture.account, plan, false, new AbortController().signal));
   assert.equal(fixture.requests.filter(request => request.method === 'POST' && request.path.endsWith('/decision')).length, 0);
   for (const changes of [{ ownerBackendUserId: '@wrong:test' }, { controllerName: 'wrong' }, { verificationCode: 'WRONGWRONG00' },

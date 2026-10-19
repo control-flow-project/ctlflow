@@ -47,12 +47,12 @@ public sealed partial class CrossfireDbContext
         {
             entity.ToTable("listener_run");
             entity.HasKey(value => value.Id);
-            entity.Property(value => value.ControllerFleetId).HasColumnName("controller_fleet_id").HasColumnType("TEXT").ValueGeneratedNever();
-            entity.Property(value => value.ControllerConnectionId).HasColumnName("controller_connection_id").HasColumnType("TEXT").ValueGeneratedNever();
-            entity.Property(value => value.ControllerCredentialId).HasColumnName("controller_credential_id").HasColumnType("TEXT").ValueGeneratedNever();
+            entity.Property(value => value.ControllerFleetId).HasColumnName("controller_fleet_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
+            entity.Property(value => value.ControllerConnectionId).HasColumnName("controller_connection_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
+            entity.Property(value => value.ControllerCredentialId).HasColumnName("controller_credential_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.Id).HasColumnName("id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.AgentId).HasColumnName("agent_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
-            entity.Property(value => value.Release).HasColumnName("release").HasColumnType("TEXT").ValueGeneratedNever();
+            entity.Property(value => value.Release).HasColumnName("release").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.StartedAt).HasColumnName("started_at").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.LastSeenAt).HasColumnName("last_seen_at").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.ActiveMs).HasColumnName("active_ms").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();

@@ -31,8 +31,7 @@ export function readRetirement(database: Database.Database, selection: Retiremen
       position: helpers.window(row).partitionBy(item => item.agent_id).orderByDescending(item => item.started_at)
         .thenByDescending(item => item.id).rowNumber() })).where(row => row.position === 1), { agentIds: ids });
   const runByAgent = new Map(latestRuns.map(run => [run.agentId, { id: run.id, stoppedAt: run.stoppedAt,
-    controller: run.fleetId !== null && run.connectionId !== null && run.credentialId !== null
-      ? { fleetId: run.fleetId, connectionId: run.connectionId, credentialId: run.credentialId } : null }]));
+    controller: { fleetId: run.fleetId, connectionId: run.connectionId, credentialId: run.credentialId } }]));
   const proofs = executeSelect(database, schema, (query, params, helpers) => query.from('fleet_native_stop')
     .where(row => params.agentIds.includes(row.agent_id))
     .select(row => ({ agentId: row.agent_id, receiptId: row.receipt_id, sequence: row.sequence, fleetId: row.fleet_id, runId: row.run_id,

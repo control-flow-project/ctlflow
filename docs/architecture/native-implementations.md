@@ -98,7 +98,7 @@ and out-of-range values. Empty collections have one logical page.
 ## Database
 
 Management SQLite uses application ID `1129465426`, schema 1 and one initial
-Knex migration. Current metadata describes 63 application tables.
+Knex migration. Current metadata describes 57 application tables.
 Knex's own bookkeeping tables are separate. File state and Conduit's externally
 owned RocksDB are not management SQL databases.
 
@@ -147,7 +147,7 @@ owner, with its upstream notices retained; they are not runtime query fallbacks.
 
 ## Evidence
 
-- [Rust implementation review and verification boundaries](rust-review.md)
+- [Historical Rust implementation review](../verification/20261017-rust-integration-review.md)
 
 - [Current correction record and issue IDs](../verification/20261015-outside-review-fixes.md)
 - [Shared contract execution](../verification/shared-contracts.md)

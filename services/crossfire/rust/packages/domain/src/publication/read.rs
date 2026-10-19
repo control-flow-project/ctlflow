@@ -25,7 +25,7 @@ fn lease(repo: &mut impl PublicationRepository, id: &str, now: i64) -> Result<()
             && listener::controller_admission(
                 repo,
                 id,
-                run.controller.as_ref(),
+                &run.controller,
                 now,
                 listener::ControllerPurpose::Reporting,
             )?

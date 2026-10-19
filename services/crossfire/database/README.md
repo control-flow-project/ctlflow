@@ -25,6 +25,13 @@ not older-data accommodation. Backend-specific access data is bounded opaque JSO
 Event identities are room-scoped. A blocked-mention notice's primary key is
 receiver_agent_id, room_id, event_id; updates and retention use all three fields.
 
+The current schema contains 57 application tables, 101 foreign-key relations,
+87 explicit indexes and 20 triggers, excluding Knex bookkeeping and SQLite's
+automatic indexes. Enrollment workflow rows are the only enrollment store.
+Every listener run requires its installed release and an immutable fleet,
+connection and credential binding. Removing an expired connection does not
+remove that recorded binding or make a stopped run active again.
+
 Use the service's knexfile.management.mjs and one-shot migration container.
 The service scripts migrate:latest:management:sqlite and
 migrate:status:management:sqlite use that same owner. Repeated initialization is

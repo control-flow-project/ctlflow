@@ -12,8 +12,8 @@ public static class ListenerCommands
         var row = create ? new Entities.ListenerRunRow { Id = id, AgentId = value.AgentId, StartedAt = value.StartedAt }
             : context.ListenerRun.Single(row => row.Id == id);
         if (create) context.ListenerRun.Add(row);
-        row.Release = value.Release; row.ControllerFleetId = value.Controller?.FleetId; row.ControllerConnectionId = value.Controller?.ConnectionId;
-        row.ControllerCredentialId = value.Controller?.CredentialId; row.LastSeenAt = value.LastSeenAt; row.ActiveMs = value.ActiveMs;
+        row.Release = value.Release; row.ControllerFleetId = value.Controller.FleetId; row.ControllerConnectionId = value.Controller.ConnectionId;
+        row.ControllerCredentialId = value.Controller.CredentialId; row.LastSeenAt = value.LastSeenAt; row.ActiveMs = value.ActiveMs;
         row.MessagesDelivered = value.MessagesDelivered; row.StoppedAt = value.StoppedAt; row.DisconnectRequestedAt = value.DisconnectRequestedAt;
         context.SaveChanges(); return Results.Done();
     }

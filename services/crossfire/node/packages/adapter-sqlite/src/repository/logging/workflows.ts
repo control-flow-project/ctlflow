@@ -23,17 +23,6 @@ export function pruneWorkflows(database: Database.Database, cutoff: number, limi
     .where(row => row.expires_at < params.cutoff && (row.consumed_by_member_id !== null || row.claim_backend_user_id === null))
     .orderBy(row => row.expires_at).thenBy(row => row.id).take(params.limit).select(row => ({ id: row.id })), parameters).map(row => row.id);
   if (invitations.length) executeDelete(database, schema, (query, params) => query.deleteFrom('member_invitation').where(row => params.ids.includes(row.id)), { ids: invitations });
-  const archives = executeSelect(database, schema, (query, params) => query.from('enrollment_archive').where(row => row.created_at < params.cutoff)
-    .orderBy(row => row.created_at).thenBy(row => row.id).take(params.limit).select(row => ({ id: row.id })), parameters).map(row => row.id);
-  if (archives.length) {
-    const ids = { ids: archives };
-    executeDelete(database, schema, (query, params) => query.deleteFrom('enrollment_archive_permission').where(row => params.ids.includes(row.request_id)), ids);
-    executeDelete(database, schema, (query, params) => query.deleteFrom('enrollment_archive_wake_sender').where(row => params.ids.includes(row.request_id)), ids);
-    executeDelete(database, schema, (query, params) => query.deleteFrom('enrollment_archive_policy').where(row => params.ids.includes(row.request_id)), ids);
-    executeDelete(database, schema, (query, params) => query.deleteFrom('enrollment_archive_metadata').where(row => params.ids.includes(row.enrollment_id)), ids);
-    executeDelete(database, schema, (query, params) => query.deleteFrom('enrollment_archive_item').where(row => params.ids.includes(row.request_id)), ids);
-    executeDelete(database, schema, (query, params) => query.deleteFrom('enrollment_archive').where(row => params.ids.includes(row.id)), ids);
-  }
   const rejected = executeSelect(database, schema, (query, params) => query.from('enrollment_request')
     .where(row => (row.status === 'rejected' || row.status === 'expired') && (row.decided_at ?? row.expires_at) < params.cutoff)
     .groupJoin(query.from('agent_name').where(row => row.request_id !== null), row => row.id, name => name.request_id,
@@ -49,5 +38,5 @@ export function pruneWorkflows(database: Database.Database, cutoff: number, limi
     executeDelete(database, schema, (query, params) => query.deleteFrom('enrollment_item').where(row => params.ids.includes(row.request_id)), ids);
     executeDelete(database, schema, (query, params) => query.deleteFrom('enrollment_request').where(row => params.ids.includes(row.id)), ids);
   }
-  return [audit.length, notices.length, wakes.length, messages.length, invitations.length, archives.length, rejected.length];
+  return [audit.length, notices.length, wakes.length, messages.length, invitations.length, rejected.length];
 }

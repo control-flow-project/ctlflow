@@ -34,7 +34,8 @@
 - [Normative specification](specification.md)
 - [Implementation ownership and limits](architecture/native-implementations.md)
 - [Current file-by-file audit](architecture/native-file-audit.md)
-- [Rust integration review](architecture/rust-review.md)
+- [Obsolete-material cleanup review](verification/20261019-obsolete-cleanup.md)
+- [Historical Rust integration review](verification/20261017-rust-integration-review.md)
 - [Development commands](development.md)
 - [Shared executable test matrix](verification/shared-contracts.md)
 - [Native decision diagnosis](runtime-approval-readiness.md)
@@ -42,5 +43,5 @@
 
 The specification defines required behavior. Code-owned schemas define exact
 wire fields and database structure. Product guides describe procedures.
-Dated files under `verification/`, `plans/` and `proposals/` are historical
-records, not current installation instructions or certification of later source.
+Dated files under `verification/` are historical records, not current
+installation instructions or certification of later source.

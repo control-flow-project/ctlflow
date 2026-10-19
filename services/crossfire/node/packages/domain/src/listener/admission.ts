@@ -13,7 +13,7 @@ export type ControllerAdmissionFacts = {
 export type ControllerPurpose = 'reporting' | 'delivery';
 
 export function admitsController(run: Pick<ListenerRun, 'controller'>, facts: ControllerAdmissionFacts | null, now: number, purpose: ControllerPurpose): boolean {
-  if (!run.controller || !facts) return false;
+  if (!facts) return false;
   const { binding, fleet, connection, credential, ownerStatus } = facts;
   return ownerStatus === 'active' && binding.retiredAt === null && fleet.archivedAt === null
     && binding.ownerId === fleet.ownerId && binding.fleetKey === fleet.fleetKey

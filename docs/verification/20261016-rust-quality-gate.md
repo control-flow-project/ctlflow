@@ -47,7 +47,7 @@ integration review. Confirmed Node/C# defects are included in this PR; the earli
 fork-only exclusion no longer applies. Superseded helper owners and guards are
 removed rather than retained as compatibility layers.
 
-- [Corrections and issue IDs](../architecture/rust-review.md)
+- [Corrections and issue IDs](20261017-rust-integration-review.md)
 - [Executable scenario inventory](../../services/crossfire/tests/contracts/README.md)
 - [Reproduction commands and resource model](shared-contracts.md)
 

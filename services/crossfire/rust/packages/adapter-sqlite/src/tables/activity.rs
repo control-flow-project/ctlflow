@@ -32,12 +32,12 @@ diesel::table! {
 
 diesel::table! {
     listener_run (id) {
-        controller_fleet_id -> Nullable<Text>,
-        controller_connection_id -> Nullable<Text>,
-        controller_credential_id -> Nullable<Text>,
+        controller_fleet_id -> Text,
+        controller_connection_id -> Text,
+        controller_credential_id -> Text,
         id -> Text,
         agent_id -> Text,
-        release -> Nullable<Text>,
+        release -> Text,
         started_at -> BigInt,
         last_seen_at -> BigInt,
         active_ms -> BigInt,

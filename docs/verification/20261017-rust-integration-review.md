@@ -1,5 +1,8 @@
 # Rust integration review
 
+Historical record of the source and verification identified below. The current
+contract is the [specification](../specification.md), not this report.
+
 Review dates: 16–17 October 2026. Coordinated version: 0.1.20.
 Main `7378d12` is integrated into `feat/rust-native-20261014`.
 
@@ -24,9 +27,9 @@ The inventory covers 804 Node files, 526 C# files and 592 Rust files. It include
 source, tests, manifests, generated metadata and build inputs. A file association
 is an ownership check, not proof of equivalent behavior.
 
-- [Per-file review and owning corrections](native-file-audit.md)
-- [Per-file ownership map](native-file-map.tsv)
-- [Structure and native differences](native-layout.md)
+- [Per-file review and owning corrections](../architecture/native-file-audit.md)
+- [Per-file ownership map](../architecture/native-file-map.tsv)
+- [Structure and native differences](../architecture/native-layout.md)
 
 ## Parent review corrections
 
@@ -63,9 +66,9 @@ The parent full gate passes on all four targets, including actual container
 recovery and shared Knex migrations. The linked parent record defines the tested
 platform, native-runtime scope, resource bounds and remaining dependency limits.
 
-- [Parent quality gate and findings](../verification/20261016-rust-quality-gate.md)
-- [Executable shared scenario coverage](../verification/shared-contracts.md)
-- [Earlier 15 October evidence](../verification/20261015-rust-integration.md)
+- [Parent quality gate and findings](20261016-rust-quality-gate.md)
+- [Executable shared scenario coverage](shared-contracts.md)
+- [Earlier 15 October evidence](20261015-rust-integration.md)
 
 ## Limits
 

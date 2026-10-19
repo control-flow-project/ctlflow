@@ -248,14 +248,12 @@ impl IncidentRepository for Store {
                             .and(later.field(listener_run::id).gt(listener_run::id))),
                 ),
         );
-        listener_run::table
+        let rows = listener_run::table
             .filter(not(exists(superseded)))
             .select(ListenerRow::as_select())
             .load::<ListenerRow>(self.database.connection())
-            .map_err(failure)?
-            .into_iter()
-            .map(Run::try_from)
-            .collect()
+            .map_err(failure)?;
+        Ok(rows.into_iter().map(Run::from).collect())
     }
     fn watched_fleets(&mut self) -> Result<Vec<(Fleet, Connection)>> {
         fleet_connection::table

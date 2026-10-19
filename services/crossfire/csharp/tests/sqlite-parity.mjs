@@ -18,9 +18,9 @@ const directory = mkdtempSync(join(tmpdir(), 'crossfire-sqlite-parity-')); chmod
 function checkDatabase(database) {
   const rows = migrationRows(database, migrationQuery('sqlite_schema').select('type', 'name', 'tbl_name', 'sql')
     .where('name', 'not like', 'sqlite_%').where('name', 'not like', 'knex_%').orderBy(['type', 'name']));
-  assert.equal(rows.filter(row => row.type === 'table').length, 63);
-  assert.equal(rows.filter(row => row.type === 'index').length, 94);
-  assert.equal(rows.filter(row => row.type === 'trigger').length, 26);
+  assert.equal(rows.filter(row => row.type === 'table').length, 57);
+  assert.equal(rows.filter(row => row.type === 'index').length, 87);
+  assert.equal(rows.filter(row => row.type === 'trigger').length, 20);
   assert.deepEqual(foreignKeyViolations(database), []);
   assert.deepEqual(databaseIdentity(database), { application: 1129465426, version: 1 });
   assert.deepEqual(integrityResults(database), [{ integrity_check: 'ok' }]);

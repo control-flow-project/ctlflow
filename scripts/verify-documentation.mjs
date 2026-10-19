@@ -8,7 +8,7 @@ export function documentationFiles(root) {
     return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
       if (generated.has(entry.name) || entry.isSymbolicLink()) return [];
       const file = join(directory, entry.name), path = relative(root, file).split('\\').join('/');
-      if (entry.isDirectory()) return path === 't' || /^(?:docs\/(?:plans|proposals)|docs\/verification\/\d{8})\b/u.test(path) ? [] : walk(file);
+      if (entry.isDirectory()) return /^docs\/verification\/\d{8}\b/u.test(path) ? [] : walk(file);
       return entry.isFile() && entry.name.endsWith('.md') && !/^docs\/verification\/\d{8}/u.test(path) ? [file] : [];
     });
   }

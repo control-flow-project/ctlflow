@@ -48,13 +48,6 @@ public static class LoggingRetention
         context.FleetMessage.Where(row => messages.Contains(row.Id)).ExecuteDelete();
         var invitations = context.MemberInvitation.AsNoTracking().Where(row => row.ExpiresAt < cutoff && (row.ConsumedByMemberId != null || row.ClaimBackendUserId == null)).OrderBy(row => row.ExpiresAt).ThenBy(row => row.Id).Take(limit).Select(row => row.Id).ToArray();
         context.MemberInvitation.Where(row => invitations.Contains(row.Id)).ExecuteDelete();
-        var archives = context.EnrollmentArchive.AsNoTracking().Where(row => row.CreatedAt < cutoff).OrderBy(row => row.CreatedAt).ThenBy(row => row.Id).Take(limit).Select(row => row.Id).ToArray();
-        context.EnrollmentArchivePermission.Where(row => archives.Contains(row.RequestId)).ExecuteDelete();
-        context.EnrollmentArchiveWakeSender.Where(row => archives.Contains(row.RequestId)).ExecuteDelete();
-        context.EnrollmentArchivePolicy.Where(row => archives.Contains(row.RequestId)).ExecuteDelete();
-        context.EnrollmentArchiveMetadata.Where(row => archives.Contains(row.EnrollmentId)).ExecuteDelete();
-        context.EnrollmentArchiveItem.Where(row => archives.Contains(row.RequestId)).ExecuteDelete();
-        context.EnrollmentArchive.Where(row => archives.Contains(row.Id)).ExecuteDelete();
         var rejected = context.EnrollmentRequest.AsNoTracking().Where(row => (row.Status == "rejected" || row.Status == "expired") && (row.DecidedAt ?? row.ExpiresAt) < cutoff
             && !context.AgentName.Any(name => name.RequestId == row.Id)).OrderBy(row => row.CreatedAt).Take(limit).Select(row => row.Id).ToArray();
         context.EnrollmentItemPermission.Where(row => rejected.Contains(row.RequestId)).ExecuteDelete();
@@ -63,7 +56,7 @@ public static class LoggingRetention
         context.EnrollmentControllerMetadata.Where(row => rejected.Contains(row.EnrollmentId)).ExecuteDelete();
         context.EnrollmentItem.Where(row => rejected.Contains(row.RequestId)).ExecuteDelete();
         context.EnrollmentRequest.Where(row => rejected.Contains(row.Id)).ExecuteDelete();
-        return [audit.Length, notices.Length, wakes.Length, messages.Length, invitations.Length, archives.Length, rejected.Length];
+        return [audit.Length, notices.Length, wakes.Length, messages.Length, invitations.Length, rejected.Length];
     }
 
     private static long[] Runtime(CrossfireDbContext context, long cutoff, int limit)

@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, HashMap};
 struct Run {
     id: String,
     agent_id: String,
-    fleet_id: Option<String>,
+    fleet_id: String,
     stopped_at: Option<i64>,
 }
 
@@ -112,9 +112,8 @@ pub(super) fn read(store: &mut Store, agent_ids: &[String]) -> Result<BTreeMap<S
     let operations =
         listener_run::table
             .inner_join(
-                fleet_runtime_operation::table.on(fleet_runtime_operation::fleet_id
-                    .nullable()
-                    .eq(listener_run::controller_fleet_id)),
+                fleet_runtime_operation::table
+                    .on(fleet_runtime_operation::fleet_id.eq(listener_run::controller_fleet_id)),
             )
             .filter(
                 listener_run::id
@@ -131,7 +130,7 @@ pub(super) fn read(store: &mut Store, agent_ids: &[String]) -> Result<BTreeMap<S
                 listener_run::controller_fleet_id,
                 max(fleet_runtime_operation::completed_at),
             ))
-            .load::<(String, Option<String>, Option<i64>)>(store.database.connection())
+            .load::<(String, String, Option<i64>)>(store.database.connection())
             .map_err(failure)?;
     let operations: HashMap<_, _> = operations
         .into_iter()

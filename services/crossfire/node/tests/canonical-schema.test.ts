@@ -11,6 +11,7 @@ import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result'
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import { metadataSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { readFileSync } from 'node:fs';
+import { migrationChange, migrationQuery } from './support/migration-data.js';
 
 function value<T>(result: Result<T>): T { if (!result.ok) assert.fail(result.error.message); return result.value; }
 
@@ -28,7 +29,7 @@ test('canonical schema has singular normalized tables and enforced identity/role
     const tables = executeSelect(database, metadataSchema, query => query.from('sqlite_schema')
       .where(row => row.type === 'table' && !row.name.startsWith('sqlite_') && row.name !== 'knex_migrations' && row.name !== 'knex_migrations_lock')
       .select(row => ({ name: row.name, sql: row.sql })));
-    assert.equal(tables.length, 63);
+    assert.equal(tables.length, 57);
     assert(tables.every(table => table.sql !== null && (!/json_valid/iu.test(table.sql) || ['agent_room_grant', 'room_grant_application'].includes(table.name))));
     const nativeTables = tables.filter(table => ['agent_room_grant', 'room_grant_application'].includes(table.name));
     assert(nativeTables.every(table => /native_access TEXT CHECK\(native_access IS NULL OR \(json_valid/iu.test(table.sql ?? '')));
@@ -80,10 +81,26 @@ test('canonical schema has singular normalized tables and enforced identity/role
     assert.deepEqual(value(activity.reportingAgentIds(5, false, 10)), ['agent']);
     assert.equal(value(activity.activeCount('agent', 5, 10)), 1);
     assert.equal(value(activity.totals(['agent']))[0]?.messagesDelivered, 2);
+    for (const column of ['controller_fleet_id', 'controller_connection_id', 'controller_credential_id']) {
+      assert.throws(() => migrationChange(database, migrationQuery('listener_run').where('id', 'run').update({ [column]: null })), /immutable/u, column);
+      assert.throws(() => migrationChange(database, migrationQuery('listener_run').where('id', 'run').update({ [column]: 'other' })), /immutable/u, column);
+    }
+    assert.throws(() => migrationChange(database, migrationQuery('listener_run').where('id', 'run').update({ release: null })), /NOT NULL/u);
+    for (const release of ['', 'x'.repeat(201)]) {
+      assert.throws(() => migrationChange(database, migrationQuery('listener_run').where('id', 'run').update({ release })), /CHECK/u);
+    }
+    assert.equal(value(repositories.listenerRun.find({ id: 'run' }))?.release, 'test');
     value(repositories.agentRoomGrant.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', authorizerId: 'human', addedById: 'human', invitationEventId: null, admissionKind: 'managed', accessMode: 'reply', nativeAccess: null, muted: false, revision: 0, accessRevision: 0, updatedAt: 1 }));
     assert.equal(value(repositories.agentRoomGrant.find({ agentId: 'agent', roomId: '!room:test' }))?.muted, false);
     assert.equal(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'policy.manage', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }).ok, false);
     value(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'room.agent.invite', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }));
+    const run = value(repositories.listenerRun.find({ id: 'run' }))!;
+    value(repositories.listenerRun.update({ ...run, stoppedAt: 20 }));
+    migrationChange(database, migrationQuery('fleet_connection').where('fleet_id', 'fleet').delete());
+    const stopped = value(repositories.listenerRun.find({ id: 'run' }))!;
+    assert.deepEqual(stopped.controller, { fleetId: 'fleet', connectionId: 'connection', credentialId: 'credential' });
+    assert.equal(stopped.stoppedAt, 20);
+    assert.equal(value(activity.activeCount('agent', 5, 20)), 0);
     assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   } finally { database.close(); }
 });

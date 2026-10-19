@@ -42,7 +42,7 @@ public static class FleetRetirement
                 return Results.Fail<Unit>("forbidden", "Native stop proof must cover this current fleet instance");
             var run = ports.Listener.Find(runId);
             if (!run.IsSuccess) return Result<Unit>.Fail(run.Error);
-            if (run.Value is null || run.Value.AgentId != agentId || run.Value.Controller?.FleetId != fleetId || run.Value.Controller.ConnectionId != connectionId
+            if (run.Value is null || run.Value.AgentId != agentId || run.Value.Controller.FleetId != fleetId || run.Value.Controller.ConnectionId != connectionId
                 || run.Value.Controller.CredentialId != current.Value.Connection.CredentialId)
                 return Results.Fail<Unit>("conflict", "Native stop proof requires the current authenticated listener generation");
             if (run.Value.StoppedAt is null) return Results.Fail<Unit>("conflict", "Stop delivery for this listener generation before recording native close");

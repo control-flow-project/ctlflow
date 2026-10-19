@@ -87,49 +87,6 @@ pub(super) fn prune(store: &mut Store, cutoff: i64, limit: i64) -> Result<Vec<us
     diesel::delete(member_invitation::table.filter(member_invitation::id.eq_any(&invitations)))
         .execute(store.database.connection())
         .map_err(failure)?;
-    let archives = enrollment_archive::table
-        .filter(enrollment_archive::created_at.lt(cutoff))
-        .order((
-            enrollment_archive::created_at.asc(),
-            enrollment_archive::id.asc(),
-        ))
-        .limit(limit)
-        .select(enrollment_archive::id)
-        .load::<String>(store.database.connection())
-        .map_err(failure)?;
-    diesel::delete(
-        enrollment_archive_permission::table
-            .filter(enrollment_archive_permission::request_id.eq_any(&archives)),
-    )
-    .execute(store.database.connection())
-    .map_err(failure)?;
-    diesel::delete(
-        enrollment_archive_wake_sender::table
-            .filter(enrollment_archive_wake_sender::request_id.eq_any(&archives)),
-    )
-    .execute(store.database.connection())
-    .map_err(failure)?;
-    diesel::delete(
-        enrollment_archive_policy::table
-            .filter(enrollment_archive_policy::request_id.eq_any(&archives)),
-    )
-    .execute(store.database.connection())
-    .map_err(failure)?;
-    diesel::delete(
-        enrollment_archive_metadata::table
-            .filter(enrollment_archive_metadata::enrollment_id.eq_any(&archives)),
-    )
-    .execute(store.database.connection())
-    .map_err(failure)?;
-    diesel::delete(
-        enrollment_archive_item::table
-            .filter(enrollment_archive_item::request_id.eq_any(&archives)),
-    )
-    .execute(store.database.connection())
-    .map_err(failure)?;
-    diesel::delete(enrollment_archive::table.filter(enrollment_archive::id.eq_any(&archives)))
-        .execute(store.database.connection())
-        .map_err(failure)?;
     let reservations =
         agent_name::table.filter(agent_name::request_id.eq(enrollment_request::id.nullable()));
     let rejected = enrollment_request::table
@@ -185,7 +142,6 @@ pub(super) fn prune(store: &mut Store, cutoff: i64, limit: i64) -> Result<Vec<us
         wakes.len(),
         messages.len(),
         invitations.len(),
-        archives.len(),
         rejected.len(),
     ])
 }

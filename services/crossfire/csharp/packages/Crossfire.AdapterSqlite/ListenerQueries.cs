@@ -15,8 +15,7 @@ public static class ListenerQueries
         if (!selected.IsSuccess) return Result<IReadOnlyList<ListenerRun>>.Fail(selected.Error);
         var runIds = selected.Value.Where(id => id is not null).Select(id => id!).ToArray();
         return Stored.Read<IReadOnlyList<ListenerRun>>(() => context.ListenerRun.AsNoTracking().Where(row => runIds.Contains(row.Id))
-            .Select(row => new ListenerRun(row.Id, row.AgentId, row.Release, row.ControllerFleetId == null || row.ControllerConnectionId == null || row.ControllerCredentialId == null
-                ? null : new ListenerController(row.ControllerFleetId, row.ControllerConnectionId, row.ControllerCredentialId), row.StartedAt, row.LastSeenAt,
+            .Select(row => new ListenerRun(row.Id, row.AgentId, row.Release, new ListenerController(row.ControllerFleetId, row.ControllerConnectionId, row.ControllerCredentialId), row.StartedAt, row.LastSeenAt,
                 row.ActiveMs, row.MessagesDelivered, row.StoppedAt, row.DisconnectRequestedAt)).ToArray());
     }
 
@@ -36,8 +35,7 @@ public static class ListenerQueries
 
     public static Result<ListenerRun?> Find(CrossfireDbContext context, string runId)
         => Stored.Read(() => context.ListenerRun.AsNoTracking().Where(row => row.Id == runId)
-            .Select(row => new ListenerRun(row.Id, row.AgentId, row.Release, row.ControllerFleetId == null || row.ControllerConnectionId == null || row.ControllerCredentialId == null
-                ? null : new ListenerController(row.ControllerFleetId, row.ControllerConnectionId, row.ControllerCredentialId), row.StartedAt, row.LastSeenAt,
+            .Select(row => new ListenerRun(row.Id, row.AgentId, row.Release, new ListenerController(row.ControllerFleetId, row.ControllerConnectionId, row.ControllerCredentialId), row.StartedAt, row.LastSeenAt,
                 row.ActiveMs, row.MessagesDelivered, row.StoppedAt, row.DisconnectRequestedAt)).SingleOrDefault());
 
     public static Result<ControllerAdmissionFacts?> Facts(CrossfireDbContext context, string agentId, string fleetId, string credentialId)
@@ -53,8 +51,7 @@ public static class ListenerQueries
     public static Result<IReadOnlyList<ListenerRun>> Recent(CrossfireDbContext context, string agentId, long since)
         => Stored.Read<IReadOnlyList<ListenerRun>>(() => context.ListenerRun.AsNoTracking().Where(row => row.AgentId == agentId && row.StoppedAt == null && row.LastSeenAt > since)
             .OrderByDescending(row => row.StartedAt).ThenByDescending(row => row.Id)
-            .Select(row => new ListenerRun(row.Id, row.AgentId, row.Release, row.ControllerFleetId == null || row.ControllerConnectionId == null || row.ControllerCredentialId == null
-                ? null : new ListenerController(row.ControllerFleetId, row.ControllerConnectionId, row.ControllerCredentialId), row.StartedAt, row.LastSeenAt,
+            .Select(row => new ListenerRun(row.Id, row.AgentId, row.Release, new ListenerController(row.ControllerFleetId, row.ControllerConnectionId, row.ControllerCredentialId), row.StartedAt, row.LastSeenAt,
                 row.ActiveMs, row.MessagesDelivered, row.StoppedAt, row.DisconnectRequestedAt)).ToArray());
 
     public static Result<ListenerTotal?> Totals(CrossfireDbContext context, string agentId)
@@ -67,8 +64,7 @@ public static class ListenerQueries
         if (!count.IsSuccess) return Result<Page<ListenerRun>>.Fail(count.Error);
         var offset = checked((page - 1) * size);
         return Stored.Read(() => context.ListenerRun.AsNoTracking().Where(row => row.AgentId == agentId).OrderByDescending(row => row.StartedAt).ThenByDescending(row => row.Id)
-            .Skip(offset).Take(size).Select(row => new ListenerRun(row.Id, row.AgentId, row.Release, row.ControllerFleetId == null || row.ControllerConnectionId == null || row.ControllerCredentialId == null
-                ? null : new ListenerController(row.ControllerFleetId, row.ControllerConnectionId, row.ControllerCredentialId), row.StartedAt, row.LastSeenAt,
+            .Skip(offset).Take(size).Select(row => new ListenerRun(row.Id, row.AgentId, row.Release, new ListenerController(row.ControllerFleetId, row.ControllerConnectionId, row.ControllerCredentialId), row.StartedAt, row.LastSeenAt,
                 row.ActiveMs, row.MessagesDelivered, row.StoppedAt, row.DisconnectRequestedAt)).ToArray()).Map(rows => new Page<ListenerRun>(rows, page, size, count.Value));
     }
 }

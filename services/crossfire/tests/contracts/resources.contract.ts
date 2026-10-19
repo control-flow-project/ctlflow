@@ -59,6 +59,14 @@ export async function resourceContracts(scope: TestContext, fixture: ContractSta
     try {
       for (const target of fixture.targets) {
         await fixture.restart(target);
+        const runs = list((await fixture.operation(operations.listenerRuns, params)).data).map(record);
+        const stoppedRun = runs.find(run => run.runId === runId);
+        assert(stoppedRun, target.name + ': stopped listener run survives a backend switch');
+        assert.equal(stoppedRun.release, fixture.release.release.manifest.release, target.name);
+        assert.equal(record(stoppedRun.controller).fleetId, agent.fleetId, target.name);
+        assert.equal(record(stoppedRun.controller).connectionId, controller.connectionId, target.name);
+        assert.equal(typeof record(stoppedRun.controller).credentialId, 'string', target.name);
+        assert.equal(typeof stoppedRun.stoppedAt, 'number', target.name);
         const directory = await fixture.operation(operations.agents, {}, undefined, fixture.owner, '?search=resource&pageSize=100');
         assert.deepEqual(list(directory.data).map(value => text(record(value).agentId)), expectedAgents, target.name);
         const first = await fixture.operation(operations.agents, {}, undefined, fixture.owner, '?search=resource&pageSize=1');

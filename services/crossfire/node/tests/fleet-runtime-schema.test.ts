@@ -6,7 +6,7 @@ import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
 import { metadataSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 
-test('current fleet session commands retain normalized indexed lifecycle state', () => {
+test('current fleet runtime schema retains normalized indexed lifecycle state', () => {
   const database = openTestStore(':memory:');
   try {
     assert.deepEqual(executeSelect(database, schema, query => query.from('fleet_runtime_operation')), []);

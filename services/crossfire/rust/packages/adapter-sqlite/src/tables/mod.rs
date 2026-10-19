@@ -14,8 +14,6 @@ pub use agents::{
 };
 mod enrollment;
 pub use enrollment::{
-    enrollment_archive, enrollment_archive_item, enrollment_archive_metadata,
-    enrollment_archive_permission, enrollment_archive_policy, enrollment_archive_wake_sender,
     enrollment_controller_metadata, enrollment_item, enrollment_item_permission,
     enrollment_item_policy, enrollment_item_wake_sender, enrollment_request,
 };
@@ -45,12 +43,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     agent_room_permission,
     agent_wake_sender,
     audit_event,
-    enrollment_archive,
-    enrollment_archive_item,
-    enrollment_archive_metadata,
-    enrollment_archive_permission,
-    enrollment_archive_policy,
-    enrollment_archive_wake_sender,
     enrollment_controller_metadata,
     enrollment_item,
     enrollment_item_permission,

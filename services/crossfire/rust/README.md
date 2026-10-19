@@ -58,4 +58,4 @@ hosts or every power-loss boundary.
 
 - [Development prerequisites](../../../docs/development.md)
 - [Shared test matrix](../../../docs/verification/shared-contracts.md)
-- [Current integration review](../../../docs/architecture/rust-review.md)
+- [Historical integration review](../../../docs/verification/20261017-rust-integration-review.md)

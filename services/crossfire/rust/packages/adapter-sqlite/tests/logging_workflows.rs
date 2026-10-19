@@ -176,29 +176,6 @@ fn expired_workflow_logs_are_removed_without_erasing_pending_claims_rules_or_res
                 .execute(database.connection())?;
         }
     }
-    let archived_id = identity::id();
-    diesel::insert_into(enrollment_archive::table)
-        .values((
-            enrollment_archive::id.eq(&archived_id),
-            enrollment_archive::owner_id.eq(&scenario.owner.principal_id),
-            enrollment_archive::verification_code.eq(&archived_id),
-            enrollment_archive::claim_hash.eq(identity::hash(&archived_id)),
-            enrollment_archive::roster_digest.eq(identity::hash(&archived_id)),
-            enrollment_archive::status.eq("rejected"),
-            enrollment_archive::revision.eq(0),
-            enrollment_archive::created_at.eq(OLD),
-            enrollment_archive::expires_at.eq(OLD + 1000),
-        ))
-        .execute(database.connection())?;
-    diesel::insert_into(enrollment_archive_item::table)
-        .values((
-            enrollment_archive_item::request_id.eq(&archived_id),
-            enrollment_archive_item::instance_key.eq("instance"),
-            enrollment_archive_item::requested_name.eq("archived"),
-            enrollment_archive_item::outcome.eq("failed"),
-            enrollment_archive_item::failure_code.eq("forbidden"),
-        ))
-        .execute(database.connection())?;
     let incident_id = identity::id();
     scenario.store.insert_incident(&Incident {
         id: incident_id.clone(),
@@ -276,18 +253,6 @@ fn expired_workflow_logs_are_removed_without_erasing_pending_claims_rules_or_res
             .count()
             .get_result::<i64>(database.connection())?,
         1
-    );
-    assert_eq!(
-        enrollment_archive::table
-            .count()
-            .get_result::<i64>(database.connection())?,
-        0
-    );
-    assert_eq!(
-        enrollment_archive_item::table
-            .count()
-            .get_result::<i64>(database.connection())?,
-        0
     );
     assert!(scenario.store.incident(&incident_id)?.is_none());
     assert_eq!(

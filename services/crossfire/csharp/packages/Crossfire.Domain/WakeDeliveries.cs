@@ -33,7 +33,7 @@ public static class WakeDeliveries
     {
         var run = Run(ports, actor, agentId, runId); if (!run.IsSuccess) return Result<bool>.Fail(run.Error);
         var now = ports.Rules.Discovery.Authorization.Now();
-        if (run.Value.StoppedAt is not null || run.Value.DisconnectRequestedAt is not null || run.Value.LastSeenAt < now - ControllerAdmission.HeartbeatExpiryMs || run.Value.Controller is null) return Result<bool>.Success(false);
+        if (run.Value.StoppedAt is not null || run.Value.DisconnectRequestedAt is not null || run.Value.LastSeenAt < now - ControllerAdmission.HeartbeatExpiryMs) return Result<bool>.Success(false);
         var controller = run.Value.Controller;
         return ports.Listener.Facts(agentId, controller.FleetId, controller.CredentialId).Map(value => ControllerAdmission.Admits(run.Value, value, now, ControllerPurpose.Delivery));
     }

@@ -30,10 +30,10 @@ main `9d57e5d` remain clean and untouched.
   and settled delivery. Indexed eligibility projections use 11 queries,
   independent of page size.
 
-The [specification](../specification.md) owns the current contracts. The
-[implementation plan](../plans/20261005-universal-fleet-controller.md) records
-source ownership and completed phases; product workflows are indexed in the
-[documentation](../README.md).
+The [specification](../specification.md) owns the current contracts; product
+workflows are indexed in the [documentation](../README.md). The implementation
+plan accompanying this revision has been superseded and removed from the
+current tree. This report records only the source revision identified above.
 
 ## Final quality gates
 

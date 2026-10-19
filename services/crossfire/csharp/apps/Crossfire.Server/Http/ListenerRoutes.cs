@@ -13,8 +13,7 @@ public static class ListenerRoutes
     public static void Run(ProtocolWriter writer, ListenerRun value)
     {
         writer.WriteStartObject(); writer.WriteString("runId", value.Id); writer.WriteString("agentId", value.AgentId); writer.WriteString("release", value.Release);
-        if (value.Controller is null) writer.WriteNull("controller");
-        else { writer.WriteStartObject("controller"); writer.WriteString("fleetId", value.Controller.FleetId); writer.WriteString("connectionId", value.Controller.ConnectionId); writer.WriteString("credentialId", value.Controller.CredentialId); writer.WriteEndObject(); }
+        writer.WriteStartObject("controller"); writer.WriteString("fleetId", value.Controller.FleetId); writer.WriteString("connectionId", value.Controller.ConnectionId); writer.WriteString("credentialId", value.Controller.CredentialId); writer.WriteEndObject();
         writer.WriteNumber("startedAt", value.StartedAt); writer.WriteNumber("lastSeenAt", value.LastSeenAt); writer.WriteNumber("activeMs", value.ActiveMs); writer.WriteNumber("messagesDelivered", value.MessagesDelivered);
         JsonValues.Number(writer, "stoppedAt", value.StoppedAt); JsonValues.Number(writer, "disconnectRequestedAt", value.DisconnectRequestedAt); writer.WriteEndObject();
     }

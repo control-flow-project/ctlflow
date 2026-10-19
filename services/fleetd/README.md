@@ -13,7 +13,7 @@ crossfire owns remote authorization and coordination, not local process control.
 - [Operation and failure boundaries](docs/operations.md)
 - [Read-only diagnostic API](docs/diagnostics.md)
 - [Coordination defaults](docs/coordination.md)
-- [Private storage and conversions](docs/storage.md)
+- [Private storage](docs/storage.md)
 - [Operator inspection](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/node/tools/README.md)
 - [fleet CLI](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/README.md)
 - [Node package installation](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/node.md)

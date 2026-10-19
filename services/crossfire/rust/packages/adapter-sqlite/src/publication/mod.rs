@@ -276,7 +276,7 @@ impl PublicationRepository for Store {
             .transpose()
     }
     fn publication_listener_runs(&mut self, id: &str, since: i64) -> Result<Vec<Run>> {
-        listener_run::table
+        let rows = listener_run::table
             .filter(
                 listener_run::agent_id
                     .eq(id)
@@ -285,9 +285,7 @@ impl PublicationRepository for Store {
             )
             .select(ListenerRow::as_select())
             .load::<ListenerRow>(self.database.connection())
-            .map_err(failure)?
-            .into_iter()
-            .map(Run::try_from)
-            .collect()
+            .map_err(failure)?;
+        Ok(rows.into_iter().map(Run::from).collect())
     }
 }

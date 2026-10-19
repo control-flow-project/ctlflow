@@ -11,12 +11,6 @@ import { retentionProof, recordIdentity, type RetentionProof } from './database-
 
 function counts(database: Database.Database) {
   return {
-    enrollment_archive: () => executeSelect(database, schema, query => query.from('enrollment_archive').count()),
-    enrollment_archive_item: () => executeSelect(database, schema, query => query.from('enrollment_archive_item').count()),
-    enrollment_archive_policy: () => executeSelect(database, schema, query => query.from('enrollment_archive_policy').count()),
-    enrollment_archive_permission: () => executeSelect(database, schema, query => query.from('enrollment_archive_permission').count()),
-    enrollment_archive_wake_sender: () => executeSelect(database, schema, query => query.from('enrollment_archive_wake_sender').count()),
-    enrollment_archive_metadata: () => executeSelect(database, schema, query => query.from('enrollment_archive_metadata').count()),
     fleet_native_stop: () => executeSelect(database, schema, query => query.from('fleet_native_stop').count()),
     publication: () => executeSelect(database, schema, query => query.from('publication').count()),
     publication_file: () => executeSelect(database, schema, query => query.from('publication_file').count()),
@@ -157,12 +151,6 @@ function protectedRecords(database: Database.Database) {
     enrollment_request: () => executeSelect(database, schema, query => query.from('enrollment_request').take(100001)),
     enrollment_item: () => executeSelect(database, schema, query => query.from('enrollment_item').take(100001)),
     enrollment_controller_metadata: () => executeSelect(database, schema, query => query.from('enrollment_controller_metadata').take(100001)),
-    enrollment_archive: () => executeSelect(database, schema, query => query.from('enrollment_archive').take(100001)),
-    enrollment_archive_item: () => executeSelect(database, schema, query => query.from('enrollment_archive_item').take(100001)),
-    enrollment_archive_policy: () => executeSelect(database, schema, query => query.from('enrollment_archive_policy').take(100001)),
-    enrollment_archive_permission: () => executeSelect(database, schema, query => query.from('enrollment_archive_permission').take(100001)),
-    enrollment_archive_wake_sender: () => executeSelect(database, schema, query => query.from('enrollment_archive_wake_sender').take(100001)),
-    enrollment_archive_metadata: () => executeSelect(database, schema, query => query.from('enrollment_archive_metadata').take(100001)),
     fleet_native_stop: () => executeSelect(database, schema, query => query.from('fleet_native_stop').take(100001)),
     publication: () => executeSelect(database, schema, query => query.from('publication').take(100001)),
     publication_file: () => executeSelect(database, schema, query => query.from('publication_file').take(100001)),

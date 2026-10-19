@@ -97,8 +97,8 @@ pub(super) fn read(store: &mut Store, selection: Selection<'_>, now: i64) -> Res
         .load::<ListenerRow>(store.database.connection())
         .map_err(failure)?
         .into_iter()
-        .map(Run::try_from)
-        .collect::<Result<Vec<_>>>()?;
+        .map(Run::from)
+        .collect::<Vec<_>>();
     let run_ids = runs.iter().map(|run| run.id.clone()).collect::<Vec<_>>();
     let runs = runs
         .into_iter()

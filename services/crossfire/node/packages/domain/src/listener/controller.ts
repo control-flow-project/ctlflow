@@ -20,7 +20,6 @@ export function controllerProof(services: Dependencies, agentId: string, proof: 
 }
 
 export function controllerAdmission(services: Pick<Services, 'repositories' | 'clock'>, run: Pick<ListenerRun, 'agentId' | 'controller'>, purpose: ControllerPurpose) {
-  if (!run.controller) return success(false);
   const binding = services.repositories.fleetInstance.findByAgent(run.agentId); if (!binding.ok) return binding;
   const fleet = services.repositories.fleet.findById(run.controller.fleetId); if (!fleet.ok) return fleet;
   const connection = services.repositories.fleetConnection.find(run.controller.fleetId); if (!connection.ok) return connection;

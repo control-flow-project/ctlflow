@@ -98,15 +98,14 @@ impl RetirementRepository for Store {
         snapshot::read(self, selection, now)
     }
     fn latest_listener(&mut self, id: &str) -> Result<Option<Run>> {
-        run::table
+        let row = run::table
             .filter(run::agent_id.eq(id))
             .order((run::started_at.desc(), run::id.desc()))
             .select(ListenerRow::as_select())
             .first::<ListenerRow>(self.database.connection())
             .optional()
-            .map_err(failure)?
-            .map(Run::try_from)
-            .transpose()
+            .map_err(failure)?;
+        Ok(row.map(Run::from))
     }
     fn retire_listener_runs(&mut self, id: &str, now: i64) -> Result<()> {
         diesel::update(
