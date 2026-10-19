@@ -15,11 +15,11 @@ export function readFleetStatistics(services: Pick<Services, 'statistics' | 'rep
   const records = services.discovery.selected(agentIds); if (!records.ok) return records;
   const names = new Map(records.value.map(record => [record.principalId, record]));
   const measured = services.statistics.read(agentIds, since, query.page, query.pageSize); if (!measured.ok) return measured;
-  const senders = services.discovery.identities([...new Set(measured.value.flows.map(flow => flow.senderMatrixId))]); if (!senders.ok) return senders;
-  const senderNames = new Map(senders.value.map(sender => [sender.matrixUserId, sender.displayName]));
+  const senders = services.discovery.identities([...new Set(measured.value.flows.map(flow => flow.senderBackendUserId))]); if (!senders.ok) return senders;
+  const senderNames = new Map(senders.value.map(sender => [sender.backendUserId, sender.displayName]));
   const { totalFlows, ...value } = measured.value;
   return success({ ...value, capturedAt, since, retentionDays: services.logging.days,
-    agents: value.agents.map(agent => ({ ...agent, displayName: names.get(agent.agentId)!.displayName, matrixUserId: names.get(agent.agentId)!.matrixUserId })),
-    flows: value.flows.map(({ roomId, senderMatrixId, messageType, agentId, ...totals }) => ({ agentId, roomId, senderMatrixId, messageType, totals, senderName: senderNames.get(senderMatrixId) ?? null })),
+    agents: value.agents.map(agent => ({ ...agent, displayName: names.get(agent.agentId)!.displayName, backendUserId: names.get(agent.agentId)!.backendUserId })),
+    flows: value.flows.map(({ roomId, senderBackendUserId, messageType, agentId, ...totals }) => ({ agentId, roomId, senderBackendUserId, messageType, totals, senderName: senderNames.get(senderBackendUserId) ?? null })),
     meta: { page: query.page, pageSize: query.pageSize, totalItems: totalFlows, totalPages: Math.max(1, Math.ceil(totalFlows / query.pageSize)) }, spend: null });
 }

@@ -3,7 +3,7 @@ import test from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { chromium, expect } from '@playwright/test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
-import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { API } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-grant';
 import { reconcileRoomGrant } from '@ctlflow/crossfire-domain/room-access/reconcile-grant';
@@ -30,7 +30,7 @@ test('real room refresh updates pristine edits and explicitly fences dirty edits
     const current = value(services.directory.agent(agent.id))!;
     const grant = value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId }));
     value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: current.principal.revision,
-      expectedGeneration: grant?.generation ?? null, accessMode, powerLevel: null, muted }, randomUUID()));
+      expectedGeneration: grant?.generation ?? null, accessMode, nativeAccess: null, muted }, randomUUID()));
     value(await reconcileRoomGrant(services, agent.id, roomId));
   }
   await assign('reply', false);

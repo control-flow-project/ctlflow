@@ -32,7 +32,9 @@ public static class ServerHost
     {
         using var configuration = JsonDocument.Parse(PrivateFiles.Read(Path.Combine(input.Directory, "config.json"), 65536));
         var parsed = Configurations.Parse(configuration.RootElement); if (!parsed.IsSuccess) throw new ArgumentException(parsed.Error.Message);
-        var config = parsed.Value; var release = Releases.Load(input.Release); var database = Path.Combine(input.Directory, "management.sqlite");
+        var config = parsed.Value; var backend = MatrixSettings.Read(config.Messaging, config.Instance, config.Administrator); if (!backend.IsSuccess) throw new ArgumentException(backend.Error.Message);
+        if (new Uri(config.ContentOrigin).Host == new Uri(backend.Value.Origin).Host) throw new ArgumentException("Publications require a separate backend hostname");
+        var release = Releases.Load(input.Release); var database = Path.Combine(input.Directory, "management.sqlite");
         using var storage = new ManagementStorage(database);
         using (var validation = storage.Open()) { var schema = Schema.Validate(validation); if (!schema.IsSuccess) throw new IOException(schema.Error.Message); }
         using var bootstrap = JsonDocument.Parse(PrivateFiles.Read(Path.Combine(input.Directory, "bootstrap.json"), 16384));
@@ -42,17 +44,19 @@ public static class ServerHost
         using var interrupt = PosixSignalRegistration.Create(PosixSignal.SIGINT, signal => { signal.Cancel = true; stop.Cancel(); });
         using var terminate = PosixSignalRegistration.Create(PosixSignal.SIGTERM, signal => { signal.Cancel = true; stop.Cancel(); });
         using var hangup = PosixSignalRegistration.Create(PosixSignal.SIGHUP, signal => { signal.Cancel = true; stop.Cancel(); });
-        await using var homeserver = input.HomeserverBinary is null ? null : HomeserverProcess.Start(config, input.Directory, input.HomeserverBinary, diagnostics);
+        await using var homeserver = input.HomeserverBinary is null ? null : HomeserverProcess.Start(backend.Value, input.Directory, input.HomeserverBinary, diagnostics);
         try
         {
-            if (homeserver is not null) await homeserver.Ready(config, stop.Token);
-            using var matrix = new AccountAuthority(new(config.MatrixOrigin, config.ServerName, config.JwtSecret, config.RegistrationSecret, config.ServiceMatrixId));
-            var initialized = await Bootstrap.Apply(config, secrets.Value, matrix, stop.Token); if (!initialized.IsSuccess) throw new IOException(initialized.Error.Message);
+            if (homeserver is not null) await homeserver.Ready(backend.Value, stop.Token);
+            using var matrix = new AccountAuthority(backend.Value);
+            var initialized = await Bootstrap.Apply(backend.Value, config.Administrator, secrets.Value, matrix, stop.Token); if (!initialized.IsSuccess) throw new IOException(initialized.Error.Message);
             using var reports = new PublicationStore(database + ".publications", config.PublicationBudget.Uploads, path => new StateLock(path));
-            var state = new ApiState(config, storage, release, matrix, reports, diagnostics, Identity.Now(), Identity.Now);
-            await using var worker = new ApiWorker(state); using var proxy = new MatrixProxy();
+            var state = new ApiState(config, storage, release, matrix.Ports(), matrix.RoomOperation, reports, diagnostics, Identity.Now(), Identity.Now);
+            await using var worker = new ApiWorker(state); using var proxy = new MatrixProxy(); var webServices = MessagingComposition.Web(state, backend.Value); var presentation = ElementPresentation.Read(input.Element, config.PublicOrigin);
+            MessagingHttpFactory webHandler = (admission, changed) => { var handler = NativeWeb.Create(webServices, presentation, admission, changed); return (http, path, request) => handler(http, path, request); };
+            MessagingPublicRoutes publicHandler = (http, path, raw, api, serve) => NativeWeb.Public(http, path, raw, config.PublicOrigin, backend.Value.Origin, input.Element, proxy, api, serve);
             await using var content = ContentApplication.Build(state, input.ContentListen);
-            await using var application = PublicApplication.Build(state, input.Listen, input.Web, input.Element, proxy, worker.Wake);
+            await using var application = PublicApplication.Build(state, input.Listen, input.Web, webHandler, publicHandler, worker.Wake);
             await content.StartAsync(stop.Token); await application.StartAsync(stop.Token); worker.Start();
             diagnostics.Write("Crossfire ready: " + config.PublicOrigin + "/ | Management: " + config.PublicOrigin + "/manage/");
             var shutdown = application.WaitForShutdownAsync(stop.Token);

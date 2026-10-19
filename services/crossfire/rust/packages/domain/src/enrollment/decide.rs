@@ -208,7 +208,7 @@ pub fn decide(
     enrollment: &str,
     input: &Decision,
     request_id: &str,
-    server_name: &str,
+    messaging: &impl crate::messaging::MessagingAuthority,
     now: i64,
 ) -> Result<DecisionResult> {
     repo.transaction(|repo| {
@@ -316,7 +316,7 @@ pub fn decide(
                     repo,
                     &Principal {
                         id: id.clone(),
-                        matrix_user_id: format!("@agent-{id}:{server_name}"),
+                        backend_user_id: messaging.agent_user_id(&id),
                         kind: PrincipalKind::Agent,
                         status: Status::Active,
                         revision: 0,

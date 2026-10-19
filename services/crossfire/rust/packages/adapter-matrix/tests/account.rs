@@ -1,5 +1,5 @@
 mod support;
-use crossfire_domain::{matrix::MatrixAuthority, port::MatrixIdentity};
+use crossfire_domain::{messaging::MessagingAuthority, port::BackendUserIdentity};
 use crossfire_kernel::{failure::ErrorCode, secret::Secret};
 use crossfire_test_support::http::Fixture;
 use serde_json::{Value, json};
@@ -65,9 +65,10 @@ async fn protocol_provisioning_completes_supported_challenges_without_changing_p
 -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = Fixture::open().await?;
     let authority = support::authority(&fixture)?;
+    let native = serde_json::Map::from_iter([("deviceId".to_owned(), json!("DEVICE"))]);
     let password = Secret::new("native-password".to_owned());
     let (result, protocol) = tokio::join!(
-        MatrixAuthority::provision(&authority, "@agent:example.test", &password, "DEVICE"),
+        MessagingAuthority::provision(&authority, "@agent:example.test", &password, &native),
         async {
             let call = fixture.next().await?;
             assert_eq!(call.method, "POST");
@@ -110,9 +111,10 @@ async fn existing_accounts_use_the_exact_configured_credentials()
 -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = Fixture::open().await?;
     let authority = support::authority(&fixture)?;
+    let native = serde_json::Map::from_iter([("deviceId".to_owned(), json!("DEVICE"))]);
     let password = Secret::new("saved-password".to_owned());
     let (result, protocol) = tokio::join!(
-        authority.provision("@agent:example.test", &password, "DEVICE"),
+        authority.provision("@agent:example.test", &password, &native),
         async {
             fixture
                 .next()
@@ -128,7 +130,13 @@ async fn existing_accounts_use_the_exact_configured_credentials()
         }
     );
     protocol?;
-    assert_eq!(result?.device_id.len(), 255);
+    assert_eq!(
+        result?.native["deviceId"]
+            .as_str()
+            .ok_or("device ID")?
+            .len(),
+        255
+    );
     Ok(())
 }
 

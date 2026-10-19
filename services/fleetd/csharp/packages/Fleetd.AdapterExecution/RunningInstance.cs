@@ -26,6 +26,7 @@ public sealed partial class ExecutionHost
         public bool ListenerActive => Control.Current().Active;
         public InstanceExecution(NativeLifecycle native, CancellationToken lifetime, ListenerControl control, Func<Task> close) { Native = native; lifetimeToken = lifetime; Control = control; this.close = close; }
         public NativeSessionState NativeState() => Native.Current();
+        public ValueTask<NativeDiagnostic> Diagnostics(CancellationToken cancellation) => Native.Diagnostics(cancellation);
         public ValueTask<Result<Unit>> Resume() => Native.Resume();
         public ValueTask<Result<RuntimeAttachment>> Attachment(string? context = null) => Native.Attachment(context);
         public Result<IReadOnlyList<SavedRuntimeContext>> Contexts() => Native.Contexts();
@@ -56,10 +57,13 @@ public sealed partial class ExecutionHost
         {
             var host = await Host(stop.Token); owner = new StateLock(Path.Combine(local.State, "listener"));
             var software = reason == "recovery" || PrivateFiles.Exists(Path.Combine(local.Root, "client.mjs")) ? AgentSoftware.Installed(local.Root) : AgentSoftware.Install(local.Root, artifacts); var client = Client(binding.Server, identity.Account.AccessToken); var health = await client.Call(new("health", new Dictionary<string, string>()), stop.Token); if (!health.IsSuccess) return Result<RunningAgent>.Fail(health.Error);
-            var serverName = binding.Owner[(binding.Owner.IndexOf(':') + 1)..]; var profile = new AgentProfile(new(WireJson.Text(health.Value, "instance") ?? throw new InvalidDataException("Crossfire health lacks its instance identity"), binding.Server, serverName, binding.Owner, 16777216), stateDirectory, identity.AgentId, identity.Account); AgentIO.Write(AgentState.Port, local.Profile, AgentProfiles.Encode(profile)); software.Activate();
+            var described = await client.Call(new("messagingBackend", new Dictionary<string, string>()), stop.Token); if (!described.IsSuccess) return Result<RunningAgent>.Fail(described.Error);
+            var backend = described.Value.TryGetProperty("configuration", out var parameters) ? MessagingContract.Configuration(parameters) : Results.Fail<BackendConfiguration>("invalid", "Messaging backend description lacks configuration"); if (!backend.IsSuccess) return Result<RunningAgent>.Fail(backend.Error);
+            var profile = new AgentProfile(new(WireJson.Text(health.Value, "instance") ?? throw new InvalidDataException("Crossfire health lacks its instance identity"), binding.Server, backend.Value, binding.Owner, 16777216), stateDirectory, identity.AgentId, identity.Account); AgentIO.Write(AgentState.Port, local.Profile, AgentProfiles.Encode(profile)); software.Activate();
             var instructions = definition.Instructions + "\n\nCrossfire identity: " + instance.Name + ". This instance is already enrolled and its listener is managed by the fleet controller. Do not reconnect, enroll or start another listener.\n\nUse the intentional Crossfire tools from CROSSFIRE_PROJECT: node \"$CROSSFIRE_PROJECT/.crossfire/client.mjs\" --profile " + instance.Key + ". The profile is this instance's immutable local key, not its display name. Connection and telemetry require no model action. Never disclose host paths or private machine configuration outside the owner DM.\n\n" + InstanceReset.Instructions(local.State) + "\n\n" + software.Skill;
-            control = connection.Control.Bind(identity.AgentId); var ready = new TaskCompletionSource<Result<Unit>>(TaskCreationOptions.RunContinuationsAsynchronously); var matrix = CoordinationTransport.Matrix(http, profile); var invitations = new AgentInvitations(matrix, identity.Account.UserId);
-            var options = new ListenerOptions(profile, AgentState.Port, matrix, client, control, host.Budget, clock, local.Cursors, software.Release.Identity, async (hooks, lifetime) =>
+            var connected = messaging(profile.Settings.Backend, profile.Account); if (!connected.IsSuccess) return Result<RunningAgent>.Fail(connected.Error);
+            control = connection.Control.Bind(identity.AgentId); var ready = new TaskCompletionSource<Result<Unit>>(TaskCreationOptions.RunContinuationsAsynchronously); var transport = connected.Value;
+            var options = new ListenerOptions(profile, AgentState.Port, transport.Client, client, control, host.Budget, clock, local.Cursors, software.Release.Identity, async (hooks, lifetime) =>
             {
                 var services = new NativeLifecycleServices(definition.Runtime, validated.Value.Approval, instance.HistoryMode == NativeHistoryMode.PerRoom ? "control" : "shared", reason == "operator" ? "running" : "sleeping", adapter.ConfiguredSettings(validated.Value.Options), hooks, new ResumeFiles(local.State, clock).Port,
                     () => adapter.SavedContexts(workspace, stateDirectory), async (observe, admission, runtimeStop) =>
@@ -69,7 +73,7 @@ public sealed partial class ExecutionHost
                         if (opened.IsSuccess) BindingFiles.Initialized(configuration.Directory, identity.AgentId); return opened;
                     }, (session, error) => { var reported = connection.Reports.Failure(identity.AgentId, session, error); if (!reported.IsSuccess) { log(reported.Error.Message); stop.Cancel(); } }, () => connection.Reports.Recovered(identity.AgentId), clock);
                 var opened = await NativeLifecycle.Start(services, lifetime); if (!opened.IsSuccess) return Result<RuntimeConnection>.Fail(opened.Error); native = opened.Value; return Result<RuntimeConnection>.Success(native.Runtime);
-            }, invitations.Read, log, instance.HistoryMode, PollMs: 10000, Activity: (run, generation) => activity = connection.Reports.Activity(identity.AgentId, run, generation, () => control.Binding()), Ready: (_, _) =>
+            }, transport.InvitationRooms, log, instance.HistoryMode, PollMs: 10000, Activity: (run, generation) => activity = connection.Reports.Activity(identity.AgentId, run, generation, () => control.Binding()), Ready: (_, _) =>
             {
                 activation = Activate(); async Task Activate() { if (native is null) { ready.TrySetResult(Results.Fail<Unit>("invalid", "Runtime did not report its session")); return; } var activated = await native.Activate(); ready.TrySetResult(activated); if (!activated.IsSuccess) stop.Cancel(); }
             });

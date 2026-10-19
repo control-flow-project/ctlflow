@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 use std::{
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicI64, Ordering},
     },
     time::Duration,
 };
@@ -23,6 +23,10 @@ struct Network {
     with_message: bool,
     blocked: AtomicBool,
     fail_receipt: AtomicBool,
+    hold_receipt: AtomicBool,
+    receipt_entered: Notify,
+    revision: AtomicI64,
+    enabled: AtomicBool,
     release_error: Mutex<Option<ErrorCode>>,
     block_release: AtomicBool,
     changed: Notify,
@@ -63,14 +67,31 @@ impl Coordination for Network {
                     tokio::select! { _=stop.cancelled()=>return Err(error()),_=self.changed.notified()=>{} }
                 }
                 Ok(
-                    json!({"fleetId":self.fleet,"revision":1,"deliveryEnabled":true,"connection":{"status":"online"},"agentIds":[self.agent],"messages":if self.with_message {vec![json!({"messageId":self.message,"fleetId":self.fleet,"body":"review current instructions","createdAt":1,"expiresAt":60000,"sender":{"kind":"human","matrixUserId":"@owner:example.test"},"agentIds":[self.agent]})]} else {vec![]},"runtimeOperations":[]}),
+                    json!({"fleetId":self.fleet,"revision":self.revision.load(Ordering::SeqCst),"deliveryEnabled":self.enabled.load(Ordering::SeqCst),"connection":{"status":"online"},"agentIds":[self.agent],"messages":if self.with_message {vec![json!({"messageId":self.message,"fleetId":self.fleet,"body":"review current instructions","createdAt":1,"expiresAt":60000,"sender":{"kind":"human","backendUserId":"@owner:example.test"},"agentIds":[self.agent]})]} else {vec![]},"runtimeOperations":[]}),
                 )
             }
             OperationId::AcknowledgeFleetMessage => {
+                if self.hold_receipt.load(Ordering::SeqCst) {
+                    self.receipt_entered.notify_one();
+                    stop.cancelled().await;
+                    return Err(error());
+                }
                 if self.fail_receipt.swap(false, Ordering::SeqCst) {
                     return Err(error());
                 }
                 Ok(json!({"recorded":true}))
+            }
+            OperationId::ChangeFleetDelivery => {
+                let enabled = call
+                    .body
+                    .as_ref()
+                    .and_then(|body| body["enabled"].as_bool())
+                    .ok_or_else(error)?;
+                self.enabled.store(enabled, Ordering::SeqCst);
+                let revision = self.revision.fetch_add(1, Ordering::SeqCst) + 1;
+                Ok(
+                    json!({"fleetId":self.fleet,"revision":revision,"deliveryEnabled":enabled,"connection":{"status":"online","lastSeenAt":0}}),
+                )
             }
             _ => Err(error()),
         }
@@ -105,11 +126,76 @@ fn network(with_message: bool) -> Arc<Network> {
         with_message,
         blocked: AtomicBool::new(false),
         fail_receipt: AtomicBool::new(false),
+        hold_receipt: AtomicBool::new(false),
+        receipt_entered: Notify::new(),
+        revision: AtomicI64::new(1),
+        enabled: AtomicBool::new(true),
         release_error: Mutex::new(None),
         block_release: AtomicBool::new(false),
         changed: Notify::new(),
         calls: Mutex::new(Vec::new()),
     })
+}
+#[tokio::test(start_paused = true)]
+async fn cancelled_message_receipt_retains_authenticated_reporting_and_can_be_retried()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let network = network(true);
+    let fleet = Fleet::open(
+        network.clone(),
+        &network.fleet,
+        Secret::new("private".to_owned()),
+        "owner",
+        Arc::new(Operations),
+        CancellationToken::new(),
+    )?;
+    let control = fleet.bind(&network.agent)?;
+    fleet.start().await?;
+    observe(|| Ok(control.current()?.active)).await?;
+    let original = control.current()?;
+    let input = original
+        .input
+        .as_ref()
+        .ok_or("Directed input")?
+        .message_id
+        .clone();
+    network.hold_receipt.store(true, Ordering::SeqCst);
+    let acknowledger = Arc::new(Acknowledger {
+        fleet: fleet.clone(),
+        agent: network.agent.clone(),
+    });
+    let sender = acknowledger.clone();
+    let message = input.clone();
+    let cancellation = original.generation.clone();
+    let receipt = tokio::spawn(async move {
+        sender
+            .acknowledge(&message, "delivered", None, cancellation)
+            .await
+    });
+    network.receipt_entered.notified().await;
+    fleet.delivery(1, false, CancellationToken::new()).await?;
+    assert!(receipt.await?.is_err());
+    assert!(original.generation.is_cancelled());
+    assert!(
+        fleet.status()?.connected,
+        "Cancelled message receipt cannot disconnect authenticated reporting"
+    );
+    assert!(
+        !original.connection.is_cancelled(),
+        "Pending native questions retain their reporting generation"
+    );
+    assert_eq!(
+        control.current()?.binding.connection_id,
+        original.binding.connection_id
+    );
+    assert!(control.current()?.input.is_some());
+    network.hold_receipt.store(false, Ordering::SeqCst);
+    acknowledger
+        .acknowledge(&input, "delivered", None, CancellationToken::new())
+        .await?;
+    assert!(control.current()?.input.is_none());
+    assert!(fleet.status()?.connected);
+    fleet.close().await?;
+    Ok(())
 }
 #[tokio::test(start_paused = true)]
 async fn remote_release_refusal_cannot_block_idempotent_local_shutdown()

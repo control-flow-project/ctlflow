@@ -17,22 +17,22 @@ use diesel::prelude::*;
 #[derive(Queryable)]
 pub(crate) struct SummaryRow {
     principal_id: String,
-    matrix_user_id: String,
+    backend_user_id: String,
     kind: String,
     pub(crate) name: String,
     owner_id: String,
-    owner_matrix_id: String,
+    owner_backend_user_id: String,
 }
 
 impl SummaryRow {
     pub(crate) fn value(self, display_name: String) -> Result<PrincipalSummary> {
         Ok(PrincipalSummary {
             principal_id: self.principal_id,
-            matrix_user_id: self.matrix_user_id,
+            backend_user_id: self.backend_user_id,
             kind: rows::kind(&self.kind)?,
             display_name,
             owner_id: self.owner_id,
-            owner_matrix_id: self.owner_matrix_id,
+            owner_backend_user_id: self.owner_backend_user_id,
         })
     }
 }
@@ -103,11 +103,11 @@ impl DiscoveryRepository for Store {
             .filter(principal::id.eq_any(ids))
             .select((
                 principal::id,
-                principal::matrix_user_id,
+                principal::backend_user_id,
                 principal::kind,
                 member::display_name,
                 principal::id,
-                principal::matrix_user_id,
+                principal::backend_user_id,
             ))
             .load::<SummaryRow>(self.database.connection())
             .map_err(failure)?;
@@ -130,11 +130,11 @@ impl DiscoveryRepository for Store {
             .select((
                 (
                     principal::id,
-                    principal::matrix_user_id,
+                    principal::backend_user_id,
                     principal::kind,
                     agent_name::name,
                     agent::owner_id,
-                    owner.field(principal::matrix_user_id),
+                    owner.field(principal::backend_user_id),
                 ),
                 member::display_name,
             ))

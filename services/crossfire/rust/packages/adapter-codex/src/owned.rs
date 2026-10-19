@@ -384,7 +384,7 @@ impl<H: Hooks + 'static> Connection for CodexOwnedConnection<H> {
     async fn conversation(&self, room: &str, admission: Option<&Admission>) -> Result<Self> {
         let connection = self
             .histories
-            .open(self.histories.context(Some(room)), admission)
+            .open(&self.histories.context(Some(room)), admission)
             .await?;
         Ok(Self {
             histories: Arc::clone(&self.histories),
@@ -402,6 +402,12 @@ impl<H: Hooks + 'static> Connection for CodexOwnedConnection<H> {
     }
 }
 impl<H: Hooks + 'static> OwnedConnection for CodexOwnedConnection<H> {
+    async fn provider(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Result<crossfire_agent_core::owned_runtime::ProviderState> {
+        self.connection.provider(cancellation).await
+    }
     async fn activity(&self) -> Result<NativeActivity> {
         self.histories.activity().await
     }
@@ -420,11 +426,13 @@ impl<H: Hooks + 'static> TurnControl for CodexOwnedConnection<H> {
         room: Option<&str>,
         admission: Option<&Admission>,
     ) -> Result<Option<String>> {
-        let context = self.histories.context(room.or(Some(&self.context)));
+        let context = room
+            .map(|room| self.histories.context(Some(room)))
+            .unwrap_or_else(|| self.context.clone());
         let connection = if admission.is_some() {
-            Some(self.histories.open(context, admission).await?)
+            Some(self.histories.open(&context, admission).await?)
         } else {
-            self.histories.existing(context)?
+            self.histories.existing(&context)?
         };
         let turn = match connection {
             Some(connection) => connection.active_turn(None, admission).await?,

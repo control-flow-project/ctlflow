@@ -209,7 +209,7 @@ The shared actual-container bank builds packages once and then runs identical
 API/UI/data assertions on each backend. It additionally crosses operator/backend
 selection, runs image-owned readiness probes, tests transfer/import and rejects
 corrupt archives/mismatched labels before touching a running instance.
-The ordinary installed-products and historical migration banks remain required.
+The installed-products and current-schema migration banks remain required.
 
 The root packaging coordinator composes the unchanged Node/C# builder with the
 Rust-owned image producer. Rust reuses the common asset/migration Dockerfile,

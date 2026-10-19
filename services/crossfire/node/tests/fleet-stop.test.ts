@@ -14,7 +14,7 @@ import { mapFleet } from './support/map-fleet.js';
 
 test('stop completion survives historical runs and lease rollover without fabricating retirement proofs or blocking resume', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
-  const { fleet, instances, controller } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId, 2);
+  const { fleet, instances, controller } = await mapFleet(services, admin.actor, admin.member.principal.backendUserId, 2);
   const actor = value(authenticateController(services, controller.credential)), params = [services, actor, fleet.id] as const;
   const agents = instances.map(instance => instance.agentId!), runs = agents.map(() => randomUUID());
   const lastActivityAt = services.clock.now();
@@ -58,7 +58,7 @@ test('stop completion survives historical runs and lease rollover without fabric
 
 test('native stopped summaries respect per-agent scope and disappear when a later reporting generation starts', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
-  const { fleet, instances, controller } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId, 2);
+  const { fleet, instances, controller } = await mapFleet(services, admin.actor, admin.member.principal.backendUserId, 2);
   const actor = value(authenticateController(services, controller.credential)), params = [services, actor, fleet.id] as const;
   const agents = instances.map(instance => instance.agentId!), runs = agents.map(() => randomUUID());
   const report = { release: 'fixture', messagesDelivered: 0, statistics: null, controller, stopped: false };

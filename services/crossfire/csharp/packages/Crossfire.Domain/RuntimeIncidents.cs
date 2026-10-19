@@ -12,7 +12,7 @@ public sealed record IncidentPorts(AuthorizationPorts Authorization, UnitOfWork 
     Func<string, string, Result<IncidentNotification?>> Notification, Func<IncidentNotification, bool, Result<Unit>> SaveNotification,
     Func<long, Result<IReadOnlyList<IncidentNotification>>> Due, Func<string?, string?, Result<string?>> ControllerName,
     Func<string, Result<ManagementConversation?>> Conversation, Func<ManagementConversation, Result<Unit>> SaveConversation,
-    MatrixPorts Matrix, string PublicOrigin, string ServiceMatrixId);
+    MessagingPorts Messaging, string PublicOrigin, string ServiceBackendUserId);
 
 public static class RuntimeIncidents
 {
@@ -89,10 +89,10 @@ public static class RuntimeIncidents
             if (!previous.IsSuccess) return Result<Unit>.Fail(previous.Error);
             if (previous.Value is null)
             {
-                var named = await ports.Matrix.SetDisplayName(ports.ServiceMatrixId, "crossfire", cancellation);
+                var named = await ports.Messaging.SetDisplayName(ports.ServiceBackendUserId, "crossfire", cancellation);
                 if (!named.IsSuccess) continue;
             }
-            var conversation = await ports.Matrix.OwnerConversation(owner.Value.MatrixUserId, ports.ServiceMatrixId, previous.Value?.RoomId, null, cancellation);
+            var conversation = await ports.Messaging.OwnerConversation(owner.Value.BackendUserId, ports.ServiceBackendUserId, previous.Value?.RoomId, null, cancellation);
             if (!conversation.IsSuccess)
             {
                 var delayed = ports.Transaction.Run(() => ports.SaveNotification(notice with { NextAttemptAt = ports.Authorization.Now() + 30000 }, false));
@@ -104,7 +104,7 @@ public static class RuntimeIncidents
                 var saved = ports.Transaction.Run(() => ports.SaveConversation(new(owner.Value.Id, conversation.Value, ports.Authorization.Now())));
                 if (!saved.IsSuccess) continue;
             }
-            var sent = await ports.Matrix.SendNotice(ports.ServiceMatrixId, conversation.Value, "incident-" + notice.IncidentId + "-" + notice.Phase, notice.Body, owner.Value.MatrixUserId, cancellation);
+            var sent = await ports.Messaging.SendNotice(ports.ServiceBackendUserId, conversation.Value, "incident-" + notice.IncidentId + "-" + notice.Phase, notice.Body, owner.Value.BackendUserId, cancellation);
             var recorded = ports.Transaction.Run(() => ports.SaveNotification(notice with { NextAttemptAt = ports.Authorization.Now() + 30000, EventId = sent.IsSuccess ? sent.Value : null }, false));
             if (!recorded.IsSuccess) return recorded;
         }

@@ -29,10 +29,10 @@ pub struct Registry {
 }
 
 pub fn validate_context(context: &str) -> Result<()> {
-    if ["shared", "control"].contains(&context) {
+    if crossfire_kernel::history_context::valid(context) {
         Ok(())
     } else {
-        validation::room_id(&json!(context)).map(|_| ())
+        Err(invalid("Invalid native history context"))
     }
 }
 fn invalid(message: &str) -> Failure {
@@ -100,21 +100,8 @@ pub fn receipt(home: &Path, context: &str) -> PathBuf {
     home.join(format!("{REGISTRY}.{}.receipt", journal::digest(context)))
 }
 
-pub(crate) fn obsolete(name: &str) -> bool {
-    name == "crossfire-session.json"
-        || name.starts_with("crossfire-session.json.")
-        || name == "crossfire-contexts.json"
-        || name.starts_with("crossfire-contexts.json.")
-}
-
 pub fn load(home: &Path) -> Result<(Registry, bool)> {
     let directory = PrivateDirectory::open(home, false)?;
-    if directory.names(20_000)?.iter().any(|name| obsolete(name)) {
-        return Err(invalid(
-            "Native context metadata requires the explicit fleetd context migration before resume",
-        ));
-    }
-    crate::context_migration::validate_completed(home)?;
     let bytes = directory.read_optional(REGISTRY, MAXIMUM_BYTES)?;
     let exists = bytes.is_some();
     let registry = match bytes {

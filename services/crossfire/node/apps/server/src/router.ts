@@ -1,8 +1,10 @@
-import { createServer, request as forward, type ServerResponse, type IncomingHttpHeaders, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http';
 import { createReadStream, realpathSync, statSync } from 'node:fs';
 import { extname, resolve, sep } from 'node:path';
 
-type Routes = { publicOrigin: string; matrixOrigin: string; service: Server; web: string; element: string };
+type ServeFile = (root: string, path: string, response: ServerResponse, head: boolean) => void;
+type Routes = { publicOrigin: string; service: Server; web: string;
+  backend(request: IncomingMessage, response: ServerResponse, url: URL, serve: ServeFile): boolean };
 const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff': 'font/woff',
@@ -31,58 +33,16 @@ export function publicRouter(routes: Routes) {
       response.writeHead(403); response.end('Invalid host'); return;
     }
     const path = url.pathname;
-    const native = path.startsWith('/_matrix/');
-    let decodedPath = path;
-    try { if (native) decodedPath = decodeURIComponent(path); }
-    catch { response.writeHead(400); response.end('Invalid request path encoding'); return; }
-    const registration = path === '/_matrix/client/v3/register';
-    const registrationAuthentication = path === '/_matrix/client/v3/auth/org.crossfire.login.registration/fallback/web';
-    const exactPath = (request.url ?? '/').split('?')[0] === path;
-    const profileWrite = request.method === 'PUT' && /^\/_matrix\/client\/v3\/profile\/[^/]+\/displayname$/u.test(path);
-    if (request.method === 'PUT' && /^\/_matrix\/client\/(?:.*\/)?profile\/[^/]+\/displayname\/*$/u.test(decodedPath)
-      && (!profileWrite || !exactPath)) {
-      response.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      response.end(JSON.stringify({ errcode: 'M_UNRECOGNIZED', error: 'Unsupported profile path' })); return;
-    }
-    if (((!registration || !exactPath) && /^\/_matrix\/client\/(?:.*\/)?register\/*$/u.test(decodedPath))
-      || ((!registrationAuthentication || !exactPath) && /^\/_matrix\/client\/(?:.*\/)?auth\/org\.crossfire\.login\.registration\/fallback\/web\/*$/u.test(decodedPath))) {
-      response.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      response.end(JSON.stringify({ errcode: 'M_UNRECOGNIZED', error: 'Unsupported registration path' })); return;
-    }
-    const elementConfiguration = path === '/config.json' || path === '/config.' + new URL(routes.publicOrigin).hostname + '.json';
-    const management = profileWrite || path === '/_matrix/client/v3/user_directory/search' || registration || registrationAuthentication || elementConfiguration || path.startsWith('/api/') || path.startsWith('/onboarding/');
-    if (management) { routes.service.emit('request', request, response); return; }
-    if (native) {
-      const target = new URL(routes.matrixOrigin);
-      const headers: IncomingHttpHeaders = { ...request.headers, host: new URL(routes.publicOrigin).host };
-      delete headers['forwarded']; delete headers['x-forwarded-for']; delete headers['x-forwarded-host'];
-      const upstream = forward({ hostname: target.hostname, port: target.port, method: request.method,
-        path: request.url, headers, timeout: 110_000 }, incoming => {
-        response.writeHead(incoming.statusCode ?? 502, incoming.headers);
-        incoming.on('error', () => response.destroy()); incoming.pipe(response);
-      });
-      upstream.on('timeout', () => upstream.destroy(new Error('Upstream deadline')));
-      upstream.on('error', () => { if (!response.headersSent) response.writeHead(502); response.end(); });
-      response.on('close', () => upstream.destroy());
-      request.on('error', () => upstream.destroy()); request.pipe(upstream); return;
+    if (path.startsWith('/api/') || path.startsWith('/onboarding/')) { routes.service.emit('request', request, response); return; }
+    if (path !== '/manage' && !path.startsWith('/manage/')) {
+      if (!routes.backend(request, response, url, staticFile)) { response.writeHead(404); response.end('Not found'); }
+      return;
     }
     if (!['GET', 'HEAD'].includes(request.method ?? '')) { response.writeHead(405); response.end(); return; }
-    response.setHeader('Referrer-Policy', 'no-referrer');
-    response.setHeader('X-Frame-Options', 'DENY');
-    if (path === '/.well-known/matrix/client') {
-      response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-      const homeserver = { base_url: routes.publicOrigin };
-      response.end(JSON.stringify({ 'm.homeserver': homeserver })); return;
-    }
+    response.setHeader('Referrer-Policy', 'no-referrer'); response.setHeader('X-Frame-Options', 'DENY');
     if (path === '/manage' || path.startsWith('/manage/')) {
       response.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
       staticFile(routes.web, path.startsWith('/manage/assets/') ? path.slice('/manage'.length) : '/index.html', response, request.method === 'HEAD');
-    } else {
-      if (path === '/usercontent/' || path === '/usercontent/index.html') {
-        response.removeHeader('X-Frame-Options');
-        response.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
-      }
-      staticFile(routes.element, path, response, request.method === 'HEAD');
     }
   });
 }

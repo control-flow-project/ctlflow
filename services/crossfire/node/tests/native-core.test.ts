@@ -15,19 +15,19 @@ import { connectOwnerConversation } from '@ctlflow/crossfire-domain/owner-conver
 import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
 import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
 import { readRoom } from '@ctlflow/crossfire-domain/room/read-room';
-import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { API, segment } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { nativeOk, nativeRequest, type Native } from '@ctlflow/crossfire-adapter-matrix/http';
 import { success } from '@ctlflow/crossfire-kernel/result';
 import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 
 test("management core applies and verifies direct native authority", { timeout: 180_000 }, async scope => {
   const fixture = await nativeApplication(scope), { services, admin } = fixture;
-  const owner = await fixture.member('alice'), ownerId = owner.member.principal.matrixUserId;
+  const owner = await fixture.member('alice'), ownerId = owner.member.principal.backendUserId;
   await scope.test("human invitation creates one native identity without storing a password", async () => {
-    const resumed = value(await acceptMemberInvitation(services, owner.invitation.invitationId, owner.input, randomUUID(), 'RECOVERED_ELEMENT_DEVICE'));
+    const resumed = value(await acceptMemberInvitation(services, owner.invitation.invitationId, owner.input, randomUUID(), { deviceId: 'RECOVERED_ELEMENT_DEVICE' }));
     assert.equal(resumed.memberId, owner.accepted.memberId);
     assert.equal(resumed.account.userId, owner.accepted.account.userId);
-    assert.equal(value(await services.matrix.identify(resumed.account.accessToken)), ownerId);
+    assert.equal(value(await services.messaging.identify(resumed.account.accessToken)), ownerId);
     assert(!JSON.stringify(value(services.repositories.memberInvitation.find({ id: owner.invitation.invitationId }))).includes(owner.input.password));
     assert.deepEqual(value(await nativeOk({ base: fixture.native.base, token: owner.token }, "GET", API + "/joined_rooms")).joined_rooms, []);
   });
@@ -44,13 +44,13 @@ test("management core applies and verifies direct native authority", { timeout: 
   value(await nativeOk({ base: fixture.native.base, token: owner.token }, "POST", path + "/join", {}));
   const agent = await fixture.agent(owner.actor, 'holmes'), agentId = agent.id;
   assert.equal(value(services.repositories.ownerConversation.find({ agentId })), null);
-  assert.deepEqual(value(await services.matrix.joined(agent.matrixUserId)), []);
+  assert.deepEqual(value(await services.messaging.joined(agent.backendUserId)), []);
   value(await connectOwnerConversation(services, agent.actor, agentId));
   const ownerRoom = value(services.repositories.ownerConversation.find({ agentId }))!.roomId;
   const current = () => value(services.directory.agent(agentId))!;
   async function grant(accessMode: 'read' | 'reply' | 'custom' | 'none', powerLevel: number | null = null, muted = false) {
     return changeRoomGrant(services, owner.actor, { agentId, roomId: room, expectedRevision: current().principal.revision,
-      expectedGeneration: value(services.repositories.agentRoomGrant.find({ agentId, roomId: room }))?.generation ?? null, accessMode, powerLevel, muted }, randomUUID());
+      expectedGeneration: value(services.repositories.agentRoomGrant.find({ agentId, roomId: room }))?.generation ?? null, accessMode, nativeAccess: powerLevel === null ? null : { powerLevel }, muted }, randomUUID());
   }
   async function reconcile() { value(await reconcilePrincipal(services, agentId)); return reconcileRoomGrant(services, agentId, room); }
   const joined = async (client: Native) => { const response = await nativeOk(client, "GET", API + "/joined_rooms"); return response.ok ? success(response.value.joined_rooms) : response; };
@@ -70,7 +70,7 @@ test("management core applies and verifies direct native authority", { timeout: 
     value(await nativeOk(serviceClient, 'PUT', path + '/state/m.room.name', { name: 'Options Analysis' }));
     const nativeRoom = value(await readRoom(services, owner.actor, room, agentId));
     assert.equal(nativeRoom.name, 'Options Analysis');
-    assert.equal(nativeRoom.authority?.replyLevel, 0);
+    assert(nativeRoom.authority?.accessModes.includes('reply'));
     value(await grant('reply', null, false));
     value(await reconcile());
     value(await nativeOk(client!, 'PUT', path + '/send/m.room.message/normal-member', { msgtype: 'm.text', body: 'Reply works with native invite/call permissions' }));
@@ -109,11 +109,11 @@ test("management core applies and verifies direct native authority", { timeout: 
     assert.deepEqual((value(await joined(client!)) as string[]).sort(), [ownerRoom, room].sort());
     assert.equal(value(await nativeRequest(client!, "PUT", path + "/send/m.room.message/denied", { msgtype: "m.text", body: "no" })).status, 403);
     assert.equal(value(await nativeRequest(client!, "PUT", path + "/send/m.reaction/denied", { "m.relates_to": { rel_type: "m.annotation", event_id: "$unknown", key: "x" } })).status, 403);
-    assert.equal(value(await nativeRequest(client!, "POST", path + "/invite", { user_id: admin.member.principal.matrixUserId })).status, 403);
+    assert.equal(value(await nativeRequest(client!, "POST", path + "/invite", { user_id: admin.member.principal.backendUserId })).status, 403);
     const positive = value(await nativeOk(serviceClient, "PUT", path + "/send/m.room.message/positive", { msgtype: "m.text", body: "readable" }));
     value(await nativeOk(client!, "GET", path + "/event/" + segment(positive.event_id as string)));
     const applied = value(await nativeOk(serviceClient, "GET", path + "/state/m.room.power_levels"));
-    assert.equal((applied.users as Record<string, unknown>)[agent.matrixUserId], -1);
+    assert.equal((applied.users as Record<string, unknown>)[agent.backendUserId], -1);
     assert.equal(value(await nativeRequest(client!, "PUT", path + "/send/org.crossfire.review/denied", { arbitrary: "content" })).status, 403);
     const arbitrary = value(await nativeOk(serviceClient, "PUT", path + "/send/org.crossfire.review/positive", { arbitrary: "content" }));
     value(await nativeOk(client!, "GET", path + "/event/" + segment(arbitrary.event_id as string)));
@@ -123,7 +123,7 @@ test("management core applies and verifies direct native authority", { timeout: 
     value(await grant('reply', null, false));
     value(await reconcile());
     value(await nativeOk(client!, "PUT", path + "/send/m.room.message/allowed", { msgtype: "m.text", body: "allowed" }));
-    value(await nativeOk(serviceClient, "POST", path + "/kick", { user_id: agent.matrixUserId }));
+    value(await nativeOk(serviceClient, "POST", path + "/kick", { user_id: agent.backendUserId }));
     value(changeAgent(services, admin.actor, agentId, { expectedRevision: current().principal.revision, status: 'active' }, randomUUID()));
     value(await grant('reply', null, true));
     value(await reconcile());
@@ -147,7 +147,7 @@ test("management core applies and verifies direct native authority", { timeout: 
     const probePassword = "crossfire-deactivation-probe";
     const challenge = value(await nativeRequest(client!, "POST", API + "/account/password", { new_password: probePassword }));
     assert.equal(challenge.status, 401);
-    const account = { userId: agent.matrixUserId, password: value(services.repositories.agentCredential.find({ agentId }))!.provisioningPassword };
+    const account = { userId: agent.backendUserId, password: value(services.repositories.agentCredential.find({ agentId }))!.provisioningPassword };
     value(await nativeOk(client!, "POST", API + "/account/password", { new_password: probePassword,
       logout_devices: false, auth: { type: "m.login.password", session: challenge.body.session,
         identifier: { type: "m.id.user", user: account.userId }, password: account.password } }));
@@ -170,7 +170,7 @@ test("management core applies and verifies direct native authority", { timeout: 
   await scope.test("member revocation is guarded by current management authority", async () => {
     assert.equal(changeMember(services, admin.actor, admin.actor.principalId, { expectedRevision: 0, status: "revoked" }, randomUUID()).ok, false);
     assert.equal(changeMember(services, owner.actor, admin.actor.principalId, { expectedRevision: 0, status: "revoked" }, randomUUID()).ok, false);
-    assert.equal((await introduceEnrollment(services, { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: "@outsider:architecture.localhost",
+    assert.equal((await introduceEnrollment(services, { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: "@outsider:architecture.localhost",
       fleetKey: 'unknown-owner-fleet', controller: { name: 'Unknown owner controller' },
       instances: [{ instanceKey: "unknown", name: "unknown", coordinationPolicy: defaultCoordinationPolicy('@outsider:architecture.localhost') }] })).ok, false);
   });

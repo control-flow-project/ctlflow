@@ -75,8 +75,8 @@ export async function checkOnboardingPolicy(page: Page, memberPage: Page, origin
     await expect(confirmation.getByRole('heading', { name: 'Account confirmed', exact: true })).toBeVisible();
     const response = await completion;
     assert.equal(response.status, 200, response.body);
-    assert.equal((JSON.parse(response.body) as { user_id: string }).user_id, '@open-reader:' + services.instance.serverName);
-    const principal = value(services.directory.principalByMatrixId('@open-reader:' + services.instance.serverName))!;
+    assert.equal((JSON.parse(response.body) as { user_id: string }).user_id, '@open-reader:' + services.messaging.serviceUserId().split(':').slice(1).join(':'));
+    const principal = value(services.directory.principalByBackendUserId('@open-reader:' + services.messaging.serviceUserId().split(':').slice(1).join(':')))!;
     assert.equal(value(services.directory.member(principal.id))!.role.roleCode, 'member');
   } finally { await signupContext.close(); }
   await configure(page, origin, 'invitation', 'administrators');

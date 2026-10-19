@@ -161,6 +161,15 @@ impl<H: Hooks + 'static> TurnControl for Native<H> {
     }
 }
 impl<H: Hooks + 'static> OwnedConnection for Native<H> {
+    async fn provider(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Result<crossfire_agent_core::owned_runtime::ProviderState> {
+        match self {
+            Self::Codex(native) => native.provider(cancellation).await,
+            Self::Pi(native) => native.provider(cancellation).await,
+        }
+    }
     async fn activity(&self) -> Result<NativeActivity> {
         match self {
             Self::Codex(native) => native.activity().await,

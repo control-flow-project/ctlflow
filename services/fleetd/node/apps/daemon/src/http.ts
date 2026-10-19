@@ -53,6 +53,14 @@ async function body(request: IncomingMessage): Promise<Result<unknown>> {
 }
 export function createDaemonHttp(controller: FleetController, authenticationKey: string, stopped: () => void, logging: () => { loggingRetentionDays: number; loggingError: string | null }) {
   const routes = [
+    bind(operations.diagnostics, async (_params, scope) => {
+      const report = await controller.diagnostics(scope, AbortSignal.timeout(20000)), state = logging();
+      if (report.ok) report.value.checks.push({ id: 'controller.logging', scope: { fleetId: null, instanceKey: null },
+        status: state.loggingError === null ? 'pass' : 'fail', observedAt: report.value.checkedAt,
+        message: state.loggingError === null ? 'Controller logging is available' : 'Controller logging has failed',
+        remediation: state.loggingError === null ? null : 'Check disk space and controller log permissions' });
+      return reply(report);
+    }),
     bind(operations.setup, async (_params, _query, input) => reply(await controller.setup(input))),
     bind(operations.status, () => reply(success({ ...controller.status(), ...logging() }))),
     bind(operations.fleets, (_params, query) => paged(controller.list(), query)),

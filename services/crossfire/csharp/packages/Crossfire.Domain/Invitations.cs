@@ -3,7 +3,7 @@ using Crossfire.Kernel;
 namespace Crossfire.Domain;
 
 public sealed record MemberInvitation(string Id, string CreatedByMemberId, string ClaimHash, string RoleCode, string PrincipalKind,
-    long CreatedAt, long ExpiresAt, string? ConsumedByMemberId, long? RevokedAt, string? ClaimMatrixUserId, string? ClaimDisplayName, string? ClaimFingerprint);
+    long CreatedAt, long ExpiresAt, string? ConsumedByMemberId, long? RevokedAt, string? ClaimBackendUserId, string? ClaimDisplayName, string? ClaimFingerprint);
 public sealed record InvitationCreation(string InvitationId, string ClaimSecret, long ExpiresAt);
 public sealed record InvitationPorts(AuthorizationPorts Authorization, UnitOfWork Transaction, Func<Result<InstancePolicy?>> Policy,
     Func<string, Result<MemberInvitation?>> Find, Func<MemberInvitation, Result<Unit>> Insert, Func<MemberInvitation, Result<Unit>> Update,

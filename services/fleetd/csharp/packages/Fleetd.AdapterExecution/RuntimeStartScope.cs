@@ -30,6 +30,7 @@ public sealed class RuntimeStartScope : OwnedRuntimeConnection
     public RuntimeAttachment? Attachment => native.Attachment;
     public ValueTask<Result<IReadOnlyList<ContextAttachment>>> Attachments() => native.Attachments();
     public ValueTask<Result<NativeActivity>> Activity() => native.Activity();
+    public ValueTask<Result<ProviderState>> Provider(CancellationToken cancellation) => native.Provider(cancellation);
     public ValueTask<Result<bool>> Inspect() => native.Inspect();
     public ValueTask<Result<Unit>> Deliver(string text, string messageId, CancellationToken cancellation = default, InputPriority? priority = null) => native.Deliver(text, messageId, cancellation, priority);
     public ValueTask<Result<bool>> Settle(CancellationToken cancellation = default) => native.Settle(cancellation);

@@ -4,9 +4,9 @@ import { authorizeGrantChange } from '../room-access/authorize-change.js';
 import { commitGrantChange, recheckGrantAuthorization } from '../room-access/commit-change.js';
 import { reconcileRoomGrant } from '../room-access/reconcile-grant.js';
 import { recordEvent } from '../audit/record-event.js';
-import type { RoomInvitation } from '../port/matrix-authority.js';
+import type { RoomInvitation } from '../port/messaging.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'matrix' | 'unitOfWork' | 'roomOperations' | 'runtime'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'messaging' | 'unitOfWork' | 'roomOperations' | 'runtime'>;
 
 export function ensureOwnerConversation(services: Dependencies, agentId: string, invitation: RoomInvitation | null = null) {
   return services.roomOperations.run('agent:' + agentId, async () => {
@@ -16,21 +16,21 @@ export function ensureOwnerConversation(services: Dependencies, agentId: string,
     const identity = target.value;
     if (identity.principal.status !== 'active' || identity.owner.status !== 'active') return failure('forbidden', 'Agent and owner must be active');
     if (identity.application.appliedStatus !== 'active' || identity.application.errorCode !== null) return failure('unavailable', 'The native agent account is not ready');
-    if (invitation && (!invitation.direct || invitation.senderMatrixId !== identity.owner.matrixUserId
+    if (invitation && (!invitation.direct || invitation.senderBackendUserId !== identity.owner.backendUserId
       || previous.value && previous.value.roomId !== invitation.roomId)) return failure('conflict', 'The invitation does not identify this agent’s private owner conversation');
     if (invitation) {
-      const current = await services.matrix.invitation(identity.principal.matrixUserId, invitation.roomId);
+      const current = await services.messaging.invitation(identity.principal.backendUserId, invitation.roomId);
       if (!current.ok) return current;
       if (!current.value || !current.value.direct || current.value.eventId !== invitation.eventId
-        || current.value.senderMatrixId !== invitation.senderMatrixId) return failure('conflict', 'The owner DM invitation was withdrawn or replaced');
+        || current.value.senderBackendUserId !== invitation.senderBackendUserId) return failure('conflict', 'The owner DM invitation was withdrawn or replaced');
     }
     let roomId: string;
     if (invitation) {
-      const verified = await services.matrix.verifyOwnerConversation(identity.owner.matrixUserId, identity.principal.matrixUserId, invitation.roomId);
+      const verified = await services.messaging.verifyOwnerConversation(identity.owner.backendUserId, identity.principal.backendUserId, invitation.roomId);
       if (!verified.ok) return verified;
       roomId = invitation.roomId;
     } else {
-      const native = await services.matrix.ownerConversation(identity.owner.matrixUserId, identity.principal.matrixUserId, previous.value?.roomId ?? null, null);
+      const native = await services.messaging.ownerConversation(identity.owner.backendUserId, identity.principal.backendUserId, previous.value?.roomId ?? null, null);
       if (!native.ok) return native;
       roomId = native.value;
     }
@@ -38,16 +38,16 @@ export function ensureOwnerConversation(services: Dependencies, agentId: string,
     const grant = services.repositories.agentRoomGrant.find({ agentId, roomId });
     if (!grant.ok) return grant;
     const actor = { principalId: identity.owner.id, kind: 'human' as const,
-      authentication: { kind: 'native' as const, matrixUserId: identity.owner.matrixUserId } };
+      authentication: { kind: 'native' as const, backendUserId: identity.owner.backendUserId } };
     const proof = await authorizeGrantChange(services, actor, { agentId, roomId,
       expectedRevision: identity.principal.revision, expectedGeneration: grant.value?.generation ?? null,
-      accessMode: 'reply', powerLevel: null, muted: false }, invitation);
+      accessMode: 'reply', nativeAccess: null, muted: false }, invitation);
     if (!proof.ok) return proof;
     if (invitation) {
-      const current = await services.matrix.invitation(identity.principal.matrixUserId, roomId);
+      const current = await services.messaging.invitation(identity.principal.backendUserId, roomId);
       if (!current.ok) return current;
       if (!current.value || !current.value.direct || current.value.eventId !== invitation.eventId
-        || current.value.senderMatrixId !== invitation.senderMatrixId) return failure('conflict', 'The owner DM invitation was withdrawn or replaced');
+        || current.value.senderBackendUserId !== invitation.senderBackendUserId) return failure('conflict', 'The owner DM invitation was withdrawn or replaced');
     }
     const saved = services.unitOfWork.run(() => {
       const rechecked = recheckGrantAuthorization(services, actor, proof.value);
@@ -90,7 +90,7 @@ export function ensureOwnerConversation(services: Dependencies, agentId: string,
     const observation = services.repositories.roomGrantApplication.find({ agentId, roomId });
     if (!observation.ok) return observation;
     if (observation.value?.membership !== 'join' || observation.value.errorCode !== null) return failure('unavailable', observation.value?.errorMessage ?? 'Owner conversation read and reply is not ready');
-    const marked = await services.matrix.ownerConversation(identity.owner.matrixUserId, identity.principal.matrixUserId, roomId, null);
+    const marked = await services.messaging.ownerConversation(identity.owner.backendUserId, identity.principal.backendUserId, roomId, null);
     if (!marked.ok) return marked;
     if (marked.value !== roomId) return failure('conflict', 'The native owner conversation changed');
     const bound = services.unitOfWork.run(() => {

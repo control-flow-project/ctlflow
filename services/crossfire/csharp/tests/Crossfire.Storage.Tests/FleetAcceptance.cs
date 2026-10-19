@@ -61,7 +61,7 @@ public static class FleetAcceptance
         Equal(FleetMessages.Create(messages, actor, fixture.FleetId, Identity.Identifier(), "bad\u0001input", Identity.Identifier()).Error.Code, "invalid", "fleet message controls rejected");
         var snapshot = FleetMessages.Control(messages, controller, fixture.FleetId, replacement).Value;
         Equal(snapshot.Messages.Count, 1, "control exposes one pending broadcast");
-        Equal(snapshot.Messages[0].Sender.MatrixUserId, ((NativeAuthentication)owner.Authentication!).MatrixUserId, "broadcast source provenance");
+        Equal(snapshot.Messages[0].Sender.BackendUserId, ((NativeAuthentication)owner.Authentication!).BackendUserId, "broadcast source provenance");
         Equal(snapshot.Messages[0].AgentIds[0], fixture.AgentId, "broadcast exact target");
         Equal(FleetMessages.Receipt(messages, actor, fixture.FleetId, messageId, fixture.AgentId, "delivered", null).Error.Code, "forbidden", "human cannot fabricate native broadcast receipt");
         Equal(FleetMessages.Receipt(messages, controller, fixture.FleetId, messageId, fixture.AgentId, "failed", null).Error.Code, "invalid", "failure receipt requires error");

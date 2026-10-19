@@ -23,10 +23,10 @@ export function agentRoutes() {
       return result.ok ? reply(readWakePolicy(context.services, actor(context), params.agentId)) : result;
     }),
     bind(operations.deliveryPolicy, (context, params) => reply(deliveryPolicy(context.services, actor(context), params.agentId), value => ({
-      agentId: value.record.principal.id, matrixUserId: value.record.principal.matrixUserId, ownerMatrixId: value.record.owner.matrixUserId,
+      agentId: value.record.principal.id, backendUserId: value.record.principal.backendUserId, ownerBackendUserId: value.record.owner.backendUserId,
       status: value.record.principal.status, ownerStatus: value.record.owner.status, ownerConversation: value.ownerConversation,
-      roomGrants: value.grants.map(grant => ({ roomId: grant.roomId, accessMode: grant.accessMode, powerLevel: grant.powerLevel, muted: grant.muted })),
-      wakeMode: value.wake.mode, senderMatrixIds: value.wake.senders,
+      roomGrants: value.grants.map(grant => ({ roomId: grant.roomId, accessMode: grant.accessMode, nativeAccess: grant.nativeAccess, muted: grant.muted })),
+      wakeMode: value.wake.mode, senderBackendUserIds: value.wake.senders,
       maxMessageBytes: value.maxMessageBytes,
       fleetIdleTimeoutSeconds: value.fleetIdleTimeoutSeconds,
     }))),

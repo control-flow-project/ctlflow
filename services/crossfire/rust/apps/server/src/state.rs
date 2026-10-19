@@ -1,31 +1,32 @@
-use crate::{configuration::Configuration, http::public_request_budget::RequestBudget};
+use crate::configuration::Configuration;
 use crossfire_adapter_filesystem::{publication, release::Release};
-use crossfire_adapter_matrix::account::Authority;
+use crossfire_adapter_http::{messaging::MessagingHttp, public_request_budget::RequestBudget};
 use crossfire_adapter_sqlite::store::SharedStore;
 use crossfire_contracts::enrollment::Digest;
+use crossfire_domain::messaging::MessagingAuthority;
 use crossfire_kernel::{Result, identity};
+use std::sync::Arc;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 
-pub struct State {
+pub struct State<M: MessagingAuthority> {
     pub configuration: Configuration,
     pub repository: SharedStore,
-    pub matrix: Authority,
-    pub room_operations: crossfire_adapter_matrix::room_operations::Operations,
-    pub matrix_proxy: crossfire_adapter_http::NativeHttp,
+    pub messaging: Arc<M>,
+    pub backend: Arc<dyn MessagingHttp>,
+    pub room_operations: crossfire_adapter_runtime::room_operations::Operations,
     pub release: Release,
     pub assets: crate::assets::Assets,
     pub digest: Digest,
     pub publications: publication::Store,
     pub public_reads: std::sync::Arc<tokio::sync::Semaphore>,
     pub started_at: i64,
-    pub rate: RequestBudget,
-    pub registration: crate::registration::Registration,
-    pub changed: Notify,
+    pub rate: Arc<RequestBudget>,
+    pub changed: Arc<Notify>,
     pub stop: CancellationToken,
     pub diagnostics: std::sync::Arc<crossfire_adapter_filesystem::logging::Store>,
 }
-impl State {
+impl<M: MessagingAuthority> State<M> {
     pub fn publications(
         &self,
     ) -> crossfire_domain::publication::service::Service<
@@ -49,16 +50,12 @@ impl State {
     }
     pub fn rooms(
         &self,
-    ) -> crossfire_domain::room_access::service::Service<
-        '_,
-        SharedStore,
-        Authority,
-        fn() -> Result<i64>,
-    > {
+    ) -> crossfire_domain::room_access::service::Service<'_, SharedStore, M, fn() -> Result<i64>>
+    {
         static CLOCK: fn() -> Result<i64> = identity::now;
         crossfire_domain::room_access::service::Service {
             repository: &self.repository,
-            matrix: &self.matrix,
+            messaging: self.messaging.as_ref(),
             clock: &CLOCK,
         }
     }

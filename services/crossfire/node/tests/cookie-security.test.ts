@@ -3,7 +3,7 @@ import test from 'node:test';
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
 import { cookie, setCookie } from '../apps/server/src/http/transport.js';
-import { invitationCookie, setInvitationCookie } from '../apps/server/src/http/registration.js';
+import { invitationCookie, setInvitationCookie } from '../apps/server/src/http/invitation-cookie.js';
 
 const credential = 'a'.repeat(43), invitation = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.' + credential;
 

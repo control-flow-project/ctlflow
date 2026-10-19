@@ -6,6 +6,7 @@ public static class DaemonOperations
 {
     public static readonly IReadOnlyDictionary<string, RestOperation> All = new Dictionary<string, RestOperation>(StringComparer.Ordinal)
     {
+        ["diagnostics"] = new("diagnostics", "GET", "/api/diagnostics", "controller", 200, false, 1048576, false),
         ["setup"] = new("setup", "POST", "/api/setup", "controller", 200, false, 1048576, false),
         ["status"] = new("status", "GET", "/api/status", "controller", 200, false, 1048576, false),
         ["fleets"] = new("fleets", "GET", "/api/fleets", "controller", 200, true, 1048576, false),

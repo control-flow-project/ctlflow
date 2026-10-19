@@ -29,8 +29,8 @@ pub fn receipt(repo: &mut impl EnrollmentRepository, request: Request) -> Result
                     "Selected sender identity is missing",
                 )
             })?;
-            senders.push(crate::coordination::MatrixSender {
-                matrix_user_id: principal.matrix_user_id,
+            senders.push(crate::coordination::BackendSender {
+                backend_user_id: principal.backend_user_id,
                 include_agents: sender.include_agents,
             });
         }

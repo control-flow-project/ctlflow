@@ -2,7 +2,7 @@ use super::{authority, port::RoomRepository, values::*};
 use crate::{
     authorization::{AgentAction, authorize_agent},
     identity::{Actor, PrincipalKind, Status},
-    matrix::{MatrixAuthority, RoomInvitation, RoomPower},
+    messaging::{MessagingAuthority, RoomInvitation},
     port::{
         AgentRepository, Audit, AuthorizationRepository, CoreRepository, RepositoryAccess,
         UnitOfWork,
@@ -10,9 +10,9 @@ use crate::{
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, time::Clock};
 
-pub struct Service<'a, Access, Matrix, Time> {
+pub struct Service<'a, Access, Messaging, Time> {
     pub repository: &'a Access,
-    pub matrix: &'a Matrix,
+    pub messaging: &'a Messaging,
     pub clock: &'a Time,
 }
 pub struct Changed {
@@ -75,7 +75,8 @@ pub(super) fn commit(
                 && proof.invitation_event_id != grant.invitation_event_id
     });
     let access_changed = previous.as_ref().is_none_or(|grant| {
-        grant.intent.access != input.intent.access || grant.intent.power != input.intent.power
+        grant.intent.access != input.intent.access
+            || grant.intent.native_access != input.intent.native_access
     });
     let generation = if fresh {
         identity::id()
@@ -150,7 +151,7 @@ pub(super) fn commit(
     repo.audit(&audit)?;
     Ok(Some(grant))
 }
-impl<A: RepositoryAccess, M: MatrixAuthority, C: Clock> Service<'_, A, M, C>
+impl<A: RepositoryAccess, M: MessagingAuthority, C: Clock> Service<'_, A, M, C>
 where
     A::Repository: RoomRepository,
 {
@@ -164,22 +165,16 @@ where
             .repository
             .with(|repo| authority::prepare(repo, actor, input, invitation, self.clock.now()?))?;
         if authority::needs_native(&proof, actor) {
-            let facts = self.matrix.room(&acting, &input.room_id).await?;
-            if actor.kind == PrincipalKind::Agent
-                && matches!(facts.power,RoomPower::Level(level) if level < facts.invite_level)
-            {
+            let facts = self
+                .messaging
+                .authorize_room_access(&acting, &target, &input.room_id, &input.intent)
+                .await?;
+            if actor.kind == PrincipalKind::Agent && !facts.can_invite {
                 return Err(Failure::new(
                     ErrorCode::Forbidden,
-                    "The inviter lacks native Matrix invitation authority",
+                    "The inviter lacks backend invitation authority",
                 ));
             }
-            if facts.creator_ids.contains(&target) && input.intent.access != Access::Reply {
-                return Err(Failure::new(
-                    ErrorCode::Forbidden,
-                    "A native room creator can have read-and-reply access or no membership; its Matrix authority cannot be restricted",
-                ));
-            }
-            authority::requested_power(&facts, &input.intent)?;
             proof.native = Some(facts);
         }
         Ok(proof)

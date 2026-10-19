@@ -7,7 +7,7 @@ import { failure, success } from '@ctlflow/crossfire-kernel/result';
 export async function publishReport(profile: Profile, directory: string, title: string) {
   const source = await publicationSource(directory); if (!source.ok) return source;
   let client: ReturnType<typeof createClient>;
-  try { client = createClient({ origin: profile.settings.homeserver, token: profile.account.access_token }); }
+  try { client = createClient({ origin: profile.settings.server, token: profile.account.accessToken }); }
   catch { return failure('invalid', 'Report publication requires a valid HTTPS Crossfire origin or an explicit loopback development origin'); }
   const created = await client.call(operations.createPublication, {}, { title, files: source.value.files }); if (!created.ok) return created;
   const report = created.value.data;

@@ -4,11 +4,11 @@ using Crossfire.Kernel;
 
 namespace Crossfire.Domain;
 
-public sealed record MatrixWakeSender(string MatrixUserId, bool IncludeAgents);
-public sealed record CoordinationPolicy(string WakeMode, IReadOnlyList<MatrixWakeSender> Senders, IReadOnlyList<string> Permissions);
+public sealed record BackendWakeSender(string BackendUserId, bool IncludeAgents);
+public sealed record CoordinationPolicy(string WakeMode, IReadOnlyList<BackendWakeSender> Senders, IReadOnlyList<string> Permissions);
 public sealed record ControllerDescription(string Name, IReadOnlyDictionary<string, string> Metadata);
 public sealed record RosterInstance(string InstanceKey, string Name, string? AgentId, CoordinationPolicy CoordinationPolicy, string? AccessToken = null);
-public sealed record EnrollmentRoster(string OwnerMatrixId, string FleetKey, ControllerDescription Controller, IReadOnlyList<RosterInstance> Instances, string? ControllerCredential = null);
+public sealed record EnrollmentRoster(string OwnerBackendUserId, string FleetKey, ControllerDescription Controller, IReadOnlyList<RosterInstance> Instances, string? ControllerCredential = null);
 
 public static class RosterValues
 {
@@ -17,7 +17,7 @@ public static class RosterValues
     public static string Encode(EnrollmentRoster roster)
     {
         var output = new StringBuilder("{\"owner\":");
-        ProtocolJson.String(output, roster.OwnerMatrixId);
+        ProtocolJson.String(output, roster.OwnerBackendUserId);
         output.Append(",\"fleet\":"); ProtocolJson.String(output, roster.FleetKey);
         output.Append(",\"controller\":{\"name\":"); ProtocolJson.String(output, roster.Controller.Name);
         output.Append(",\"metadata\":[");
@@ -35,10 +35,10 @@ public static class RosterValues
             output.Append(','); if (instance.AgentId is null) output.Append("null"); else ProtocolJson.String(output, instance.AgentId);
             output.Append(",{\"wakeMode\":"); ProtocolJson.String(output, instance.CoordinationPolicy.WakeMode);
             output.Append(",\"senders\":["); var senderPosition = 0;
-            foreach (var sender in instance.CoordinationPolicy.Senders.OrderBy(sender => sender.MatrixUserId, Ordering))
+            foreach (var sender in instance.CoordinationPolicy.Senders.OrderBy(sender => sender.BackendUserId, Ordering))
             {
                 if (senderPosition++ != 0) output.Append(',');
-                output.Append("{\"matrixUserId\":"); ProtocolJson.String(output, sender.MatrixUserId);
+                output.Append("{\"backendUserId\":"); ProtocolJson.String(output, sender.BackendUserId);
                 output.Append(",\"includeAgents\":").Append(sender.IncludeAgents ? "true" : "false").Append('}');
             }
             output.Append("],\"permissions\":["); var permissionPosition = 0;

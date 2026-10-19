@@ -6,7 +6,6 @@ pub mod enrollment;
 pub mod fleet;
 pub mod fleet_read;
 pub mod identity;
-pub mod public_request_budget;
 pub mod publication;
 pub mod reply;
 pub mod rooms;

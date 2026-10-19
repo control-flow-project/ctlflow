@@ -12,24 +12,23 @@ export function listenerStatistics(self: string, now: () => number) {
   let startedAt = now(), sequence = 0, dropped = 0, pending: StatisticsBatch | null = null;
   function record(events: readonly ReceivedEvent[], delivered: boolean): void {
     for (const event of events) {
-      if (event.type !== 'm.room.message' || event.sender === self || isListenerNotice(event)) continue;
-      const previous = recent.get(event.event_id) ?? { observed: false, delivered: false };
+      if (event.type !== "message" || event.sender === self || isListenerNotice(event)) continue;
+      const eventKey = JSON.stringify([event.roomId, event.eventId]);
+      const previous = recent.get(eventKey) ?? { observed: false, delivered: false };
       if (delivered ? previous.delivered : previous.observed) continue;
-      const prefix = typeof event.content.msgtype === 'string' && event.content.msgtype.isWellFormed() ? truncateUtf16(event.content.msgtype, 100) : 'unknown';
+      const prefix = typeof event.content.kind === 'string' && event.content.kind.isWellFormed() ? truncateUtf16(event.content.kind, 100) : 'unknown';
       const messageType = label(prefix).ok ? prefix : 'unknown';
-      const key = JSON.stringify([event.room_id, event.sender, messageType]);
+      const key = JSON.stringify([event.roomId, event.sender, messageType]);
       let flow = flows.get(key);
       if (!flow && flows.size >= STATISTICS_LIMITS.flows) { dropped++; continue; }
-      if (!flow) { flow = { roomId: event.room_id, senderMatrixId: event.sender, messageType, observed: 0, delivered: 0,
+      if (!flow) { flow = { roomId: event.roomId, senderBackendUserId: event.sender, messageType, observed: 0, delivered: 0,
         contentBytes: 0, deliveredBytes: 0, attachmentBytes: 0, largestBytes: 0 }; }
       const next = { ...flow };
-      const bytes = event.content_file?.sourceBytes ?? Buffer.byteLength(JSON.stringify(event.content));
+      const bytes = event.contentFile?.sourceBytes ?? Buffer.byteLength(JSON.stringify(event.content));
       if (!previous.observed) {
         next.observed++; next.contentBytes += bytes; next.largestBytes = Math.max(next.largestBytes, bytes);
-        const info = event.content.info;
-        const size = info && typeof info === 'object' && !Array.isArray(info) ? info.size : undefined;
-        if (event.content_file) next.attachmentBytes += event.content_file.attachmentBytes;
-        else if (typeof size === 'number' && Number.isSafeInteger(size) && size >= 0) next.attachmentBytes += size;
+        if (event.contentFile) next.attachmentBytes += event.contentFile.attachmentBytes;
+        else next.attachmentBytes += event.content.attachments.reduce((total, attachment) => total + (attachment.bytes ?? 0), 0);
       }
       if (delivered) {
         next.delivered++; next.deliveredBytes += bytes;
@@ -37,7 +36,7 @@ export function listenerStatistics(self: string, now: () => number) {
       if (!count(next.observed) || !count(next.delivered) || !count(next.contentBytes) || !count(next.deliveredBytes)
         || !count(next.attachmentBytes) || !count(next.largestBytes)) { dropped++; continue; }
       flows.set(key, next);
-      recent.delete(event.event_id); recent.set(event.event_id, { observed: true, delivered: previous.delivered || delivered });
+      recent.delete(eventKey); recent.set(eventKey, { observed: true, delivered: previous.delivered || delivered });
       if (recent.size > STATISTICS_LIMITS.recentEvents) recent.delete(recent.keys().next().value!);
     }
   }

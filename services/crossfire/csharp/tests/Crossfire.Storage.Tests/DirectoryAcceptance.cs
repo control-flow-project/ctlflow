@@ -44,8 +44,8 @@ public static class DirectoryAcceptance
         Equal(FleetReads.Change(fleets, actor, fixture.FleetId, 0, "stale", new("controller", new Dictionary<string, string>()), Identity.Identifier()).Error.Code, "stale_revision", "stale fleet edits fail without deleting metadata");
         Equal(FleetReads.Change(fleets, actor, fixture.FleetId, 1, "Reviewed directory fleet", new("Reviewed controller", new Dictionary<string, string>()), Identity.Identifier()).Value.Metadata.Count, 0, "replaced metadata does not preserve deleted keys");
         Equal(FleetReads.List(fleets, owner, 1, 100, owner.PrincipalId, "reviewed directory").Value.Items.Any(value => value.Record.Id == fixture.FleetId), true, "fleet search is case-insensitive in SQL");
-        var disclosure = Discovery.Resolve(DiscoveryQueries.Ports(context, () => now), owner, [record.Value.Record.Principal.MatrixUserId, "@unknown:example.test"]).Value;
-        Equal(disclosure[0].OwnerMatrixId, record.Value.Record.Owner.MatrixUserId, "identity discovery includes registered agent owner");
+        var disclosure = Discovery.Resolve(DiscoveryQueries.Ports(context, () => now), owner, [record.Value.Record.Principal.BackendUserId, "@unknown:example.test"]).Value;
+        Equal(disclosure[0].OwnerBackendUserId, record.Value.Record.Owner.BackendUserId, "identity discovery includes registered agent owner");
         Equal(disclosure[1].Kind, "unknown", "unregistered names cannot become authority");
     }
 }

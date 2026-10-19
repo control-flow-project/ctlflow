@@ -9,17 +9,17 @@ public static class Onboarding
 {
     public static Result<SetupDescriptor> ParseDescriptor(JsonElement value)
     {
-        if (!Validation.Fields(value, ["schemaVersion", "server", "ownerMatrixId", "package", "instructions"]).IsSuccess || !value.GetProperty("schemaVersion").TryGetInt32(out var version) || version != 1 || !Validation.Fields(value.GetProperty("package"), ["name", "version"]).IsSuccess || WireJson.Text(value.GetProperty("package"), "name") != "@ctlflow/fleet") return Results.Fail<SetupDescriptor>("invalid", "Invalid Crossfire setup descriptor");
-        var server = WireJson.Text(value, "server"); var owner = WireJson.Text(value, "ownerMatrixId"); var package = WireJson.Text(value.GetProperty("package"), "version"); var instructions = Validation.PlainText(value.GetProperty("instructions"), 131072);
+        if (!Validation.Fields(value, ["schemaVersion", "server", "ownerBackendUserId", "package", "instructions"]).IsSuccess || !value.GetProperty("schemaVersion").TryGetInt32(out var version) || version != 1 || !Validation.Fields(value.GetProperty("package"), ["name", "version"]).IsSuccess || WireJson.Text(value.GetProperty("package"), "name") != "@ctlflow/fleet") return Results.Fail<SetupDescriptor>("invalid", "Invalid Crossfire setup descriptor");
+        var server = WireJson.Text(value, "server"); var owner = WireJson.Text(value, "ownerBackendUserId"); var package = WireJson.Text(value.GetProperty("package"), "version"); var instructions = Validation.PlainText(value.GetProperty("instructions"), 131072);
         return server is not null && Validation.Origin(server).IsSuccess && owner is not null && Validation.UserId(owner) && package is not null && ReleaseValues.Version(package) && instructions.IsSuccess ? Result<SetupDescriptor>.Success(new(server, owner, package, instructions.Value)) : Results.Fail<SetupDescriptor>("invalid", "Invalid setup authority, package version or instructions");
     }
     private static string Quote(string value) => "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
-    public static string DescriptorUrl(string origin, string owner) => origin + "/onboarding/setup.json?ownerMatrixId=" + Uri.EscapeDataString(owner)
+    public static string DescriptorUrl(string origin, string owner) => origin + "/onboarding/setup.json?ownerBackendUserId=" + Uri.EscapeDataString(owner)
         .Replace("%21", "!", StringComparison.Ordinal).Replace("%27", "'", StringComparison.Ordinal).Replace("%28", "(", StringComparison.Ordinal).Replace("%29", ")", StringComparison.Ordinal).Replace("%2A", "*", StringComparison.Ordinal);
     public static JsonElement Descriptor(string origin, string owner, string version, string instructions)
         => WireJson.Object(writer =>
         {
-            writer.WriteNumber("schemaVersion", 1); writer.WriteString("server", origin); writer.WriteString("ownerMatrixId", owner);
+            writer.WriteNumber("schemaVersion", 1); writer.WriteString("server", origin); writer.WriteString("ownerBackendUserId", owner);
             writer.WriteStartObject("package"); writer.WriteString("name", "@ctlflow/fleet"); writer.WriteString("version", version); writer.WriteEndObject(); writer.WriteString("instructions", instructions);
         });
     public static string Command(string origin, string owner, string version)
@@ -45,11 +45,11 @@ public static class Onboarding
         foreach (var line in new[]
         {
             "# Set up a crossfire agent", "",
-            "crossfire lets people message managed agents through Matrix. fleetd owns each agent’s native session and the shared listener; a single agent is an ordinary one-agent fleet.",
+            "crossfire lets people message managed agents through Messaging. fleetd owns each agent’s native session and the shared listener; a single agent is an ordinary one-agent fleet.",
             "These instructions are for the coding harness performing setup. Run them on the computer where native agents will execute; Docker hosts the server only. Install only the pinned Node.js @ctlflow/fleet CLI and its exact Node.js fleetd dependency into private user-owned storage. The selected Codex/Pi installation and native login must already exist there. Do not install or upgrade a harness or copy provider credentials into Docker. Fleet attachment does not require .NET or a C# controller. Do not attach this coding session; fleetd starts a separate managed native session.",
             "Server: " + origin, "Verified human owner: " + owner, "", "## 1. Check prerequisites",
             "Use the human-selected project directory on Linux or macOS. Requires Node.js 26+, npm, Git, Bash and an existing supported native harness with provider login. Codex is the default; Earendil Pi requires explicit ordinary fleet configuration. Check node --version, npm --version, git --version and the selected harness version. The controller performs model-free native capability and authentication checks before enrolling or starting an agent.",
-            "If a prerequisite or provider login is missing, stop and report it. The user must install missing prerequisites or complete the selected harness native login before repeating setup. Never install or upgrade Codex/Pi as part of these instructions. Official prerequisite documentation: https://nodejs.org/en/download ; https://git-scm.com/downloads ; https://developers.openai.com/codex/cli . Never request Matrix passwords, administrator tokens, ports or session IDs. Do not use sudo, change host services or install global skills.",
+            "If a prerequisite or provider login is missing, stop and report it. The user must install missing prerequisites or complete the selected harness native login before repeating setup. Never install or upgrade Codex/Pi as part of these instructions. Official prerequisite documentation: https://nodejs.org/en/download ; https://git-scm.com/downloads ; https://developers.openai.com/codex/cli . Never request Messaging passwords, administrator tokens, ports or session IDs. Do not use sudo, change host services or install global skills.",
             "This coding session only performs setup. It stays independent: its process, conversation and project-native settings are not adopted or imported. fleetd creates a separate managed session. Subsequent resume and wake reuse that managed session’s saved histories. Linux inert-provider checks are not macOS or paid-provider certification.",
             "", "## 2. Run the complete setup command",
             "Inspect and run this Bash command from the project directory. It installs the pinned public CLI/controller into private user-owned storage and runs one noninteractive setup operation. It asks no naming, model, controller or room questions. Stable names and state are derived and persisted automatically.",

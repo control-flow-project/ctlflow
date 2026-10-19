@@ -39,14 +39,14 @@ public static class LoggingRetention
     {
         var audit = context.AuditEvent.AsNoTracking().Where(row => row.CreatedAt < cutoff).OrderBy(row => row.CreatedAt).ThenBy(row => row.Id).Take(limit).Select(row => row.Id).ToArray();
         context.AuditEvent.Where(row => audit.Contains(row.Id)).ExecuteDelete();
-        var notices = context.WakeNotice.AsNoTracking().Where(row => row.Status != "pending" && (row.SentAt ?? row.ReservedAt) < cutoff).OrderBy(row => row.ReservedAt).Take(limit).Select(row => new { row.ReceiverAgentId, row.EventId }).ToArray();
+        var notices = context.WakeNotice.AsNoTracking().Where(row => row.Status != "pending" && (row.SentAt ?? row.ReservedAt) < cutoff).OrderBy(row => row.ReservedAt).Take(limit).Select(row => new { row.ReceiverAgentId, row.RoomId, row.EventId }).ToArray();
         foreach (var notice in notices)
-        { var agent = notice.ReceiverAgentId; var eventId = notice.EventId; context.WakeNotice.Where(row => row.ReceiverAgentId == agent && row.EventId == eventId).ExecuteDelete(); }
+        { var agent = notice.ReceiverAgentId; var roomId = notice.RoomId; var eventId = notice.EventId; context.WakeNotice.Where(row => row.ReceiverAgentId == agent && row.RoomId == roomId && row.EventId == eventId).ExecuteDelete(); }
         var wakes = context.WakeDelivery.AsNoTracking().Where(row => row.Status != "pending" && (row.DeliveredAt ?? row.CreatedAt) < cutoff).OrderBy(row => row.CreatedAt).ThenBy(row => row.Id).Take(limit).Select(row => row.Id).ToArray();
         context.WakeDelivery.Where(row => wakes.Contains(row.Id)).ExecuteDelete();
         var messages = context.FleetMessage.AsNoTracking().Where(row => row.ExpiresAt < cutoff).OrderBy(row => row.ExpiresAt).ThenBy(row => row.Id).Take(limit).Select(row => row.Id).ToArray();
         context.FleetMessage.Where(row => messages.Contains(row.Id)).ExecuteDelete();
-        var invitations = context.MemberInvitation.AsNoTracking().Where(row => row.ExpiresAt < cutoff && (row.ConsumedByMemberId != null || row.ClaimMatrixUserId == null)).OrderBy(row => row.ExpiresAt).ThenBy(row => row.Id).Take(limit).Select(row => row.Id).ToArray();
+        var invitations = context.MemberInvitation.AsNoTracking().Where(row => row.ExpiresAt < cutoff && (row.ConsumedByMemberId != null || row.ClaimBackendUserId == null)).OrderBy(row => row.ExpiresAt).ThenBy(row => row.Id).Take(limit).Select(row => row.Id).ToArray();
         context.MemberInvitation.Where(row => invitations.Contains(row.Id)).ExecuteDelete();
         var archives = context.EnrollmentArchive.AsNoTracking().Where(row => row.CreatedAt < cutoff).OrderBy(row => row.CreatedAt).ThenBy(row => row.Id).Take(limit).Select(row => row.Id).ToArray();
         context.EnrollmentArchivePermission.Where(row => archives.Contains(row.RequestId)).ExecuteDelete();

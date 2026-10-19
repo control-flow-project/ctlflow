@@ -122,18 +122,18 @@ fn discovery_is_paginated_filtered_and_resolves_unknown_identities_without_adopt
         NOW,
     )?;
     assert_eq!(values[0].kind, None);
-    assert_eq!(values[0].owner_matrix_id, None);
+    assert_eq!(values[0].owner_backend_user_id, None);
     assert_eq!(
-        values[1].owner_matrix_id.as_deref(),
+        values[1].owner_backend_user_id.as_deref(),
         Some("@owner:example.test")
     );
     assert_eq!(values[1].owner_display_name.as_deref(), Some("owner"));
     assert_eq!(values[2].kind, Some(PrincipalKind::Human));
-    assert_eq!(values[2].owner_matrix_id, None);
+    assert_eq!(values[2].owner_backend_user_id, None);
     assert!(
         scenario
             .store
-            .principal_by_matrix_id("@unknown:example.test")?
+            .principal_by_backend_user_id("@unknown:example.test")?
             .is_none()
     );
     assert!(

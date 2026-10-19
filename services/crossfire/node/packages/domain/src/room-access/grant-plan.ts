@@ -11,7 +11,7 @@ export type GrantPlan = { fleetId: string; agents: { instanceKey: string; grants
 export type GrantPlanSnapshot = { agentId: string; revision: number; grants: { roomId: string; generation: string; revision: number }[] };
 export type GrantPlanChange = GrantAuthorization & { agentName: string; instanceKey: string; roomName: string; roomAlias: string | null };
 export type GrantPlanPreview = { digest: string; fleetId: string; fleetRevision: number; snapshots: GrantPlanSnapshot[]; changes: GrantPlanChange[] };
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'matrix' | 'unitOfWork' | 'runtime'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'messaging' | 'unitOfWork' | 'runtime'>;
 
 export async function previewGrantPlan(services: Dependencies, actor: Actor, plan: GrantPlan): Promise<Result<GrantPlanPreview>> {
   if (actor.kind !== 'human') return failure('forbidden', 'Only a human can review a fleet room plan');
@@ -39,7 +39,7 @@ export async function previewGrantPlan(services: Dependencies, actor: Actor, pla
     const rooms = [...new Set([...current.value.filter(grant => grant.roomId !== conversation.value?.roomId).map(grant => grant.roomId), ...proposed.grants.map(grant => grant.roomId)])].sort();
     for (const roomId of rooms) {
       const previous = current.value.find(grant => grant.roomId === roomId);
-      const next = proposed.grants.find(grant => grant.roomId === roomId) ?? { accessMode: 'none' as const, powerLevel: null, muted: false };
+      const next = proposed.grants.find(grant => grant.roomId === roomId) ?? { accessMode: 'none' as const, nativeAccess: null, muted: false };
       const authorized = await authorizeGrantChange(services, actor, { ...next, agentId: binding.value.agentId, roomId,
         expectedRevision: target.value.principal.revision, expectedGeneration: previous?.generation ?? null });
       if (!authorized.ok) return authorized;
@@ -53,8 +53,7 @@ export async function previewGrantPlan(services: Dependencies, actor: Actor, pla
   if (current.value?.revision !== fleet.value.revision) return failure('conflict', 'Fleet changed during review');
   const digest = services.identity.hash(JSON.stringify({ fleetId: plan.fleetId, fleetRevision: fleet.value.revision, snapshots,
     changes: changes.map(change => ({ input: change.input, authorizerId: change.authorizerId,
-      native: change.native ? { powerLevel: change.native.powerLevel, creator: change.native.creator,
-        readLevel: change.native.readLevel, replyLevel: change.native.replyLevel } : null })) }));
+      native: change.native })) }));
   return success({ digest, fleetId: fleet.value.id, fleetRevision: fleet.value.revision, snapshots, changes });
 }
 export async function applyGrantPlan(services: Dependencies, actor: Actor,

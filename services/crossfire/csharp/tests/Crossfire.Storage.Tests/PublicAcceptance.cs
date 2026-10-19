@@ -1,3 +1,4 @@
+using Crossfire.AdapterMatrix;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
@@ -22,7 +23,11 @@ public static class PublicAcceptance
         var assets = PrivateFiles.Directory(Path.Combine(web, "assets")); PrivateFiles.Write(Path.Combine(assets, "app.js"), "console.log('shared');"u8, 1024);
         File.CreateSymbolicLink(Path.Combine(assets, "escape.js"), Path.Combine(root, "secret")); PrivateFiles.Write(Path.Combine(root, "secret"), "private"u8, 1024);
         using var proxy = new MatrixProxy();
-        await using var app = PublicApplication.Build(state, "http://127.0.0.1:0", web, element, proxy, () => { });
+        var native = MatrixSettings.Read(state.Configuration.Messaging, state.Configuration.Instance, state.Configuration.Administrator).Value;
+        var presentation = ElementPresentation.Read(element, state.Configuration.PublicOrigin);
+        MessagingHttpFactory handler = (admission, changed) => { var current = NativeWeb.Create(MessagingComposition.Web(state, native), presentation, admission, changed); return (http, path, request) => current(http, path, request); };
+        await using var app = PublicApplication.Build(state, "http://127.0.0.1:0", web, handler,
+            (http, path, raw, api, serve) => NativeWeb.Public(http, path, raw, state.Configuration.PublicOrigin, native.Origin, element, proxy, api, serve), () => { });
         await app.StartAsync(); using var client = NativeHttp.Client(); var origin = app.Urls.Single();
         async Task<string> Read(string method, string path, int expected, string host = "127.0.0.1", string? cookie = null)
         {
@@ -53,7 +58,7 @@ public static class PublicAcceptance
         await Read("HEAD", "/config.127.0.0.1.json", 200);
         using (var context = state.Storage.Open())
         {
-            var principal = MemberQueries.ByMatrixId(context, owner).Value!;
+            var principal = MemberQueries.ByBackendUserId(context, owner).Value!;
             var created = Invitations.Create(InvitationCommands.Ports(context, state.Now), new(principal.Id, "human", new NativeAuthentication(owner)), "member", 600, Crossfire.Kernel.Identity.Identifier());
             Equal(created.IsSuccess, true, "native signup fixture creates a current invitation");
             var cookie = InvitationCookies.Name + "=" + created.Value.InvitationId + "." + created.Value.ClaimSecret;
@@ -64,12 +69,12 @@ public static class PublicAcceptance
         }
         await Read("PUT", "/config.json", 405);
         await Read("GET", "/onboarding/setup.json", 400);
-        await Read("GET", "/onboarding/setup.json?ownerMatrixId=" + Uri.EscapeDataString(owner) + "&unknown=true", 400);
-        await Read("GET", "/onboarding/setup.json?ownerMatrixId=%40unknown%3Aexample.test", 403);
-        var descriptorPath = "/onboarding/setup.json?ownerMatrixId=" + Uri.EscapeDataString(owner);
+        await Read("GET", "/onboarding/setup.json?ownerBackendUserId=" + Uri.EscapeDataString(owner) + "&unknown=true", 400);
+        await Read("GET", "/onboarding/setup.json?ownerBackendUserId=%40unknown%3Aexample.test", 403);
+        var descriptorPath = "/onboarding/setup.json?ownerBackendUserId=" + Uri.EscapeDataString(owner);
         using (var descriptor = JsonDocument.Parse(await Read("GET", descriptorPath, 200)))
         {
-            Equal(descriptor.RootElement.GetProperty("ownerMatrixId").GetString(), owner, "setup descriptor binds a registered human identity");
+            Equal(descriptor.RootElement.GetProperty("ownerBackendUserId").GetString(), owner, "setup descriptor binds a registered human identity");
             Equal(descriptor.RootElement.GetProperty("package").GetProperty("version").GetString(), state.Release.Version, "setup uses the exact coordinated public release");
             Equal(descriptor.RootElement.GetProperty("package").GetProperty("name").GetString(), "@ctlflow/fleet", "internal modules are not published by onboarding");
         }

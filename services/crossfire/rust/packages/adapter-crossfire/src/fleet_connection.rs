@@ -77,7 +77,7 @@ impl<C: Coordination + 'static, E: Executor + 'static> Fleet<C, E> {
         stop: CancellationToken,
     ) -> Result<Arc<Self>> {
         check::identifier(&json!(fleet))?;
-        check::matrix_user_id(&json!(owner))?;
+        check::backend_user_id(&json!(owner))?;
         let value = Arc::new(Self {
             coordination,
             executor,
@@ -408,12 +408,13 @@ impl<C: Coordination + 'static, E: Executor + 'static> Fleet<C, E> {
             ("agentId".to_owned(), agent.to_owned()),
         ]);
         call.body = Some(json!({"status":status,"errorMessage":error}));
-        if let Err(error) = self.coordination.call(&call, stop.clone()).await {
-            self.disconnect(&error.message)?;
-            return Err(error);
-        }
+        let result = self.coordination.call(&call, stop.clone()).await;
         if stop.is_cancelled() {
             return Err(failure("Controller acknowledgment was cancelled"));
+        }
+        if let Err(error) = result {
+            self.disconnect(&error.message)?;
+            return Err(error);
         }
         self.state
             .lock()

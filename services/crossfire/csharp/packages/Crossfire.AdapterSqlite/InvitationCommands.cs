@@ -10,7 +10,7 @@ public static class InvitationCommands
     {
         context.MemberInvitation.Add(new() { Id = invitation.Id, CreatedByMemberId = invitation.CreatedByMemberId, ClaimHash = invitation.ClaimHash,
             RoleCode = invitation.RoleCode, PrincipalKind = invitation.PrincipalKind, CreatedAt = invitation.CreatedAt, ExpiresAt = invitation.ExpiresAt,
-            ConsumedByMemberId = invitation.ConsumedByMemberId, RevokedAt = invitation.RevokedAt, ClaimMatrixUserId = invitation.ClaimMatrixUserId,
+            ConsumedByMemberId = invitation.ConsumedByMemberId, RevokedAt = invitation.RevokedAt, ClaimBackendUserId = invitation.ClaimBackendUserId,
             ClaimDisplayName = invitation.ClaimDisplayName, ClaimFingerprint = invitation.ClaimFingerprint });
         context.SaveChanges(); return Results.Done();
     }
@@ -22,7 +22,7 @@ public static class InvitationCommands
         row.CreatedByMemberId = invitation.CreatedByMemberId; row.ClaimHash = invitation.ClaimHash; row.RoleCode = invitation.RoleCode;
         row.PrincipalKind = invitation.PrincipalKind; row.CreatedAt = invitation.CreatedAt; row.ExpiresAt = invitation.ExpiresAt;
         row.ConsumedByMemberId = invitation.ConsumedByMemberId; row.RevokedAt = invitation.RevokedAt;
-        row.ClaimMatrixUserId = invitation.ClaimMatrixUserId; row.ClaimDisplayName = invitation.ClaimDisplayName; row.ClaimFingerprint = invitation.ClaimFingerprint;
+        row.ClaimBackendUserId = invitation.ClaimBackendUserId; row.ClaimDisplayName = invitation.ClaimDisplayName; row.ClaimFingerprint = invitation.ClaimFingerprint;
         context.SaveChanges(); return Results.Done();
     }
 

@@ -2,8 +2,8 @@ using Crossfire.Kernel;
 
 namespace Crossfire.Domain;
 
-public sealed record PrincipalSummary(string PrincipalId, string MatrixUserId, string Kind, string DisplayName, string OwnerId, string OwnerMatrixId);
-public sealed record PrincipalIdentity(string MatrixUserId, string Kind, string? OwnerMatrixId, string? DisplayName, string? OwnerDisplayName);
+public sealed record PrincipalSummary(string PrincipalId, string BackendUserId, string Kind, string DisplayName, string OwnerId, string OwnerBackendUserId);
+public sealed record PrincipalIdentity(string BackendUserId, string Kind, string? OwnerBackendUserId, string? DisplayName, string? OwnerDisplayName);
 public sealed record Role(string Code, string PrincipalKind, string Label);
 public sealed record Permission(string Code, string GrantScope, string Description);
 public sealed record DiscoveryRequest(int Page, int PageSize, string Kind, string Search, string? ExcludeId = null);
@@ -23,16 +23,16 @@ public static class Discovery
         return authority.IsSuccess ? ports.Principals(input) : Result<Page<PrincipalSummary>>.Fail(authority.Error);
     }
 
-    public static Result<IReadOnlyList<PrincipalIdentity>> Resolve(DiscoveryPorts ports, Actor actor, IReadOnlyList<string> matrixUserIds)
+    public static Result<IReadOnlyList<PrincipalIdentity>> Resolve(DiscoveryPorts ports, Actor actor, IReadOnlyList<string> backendUserIds)
     {
         var authority = Authorization.Require(ports.Authorization, actor, "principal.read");
         if (!authority.IsSuccess) return Result<IReadOnlyList<PrincipalIdentity>>.Fail(authority.Error);
-        if (matrixUserIds.Count is < 1 or > 100 || matrixUserIds.Distinct(StringComparer.Ordinal).Count() != matrixUserIds.Count || matrixUserIds.Any(value => !IdentitySyntax.MatrixUser(value)))
-            return Results.Fail<IReadOnlyList<PrincipalIdentity>>("invalid", "Resolve 1–100 unique Matrix identities");
-        return ports.Identities(matrixUserIds).Map<IReadOnlyList<PrincipalIdentity>>(values =>
+        if (backendUserIds.Count is < 1 or > 100 || backendUserIds.Distinct(StringComparer.Ordinal).Count() != backendUserIds.Count || backendUserIds.Any(value => !IdentitySyntax.BackendIdentifier(value)))
+            return Results.Fail<IReadOnlyList<PrincipalIdentity>>("invalid", "Resolve 1–100 unique Messaging identities");
+        return ports.Identities(backendUserIds).Map<IReadOnlyList<PrincipalIdentity>>(values =>
         {
-            var byId = values.ToDictionary(value => value.MatrixUserId, StringComparer.Ordinal);
-            return matrixUserIds.Select(id => byId.GetValueOrDefault(id) ?? new(id, "unknown", null, null, null)).ToArray();
+            var byId = values.ToDictionary(value => value.BackendUserId, StringComparer.Ordinal);
+            return backendUserIds.Select(id => byId.GetValueOrDefault(id) ?? new(id, "unknown", null, null, null)).ToArray();
         });
     }
 

@@ -1,9 +1,10 @@
+import { connectMatrix } from '@ctlflow/crossfire-adapter-matrix/connection';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { API, segment } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { createInvitationReader } from '@ctlflow/crossfire-adapter-matrix/room/invitation';
 import { readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
@@ -25,8 +26,8 @@ test('a resumed shared listener recovers pending rooms and owner DMs without rep
   const host = await createListenerHost(); cleanup(scope, () => host.close()); cleanup(scope, control.close);
   const native = (token: string, method: string, path: string, input?: unknown) => nativeOk({ base: origin, token }, method, API + path, input);
   const observer = createInvitationReader();
-  assert.equal(value(await observer({ base: origin, token: agent.token }, agent.matrixUserId)).size, 0);
-  const room = value(await native(owner.token, 'POST', '/createRoom', { name: 'Samosas', preset: 'private_chat', invite: [agent.matrixUserId] }));
+  assert.equal(value(await observer({ base: origin, token: agent.token }, agent.backendUserId)).size, 0);
+  const room = value(await native(owner.token, 'POST', '/createRoom', { name: 'Samosas', preset: 'private_chat', invite: [agent.backendUserId] }));
   assert(typeof room.room_id === 'string');
   const roomId = room.room_id;
   const previous = value(await native(agent.token, 'GET', '/sync?timeout=0'));
@@ -38,9 +39,8 @@ test('a resumed shared listener recovers pending rooms and owner DMs without rep
     assert(!JSON.stringify(incremental.rooms ?? {}).includes(roomId), 'An unchanged pending invite is absent even from full-state incremental sync');
   }
   let ended: unknown, ready = false;
-  const receiver = listen({ log: (_message: string) => {}, binding: 'fixture', host, coordination: createCoordination({ origin, token: agent.token }), settings: {
-    instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: owner.accepted.account.userId, max_upload_bytes: 1024 },
-    account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' },
+  const receiver = listen({ ...connectMatrix({ type: 'matrix', parameters: { origin, serverName: 'architecture.localhost' } }, { userId: agent.backendUserId, accessToken: agent.token, native: { deviceId: 'CROSSFIRE_AGENT' } }), log: (_message: string) => {}, binding: 'fixture', host, coordination: createCoordination({ origin, token: agent.token }), settings: { instance: 'tests', server: origin, backend: { type: "matrix", parameters: { origin: origin, serverName: 'architecture.localhost' } }, owner: owner.accepted.account.userId, maxUploadBytes: 1024 },
+    account: { userId: agent.backendUserId, accessToken: agent.token, native: { deviceId: 'CROSSFIRE_AGENT' } },
     id: agent.id, release: release.manifest, cursorFile,
     limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 10000, runtime: runtime.runtime, control: control.connection,
     ready: () => { ready = true; },
@@ -66,9 +66,9 @@ test('a resumed shared listener recovers pending rooms and owner DMs without rep
   assert(delivered.includes(String(sent.event_id)));
   assert(delivered.includes('Ada, are you here?'));
 
-  const rejected = value(await native(outsider.token, 'POST', '/createRoom', { preset: 'private_chat', invite: [agent.matrixUserId] }));
+  const rejected = value(await native(outsider.token, 'POST', '/createRoom', { preset: 'private_chat', invite: [agent.backendUserId] }));
   assert(typeof rejected.room_id === 'string');
-  const dm = value(await native(owner.token, 'POST', '/createRoom', { preset: 'private_chat', is_direct: true, invite: [agent.matrixUserId] }));
+  const dm = value(await native(owner.token, 'POST', '/createRoom', { preset: 'private_chat', is_direct: true, invite: [agent.backendUserId] }));
   assert(typeof dm.room_id === 'string');
   const directRoom = dm.room_id;
   const direct = value(await native(owner.token, 'PUT', '/rooms/' + segment(directRoom) + '/send/m.room.message/' + randomUUID(), { msgtype: 'm.text', body: 'Owner DM task' }));

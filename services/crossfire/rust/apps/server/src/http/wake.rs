@@ -11,7 +11,9 @@ fn encoded<T: serde::Serialize>(value: T) -> Result<serde_json::Value> {
     serde_json::to_value(value)
         .map_err(|_| Failure::new(ErrorCode::Unavailable, "Wake-up response cannot be encoded"))
 }
-pub fn list(context: &Context<'_>) -> Result<Reply> {
+pub fn list(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let page = context.query.page()?;
     let filter = ListFilter {
         owner_id: context.query.identifier("ownerId")?,
@@ -22,12 +24,16 @@ pub fn list(context: &Context<'_>) -> Result<Reply> {
     let values = context.with(|repo, now| read::list(repo, context.actor()?, &filter, now))?;
     reply::page(values, |value| encoded(wire::SummaryView::from(value)))
 }
-pub fn read(context: &Context<'_>) -> Result<Reply> {
+pub fn read(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = context
         .with(|repo, now| read::read(repo, context.actor()?, context.parameter("ruleId")?, now))?;
     reply::of(wire::DetailsView::from(&value))
 }
-pub fn create(context: &Context<'_>) -> Result<Reply> {
+pub fn create(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let (id, input) = wire::creation(&context.input)?;
     let value = context.with(|repo, now| {
         manage::save(
@@ -45,7 +51,9 @@ pub fn create(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(wire::DetailsView::from(&value))
 }
-pub fn change(context: &Context<'_>) -> Result<Reply> {
+pub fn change(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let (revision, input) = wire::change(&context.input)?;
     let value = context.with(|repo, now| {
         manage::save(
@@ -63,7 +71,9 @@ pub fn change(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(wire::DetailsView::from(&value))
 }
-pub fn delete(context: &Context<'_>) -> Result<Reply> {
+pub fn delete(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let revision = wire::removal(&context.input)?;
     context.with(|repo, now| {
         manage::remove(
@@ -77,7 +87,9 @@ pub fn delete(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(json!({"deleted":true}))
 }
-fn attachment(context: &Context<'_>) -> Result<Attachment> {
+fn attachment(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Attachment> {
     Ok(Attachment {
         run_id: context
             .query
@@ -88,7 +100,9 @@ fn attachment(context: &Context<'_>) -> Result<Attachment> {
             .to_owned(),
     })
 }
-pub fn metadata(context: &Context<'_>) -> Result<Reply> {
+pub fn metadata(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let input = attachment(context)?;
     let value = context.with(|repo, now| {
         delivery::metadata(
@@ -101,7 +115,9 @@ pub fn metadata(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(wire::MetadataView(&value))
 }
-pub fn claim(context: &Context<'_>) -> Result<Reply> {
+pub fn claim(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let input = wire::attachment(&context.input)?;
     let value = context.with(|repo, now| {
         delivery::claim(
@@ -115,7 +131,9 @@ pub fn claim(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(value.as_ref().map(wire::ScheduledView))
 }
-pub fn validate(context: &Context<'_>) -> Result<Reply> {
+pub fn validate(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let input = attachment(context)?;
     let eligible = context.with(|repo, now| {
         delivery::validate(
@@ -129,7 +147,9 @@ pub fn validate(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(json!({"eligible":eligible}))
 }
-pub fn acknowledge(context: &Context<'_>) -> Result<Reply> {
+pub fn acknowledge(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let input = wire::attachment(&context.input)?;
     let recorded = context.with(|repo, now| {
         delivery::acknowledge(

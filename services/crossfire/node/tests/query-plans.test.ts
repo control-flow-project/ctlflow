@@ -41,7 +41,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
   database.transaction(() => {
     for (let ownerIndex = 0; ownerIndex < 5; ownerIndex++) {
       const ownerId = 'owner-' + ownerIndex;
-      value(repositories.principal.insert({ id: ownerId, matrixUserId: '@' + ownerId + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
+      value(repositories.principal.insert({ id: ownerId, backendUserId: '@' + ownerId + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
       value(repositories.member.insert({ principalId: ownerId, principalKind: 'human', displayName: ownerId }));
       application(ownerId);
       const fleetId = 'fleet-' + ownerId, credentialId = 'credential-' + ownerId, connectionId = 'connection-' + ownerId;
@@ -51,7 +51,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
       value(repositories.fleetConnection.save({ fleetId, credentialId, connectionId, lastSeenAt: 1, expiresAt: 1000, closedAt: null }));
       for (let agentIndex = 0; agentIndex < 200; agentIndex++) {
         const agentId = ownerId + '-agent-' + String(agentIndex).padStart(3, '0');
-        value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: agentIndex }));
+        value(repositories.principal.insert({ id: agentId, backendUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: agentIndex }));
         value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, wakeMode: 'selected' }));
         value(repositories.agentName.insert({ name: agentId, requestId: null, instanceKey: null, agentId }));
         application(agentId);
@@ -130,7 +130,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
   database.transaction(() => {
     for (let roomIndex = 0; roomIndex < 200; roomIndex++) value(repositories.agentRoomGrant.insert({
       agentId, roomId: '!room-' + String(roomIndex).padStart(3, '0') + ':test', generation: 'generation-' + roomIndex,
-      authorizerId: 'owner-2', addedById: 'owner-2', invitationEventId: null, admissionKind: 'managed', accessMode: 'reply', powerLevel: null,
+      authorizerId: 'owner-2', addedById: 'owner-2', invitationEventId: null, admissionKind: 'managed', accessMode: 'reply', nativeAccess: null,
       muted: false, revision: 0, accessRevision: 0, updatedAt: 1,
     }));
   })();
@@ -143,7 +143,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
   assert.equal(lastRoom.items[0]?.accessMode, 'reply');
   assert.equal(statements.length, 2, 'Visible room grants are filtered before paging, including grants beyond the first 100');
   assert.equal(value(grants.page(agentId, { page: 1, pageSize: 100, roomIds: [] })).totalItems, 0);
-  for (const source of ['not-json', '["invalid"]', '["!room:test","!room:test"]', JSON.stringify(Array(101).fill('!room:test'))]) {
+  for (const source of ['not-json', '[""]', '["!room:test","!room:test"]', JSON.stringify(Array(101).fill('!room:test'))]) {
     assert.equal(roomGrants(new URLSearchParams({ roomIds: source })).ok, false);
   }
   assert.equal(roomGrants(new URLSearchParams('roomIds=[]&roomIds=[]')).ok, false);
@@ -174,7 +174,7 @@ test('actual Tinqer owner pages seek indexes and hydrate activity and selected i
   assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
 });
 
-test('sender identity batches seek exact Matrix indexes across large human and agent populations', async scope => {
+test('sender identity batches seek exact backend identity indexes across large human and agent populations', async scope => {
   let statements: string[] = [];
   const database = new Database(':memory:', { verbose(statement) {
     if (typeof statement === 'string' && statement.startsWith('SELECT')) statements.push(statement);
@@ -186,9 +186,9 @@ test('sender identity batches seek exact Matrix indexes across large human and a
   database.transaction(() => {
     for (let index = 0; index < 1000; index++) {
       const ownerId = 'human-' + index, agentId = 'agent-' + index;
-      value(repositories.principal.insert({ id: ownerId, matrixUserId: '@' + ownerId + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
+      value(repositories.principal.insert({ id: ownerId, backendUserId: '@' + ownerId + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
       value(repositories.member.insert({ principalId: ownerId, principalKind: 'human', displayName: ownerId }));
-      value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
+      value(repositories.principal.insert({ id: agentId, backendUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
       value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, wakeMode: 'selected' }));
       value(repositories.agentName.insert({ name: agentId, requestId: null, instanceKey: null, agentId }));
     }
@@ -200,11 +200,11 @@ test('sender identity batches seek exact Matrix indexes across large human and a
     const resolved = value(discovery.identities(ids));
     assert.equal(resolved.length, count);
     assert.equal(statements.length, 2, 'Sender kinds and owners use two batch queries, never per-message lookups');
-    for (const identity of resolved) assert.equal(identity.ownerMatrixId, identity.kind === 'agent'
-      ? identity.matrixUserId.replace('@agent-', '@human-') : null);
+    for (const identity of resolved) assert.equal(identity.ownerBackendUserId, identity.kind === 'agent'
+      ? identity.backendUserId.replace('@agent-', '@human-') : null);
     for (const statement of statements) {
       const plan = (database.prepare('EXPLAIN QUERY PLAN ' + statement).all() as { detail: string }[]).map(row => row.detail).join('\n');
-      assert.match(plan, /SEARCH .*matrix_user_id=/u);
+      assert.match(plan, /SEARCH .*backend_user_id=/u);
       assert(!plan.includes('SCAN '), 'Exact sender resolution must not scan the principal or agent tables');
     }
   }
@@ -221,10 +221,10 @@ test('fleet enrollment review hydrates the entire roster and selected identities
   await migrateFixture(database);
   const repositories = createRepositories(database);
   database.transaction(() => {
-    value(repositories.principal.insert({ id: 'owner', matrixUserId: '@owner:test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
+    value(repositories.principal.insert({ id: 'owner', backendUserId: '@owner:test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
     value(repositories.member.insert({ principalId: 'owner', principalKind: 'human', displayName: 'Owner' }));
     for (let index = 0; index < 100; index++) value(repositories.principal.insert({ id: 'sender-' + index,
-      matrixUserId: '@sender-' + index + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
+      backendUserId: '@sender-' + index + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
     for (const [requestId, count] of [['one', 1], ['twenty', 20], ['hundred', 100], ['other', 100]] as const) {
       value(repositories.enrollmentRequest.insert({ id: requestId, ownerId: 'owner', fleetKey: requestId, controllerName: 'Computer',
         controllerCredentialHash: 'hash', verificationCode: requestId, claimHash: 'hash', rosterDigest: 'digest', status: 'pending',
@@ -243,10 +243,10 @@ test('fleet enrollment review hydrates the entire roster and selected identities
     statements = [];
     const policies = value(repositories.fleetPolicy.requested(requestId));
     assert.equal(policies.length, count);
-    assert(policies.every(policy => policy.senders.length === 100 && policy.matrixSenders.length === 100
-      && policy.matrixSenders.every(sender => sender.matrixUserId.startsWith('@sender-'))
+    assert(policies.every(policy => policy.senders.length === 100 && policy.backendSenders.length === 100
+      && policy.backendSenders.every(sender => sender.backendUserId.startsWith('@sender-'))
       && policy.senders.filter(sender => sender.includeAgents).length === 50
-      && policy.matrixSenders.filter(sender => sender.includeAgents).length === 50
+      && policy.backendSenders.filter(sender => sender.includeAgents).length === 50
       && policy.permissions.length === 1 && policy.permissions[0] === 'room.agent.invite'));
     assert.equal(statements.length, 3, 'Policy, permission and selected-sender queries are roster-wide');
     for (const statement of statements) {

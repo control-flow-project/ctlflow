@@ -11,7 +11,7 @@ public static class Authorization
         var principal = found.Value;
         if (principal is null || principal.Kind != actor.Kind || principal.Status != "active")
             return Results.Fail<Principal>("forbidden", "An active registered identity is required");
-        if (actor.Authentication is NativeAuthentication native && native.MatrixUserId != principal.MatrixUserId)
+        if (actor.Authentication is NativeAuthentication native && native.BackendUserId != principal.BackendUserId)
             return Results.Fail<Principal>("unauthorized", "Native session identity changed");
         if (actor.Kind == "human" && actor.Authentication is not NativeAuthentication)
         {

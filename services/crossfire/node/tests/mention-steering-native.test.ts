@@ -64,7 +64,7 @@ for (const historyMode of ['shared', 'per-room'] as const) for (const sourceKind
     if (peer) matrix.add(ROOM, message('$ordinary-backlog', '@context:test.localhost'));
     const redirect = 'Stop the old task and inspect the replacement evidence.';
     if (sourceKind === 'agent') {
-      await executeOperation(matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token }),
+      await executeOperation(matrixClient({ base: matrix.settings.server, token: matrix.account.accessToken }),
         matrix.settings, matrix.account, selectOperation('send-message'), { 'room-id': ROOM, 'event-type': 'm.room.message',
           'txn-id': 'native-agent-redirect', 'mention-user': SELF, markdown: redirect });
       const sent = matrix.requests.find(request => request.path.endsWith('/native-agent-redirect'))!;

@@ -5,7 +5,7 @@ use crossfire_contracts::member::ClaimFingerprint;
 use crossfire_domain::{
     identity::{Actor, Role},
     member::{invitation, signup},
-    port::{AuthorizationRepository, CoreRepository, MatrixIdentity, RepositoryAccess},
+    port::{AuthorizationRepository, BackendUserIdentity, CoreRepository, RepositoryAccess},
     session,
 };
 use crossfire_kernel::{identity, secret::Secret, time::Clock};
@@ -14,8 +14,6 @@ pub(super) async fn run(
     repository: &SharedStore,
     matrix: &Authority,
     owner: &Actor,
-    server_name: &str,
-    service_matrix_id: &str,
     clock: &SystemClock,
     checks: &mut Checks,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -50,15 +48,14 @@ pub(super) async fn run(
         username: "rust-invited-member".to_owned(),
         password: identity::secret()?,
         display_name: "Invited member".to_owned(),
-        device_id: "rust-acceptance".to_owned(),
+        native: serde_json::Map::from_iter([(
+            "deviceId".to_owned(),
+            serde_json::json!("rust-acceptance"),
+        )]),
     };
     let input = || signup::InvitationInput {
         claim: &claim,
         details: &details,
-        instance: signup::Instance {
-            server_name,
-            service_matrix_id,
-        },
         request_id: "native-human-accept",
     };
     let accepted = signup::accept(repository, matrix, clock, &ClaimFingerprint, input()).await?;
@@ -100,10 +97,6 @@ pub(super) async fn run(
             signup::InvitationInput {
                 claim: &claim,
                 details: &changed,
-                instance: signup::Instance {
-                    server_name,
-                    service_matrix_id,
-                },
                 request_id: "altered-human-accept",
             },
         )
@@ -181,7 +174,10 @@ pub(super) async fn run(
         username: "rust-open-member".to_owned(),
         password: identity::secret()?,
         display_name: "rust-open-member".to_owned(),
-        device_id: "rust-open-acceptance".to_owned(),
+        native: serde_json::Map::from_iter([(
+            "deviceId".to_owned(),
+            serde_json::json!("rust-open-acceptance"),
+        )]),
     };
     let account = signup::register(
         repository,
@@ -189,10 +185,6 @@ pub(super) async fn run(
         clock,
         signup::OpenInput {
             details: &open,
-            instance: signup::Instance {
-                server_name,
-                service_matrix_id,
-            },
             request_id: "native-open-signup",
         },
     )
@@ -203,7 +195,7 @@ pub(super) async fn run(
     )?;
     checks.require(
         repository
-            .with(|repo| repo.principal_by_matrix_id(&account.user_id))?
+            .with(|repo| repo.principal_by_backend_user_id(&account.user_id))?
             .is_some(),
         "open signup commits its human registration in canonical Knex SQLite",
     )?;
@@ -214,10 +206,6 @@ pub(super) async fn run(
             clock,
             signup::OpenInput {
                 details: &open,
-                instance: signup::Instance {
-                    server_name,
-                    service_matrix_id,
-                },
                 request_id: "native-duplicate-signup",
             },
         )

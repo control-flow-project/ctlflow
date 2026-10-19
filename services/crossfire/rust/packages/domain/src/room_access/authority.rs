@@ -2,7 +2,7 @@ use super::{port::RoomRepository, values::*};
 use crate::{
     authorization::{AgentAction, active_actor, authorize_agent},
     identity::{Actor, PrincipalKind, Status},
-    matrix::{RoomFacts, RoomInvitation, RoomPower},
+    messaging::RoomInvitation,
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 pub fn private_room(repo: &mut impl RoomRepository, room: &str) -> Result<bool> {
@@ -25,7 +25,7 @@ pub fn protect(repo: &mut impl RoomRepository, input: &Change) -> Result<()> {
     }
     if conversation.is_some()
         && (input.intent.access != Access::Reply
-            || input.intent.power.is_some()
+            || input.intent.native_access.is_some()
             || input.intent.muted)
     {
         return Err(Failure::new(
@@ -34,26 +34,6 @@ pub fn protect(repo: &mut impl RoomRepository, input: &Change) -> Result<()> {
         ));
     }
     Ok(())
-}
-pub fn requested_power(facts: &RoomFacts, intent: &Intent) -> Result<i64> {
-    let level = match intent.access {
-        Access::Read => Some(facts.read_level),
-        Access::Custom => intent.power,
-        _ => Some(facts.reply_level),
-    }
-    .ok_or_else(|| {
-        Failure::new(
-            ErrorCode::Invalid,
-            "A finite integer Matrix power level is required",
-        )
-    })?;
-    if matches!(facts.power,RoomPower::Level(current) if level > current) {
-        return Err(Failure::new(
-            ErrorCode::Forbidden,
-            "Requested access exceeds the authorizer’s native room permissions",
-        ));
-    }
-    Ok(level)
 }
 pub fn prepare(
     repo: &mut impl RoomRepository,
@@ -78,7 +58,12 @@ pub fn prepare(
     if target.principal.revision != input.expected_revision {
         return Err(Failure::new(ErrorCode::Conflict, "Agent revision changed"));
     }
-    if (input.intent.access == Access::Custom) != input.intent.power.is_some()
+    if input
+        .intent
+        .native_access
+        .as_ref()
+        .is_some_and(|value| !crate::backend_data::valid(value))
+        || (input.intent.access == Access::Custom) != input.intent.native_access.is_some()
         || input.intent.access == Access::None && input.intent.muted
     {
         return Err(Failure::new(
@@ -95,9 +80,9 @@ pub fn prepare(
     });
     if let Some(invitation) = invitation {
         if invitation.room_id != input.room_id
-            || invitation.sender_matrix_id != acting.matrix_user_id
+            || invitation.sender_backend_user_id != acting.backend_user_id
             || input.intent.access != Access::Reply
-            || input.intent.power.is_some()
+            || input.intent.native_access.is_some()
             || input.intent.muted
         {
             return Err(Failure::new(
@@ -178,7 +163,7 @@ pub fn prepare(
             || previous.as_ref().is_none_or(|grant| {
                 grant.intent.access == Access::None
                     || grant.intent.access != input.intent.access
-                    || grant.intent.power != input.intent.power
+                    || grant.intent.native_access != input.intent.native_access
             }));
     Ok((
         Authorization {
@@ -214,8 +199,8 @@ pub fn prepare(
             },
             previous,
         },
-        acting.matrix_user_id,
-        target.principal.matrix_user_id,
+        acting.backend_user_id,
+        target.principal.backend_user_id,
     ))
 }
 pub fn needs_native(proof: &Authorization, actor: &Actor) -> bool {
@@ -225,7 +210,7 @@ pub fn needs_native(proof: &Authorization, actor: &Actor) -> bool {
                 && (proof.previous.as_ref().is_none_or(|grant| {
                     grant.intent.access == Access::None
                         || grant.intent.access != proof.input.intent.access
-                        || grant.intent.power != proof.input.intent.power
+                        || grant.intent.native_access != proof.input.intent.native_access
                         || grant.invitation_event_id != proof.invitation_event_id
                 })))
 }

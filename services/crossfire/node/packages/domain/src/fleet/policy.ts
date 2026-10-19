@@ -14,9 +14,9 @@ export function resolveCoordinationPolicy(services: ReadDependencies, policy: Co
   agentId: string | null, expectedAgentRevision: number | null): Result<RequestedFleetPolicy> {
   const senders: RequestedFleetPolicy['senders'] = [];
   for (const selection of policy.senders) {
-    const sender = services.directory.principalByMatrixId(selection.matrixUserId);
+    const sender = services.directory.principalByBackendUserId(selection.backendUserId);
     if (!sender.ok) return sender;
-    if (!sender.value) return failure('invalid', 'Selected identity is not registered: ' + selection.matrixUserId);
+    if (!sender.value) return failure('invalid', 'Selected identity is not registered: ' + selection.backendUserId);
     senders.push({ principalId: sender.value.id, includeAgents: selection.includeAgents });
   }
   const valid = validateWakeSenders(services, agentId, policy.wakeMode, senders);

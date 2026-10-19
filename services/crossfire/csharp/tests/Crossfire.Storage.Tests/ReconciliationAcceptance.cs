@@ -14,21 +14,23 @@ public static class ReconciliationAcceptance
         var now = time;
         var fixture = FleetFixture.Create(context, owner, now);
         const string roomId = "!native-enforcement:example.test";
-        var ownerMatrixId = ((NativeAuthentication)owner.Authentication!).MatrixUserId;
-        var agentMatrixId = ((NativeAuthentication)fixture.Actor.Authentication!).MatrixUserId;
-        var state = new RoomMembership(agentMatrixId, "Native agent", "leave", false, 0);
+        var ownerBackendUserId = ((NativeAuthentication)owner.Authentication!).BackendUserId;
+        var agentBackendUserId = ((NativeAuthentication)fixture.Actor.Authentication!).BackendUserId;
+        var state = new RoomMembership(agentBackendUserId, "Native agent", "leave", WireJson.Object(writer => writer.WriteNumber("powerLevel", 0)));
         var sets = 0; var leaves = 0; var denyAuthority = false; var changeDuringNative = false; var rejectJoined = false;
-        NativeRoomAdmission? admission = null;
-        using var authority = new AccountAuthority(new("https://unused.example.test", "example.test", "unused-key", "unused-registration", ownerMatrixId));
+        RoomAdmission? admission = null;
+        using var authority = new AccountAuthority(new("https://unused.example.test", "example.test", "unused-key", "unused-registration", ownerBackendUserId));
         void OutsideTransaction() => Equal(context.Database.CurrentTransaction is null, true, "native reconciliation is outside transaction");
-        var matrix = authority.Ports() with
+        RoomFacts Facts(string user, string room) => AuthorityValues.View(new MatrixRoomFacts(room, "Native room", "", null, user, false, 50, [], -1, 0, 0, 50, 50, []));
+        var matrix = MessagingFixture.Ports() with
         {
-            Room = (identity, room, cancellation) =>
+            Room = (identity, room, subject, cancellation) =>
             {
                 OutsideTransaction();
                 return ValueTask.FromResult(denyAuthority ? Results.Fail<RoomFacts>("forbidden", "Native authority lost")
-                    : Result<RoomFacts>.Success(new(room, "Native room", "", null, identity, false, 50, [], -1, 0, 0, 50, 50, [])));
+                    : Result<RoomFacts>.Success(Facts(identity, room)));
             },
+            AuthorizeRoomAccess = (identity, target, room, intent, cancellation) => ValueTask.FromResult(Result<RoomFacts>.Success(Facts(identity, room))),
             Joined = (identity, cancellation) =>
             {
                 OutsideTransaction();
@@ -47,7 +49,8 @@ public static class ReconciliationAcceptance
             SetRoomAccess = (identity, target, room, access, command, cancellation) =>
             {
                 OutsideTransaction(); sets++; admission = command;
-                state = state with { Membership = "join", PowerLevel = access.PowerLevel };
+                if (denyAuthority) return ValueTask.FromResult(Results.Fail<RoomMembership>("forbidden", "Native authority lost"));
+                state = state with { Membership = "join", NativeAccess = WireJson.Object(writer => writer.WriteNumber("powerLevel", access.AccessMode == "read" ? -1 : 0)) };
                 if (changeDuringNative)
                 {
                     var current = AuthorizationQueries.Principal(context, fixture.AgentId).Value!;
@@ -57,7 +60,7 @@ public static class ReconciliationAcceptance
                 return ValueTask.FromResult(Result<RoomMembership>.Success(state));
             }
         };
-        var grants = RoomGrantCommands.Ports(context, () => now, matrix.Room);
+        var grants = RoomGrantCommands.Ports(context, () => now, matrix);
         var ports = new RoomReconcilePorts(grants, matrix, () => PolicyQueries.Find(context),
             id => AuthorizationQueries.AgentView(context, id).Map(value => value?.Application), authority.RoomOperation);
         var first = await RoomGrantChanges.Change(grants, owner, new(fixture.AgentId, roomId, 0, null, "reply", null, false), Identity.Identifier());
@@ -77,7 +80,7 @@ public static class ReconciliationAcceptance
         var read = await RoomGrantChanges.Change(grants, owner, new(fixture.AgentId, roomId, 1, first.Value.Grant.Generation, "read", null, false), Identity.Identifier());
         Equal(read.IsSuccess, true, "explicit access change creates new enforceable intent");
         Equal((await RoomReconciliation.Reconcile(ports, fixture.AgentId, roomId)).IsSuccess, true, "explicit read-only grant enforced");
-        Equal(state.PowerLevel, -1L, "read level derived from native permission thresholds");
+        Equal(state.NativeAccess!.Value.GetProperty("powerLevel").GetInt64(), -1L, "read level derived from native permission thresholds");
         Equal(sets, 2, "explicit revision authorizes another native command");
         var lastSuccess = RoomGrantQueries.Application(context, fixture.AgentId, roomId).Value!.LastSuccessAt;
         denyAuthority = true; now++;

@@ -116,19 +116,17 @@ fn initialize(directory: &Path, options: &BTreeMap<&str, &str>) -> Result<()> {
     let username = options
         .get("administrator")
         .ok_or_else(|| invalid("Supply --administrator"))?;
-    if username.is_empty()
-        || username.len() > 80
-        || !username.bytes().all(|byte| {
-            byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"._=-".contains(&byte)
-        })
-        || *username == "conduit"
-        || username.starts_with("crossfire-")
-        || username.starts_with("agent-")
-    {
-        return Err(invalid("Supply a regular human administrator username"));
-    }
-    let value = json!({"instance":options.get("instance"),"serverName":options.get("server-name"),"publicOrigin":options.get("origin"),"contentOrigin":options.get("content-origin"),"matrixOrigin":"http://127.0.0.1:6167","administrator":format!("@{}:{}",username,options.get("server-name").unwrap_or(&"")),"jwtSecret":identity::secret()?.expose(),"registrationSecret":identity::secret()?.expose()});
+    let administrator = crossfire_adapter_matrix::settings::administrator_user(
+        username,
+        options.get("server-name").unwrap_or(&""),
+    )?;
+    let value = json!({"instance":options.get("instance"),"publicOrigin":options.get("origin"),"contentOrigin":options.get("content-origin"),"administrator":administrator,"messaging":{"type":"matrix","parameters":{"serverName":options.get("server-name"),"origin":"http://127.0.0.1:6167","jwtSecret":identity::secret()?.expose(),"registrationSecret":identity::secret()?.expose()}}});
     let parsed = configuration::parse(&value)?;
+    crossfire_adapter_matrix::settings::read(
+        &parsed.messaging,
+        &parsed.instance,
+        &parsed.administrator,
+    )?;
     let private = PrivateDirectory::open(directory, true)?;
     private.write_atomic(
         "config.json",

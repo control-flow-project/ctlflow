@@ -34,7 +34,7 @@ node crossfire init --directory /absolute/private/crossfire-state \
 ```
 
 The other guides use their installed native operator with an explicit package.
-The package selects the runtime backend independently of the operator's language.
+The package selects the server implementation independently of the operator's language.
 The deployment host does not need a source checkout or build toolchain.
 
 Initialization refuses a nonempty directory. The initial password is the
@@ -48,7 +48,7 @@ Host port publication is loopback-only. Public use requires HTTPS.
 The operator acquires exclusive instance ownership, verifies and imports the
 selected package, reconciles abandoned owned containers, verifies an upgrade backup
 when needed, runs Knex and starts the runtime only after success.
-It never builds source or substitutes another backend. Ctrl+C stops and removes the owned
+It never builds source or substitutes another implementation. Ctrl+C stops and removes the owned
 container while retaining state.
 
 A live competing launcher is refused. If a launcher dies, start the instance

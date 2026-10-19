@@ -1,5 +1,5 @@
 mod roster;
-use crossfire_agent_core::{coordination::Coordination, local_state::LocalState, profile::Account};
+use crossfire_agent_core::{coordination::Coordination, local_state::LocalState};
 use crossfire_contracts::{call::Call, operations::OperationId, validation as check};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, secret::Secret};
 use fleetd_domain::{
@@ -191,7 +191,7 @@ fn accept(
     saved: &mut Binding,
     response: &Value,
 ) -> Result<()> {
-    if check::matrix_user_id(&response["ownerMatrixId"])? != saved.owner {
+    if check::backend_user_id(&response["ownerBackendUserId"])? != saved.owner {
         return Err(Failure::new(
             ErrorCode::Conflict,
             "Enrollment owner differs from its requested authority",
@@ -234,13 +234,7 @@ fn accept(
         let key = check::name(&identity["instanceKey"])?;
         let name = check::name(&identity["name"])?;
         let agent_id = check::identifier(&identity["agentId"])?;
-        let account = Account {
-            user_id: check::matrix_user_id(&identity["account"]["matrixUserId"])?.to_owned(),
-            access_token: Secret::new(
-                check::text(&identity["account"]["accessToken"], 1, 8192)?.to_owned(),
-            ),
-            device_id: check::text(&identity["account"]["deviceId"], 1, 255)?.to_owned(),
-        };
+        let account = crossfire_contracts::messaging::account(&identity["account"])?;
         if !keys.insert(key)
             || !agents.insert(agent_id)
             || !users.insert(account.user_id.clone())

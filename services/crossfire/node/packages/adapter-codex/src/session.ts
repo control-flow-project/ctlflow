@@ -1,6 +1,6 @@
 import { truncateUtf16 } from '@ctlflow/crossfire-kernel/text';
 import { realpathSync } from 'node:fs';
-import type { Json } from '@ctlflow/crossfire-contracts/json';
+import type { Json } from '@ctlflow/crossfire-kernel/json';
 import type { RuntimeApproval, RuntimeHooks, RuntimeDecision } from '@ctlflow/crossfire-agent-core/runtime';
 import { codexPermission, permissionDenial } from './approval.js';
 import { object } from '@ctlflow/crossfire-contracts/validation';

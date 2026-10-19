@@ -1,3 +1,4 @@
+using Crossfire.Domain;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AdapterRuntime;
@@ -25,6 +26,11 @@ public sealed class PiHistories : OwnedRuntimeConnection, TurnControl
     private PiConnection? selected;
     private Task? closing;
     private PiConnection Primary => selected ?? throw new InvalidOperationException("Native Pi primary context is not ready");
+    public ValueTask<Result<ProviderState>> Provider(CancellationToken cancellation)
+    {
+        PiConnection? connection; lock (gate) connection = selected;
+        return connection is null ? ValueTask.FromResult(Results.Fail<ProviderState>("unavailable", "No owned native provider connection is running")) : connection.Provider(cancellation);
+    }
     public string SessionId => Primary.SessionId;
     public RuntimeApproval Approval => RuntimeApproval.None;
     public CancellationToken Lifetime => token;
@@ -81,7 +87,7 @@ public sealed class PiHistories : OwnedRuntimeConnection, TurnControl
     }
     private ValueTask<Result<PiConnection>> Open(string context, InputAdmission? admission = null)
     {
-        if (context is not ("shared" or "control") && !Validation.RoomId(context)) return ValueTask.FromResult(Results.Fail<PiConnection>("invalid", "Invalid native Pi context"));
+        if (!HistoryContext.Valid(context)) return ValueTask.FromResult(Results.Fail<PiConnection>("invalid", "Invalid native Pi context"));
         if (Lifetime.IsCancellationRequested || admission?.Cancellation.IsCancellationRequested == true) return ValueTask.FromResult(Results.Fail<PiConnection>("unavailable", "Pi context admission was cancelled"));
         TaskCompletionSource<Result<PiConnection>> completion;
         lock (gate)
@@ -158,11 +164,11 @@ public sealed class PiHistories : OwnedRuntimeConnection, TurnControl
     public ValueTask<Result<Unit>> Deliver(string text, string messageId, CancellationToken cancellation = default, InputPriority? priority = null) => Primary.Deliver(text, messageId, cancellation, priority);
     public ValueTask<Result<bool>> Recover(string text, string messageId, CancellationToken cancellation = default) => Primary.Recover(text, messageId, cancellation);
     public async ValueTask<Result<RuntimeConnection>> Conversation(string room, InputAdmission? admission = null)
-    { if (!Validation.RoomId(room)) return Results.Fail<RuntimeConnection>("invalid", "Supply an exact Matrix room identity"); return (await Open(input.HistoryMode == NativeHistoryMode.Shared ? "shared" : room, admission)).Map<RuntimeConnection>(value => value); }
+    { if (!Validation.RoomId(room)) return Results.Fail<RuntimeConnection>("invalid", "Supply an exact messaging room identity"); return (await Open(input.HistoryMode == NativeHistoryMode.Shared ? "shared" : HistoryContext.ForRoom(room), admission)).Map<RuntimeConnection>(value => value); }
     public ValueTask<Result<IReadOnlyList<ContextAttachment>>> Attachments() => ValueTask.FromResult(Result<IReadOnlyList<ContextAttachment>>.Success([]));
     public async ValueTask<Result<string?>> ActiveTurn(string? room = null, InputAdmission? admission = null)
     {
-        var context = input.HistoryMode == NativeHistoryMode.Shared ? "shared" : room ?? "control"; PiConnection? selected;
+        var context = input.HistoryMode == NativeHistoryMode.Shared ? "shared" : room is null ? "control" : HistoryContext.ForRoom(room); PiConnection? selected;
         if (admission is not null) { var value = await Open(context, admission); if (!value.IsSuccess) return Result<string?>.Fail(value.Error); selected = value.Value; }
         else { lock (gate) selected = opened.GetValueOrDefault(context)?.Context.Connection; }
         return selected is null ? Result<string?>.Success(null) : (await selected.ActiveTurn(admission: admission)).Map(value => value is null ? null : "[" + ProtocolJson.Quote(context) + "," + ProtocolJson.Quote(value) + "]");

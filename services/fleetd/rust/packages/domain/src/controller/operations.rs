@@ -282,32 +282,36 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
                     .await
             }
             .await;
-            if let Err(error) = result {
-                let mut failed_operation = operation;
-                failed_operation.status = OperationStatus::Failed;
-                failed_operation.completed_at = controller.clock.now().ok();
-                failed_operation.approval = None;
-                failed_operation.errors.push(Self::error(None, &error));
-                if controller
-                    .registry
-                    .save_operation(&failed_operation)
-                    .is_err()
-                {
-                    controller.lifetime.cancel();
-                }
-                for instance in &selected {
-                    if controller.stop_instance(&fleet, instance).await.is_err() {
-                        controller.lifetime.cancel();
+            let outcome = match result {
+                Ok(completed) => completed,
+                Err(error) => {
+                    for instance in &selected {
+                        if controller.stop_instance(&fleet, instance).await.is_err() {
+                            controller.lifetime.cancel();
+                        }
                     }
+                    let mut failed_operation = operation;
+                    failed_operation.status = OperationStatus::Failed;
+                    failed_operation.completed_at = controller.clock.now().ok();
+                    failed_operation.approval = None;
+                    failed_operation.errors.push(Self::error(None, &error));
+                    failed_operation
                 }
-            }
-            if let Ok(mut state) = controller.lock()
-                && state
+            };
+            if let Ok(mut state) = controller.lock() {
+                if state
                     .operations
                     .get(&fleet)
                     .is_some_and(|current| current.id == work.id)
-            {
-                state.operations.remove(&fleet);
+                {
+                    state.operations.remove(&fleet);
+                }
+                if controller.registry.save_operation(&outcome).is_err() {
+                    state.stopping = true;
+                    controller.lifetime.cancel();
+                }
+            } else {
+                controller.lifetime.cancel();
             }
             done.send_replace(true);
             controller.signal();
@@ -359,7 +363,7 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
         configuration: Option<Configuration>,
         selected: Vec<Instance>,
         stop: CancellationToken,
-    ) -> Result<()> {
+    ) -> Result<Operation> {
         operation.status = OperationStatus::Running;
         self.registry.save_operation(&operation)?;
         let fleet = operation
@@ -427,7 +431,7 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
         operation.completed_at = Some(self.clock.now()?);
         operation.approval = None;
         operation.errors = errors;
-        self.registry.save_operation(&operation)
+        Ok(operation)
     }
     pub(super) async fn execute_remote(
         self: &Arc<Self>,

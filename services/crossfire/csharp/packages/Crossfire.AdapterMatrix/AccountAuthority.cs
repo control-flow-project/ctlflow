@@ -9,7 +9,7 @@ using Crossfire.Kernel;
 
 namespace Crossfire.AdapterMatrix;
 
-public sealed record MatrixConfiguration(string Origin, string ServerName, string JwtSecret, string RegistrationSecret, string ServiceMatrixId);
+public sealed record MatrixConfiguration(string Origin, string ServerName, string JwtSecret, string RegistrationSecret, string ServiceBackendUserId);
 
 public sealed partial class AccountAuthority : IDisposable
 {
@@ -26,8 +26,8 @@ public sealed partial class AccountAuthority : IDisposable
     public AccountAuthority(MatrixConfiguration configuration, TimeProvider? time = null)
     {
         var origin = Validation.Origin(configuration.Origin);
-        if (!origin.IsSuccess || !Validation.UserId(configuration.ServiceMatrixId)
-            || !configuration.ServiceMatrixId.EndsWith(":" + configuration.ServerName, StringComparison.Ordinal)
+        if (!origin.IsSuccess || !MatrixSyntax.UserId(configuration.ServiceBackendUserId)
+            || !configuration.ServiceBackendUserId.EndsWith(":" + configuration.ServerName, StringComparison.Ordinal)
             || configuration.JwtSecret.Length == 0 || configuration.RegistrationSecret.Length == 0)
             throw new ArgumentException("Invalid native Matrix authority configuration");
         this.configuration = configuration with { Origin = origin.Value };
@@ -37,7 +37,7 @@ public sealed partial class AccountAuthority : IDisposable
     }
 
     private NativeEndpoint Server(string? token = null) => new(configuration.Origin, token);
-    private bool Local(string id) => Validation.UserId(id) && id.EndsWith(":" + configuration.ServerName, StringComparison.Ordinal);
+    private bool Local(string id) => MatrixSyntax.UserId(id) && id.EndsWith(":" + configuration.ServerName, StringComparison.Ordinal);
 
     public async ValueTask<Result<string>> Identify(string token, CancellationToken cancellation = default)
     {
@@ -85,7 +85,7 @@ public sealed partial class AccountAuthority : IDisposable
 
     public async ValueTask<Result<string?>> ProfileName(string id, CancellationToken cancellation = default)
     {
-        if (!Validation.UserId(id)) return Results.Fail<string?>("invalid", "Invalid native profile identity");
+        if (!MatrixSyntax.UserId(id)) return Results.Fail<string?>("invalid", "Invalid native profile identity");
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellation, stopped);
         var result = await MatrixJson.Ok(client, Server(), "GET", MatrixJson.Api + "/profile/" + MatrixJson.Segment(id) + "/displayname", cancellation: linked.Token);
         if (!result.IsSuccess) return Result<string?>.Fail(result.Error);
@@ -107,13 +107,19 @@ public sealed partial class AccountAuthority : IDisposable
             : Results.Fail<bool>("native", "Native account existence could not be verified");
     }
 
-    public ValueTask<Result<MatrixAccount>> Provision(string id, string password, string device = "CROSSFIRE_AGENT", CancellationToken cancellation = default)
-        => Exclusive(id, linked => Register(id, password, device, linked), cancellation);
+    public ValueTask<Result<BackendAccount>> Provision(string id, string password, JsonElement? native = null, CancellationToken cancellation = default)
+    {
+        var device = native is { } options ? MatrixJson.Text(options, "deviceId") : null;
+        if (native is { } parameters && (!BackendData.Valid(parameters) || parameters.EnumerateObject().Any(property => property.Name != "deviceId")
+            || device is not null && !CleanText(device, 100))) return ValueTask.FromResult(Results.Fail<BackendAccount>("invalid", "Invalid Matrix account options"));
+        device ??= id.StartsWith("@agent-", StringComparison.Ordinal) ? "CROSSFIRE_AGENT" : "CROSSFIRE_HUMAN";
+        return Exclusive(id, linked => Register(id, password, device, linked), cancellation);
+    }
 
-    private async ValueTask<Result<MatrixAccount>> Register(string id, string password, string device, CancellationToken cancellation)
+    private async ValueTask<Result<BackendAccount>> Register(string id, string password, string device, CancellationToken cancellation)
     {
         if (!Local(id) || !CleanText(password, 1024) || !CleanText(device, 100))
-            return Results.Fail<MatrixAccount>("invalid", "Invalid native account provisioning input");
+            return Results.Fail<BackendAccount>("invalid", "Invalid native account provisioning input");
         JsonElement Body(string? stage = null, string? session = null) => MatrixJson.Object(writer =>
         {
             writer.WriteString("username", id[1..id.IndexOf(':')]); writer.WriteString("password", password);
@@ -131,25 +137,25 @@ public sealed partial class AccountAuthority : IDisposable
             using var challenge = result.Value;
             var session = MatrixJson.Text(challenge.Body, "session");
             if (session is null || !challenge.Body.TryGetProperty("flows", out var flows) || flows.ValueKind != JsonValueKind.Array)
-                return Results.Fail<MatrixAccount>("native", "Invalid native registration challenge");
+                return Results.Fail<BackendAccount>("native", "Invalid native registration challenge");
             var completed = challenge.Body.TryGetProperty("completed", out var done) && done.ValueKind == JsonValueKind.Array
                 ? done.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.String).Select(value => value.GetString()).ToArray() : [];
             var stage = flows.EnumerateArray().Where(value => value.ValueKind == JsonValueKind.Object && value.TryGetProperty("stages", out var values) && values.ValueKind == JsonValueKind.Array)
                 .SelectMany(value => value.GetProperty("stages").EnumerateArray()).FirstOrDefault(value => value.ValueKind == JsonValueKind.String && !completed.Contains(value.GetString()));
             var selected = stage.ValueKind == JsonValueKind.String ? stage.GetString() : null;
-            if (selected is not ("m.login.registration_token" or "m.login.dummy")) return Results.Fail<MatrixAccount>("native", "Unsupported native registration challenge");
+            if (selected is not ("m.login.registration_token" or "m.login.dummy")) return Results.Fail<BackendAccount>("native", "Unsupported native registration challenge");
             result = await NativeHttp.Json(client, Server(), "POST", MatrixJson.Api + "/register", Body(selected, session), cancellation: cancellation);
         }
-        if (!result.IsSuccess) return Result<MatrixAccount>.Fail(result.Error);
+        if (!result.IsSuccess) return Result<BackendAccount>.Fail(result.Error);
         using var response = result.Value;
         if (response.Status == 400 && MatrixJson.Error(response.Body, "M_USER_IN_USE"))
         {
             var login = await NativeHttp.Json(client, Server(), "POST", MatrixJson.Api + "/login", Password(id, password, device), cancellation: cancellation);
-            if (!login.IsSuccess) return Result<MatrixAccount>.Fail(login.Error);
+            if (!login.IsSuccess) return Result<BackendAccount>.Fail(login.Error);
             using var account = login.Value;
-            return account.Status == 200 ? Credentials(account.Body, id) : Results.Fail<MatrixAccount>("native", "Account provisioning is not complete");
+            return account.Status == 200 ? Credentials(account.Body, id) : Results.Fail<BackendAccount>("native", "Account provisioning is not complete");
         }
-        return response.Status == 200 ? Credentials(response.Body, id) : Results.Fail<MatrixAccount>("native", "Account provisioning is not complete");
+        return response.Status == 200 ? Credentials(response.Body, id) : Results.Fail<BackendAccount>("native", "Account provisioning is not complete");
     }
 
     private async ValueTask<Result<T>> Exclusive<T>(string id, Func<CancellationToken, ValueTask<Result<T>>> operation, CancellationToken cancellation)
@@ -188,13 +194,13 @@ public sealed partial class AccountAuthority : IDisposable
             writer.WriteString("password", password); writer.WriteString("device_id", device);
         });
 
-    private static Result<MatrixAccount> Credentials(JsonElement body, string expected)
+    private static Result<BackendAccount> Credentials(JsonElement body, string expected)
     {
         var id = MatrixJson.Text(body, "user_id");
         var token = MatrixJson.Text(body, "access_token", 8192);
         var device = MatrixJson.Text(body, "device_id");
-        return id == expected && id is not null && Validation.UserId(id) && token is not null && device is not null
-            ? Result<MatrixAccount>.Success(new(id, token, device)) : Results.Fail<MatrixAccount>("native", "Unexpected native account credentials");
+        return id == expected && id is not null && MatrixSyntax.UserId(id) && token is not null && device is not null
+            ? Result<BackendAccount>.Success(new(id, token, WireJson.Object(writer => writer.WriteString("deviceId", device)))) : Results.Fail<BackendAccount>("native", "Unexpected native account credentials");
     }
 
     private static bool CleanText(string value, int maximum) => value.Length >= 1 && value.Length <= maximum && !value.Any(character => character is <= '\u001f' or '\u007f');

@@ -2,7 +2,7 @@ mod support;
 
 use crossfire_adapter_sqlite::store::SharedStore;
 use crossfire_domain::{
-    port::{AuthorizationRepository, ListenerRepository, MatrixIdentity, RepositoryAccess},
+    port::{AuthorizationRepository, BackendUserIdentity, ListenerRepository, RepositoryAccess},
     session,
 };
 use crossfire_kernel::{Result, identity, secret::Secret};
@@ -13,7 +13,7 @@ struct Matrix {
     now: AtomicI64,
 }
 
-impl MatrixIdentity for Matrix {
+impl BackendUserIdentity for Matrix {
     async fn identify(&self, _token: &Secret) -> Result<String> {
         self.now.store(NOW + 60_000, Ordering::SeqCst);
         Ok("@owner:example.test".to_owned())

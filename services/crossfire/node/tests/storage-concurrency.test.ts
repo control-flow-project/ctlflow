@@ -17,7 +17,7 @@ test('a management reader does not block a committed heartbeat or omit committed
   const writer = openTestStore(path);
   const reader = new Database(path, { readonly: true, fileMustExist: true });
   const repositories = createRepositories(writer), reads = createRepositories(reader);
-  const original = { id: 'concurrent-owner', matrixUserId: '@concurrent:example.test', kind: 'human' as const, status: 'active' as const, revision: 0, createdAt: 1 };
+  const original = { id: 'concurrent-owner', backendUserId: '@concurrent:example.test', kind: 'human' as const, status: 'active' as const, revision: 0, createdAt: 1 };
   try {
     assert.deepEqual(databaseIdentity(writer), { application: 1129465426, version: SCHEMA_VERSION });
     assert.equal(databaseValid(writer), true);

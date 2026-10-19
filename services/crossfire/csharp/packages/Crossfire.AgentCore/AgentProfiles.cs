@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Crossfire.Contracts;
+using Crossfire.Domain;
 using Crossfire.Kernel;
 
 namespace Crossfire.AgentCore;
@@ -8,12 +9,30 @@ public static class AgentProfiles
 {
     public static JsonElement Encode(AgentProfile profile) => WireJson.Object(writer =>
     {
-        writer.WriteString("id", profile.Id); writer.WriteString("workspace", profile.Workspace); writer.WriteStartObject("account"); writer.WriteString("user_id", profile.Account.UserId); writer.WriteString("access_token", profile.Account.AccessToken); writer.WriteString("device_id", profile.Account.DeviceId); writer.WriteEndObject(); writer.WriteStartObject("settings"); writer.WriteString("instance", profile.Settings.Instance); writer.WriteString("homeserver", profile.Settings.Homeserver); writer.WriteString("server_name", profile.Settings.ServerName); writer.WriteString("owner", profile.Settings.Owner); writer.WriteNumber("max_upload_bytes", profile.Settings.MaxUploadBytes); writer.WriteEndObject();
+        writer.WriteString("id", profile.Id); writer.WriteString("workspace", profile.Workspace);
+        writer.WriteStartObject("account"); writer.WriteString("userId", profile.Account.UserId); writer.WriteString("accessToken", profile.Account.AccessToken);
+        writer.WritePropertyName("native"); profile.Account.Native.WriteTo(writer); writer.WriteEndObject();
+        writer.WriteStartObject("settings"); writer.WriteString("instance", profile.Settings.Instance); writer.WriteString("server", profile.Settings.Server);
+        writer.WriteStartObject("backend"); writer.WriteString("type", profile.Settings.Backend.Type); writer.WritePropertyName("parameters"); profile.Settings.Backend.Parameters.WriteTo(writer); writer.WriteEndObject();
+        writer.WriteString("owner", profile.Settings.Owner); writer.WriteNumber("maxUploadBytes", profile.Settings.MaxUploadBytes); writer.WriteEndObject();
     });
     public static Result<AgentProfile> Parse(JsonElement value)
     {
-        if (!Validation.Fields(value, ["id", "workspace", "account", "settings"]).IsSuccess || !Validation.Fields(value.GetProperty("account"), ["user_id", "access_token", "device_id"]).IsSuccess || !Validation.Fields(value.GetProperty("settings"), ["instance", "homeserver", "server_name", "owner", "max_upload_bytes"]).IsSuccess) return Results.Fail<AgentProfile>("invalid", "Invalid project-local agent profile");
-        var id = WireJson.Text(value, "id"); var workspace = WireJson.Text(value, "workspace"); var account = value.GetProperty("account"); var user = WireJson.Text(account, "user_id"); var token = Validation.Text(account.GetProperty("access_token"), 8192); var device = Validation.Text(account.GetProperty("device_id"), 255); var settings = value.GetProperty("settings"); var instance = Validation.Text(settings.GetProperty("instance"), 100); var server = WireJson.Text(settings, "homeserver"); var serverName = Validation.Text(settings.GetProperty("server_name"), 255); var owner = WireJson.Text(settings, "owner"); var maximum = Validation.Integer(settings.GetProperty("max_upload_bytes"), 1, 16777216);
-        return id is not null && Validation.Identifier(id) && workspace is not null && Path.IsPathFullyQualified(workspace) && user is not null && Validation.UserId(user) && token.IsSuccess && device.IsSuccess && instance.IsSuccess && server is not null && Validation.Origin(server).IsSuccess && serverName.IsSuccess && owner is not null && Validation.UserId(owner) && maximum.IsSuccess ? Result<AgentProfile>.Success(new(new(instance.Value, server, serverName.Value, owner, (int)maximum.Value), workspace, id, new(user, token.Value, device.Value))) : Results.Fail<AgentProfile>("invalid", "Invalid agent account, workspace or instance settings");
+        if (!Validation.Fields(value, ["id", "workspace", "account", "settings"]).IsSuccess) return Invalid();
+        var account = value.GetProperty("account"); var settings = value.GetProperty("settings");
+        if (!Validation.Fields(account, ["userId", "accessToken", "native"]).IsSuccess
+            || !Validation.Fields(settings, ["instance", "server", "backend", "owner", "maxUploadBytes"]).IsSuccess) return Invalid();
+        var backend = settings.GetProperty("backend");
+        if (!Validation.Fields(backend, ["type", "parameters"]).IsSuccess) return Invalid();
+        var id = WireJson.Text(value, "id"); var workspace = WireJson.Text(value, "workspace"); var user = WireJson.Text(account, "userId");
+        var token = Validation.Text(account.GetProperty("accessToken"), 8192); var instance = Validation.Text(settings.GetProperty("instance"), 100);
+        var server = WireJson.Text(settings, "server"); var owner = WireJson.Text(settings, "owner"); var type = Validation.Text(backend.GetProperty("type"), 100);
+        var maximum = Validation.Integer(settings.GetProperty("maxUploadBytes"), 1, 16777216);
+        if (id is null || !Validation.Identifier(id) || workspace is null || !Path.IsPathFullyQualified(workspace) || user is null || !Validation.UserId(user)
+            || !token.IsSuccess || !BackendData.Valid(account.GetProperty("native")) || !instance.IsSuccess || !IdentitySyntax.Name(instance.Value) || server is null || !Validation.Origin(server).IsSuccess
+            || !type.IsSuccess || !IdentitySyntax.Name(type.Value) || !BackendData.Valid(backend.GetProperty("parameters")) || owner is null || !Validation.UserId(owner) || !maximum.IsSuccess) return Invalid();
+        return Result<AgentProfile>.Success(new(new(instance.Value, server, new(type.Value, backend.GetProperty("parameters").Clone()), owner, (int)maximum.Value),
+            workspace, id, new(user, token.Value, account.GetProperty("native").Clone())));
     }
+    private static Result<AgentProfile> Invalid() => Results.Fail<AgentProfile>("invalid", "Invalid project-local agent profile");
 }

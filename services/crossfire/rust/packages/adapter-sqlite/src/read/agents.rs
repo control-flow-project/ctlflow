@@ -48,7 +48,7 @@ pub(super) fn page(
         .filter(
             agent_name::name
                 .like(&search)
-                .or(principal::matrix_user_id.like(&search)),
+                .or(principal::backend_user_id.like(&search)),
         )
         .into_boxed();
     let mut records = base
@@ -61,7 +61,7 @@ pub(super) fn page(
         .filter(
             agent_name::name
                 .like(&search)
-                .or(principal::matrix_user_id.like(&search)),
+                .or(principal::backend_user_id.like(&search)),
         )
         .into_boxed();
     if let Some(owner_id) = input.owner_id {

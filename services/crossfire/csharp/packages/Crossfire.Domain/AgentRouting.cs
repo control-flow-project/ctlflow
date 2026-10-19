@@ -15,7 +15,7 @@ public static class AgentRouting
     {
         var identities = ports.Identities(); if (!identities.IsSuccess) return Result<IReadOnlyList<string>>.Fail(identities.Error);
         var selected = ports.Senders(target.Principal.Id);
-        return selected.Map(values => WakePolicy.SenderMatrixIds(target, identities.Value, values));
+        return selected.Map(values => WakePolicy.SenderBackendUserIds(target, identities.Value, values));
     }
 
     public static Result<WakePolicyView> Wake(AgentRoutingPorts ports, Actor actor, string agentId)

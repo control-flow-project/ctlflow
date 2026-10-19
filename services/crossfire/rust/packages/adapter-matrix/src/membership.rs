@@ -1,18 +1,16 @@
 use crate::account::{API, Authority};
+use crate::native_values::{MatrixMembership, RoomPower};
+use crate::room_state::{self, StateEvent};
 use crossfire_contracts::origin::segment;
-use crossfire_contracts::{
-    matrix_room::{self, StateEvent},
-    validation,
-};
-use crossfire_domain::matrix::{
-    AccessMode, Membership, RoomAccess, RoomAdmission, RoomInvitation, RoomMembership, RoomPower,
-};
+use crossfire_contracts::validation;
+use crossfire_domain::messaging::{Membership, RoomAdmission, RoomInvitation, RoomMembership};
+use crossfire_domain::room_access::values::{Access, Intent};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use reqwest::Method;
 use serde_json::{Value, json};
 
 pub(crate) struct MemberState {
-    pub member: RoomMembership,
+    pub member: MatrixMembership,
     pub read_level: i64,
     pub reply_level: i64,
 }
@@ -52,16 +50,16 @@ pub(crate) fn member_state(events: &[StateEvent], target: &str) -> Result<Member
         .iter()
         .find(|event| event.event_type == "m.room.power_levels" && event.state_key.is_empty())
         .ok_or_else(|| Failure::new(ErrorCode::Native, "Native room power levels are missing"))?;
-    let levels = matrix_room::powers(&powers.content, target)?;
-    let creators = matrix_room::creators(events)?;
+    let levels = room_state::powers(&powers.content, target)?;
+    let creators = room_state::creators(events)?;
     let name = content.and_then(|content| content.get("displayname"));
     let display_name = name
         .and_then(|value| validation::text(value, 1, 255).ok())
         .unwrap_or(target)
         .to_owned();
     Ok(MemberState {
-        member: RoomMembership {
-            matrix_user_id: target.to_owned(),
+        member: MatrixMembership {
+            backend_user_id: target.to_owned(),
             display_name,
             membership,
             power: if creators.iter().any(|id| id == target) {
@@ -81,8 +79,10 @@ pub(crate) fn member_state(events: &[StateEvent], target: &str) -> Result<Member
 
 impl Authority {
     pub async fn membership(&self, user: &str, target: &str, room: &str) -> Result<RoomMembership> {
-        validation::matrix_user_id(&json!(target))?;
-        Ok(member_state(&self.state(user, room).await?, target)?.member)
+        crate::syntax::user_id(&json!(target))?;
+        Ok(crate::access::membership_view(
+            member_state(&self.state(user, room).await?, target)?.member,
+        ))
     }
 
     pub(crate) async fn invitation_event(
@@ -91,8 +91,8 @@ impl Authority {
         room: &str,
         sender: &str,
     ) -> Result<Option<RoomInvitation>> {
-        validation::room_id(&json!(room))?;
-        validation::matrix_user_id(&json!(recipient))?;
+        crate::syntax::room_id(&json!(room))?;
+        crate::syntax::user_id(&json!(recipient))?;
         let token = self.as_user(sender).await?;
         let response = self
             .http
@@ -132,10 +132,10 @@ impl Authority {
             {
                 return Ok(None);
             }
-            let event_id = validation::event_id(event.get("event_id").unwrap_or(&Value::Null))
+            let event_id = crate::syntax::event_id(event.get("event_id").unwrap_or(&Value::Null))
                 .map_err(|_| {
-                    Failure::new(ErrorCode::Native, "Invalid native invitation identity")
-                })?;
+                Failure::new(ErrorCode::Native, "Invalid native invitation identity")
+            })?;
             if content
                 .get("is_direct")
                 .is_some_and(|value| !value.is_boolean())
@@ -148,7 +148,7 @@ impl Authority {
             return Ok(Some(RoomInvitation {
                 room_id: room.to_owned(),
                 event_id,
-                sender_matrix_id: sender.to_owned(),
+                sender_backend_user_id: sender.to_owned(),
                 direct: content.get("is_direct") == Some(&Value::Bool(true)),
             }));
         }
@@ -160,12 +160,12 @@ impl Authority {
         user: &str,
         target: &str,
         room: &str,
-        current: &RoomMembership,
+        current: &MatrixMembership,
         admission: Option<&RoomAdmission>,
     ) -> Result<()> {
         let Some(RoomAdmission::Invitation {
             event_id,
-            sender_matrix_id,
+            sender_backend_user_id,
         }) = admission
         else {
             return Ok(());
@@ -173,7 +173,7 @@ impl Authority {
         if current.membership == Membership::Join {
             return Ok(());
         }
-        if sender_matrix_id != user {
+        if sender_backend_user_id != user {
             return Err(Failure::new(
                 ErrorCode::Forbidden,
                 "Native invitation authority does not match",
@@ -198,15 +198,10 @@ impl Authority {
         user: &str,
         target: &str,
         room: &str,
-        access: RoomAccess,
+        access: &Intent,
         admission: Option<&RoomAdmission>,
     ) -> Result<RoomMembership> {
-        validation::matrix_user_id(&json!(target))?;
-        validation::integer(
-            &json!(access.power_level),
-            -validation::SAFE_INTEGER,
-            validation::SAFE_INTEGER,
-        )?;
+        crate::syntax::user_id(&json!(target))?;
         let events = self.state(user, room).await?;
         if !events.iter().any(|event| {
             event.event_type == "m.room.member"
@@ -218,24 +213,25 @@ impl Authority {
                 "Owner is not a current room member",
             ));
         }
+        let facts = crate::facts::facts(&events, user, room)?;
+        let mut power_level = crate::access::requested_power(&facts, target, access, true)?;
         let authorizer = member_state(&events, user)?;
         let current = member_state(&events, target)?.member;
-        if matches!(authorizer.member.power, RoomPower::Level(level) if access.power_level > level)
-        {
+        if matches!(authorizer.member.power, RoomPower::Level(level) if power_level > level) {
             return Err(Failure::new(
                 ErrorCode::Forbidden,
                 "Requested power exceeds native authority",
             ));
         }
-        if current.power == RoomPower::Creator && access.mode != AccessMode::Reply {
+        if current.power == RoomPower::Creator && access.access != Access::Reply {
             return Err(Failure::new(
                 ErrorCode::Forbidden,
                 "Native creator authority cannot be restricted by an agent grant",
             ));
         }
         if current.power != RoomPower::Creator
-            && access.mode == AccessMode::Reply
-            && access.power_level < authorizer.reply_level
+            && access.access == Access::Reply
+            && power_level < authorizer.reply_level
         {
             return Err(Failure::new(
                 ErrorCode::Forbidden,
@@ -243,13 +239,18 @@ impl Authority {
             ));
         }
         if admission.is_none() && current.membership != Membership::Join {
-            return Ok(current);
+            return Ok(crate::access::membership_view(current));
+        }
+        if admission.is_none()
+            && let RoomPower::Level(current_level) = current.power
+        {
+            power_level = power_level.min(current_level);
         }
         self.verify_invitation(user, target, room, &current, admission)
             .await?;
         let token = self.as_user(user).await?;
         let path = format!("{API}/rooms/{}", segment(room));
-        if matches!(current.power, RoomPower::Level(level) if level != access.power_level) {
+        if matches!(current.power, RoomPower::Level(level) if level != power_level) {
             let mut powers = self
                 .http
                 .ok(
@@ -266,7 +267,7 @@ impl Authority {
                     value.as_object().cloned()
                 })
                 .ok_or_else(|| Failure::new(ErrorCode::Native, "Invalid native power levels"))?;
-            users.insert(target.to_owned(), json!(access.power_level));
+            users.insert(target.to_owned(), json!(power_level));
             powers["users"] = Value::Object(users);
             self.http
                 .ok(
@@ -296,11 +297,11 @@ impl Authority {
         }
         let checked = member_state(&self.state(user, room).await?, target)?;
         let permitted = match checked.member.power {
-            RoomPower::Creator => access.mode == AccessMode::Reply,
+            RoomPower::Creator => access.access == Access::Reply,
             RoomPower::Level(level) => {
-                level == access.power_level
-                    && (access.mode != AccessMode::Reply || level >= checked.reply_level)
-                    && (access.mode != AccessMode::Read || level <= checked.read_level)
+                level == power_level
+                    && (access.access != Access::Reply || level >= checked.reply_level)
+                    && (access.access != Access::Read || level <= checked.read_level)
             }
         };
         if checked.member.membership != Membership::Join || !permitted {
@@ -309,6 +310,6 @@ impl Authority {
                 "Native room membership and requested permissions were not confirmed",
             ));
         }
-        Ok(checked.member)
+        Ok(crate::access::membership_view(checked.member))
     }
 }

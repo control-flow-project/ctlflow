@@ -1,3 +1,4 @@
+mod diagnostics;
 mod logical;
 use crate::{
     lifecycle_observer::{LifecycleHooks, Tracker},
@@ -208,8 +209,8 @@ impl<
                 runtime: Runtime::parse(&context.runtime)?,
                 settings: self.tracker.settings(&context.session_id, &configured)?,
                 session_id: context.session_id,
-                room_id: (!matches!(context.context.as_str(), "shared" | "control"))
-                    .then_some(context.context),
+                room_id: crossfire_kernel::history_context::room(&context.context)
+                    .map(str::to_owned),
                 state: phase,
                 observed_at: self.clock.now()?,
                 error_message: error.map(|error| {
@@ -366,10 +367,10 @@ impl<
         Ok(())
     }
     async fn inspect_native(&self, native: &Arc<A::Connection>) -> Result<bool> {
-        let revision = self.tracker.revision()?;
+        let revisions = self.tracker.revisions()?;
         let generation = self.tracker.generation.load(Ordering::Acquire);
         let activity = native.activity().await?;
-        self.tracker.complete_idle(revision, || {
+        self.tracker.complete_idle(&revisions, || {
             let state = self.state.lock().map_err(|_| ownership())?;
             if generation != self.tracker.generation.load(Ordering::Acquire)
                 || native.lifetime().is_cancelled()

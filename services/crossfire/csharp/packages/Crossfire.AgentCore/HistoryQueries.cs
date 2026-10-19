@@ -1,3 +1,4 @@
+using Crossfire.Domain;
 using System.Text.Json;
 using Crossfire.Contracts;
 using Crossfire.Kernel;
@@ -10,7 +11,7 @@ public sealed class HistoryQueries
     private sealed record PendingQuery(string Id, IReadOnlyDictionary<string, string> Base, ReadBatch Batch, string MessageId, long ExpiresAt, string Stage);
     private readonly LocalState storage;
     private readonly string file, pendingFile;
-    private readonly AgentMatrix matrix;
+    private readonly MessagingClient messaging;
     private readonly AgentProfile profile;
     private readonly Coordination coordination;
     private readonly TimeProvider clock;
@@ -23,9 +24,9 @@ public sealed class HistoryQueries
     private CancellationTokenSource? current;
     private TaskCompletionSource? finished;
     private int reading;
-    public HistoryQueries(LocalState storage, string file, AgentMatrix matrix, AgentProfile profile, Coordination coordination, TimeProvider clock, MessageArtifacts artifacts, Func<bool> publishing,
+    public HistoryQueries(LocalState storage, string file, MessagingClient messaging, AgentProfile profile, Coordination coordination, TimeProvider clock, MessageArtifacts artifacts, Func<bool> publishing,
         Action<IReadOnlyList<ReceivedEvent>> observed, Action<IReadOnlyList<ReceivedEvent>> delivered, Action acknowledged, CancellationToken stop, object gate)
-    { this.storage = storage; this.file = file; pendingFile = file + ".query"; this.matrix = matrix; this.profile = profile; this.coordination = coordination; this.clock = clock; this.artifacts = artifacts; this.publishing = publishing; this.observed = observed; this.delivered = delivered; this.acknowledged = acknowledged; this.stop = stop; this.gate = gate; }
+    { this.storage = storage; this.file = file; pendingFile = file + ".query"; this.messaging = messaging; this.profile = profile; this.coordination = coordination; this.clock = clock; this.artifacts = artifacts; this.publishing = publishing; this.observed = observed; this.delivered = delivered; this.acknowledged = acknowledged; this.stop = stop; this.gate = gate; }
     private CancellationTokenSource? Begin(bool exclusive)
     { lock (gate) { if (reading != 0 || exclusive && publishing()) return null; reading = 1; current = new(); finished = new(TaskCreationOptions.RunContinuationsAsynchronously); return current; } }
     private void End(CancellationTokenSource selected)
@@ -59,7 +60,7 @@ public sealed class HistoryQueries
     public bool Recovering => Volatile.Read(ref reading) == 0 && storage.Exists(pendingFile) && Load().Stage == "acknowledging";
     private async ValueTask<Result<(ListenerPolicy Policy, IReadOnlySet<string> Rooms)>> Allowed(CancellationToken cancellation)
     {
-        var policy = await OwnerAuthority.Policy(coordination, profile, cancellation); if (!policy.IsSuccess) return Result<(ListenerPolicy, IReadOnlySet<string>)>.Fail(policy.Error); var joined = await ReceivePages.Joined(matrix, cancellation); if (!joined.IsSuccess) return Result<(ListenerPolicy, IReadOnlySet<string>)>.Fail(joined.Error);
+        var policy = await OwnerAuthority.Policy(coordination, profile, cancellation); if (!policy.IsSuccess) return Result<(ListenerPolicy, IReadOnlySet<string>)>.Fail(policy.Error); var joined = await ReceivePages.Joined(messaging, cancellation); if (!joined.IsSuccess) return Result<(ListenerPolicy, IReadOnlySet<string>)>.Fail(joined.Error);
         return Result<(ListenerPolicy, IReadOnlySet<string>)>.Success((policy.Value, policy.Value.Rooms.Where(grant => joined.Value.Contains(grant.RoomId)).Select(grant => grant.RoomId).ToHashSet(StringComparer.Ordinal)));
     }
     public async ValueTask<Result<JsonElement>> Read(HistoryRequest input, CancellationToken cancellation)
@@ -75,26 +76,26 @@ public sealed class HistoryQueries
             if (input.Kind == "unread")
             {
                 if (storage.Exists(pendingFile)) return Results.Fail<JsonElement>("conflict", "A previous unread query needs its acknowledgment before another catch-up"); if (input.Cursors.Count != 0) return Results.Fail<JsonElement>("invalid", "Unread queries use saved delivery checkpoints, not supplied history cursors");
-                var unread = await UnreadMessages.Read(storage, matrix, profile.Settings, file, input.Limit, policy.MaxMessageBytes, input.Room, null, allowed, null, artifacts.Stage, scope.Token); if (!unread.IsSuccess) return Result<JsonElement>.Fail(unread.Error); batch = unread.Value;
+                var unread = await UnreadMessages.Read(storage, messaging, profile.Settings, file, input.Limit, policy.MaxMessageBytes, input.Room, null, allowed, null, artifacts.Stage, scope.Token); if (!unread.IsSuccess) return Result<JsonElement>.Fail(unread.Error); batch = unread.Value;
             }
             else
             {
                 var rooms = input.Room is not null ? [input.Room] : allowed.Order(StringComparer.Ordinal).ToArray(); var events = new List<ReceivedEvent>(); var more = new List<string>(); var next = new Dictionary<string, string>(StringComparer.Ordinal); var fileMode = false;
                 for (var index = 0; index < rooms.Length; index++)
                 {
-                    var room = rooms[index]; var query = new Dictionary<string, string>(StringComparer.Ordinal) { ["dir"] = input.Direction }; if (input.Cursors.TryGetValue(room, out var from)) query["from"] = from;
-                    var page = await ReceivePages.History(matrix, room, query, ReceivePages.RoomQuota(input.Limit, rooms.Length, index), scope.Token); if (!page.IsSuccess) return Result<JsonElement>.Fail(page.Error); var messages = new List<ReceivedEvent>();
-                    foreach (var value in page.Value.Chunk) { var parsed = ReceivedEvents.View(value, room); if (!parsed.IsSuccess) return Result<JsonElement>.Fail(parsed.Error); messages.Add(parsed.Value); }
+                    var room = rooms[index]; var query = new MessagePageRequest(input.Direction == "b" ? "backward" : "forward", ReceivePages.RoomQuota(input.Limit, rooms.Length, index), input.Cursors.GetValueOrDefault(room));
+                    var page = await ReceivePages.History(messaging, room, query, scope.Token); if (!page.IsSuccess) return Result<JsonElement>.Fail(page.Error); var messages = new List<ReceivedEvent>();
+                    foreach (var value in page.Value.Events) { var parsed = ReceivedEvents.View(value, room); if (!parsed.IsSuccess) return Result<JsonElement>.Fail(parsed.Error); messages.Add(parsed.Value); }
                     if (fileMode || UnreadMessages.AcquisitionBytes([..events, ..messages], profile.Settings) > policy.MaxMessageBytes) { fileMode = true; events = artifacts.Stage(events).ToList(); messages = artifacts.Stage(messages).ToList(); }
-                    events.AddRange(messages); if (page.Value.End is { } end) next[room] = end; if (page.Value.Chunk.Count >= page.Value.RequestedLimit) more.Add(room);
+                    events.AddRange(messages); if (page.Value.End is { } end) next[room] = end; if (page.Value.Events.Count >= page.Value.RequestedLimit) more.Add(room);
                 }
                 batch = new(events, next, more, new Dictionary<string, string>(StringComparer.Ordinal));
             }
-            var enriched = await ReceivePages.Origins(matrix, profile.Account.UserId, batch.Events, scope.Token); if (!enriched.IsSuccess) return Result<JsonElement>.Fail(enriched.Error); if (input.Kind == "unread") observed(enriched.Value);
+            var enriched = await ReceivePages.Origins(messaging, profile.Account.UserId, batch.Events, scope.Token); if (!enriched.IsSuccess) return Result<JsonElement>.Fail(enriched.Error); if (input.Kind == "unread") observed(enriched.Value);
             var identities = await CoordinationValues.Senders(coordination, enriched.Value, scope.Token); if (!identities.IsSuccess) return Result<JsonElement>.Fail(identities.Error); scope.Token.ThrowIfCancellationRequested();
             var envelope = ChatBatches.Envelope(enriched.Value, profile.Settings, identities.Value); var result = WireJson.Object(writer =>
             {
-                foreach (var field in envelope.EnumerateObject()) field.WriteTo(writer); writer.WriteStartArray("more_rooms"); foreach (var room in batch.MoreRooms) writer.WriteStringValue(room); writer.WriteEndArray(); writer.WriteStartObject("continuation"); writer.WriteStartArray("entries"); foreach (var cursor in batch.Cursors.Where(value => allowed.Contains(value.Key))) { writer.WriteStartObject(); writer.WriteString("room", cursor.Key); writer.WriteString("cursor", cursor.Value); writer.WriteEndObject(); } writer.WriteEndArray(); writer.WriteEndObject();
+                foreach (var field in envelope.EnumerateObject()) field.WriteTo(writer); writer.WriteStartArray("moreRooms"); foreach (var room in batch.MoreRooms) writer.WriteStringValue(room); writer.WriteEndArray(); writer.WriteStartObject("continuation"); writer.WriteStartArray("entries"); foreach (var cursor in batch.Cursors.Where(value => allowed.Contains(value.Key))) { writer.WriteStartObject(); writer.WriteString("room", cursor.Key); writer.WriteString("cursor", cursor.Value); writer.WriteEndObject(); } writer.WriteEndArray(); writer.WriteEndObject();
             });
             var metadata = WireJson.Object(writer => { foreach (var field in result.EnumerateObject()) if (field.Name != "events") field.WriteTo(writer); }); var id = Identity.Identifier(); var message = "query-" + id; var text = artifacts.Prepare(enriched.Value, WireJson.Pretty(result).TrimEnd('\n'), message, Math.Min(input.OutputBytes - 1, policy.MaxMessageBytes), metadata);
             if (input.Kind == "unread") { if (publishing() || !ReceiveState.Same(original, ReceiveState.Load(storage, file))) { artifacts.Release([message]); return Results.Fail<JsonElement>("conflict", "Delivery checkpoints changed during the query; no unread state was advanced"); } Save(new(id, original, batch, message, clock.GetUtcNow().ToUnixTimeMilliseconds() + 300000, "prepared")); } else artifacts.Release([message]);
@@ -110,7 +111,7 @@ public sealed class HistoryQueries
             if (!storage.Exists(pendingFile)) return Results.Fail<JsonElement>("missing", "Unread query not found"); var pending = Load(); if (pending.Id != id) return Results.Fail<JsonElement>("conflict", "Unread query identity changed"); var authority = await Allowed(scope.Token); if (!authority.IsSuccess) return Result<JsonElement>.Fail(authority.Error);
             if (pending.Batch.Events.Any(value => !authority.Value.Rooms.Contains(value.RoomId))) { storage.Remove(pendingFile); artifacts.Release([pending.MessageId]); return Results.Fail<JsonElement>("forbidden", "Room access changed before query acknowledgment"); }
             var current = ReceiveState.Load(storage, file); if (publishing() || !ReceiveState.Same(current, pending.Base) && (pending.Stage != "acknowledging" || !ReceiveState.Same(current, pending.Batch.Cursors))) return Results.Fail<JsonElement>("conflict", "Delivery checkpoints changed; the unread query was not acknowledged");
-            Save(pending with { Stage = "acknowledging" }); var accepted = await ReceiveState.Acknowledge(storage, matrix, file, pending.Batch, scope.Token); if (!accepted.IsSuccess) return Result<JsonElement>.Fail(accepted.Error); delivered(pending.Batch.Events); storage.Remove(pendingFile); artifacts.Release([pending.MessageId]); acknowledged(); return Result<JsonElement>.Success(WireJson.Object(writer => writer.WriteBoolean("accepted", true)));
+            Save(pending with { Stage = "acknowledging" }); var accepted = await ReceiveState.Acknowledge(storage, messaging, file, pending.Batch, scope.Token); if (!accepted.IsSuccess) return Result<JsonElement>.Fail(accepted.Error); delivered(pending.Batch.Events); storage.Remove(pendingFile); artifacts.Release([pending.MessageId]); acknowledged(); return Result<JsonElement>.Success(WireJson.Object(writer => writer.WriteBoolean("accepted", true)));
         }); } finally { End(selected); }
     }
     public async ValueTask<Result<Unit>> Recover(CancellationToken cancellation)

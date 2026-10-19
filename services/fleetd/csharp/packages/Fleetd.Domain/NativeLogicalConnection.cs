@@ -1,4 +1,5 @@
 using Crossfire.AgentCore;
+using Crossfire.Domain;
 using Crossfire.Kernel;
 
 namespace Fleetd.Domain;
@@ -14,7 +15,7 @@ public sealed partial class NativeLifecycle
         public RuntimeLifecycle Lifecycle => owner;
         private async ValueTask<Result<RuntimeConnection>> Select(OwnedRuntimeConnection connection, InputAdmission? admission = null)
         {
-            var selected = context == owner.services.Primary ? Result<RuntimeConnection>.Success(connection) : await connection.Conversation(context, admission);
+            var selected = context == owner.services.Primary ? Result<RuntimeConnection>.Success(connection) : HistoryContext.Room(context) is { } room ? await connection.Conversation(room, admission) : Results.Fail<RuntimeConnection>("conflict", "The captured room has no saved native history");
             return selected.IsSuccess && selected.Value.SessionId != session ? Results.Fail<RuntimeConnection>("conflict", "The captured room history is not the resumed native history") : selected;
         }
         private async ValueTask<Result<T>> Call<T>(Func<OwnedRuntimeConnection, ValueTask<Result<T>>> operation, bool activity = false, InputAdmission? admission = null, bool prepare = true)
@@ -50,19 +51,24 @@ public sealed partial class NativeLifecycle
         }
         public Result<Unit> Acknowledge(IReadOnlyList<string> messageIds)
         {
-            if (messageIds.Count == 0) return Results.Done(); var connection = owner.native; if (connection is null || connection.Lifetime.IsCancellationRequested) return Results.Fail<Unit>("unavailable", "Exact native receipt acknowledgment is waiting for recovery");
+            if (messageIds.Count == 0) return Results.Done(); OwnedRuntimeConnection? connection; lock (owner.gate) connection = owner.ready ? owner.native : null; if (connection is null || connection.Lifetime.IsCancellationRequested) return Results.Fail<Unit>("unavailable", "Exact native receipt acknowledgment is waiting for recovery");
             var result = connection.Acknowledge(messageIds); if (result.IsSuccess) lock (owner.gate) { foreach (var id in messageIds) owner.unsettled.Remove(id); owner.Schedule(); } return result;
         }
         public ValueTask<Result<string?>> ActiveTurn(string? room = null, InputAdmission? admission = null)
         {
-            var selectedRoom = room ?? (context == owner.services.Primary ? null : context);
+            var selectedRoom = room ?? HistoryContext.Room(context);
             if (admission is not null) return Call(connection => connection.TurnControl is null ? ValueTask.FromResult(Results.Fail<string?>("invalid", "Native turn control is unavailable")) : connection.TurnControl.ActiveTurn(selectedRoom, admission), admission: admission, prepare: false);
             var connection = owner.native; return connection is not null && !connection.Lifetime.IsCancellationRequested && connection.TurnControl is not null ? connection.TurnControl.ActiveTurn(selectedRoom) : ValueTask.FromResult(Result<string?>.Success(null));
         }
         public ValueTask<Result<string>> Interrupt(string turnId, bool recovery = false, InputAdmission? admission = null)
             => Call(connection => connection.TurnControl is null ? ValueTask.FromResult(Results.Fail<string>("invalid", "Native turn control is unavailable")) : connection.TurnControl.Interrupt(turnId, recovery, admission), true, admission, false);
         public ValueTask<Result<RuntimeConnection>> Conversation(string room, InputAdmission? admission = null)
-            => Call(async connection => { var selected = await connection.Conversation(room, admission); if (!selected.IsSuccess) return selected; var saved = owner.RefreshContexts(); return saved.IsSuccess ? Result<RuntimeConnection>.Success(new Logical(owner, room, selected.Value.SessionId)) : Result<RuntimeConnection>.Fail(saved.Error); }, admission: admission);
+            => Call(async connection => {
+                var selected = await connection.Conversation(room, admission); if (!selected.IsSuccess) return selected;
+                var saved = owner.RefreshContexts(); if (!saved.IsSuccess) return Result<RuntimeConnection>.Fail(saved.Error);
+                SavedRuntimeContext? history; lock (owner.gate) history = owner.contexts.FirstOrDefault(value => value.SessionId == selected.Value.SessionId);
+                return history is null ? Results.Fail<RuntimeConnection>("conflict", "The selected room has no saved native history") : Result<RuntimeConnection>.Success(new Logical(owner, history.Context, selected.Value.SessionId));
+            }, admission: admission);
         public ValueTask DisposeAsync() => owner.DisposeAsync();
     }
 }

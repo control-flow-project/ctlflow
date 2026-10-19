@@ -1,3 +1,4 @@
+import { matrixSettings } from './support/matrix-config.js';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
@@ -34,8 +35,8 @@ test("HTTP management enforces cookie, origin, CSRF, strict requests and removed
   assert(!installer.includes('@earendil-works/pi'));
   assert(!installer.includes('@openai/codex'));
   execFileSync('bash', ['-n'], { input: installer });
-  assert(!guide.includes(ctx.config.jwtSecret));
-  assert(!guide.includes(ctx.config.registrationSecret));
+  assert(!guide.includes(matrixSettings(ctx.config).jwtSecret));
+  assert(!guide.includes(matrixSettings(ctx.config).registrationSecret));
   const head = await fetch(setupUrl, { method: 'HEAD' });
   assert.equal(head.status, 200);
   assert.equal(head.headers.get('content-length'), String(Buffer.byteLength(guide)));
@@ -43,12 +44,12 @@ test("HTTP management enforces cookie, origin, CSRF, strict requests and removed
   const denied = await fetch(setupUrl, { method: 'POST' });
   assert.equal(denied.status, 405);
   assert.equal(denied.headers.get('allow'), 'GET, HEAD');
-  for (const query of ['', '?ownerMatrixId=', '?ownerMatrixId=invalid', '?ownerMatrixId=%40admin%0A%3Atests.localhost',
-    '?ownerMatrixId=%40admin%3Atests.localhost&ownerMatrixId=%40other%3Atests.localhost', '?ownerMatrixId=%40admin%3Atests.localhost&unknown=true']) {
+  for (const query of ['', '?ownerBackendUserId=', '?ownerBackendUserId=%40admin%0A%3Atests.localhost',
+    '?ownerBackendUserId=%40admin%3Atests.localhost&ownerBackendUserId=%40other%3Atests.localhost', '?ownerBackendUserId=%40admin%3Atests.localhost&unknown=true']) {
     assert.equal((await request('/onboarding/setup' + query)).status, 400, query);
   }
   await fixture.member("o'connor");
-  const quotedOwner = "@o'connor:" + ctx.config.serverName;
+  const quotedOwner = "@o'connor:" + matrixSettings(ctx.config).serverName;
   const quoted = await fetch(onboardingUrl(origin, quotedOwner));
   assert.equal(quoted.status, 200, 'The guide verifies a real active human owner without granting enrollment authority');
   assert((await quoted.text()).includes(onboardingCommand(origin, quotedOwner, release.manifest)));
@@ -64,9 +65,9 @@ test("HTTP management enforces cookie, origin, CSRF, strict requests and removed
   assert(other.includes(quotedOwner));
   assert(!other.includes(ctx.config.administrator));
   for (const path of ['/onboarding/setup', '/onboarding/setup.json']) {
-    assert.equal((await request(path + '?ownerMatrixId=' + encodeURIComponent('@unknown:' + ctx.config.serverName))).status, 403);
-    assert.equal((await request(path + '?ownerMatrixId=' + encodeURIComponent(ctx.config.administrator) + '&extra=true')).status, 400);
-    assert.equal((await request(path + '?ownerMatrixId=' + encodeURIComponent(ctx.config.administrator), 'PUT', {})).status, 405);
+    assert.equal((await request(path + '?ownerBackendUserId=' + encodeURIComponent('@unknown:' + matrixSettings(ctx.config).serverName))).status, 403);
+    assert.equal((await request(path + '?ownerBackendUserId=' + encodeURIComponent(ctx.config.administrator) + '&extra=true')).status, 400);
+    assert.equal((await request(path + '?ownerBackendUserId=' + encodeURIComponent(ctx.config.administrator), 'PUT', {})).status, 405);
   }
   const invalidHost = await new Promise<number>((resolve, reject) => {
     const outgoing = httpRequest(setupUrl, { headers: { Host: 'attacker.invalid' } }, response => {

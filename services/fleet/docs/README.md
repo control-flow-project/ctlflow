@@ -6,6 +6,7 @@
 - [Session controls](sessions.md)
 - [SSH transport](remote.md)
 - [Operations and updates](operations.md)
+- [Diagnostic reports](diagnostics.md)
 - [Earendil Pi](pi.md)
 
 fleet calls fleetd's private API even locally.

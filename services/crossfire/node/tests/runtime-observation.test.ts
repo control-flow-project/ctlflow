@@ -1,3 +1,4 @@
+import { createMessagingClient } from '@ctlflow/crossfire-adapter-matrix/messaging-client';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -14,7 +15,7 @@ import { fakeCodex, matrixFixture, OWNER_DM, ROOM, SELF, temporary, until } from
 import { testClock } from '../scripts/test-support/clock.js';
 import { localState } from '@ctlflow/crossfire-adapter-filesystem/state';
 import { matrix as matrixClient } from '@ctlflow/crossfire-adapter-matrix/http';
-import type { Transport } from '@ctlflow/crossfire-agent-core/port';
+import type { MessagingTransport } from '@ctlflow/crossfire-domain/port/messaging-client';
 import { failure } from '@ctlflow/crossfire-kernel/result';
 import { decisions } from '@ctlflow/crossfire-agent-core/decisions';
 
@@ -25,7 +26,7 @@ test('corrupt owner observations fail permanently and retain exact evidence with
   for (const text of ['{', 'null', '{"output":[null],"observations":[]}', '{"output":[],"observations":[null]}']) {
     writeFileSync(file, text, { mode: 0o600 });
     assert.throws(() => ownerObservation({ agentId: matrix.id, userId: SELF, file, storage: localState, clock,
-      transport: (signal, timeoutMs) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+      transport: (signal, timeoutMs) => createMessagingClient(matrixClient({ base: matrix.settings.server, token: matrix.account.accessToken, signal, timeoutMs }), matrix.account.userId),
       coordination: matrix.coordination, historyMode: 'shared', maximum: 65536 }, scope.signal), error => {
       assert(error instanceof Error && 'code' in error); assert.equal(error.code, 'invalid');
       assert.equal(canRecoverFailure(error), false); return true;
@@ -39,9 +40,9 @@ test('malformed decision receipts cannot enter automatic recovery or erase retai
   const file = matrix.cursorFile + '.decisions'; privateDir(dirname(file));
   for (const text of ['{', 'null', '[null]', '[{"id":"invalid","native":"original","status":"pending"}]']) {
     writeFileSync(file, text, { mode: 0o600 });
-    assert.throws(() => decisions({ clock, client: matrixClient({ base: matrix.settings.homeserver,
-      token: matrix.account.access_token, signal: scope.signal, timeoutMs: 1000 }), coordination: matrix.coordination,
-      settings: matrix.settings, agent: matrix.id, matrixUserId: SELF, run: async () => randomUUID(), storage: localState, file }, scope.signal), error => {
+    assert.throws(() => decisions({ clock, client: createMessagingClient(matrixClient({ base: matrix.settings.server,
+      token: matrix.account.accessToken, signal: scope.signal, timeoutMs: 1000 }), matrix.account.userId), coordination: matrix.coordination,
+      settings: matrix.settings, agent: matrix.id, backendUserId: SELF, run: async () => randomUUID(), storage: localState, file }, scope.signal), error => {
       assert(error instanceof Error && 'code' in error); assert.equal(error.code, 'invalid');
       assert.equal(canRecoverFailure(error), false); return true;
     });
@@ -52,9 +53,9 @@ test('malformed decision receipts cannot enter automatic recovery or erase retai
 test('cancelled native questions stop waiting for reporting without publishing a decision or granting a choice', async scope => {
   const clock = testClock(scope), matrix = await matrixFixture(scope, temporary(scope), clock);
   const stop = new AbortController(), cancelled = new AbortController(); let entered = false;
-  const broker = decisions({ clock, client: matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token,
-    signal: stop.signal, timeoutMs: 1000 }), coordination: matrix.coordination, settings: matrix.settings,
-    agent: matrix.id, matrixUserId: SELF, storage: localState, file: matrix.cursorFile + '.decisions',
+  const broker = decisions({ clock, client: createMessagingClient(matrixClient({ base: matrix.settings.server, token: matrix.account.accessToken,
+    signal: stop.signal, timeoutMs: 1000 }), matrix.account.userId), coordination: matrix.coordination, settings: matrix.settings,
+    agent: matrix.id, backendUserId: SELF, storage: localState, file: matrix.cursorFile + '.decisions',
     run: async signal => {
       entered = true; signal.throwIfAborted();
       await new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
@@ -135,7 +136,7 @@ test('owner output is lazy and durable; one latest-room typing lease expires wit
   const clock = testClock(scope), native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock);
   const stop = new AbortController(), file = matrix.cursorFile + '.observation';
   const options = { agentId: matrix.id, userId: SELF, file, storage: localState, clock,
-    transport: (signal: AbortSignal, timeoutMs: number) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+    transport: (signal: AbortSignal, timeoutMs: number) => createMessagingClient(matrixClient({ base: matrix.settings.server, token: matrix.account.accessToken, signal, timeoutMs }), matrix.account.userId),
     coordination: matrix.coordination, historyMode: 'shared' as const, maximum: 100000 };
   let observer = ownerObservation(options, stop.signal);
   const state = (value: 'idle' | 'working' | 'waiting-answer') => observer.observe({ kind: 'state', observation: {
@@ -169,7 +170,7 @@ test('steering receipts flush without waiting for blocked runtime telemetry and 
   let entered = false, release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
   const options = { agentId: matrix.id, userId: SELF, file: matrix.cursorFile + '.observation', storage: localState, clock,
-    transport: (signal: AbortSignal, timeoutMs: number) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+    transport: (signal: AbortSignal, timeoutMs: number) => createMessagingClient(matrixClient({ base: matrix.settings.server, token: matrix.account.accessToken, signal, timeoutMs }), matrix.account.userId),
     coordination: { ...matrix.coordination, runtime: async (...args: Parameters<typeof matrix.coordination.runtime>) => {
       entered = true; await gate; return matrix.coordination.runtime(...args);
     } }, historyMode: 'shared' as const, maximum: 65536 };
@@ -195,7 +196,7 @@ test('an unavailable owner conversation retains receipts and retries on its boun
   const clock = testClock(scope), matrix = await matrixFixture(scope, temporary(scope), clock), stop = new AbortController();
   let ready = false, attempts = 0;
   const observer = ownerObservation({ agentId: matrix.id, userId: SELF, file: matrix.cursorFile + '.observation', storage: localState, clock,
-    transport: (signal, timeoutMs) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+    transport: (signal, timeoutMs) => createMessagingClient(matrixClient({ base: matrix.settings.server, token: matrix.account.accessToken, signal, timeoutMs }), matrix.account.userId),
     coordination: { ...matrix.coordination, ownerConversation: async (...args) => {
       attempts++;
       return ready ? matrix.coordination.ownerConversation(...args) : failure('unavailable', 'Owner conversation is temporarily unavailable');
@@ -216,13 +217,13 @@ test('owner streams coalesce before publication and uncertain delivery retries a
   const clock = testClock(scope), native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock);
   const stop = new AbortController();
   let uncertain = true;
-  const transport: Transport = (signal, timeoutMs) => {
-    const client = matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs });
-    return { ...client, async put<Value>(path: string, body: unknown): Promise<Value> {
+  const transport: MessagingTransport = (signal, timeoutMs) => {
+    const client = matrixClient({ base: matrix.settings.server, token: matrix.account.accessToken, signal, timeoutMs });
+    return createMessagingClient({ ...client, async put<Value>(path: string, body: unknown): Promise<Value> {
       const result = await client.put<Value>(path, body);
       if (path.includes('/send/') && uncertain) { uncertain = false; throw new Error('Receipt lost after native publication'); }
       return result;
-    } };
+    } }, matrix.account.userId);
   };
   const observer = ownerObservation({ agentId: matrix.id, userId: SELF, file: matrix.cursorFile + '.observation', storage: localState, clock,
     transport, coordination: matrix.coordination, historyMode: 'shared', maximum: 100000 }, stop.signal);
@@ -250,7 +251,7 @@ test('a new reporting run republishes every retained native state without anothe
   const awaiting = new Promise<void>(resolve => { awaitingReceipt = resolve; });
   const receipt = new Promise<void>(resolve => { acknowledge = resolve; });
   const observer = ownerObservation({ agentId: matrix.id, userId: SELF, file: matrix.cursorFile + '.observation', storage: localState, clock,
-    transport: (signal, timeoutMs) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+    transport: (signal, timeoutMs) => createMessagingClient(matrixClient({ base: matrix.settings.server, token: matrix.account.accessToken, signal, timeoutMs }), matrix.account.userId),
     coordination: { ...matrix.coordination, async runtime(...args) {
       const result = await matrix.coordination.runtime(...args);
       if (args[1] === run && args[2].sessionId === 'room-two') { awaitingReceipt(); await receipt; }
@@ -283,7 +284,7 @@ test('observation coalescing never removes a snapshot while its publication is a
   const publication = new Promise<void>(resolve => { received = resolve; }), receipt = new Promise<void>(resolve => { proceed = resolve; });
   let first = true;
   const observer = ownerObservation({ agentId: matrix.id, userId: SELF, file: matrix.cursorFile + '.observation', storage: localState, clock,
-    transport: (signal, timeoutMs) => matrixClient({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal, timeoutMs }),
+    transport: (signal, timeoutMs) => createMessagingClient(matrixClient({ base: matrix.settings.server, token: matrix.account.accessToken, signal, timeoutMs }), matrix.account.userId),
     coordination: { ...matrix.coordination, async runtime(...args) {
       if (first) { first = false; received(); await receipt; }
       return matrix.coordination.runtime(...args);

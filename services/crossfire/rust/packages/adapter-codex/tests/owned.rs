@@ -77,7 +77,7 @@ async fn actual_stock_codex_shared_owned_runtime_resumes_exact_history_and_expli
             .is_err(),
         "A second native owner cannot replace the canonical history binding"
     );
-    let first = connection.conversation("!first:example", None).await?;
+    let first = connection.conversation("control", None).await?;
     let second = connection.conversation("!second:example", None).await?;
     assert_eq!(first.session_id(), original);
     assert_eq!(second.session_id(), original);
@@ -133,7 +133,7 @@ async fn actual_stock_codex_per_room_owned_histories_have_distinct_persisted_ses
         )
         .await?;
     let primary = connection.session_id().to_owned();
-    let first = connection.conversation("!first:example", None).await?;
+    let first = connection.conversation("control", None).await?;
     let second = connection.conversation("!second:example", None).await?;
     assert_ne!(primary, first.session_id());
     assert_ne!(primary, second.session_id());
@@ -154,18 +154,15 @@ async fn actual_stock_codex_per_room_owned_histories_have_distinct_persisted_ses
         .await?;
     assert_eq!(resumed.session_id(), primary);
     assert_eq!(
-        resumed
-            .conversation("!first:example", None)
-            .await?
-            .session_id(),
-        saved["!first:example"]
+        resumed.conversation("control", None).await?.session_id(),
+        saved["room/control"]
     );
     assert_eq!(
         resumed
             .conversation("!second:example", None)
             .await?
             .session_id(),
-        saved["!second:example"]
+        saved["room/!second:example"]
     );
     assert_eq!(resumed.attachments().await?.len(), 3);
     resumed.close().await?;
@@ -173,11 +170,11 @@ async fn actual_stock_codex_per_room_owned_histories_have_distinct_persisted_ses
 }
 
 #[test]
-fn registry_rejects_duplicate_contexts_sessions_obsolete_and_unfinished_migrations_and_reset_never_overwrites_archives()
+fn registry_rejects_duplicate_contexts_and_sessions_and_reset_never_overwrites_archives()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let fixture = tempfile::tempdir()?;
     let home = fixture.path().join("home");
-    let directory = PrivateDirectory::open(&home, true)?;
+    PrivateDirectory::open(&home, true)?;
     let id = identity::id();
     let mut registry = context_state::Registry {
         mode: "per-room".to_owned(),
@@ -199,20 +196,6 @@ fn registry_rejects_duplicate_contexts_sessions_obsolete_and_unfinished_migratio
         context_state::load(&home)?.0.bindings == registry.bindings,
         "Exact context bindings are retained"
     );
-    directory.write_new("crossfire-session.json", b"{}")?;
-    assert!(context_state::load(&home).is_err());
-    directory.remove("crossfire-session.json")?;
-    let migration =
-        PrivateDirectory::open(&home.join("crossfire-migrations/context-registry"), true)?;
-    migration.write_new(
-        "manifest.json",
-        &serde_json::to_vec(&json!({"phase":"prepared","registry":registry,"files":[]}))?,
-    )?;
-    assert!(
-        context_state::load(&home).is_err(),
-        "An unfinished forward metadata migration cannot resume"
-    );
-    migration.remove("manifest.json")?;
     let reset_id = identity::id();
     let archive = PrivateDirectory::open(&home.join("crossfire-archive").join(&reset_id), true)?;
     archive.write_new(context_state::REGISTRY, b"protected")?;

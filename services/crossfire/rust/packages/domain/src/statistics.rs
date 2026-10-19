@@ -45,7 +45,7 @@ pub struct Totals {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Flow {
     pub room_id: String,
-    pub sender_matrix_id: String,
+    pub sender_backend_user_id: String,
     pub message_type: String,
     pub totals: Totals,
 }

@@ -6,7 +6,10 @@ use tokio_util::sync::CancellationToken;
 
 pub async fn verify(host: &str, port: u16, stop: CancellationToken) -> Result<()> {
     let http = NativeHttp::new(&format!("http://127.0.0.1:{port}"), stop)?;
-    for path in ["/api/health", "/_matrix/client/versions"] {
+    for path in [
+        "/api/health",
+        crossfire_adapter_matrix::settings::READINESS_PATH,
+    ] {
         let status = http.probe(path, host, Duration::from_secs(3)).await?;
         if status != 200 {
             return Err(Failure::new(

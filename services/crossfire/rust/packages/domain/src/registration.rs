@@ -25,27 +25,28 @@ pub fn register(
     })
 }
 
-pub fn initialize(repo: &mut impl CoreRepository, administrator: &str, now: i64) -> Result<()> {
+pub fn initialize(
+    repo: &mut impl CoreRepository,
+    administrator: &str,
+    label: &str,
+    now: i64,
+) -> Result<()> {
     repo.transaction(|repo| {
         if repo.policy()?.is_none() {
             repo.insert_policy(&InstancePolicy::default())?;
         }
-        if repo.principal_by_matrix_id(administrator)?.is_some() {
+        if repo.principal_by_backend_user_id(administrator)?.is_some() {
             return Ok(());
         }
         let principal = Principal {
             id: identity::id(),
-            matrix_user_id: administrator.to_owned(),
+            backend_user_id: administrator.to_owned(),
             kind: PrincipalKind::Human,
             status: Status::Active,
             revision: 0,
             created_at: now,
         };
         register(repo, &principal, Role::Administrator, None, now)?;
-        let label = administrator
-            .strip_prefix('@')
-            .and_then(|value| value.split_once(':'))
-            .map_or(administrator, |(local, _)| local);
         repo.insert_member(&Member {
             principal_id: principal.id,
             display_name: label.to_owned(),

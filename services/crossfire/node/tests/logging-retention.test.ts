@@ -102,7 +102,7 @@ test('age boundaries and configured retention apply to every retained traffic/to
   const fixture = await fixtureStore(scope, 14), agent = await fixture.agent(fixture.admin.actor, 'summaries');
   const run = fixture.listen(agent), createdAt = fixture.now();
   value(fixture.services.statistics.record(agent.id, run.runId, { sequence: 1, startedAt: createdAt, endedAt: createdAt, dropped: 0,
-    flows: [{ roomId: '!room:test.localhost', senderMatrixId: fixture.admin.member.principal.matrixUserId, messageType: 'm.text',
+    flows: [{ roomId: '!room:test.localhost', senderBackendUserId: fixture.admin.member.principal.backendUserId, messageType: 'm.text',
       observed: 1, delivered: 1, contentBytes: 40, deliveredBytes: 40, attachmentBytes: 100, largestBytes: 40 }],
     usage: [{ runtime: 'codex', sessionId: 'native-history', tokens: { input: 100, cachedInput: 20, cacheWriteInput: null, output: 10, reasoningOutput: 5, total: 110 } }] }, createdAt));
   fixture.advance(14 * DAY_MS); value(maintainLogging(fixture.services));
@@ -138,15 +138,15 @@ test('settled decisions, notifications, deliveries, operation receipts, invitati
   value(receiptFleetRuntime(services, controller, fleetId, operationId, { connectionId: agent.controller.connectionId, status: 'succeeded', errorMessage: null }));
   const invitation = value(createMemberInvitation(services, admin.actor, { roleCode: 'member', expiresSeconds: 60 }, randomUUID()));
   const claimed = value(createMemberInvitation(services, admin.actor, { roleCode: 'member', expiresSeconds: 60 }, randomUUID()));
-  executeUpdate(database, schema, (query, params) => query.update('member_invitation').set({ claim_matrix_user_id: '@pending:test.localhost',
+  executeUpdate(database, schema, (query, params) => query.update('member_invitation').set({ claim_backend_user_id: '@pending:test.localhost',
     claim_display_name: 'Pending user', claim_fingerprint: 'unsettled-claim' }).where(row => row.id === params.id), { id: claimed.invitationId });
   const incident = randomUUID(); value(services.runtime.insertIncident({ id: incident, ownerId: admin.actor.principalId, agentId: agent.id, fleetId: null, runId: first.runId,
     sessionId: 'native-history', kind: 'contact', message: 'Recovered contact', createdAt: fixture.now(), recoveredAt: fixture.now() }));
   for (const phase of ['initial', 'recovery'] as const) value(services.runtime.insertNotification({ incidentId: incident, phase, body: 'Owner notification', nextAttemptAt: fixture.now(), eventId: '$sent-' + phase }));
   for (const status of ['pending', 'sent', 'denied'] as const) executeInsert(database, schema, (query, params) => query.insertInto('wake_notice').values({ receiver_agent_id: params.agentId,
-    event_id: params.eventId, sender_matrix_id: params.sender, room_id: '!room:test.localhost', reserved_at: params.at, message_body: 'Wake notice', status: params.status,
+    event_id: params.eventId, sender_backend_user_id: params.sender, room_id: params.roomId, reserved_at: params.at, message_body: 'Wake notice', status: params.status,
     sent_at: params.sent, native_event_id: params.nativeEvent, next_attempt_at: params.next, last_error: null }),
-  { agentId: agent.id, eventId: '$wake-' + status, sender: admin.member.principal.matrixUserId, at: fixture.now(), status,
+  { agentId: agent.id, eventId: '$wake-' + (status === 'denied' ? 'pending' : status), roomId: status === 'denied' ? '!other:test.localhost' : '!room:test.localhost', sender: admin.member.principal.backendUserId, at: fixture.now(), status,
     sent: status === 'sent' ? fixture.now() : null, nativeEvent: status === 'sent' ? '$sent' : null, next: status === 'pending' ? fixture.now() : null });
   const ruleId = randomUUID(); value(createWakeRule(services, admin.actor, ruleId, { name: 'Scheduled task', message: 'Do the task', schedule: { kind: 'interval', seconds: 60 }, enabled: true, agentIds: [agent.id] }, randomUUID()));
   fixture.advanceConnected(60001, agent.controller); fixture.listen(agent, 'test', first.runId);
@@ -157,8 +157,8 @@ test('settled decisions, notifications, deliveries, operation receipts, invitati
   fixture.advance(1); const second = fixture.listen(agent);
   value(reportListener(services, agent.actor, agent.id, second.runId, { statistics: null, release: 'test', messagesDelivered: 1, stopped: true, controller: agent.controller }, 'stop'));
   const currentStop = randomUUID(); value(recordNativeStop(services, controller, fleetId, agent.id, { connectionId: agent.controller.connectionId, runId: second.runId, receiptId: currentStop }));
-  const introduction = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId,
-    fleetKey: 'rejected', controller: { name: 'Rejected controller' }, instances: [{ instanceKey: 'rejected', name: 'rejected', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }] };
+  const introduction = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: admin.member.principal.backendUserId,
+    fleetKey: 'rejected', controller: { name: 'Rejected controller' }, instances: [{ instanceKey: 'rejected', name: 'rejected', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.backendUserId) }] };
   const proposed = value(await introduceEnrollment(services, introduction));
   value(decideEnrollment(services, admin.actor, introduction.enrollmentId, { expectedRevision: 0, decision: 'reject', verificationCode: proposed.request.verificationCode }, randomUUID()));
   const source = executeSelect(database, schema, query => query.from('enrollment_request').where(row => row.status === 'approved').take(1))[0]!, archive = randomUUID();

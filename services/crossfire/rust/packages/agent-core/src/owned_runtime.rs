@@ -75,7 +75,28 @@ pub struct NativeActivity {
     pub busy: bool,
     pub contexts: Vec<NativeContextActivity>,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderState {
+    Present,
+    Missing,
+    NotRequired,
+    Unknown,
+}
+#[derive(Debug, Clone)]
+pub struct NativeDiagnostic {
+    pub checked_at: i64,
+    pub state: String,
+    pub observed_at: Option<i64>,
+    pub provider: ProviderState,
+    pub provider_observed_at: Option<i64>,
+    pub pending_input: bool,
+    pub pending_decision: bool,
+}
 pub trait OwnedConnection: Connection + TurnControl {
+    fn provider(
+        &self,
+        cancellation: CancellationToken,
+    ) -> impl Future<Output = Result<ProviderState>> + Send;
     fn activity(&self) -> impl Future<Output = Result<NativeActivity>> + Send;
     fn attachment(&self) -> Option<Attachment>;
     fn attachments(&self) -> impl Future<Output = Result<Vec<(String, Attachment)>>> + Send;

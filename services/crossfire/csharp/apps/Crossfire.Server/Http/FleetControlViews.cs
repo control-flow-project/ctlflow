@@ -34,7 +34,7 @@ public static class FleetControlViews
         {
             output.WriteStartObject(); output.WriteString("messageId", message.MessageId); output.WriteString("fleetId", message.FleetId); output.WriteString("body", message.Body);
             output.WriteNumber("createdAt", message.CreatedAt); output.WriteNumber("expiresAt", message.ExpiresAt);
-            output.WriteStartObject("sender"); output.WriteString("kind", message.Sender.Kind); output.WriteString("matrixUserId", message.Sender.MatrixUserId); output.WriteEndObject();
+            output.WriteStartObject("sender"); output.WriteString("kind", message.Sender.Kind); output.WriteString("backendUserId", message.Sender.BackendUserId); output.WriteEndObject();
             JsonValues.Strings(output, "agentIds", message.AgentIds); output.WriteEndObject();
         }).WriteTo(writer);
     });

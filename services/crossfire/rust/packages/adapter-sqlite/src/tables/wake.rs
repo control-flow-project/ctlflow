@@ -14,10 +14,10 @@ diesel::table! {
 }
 
 diesel::table! {
-    wake_notice (receiver_agent_id, event_id) {
+    wake_notice (receiver_agent_id, room_id, event_id) {
         receiver_agent_id -> Text,
         event_id -> Text,
-        sender_matrix_id -> Text,
+        sender_backend_user_id -> Text,
         room_id -> Text,
         reserved_at -> BigInt,
         message_body -> Text,

@@ -24,7 +24,7 @@ impl Connection {
     }
     pub fn agent(profile: &Profile, stop: CancellationToken) -> Result<Self> {
         Self::new(
-            &profile.settings.homeserver,
+            &profile.settings.server,
             Some(profile.account.access_token.clone()),
             stop,
         )

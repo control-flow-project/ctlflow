@@ -3,26 +3,20 @@ import { readFileSync, statSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import catalog from './operations.json' with { type: 'json' };
 import { kebab, type MatrixSchema, type Operation, type Parameter } from './schema.js';
-import { API, segment, json } from '@ctlflow/crossfire-contracts/matrix';
-import { collect, type Matrix } from './http.js';
-import type { JsonObject } from '@ctlflow/crossfire-contracts/json';
+import { json } from '@ctlflow/crossfire-kernel/json';
+import { API, segment } from './protocol.js';
+import type { Matrix } from './http.js';
+import { collect } from '@ctlflow/crossfire-kernel/collect';
+import type { JsonObject } from '@ctlflow/crossfire-kernel/json';
 import type { Account, Settings } from '@ctlflow/crossfire-contracts/client';
 import { DEFAULT_EVENTS, MAX_EVENTS, MAX_JSON_BYTES } from '@ctlflow/crossfire-contracts/limits';
 import { messageContent, MAX_MESSAGE_BYTES } from './message.js';
-import { matrixUserId } from '@ctlflow/crossfire-contracts/schema/validation';
+import { userId } from './syntax.js';
 import { uploadStream, saveStream } from './files.js';
+import { clientConfiguration } from './connection.js';
+import { option, type Arguments } from '@ctlflow/crossfire-kernel/arguments';
 
 export const operations: readonly Operation[] = (catalog as MatrixSchema).operations;
-export type Arguments = Readonly<Record<string, string | boolean | readonly string[] | undefined>>;
-
-export function option(arguments_: Arguments, name: string): string | undefined {
-  const value = arguments_[name];
-  if (value === undefined) return undefined;
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value) && value.length === 1) return value[0]!;
-  throw new Error(`--${name} requires exactly one value`);
-}
-
 export function selectOperation(command: string): Operation {
   const operation = operations.find(entry => entry.command === command);
   if (!operation) throw new Error('Unknown Matrix operation; use matrix --help');
@@ -100,7 +94,7 @@ export function requestBody(arguments_: Arguments): JsonObject | undefined {
 function targetedMessage(body: JsonObject, value: Arguments['mention-user']): JsonObject {
   if (value === undefined) return body;
   const users = typeof value === 'string' ? [value] : typeof value === 'boolean' ? [] : value;
-  if (!users.length || users.some(user => !matrixUserId(user).ok) || new Set(users).size !== users.length) {
+  if (!users.length || users.some(user => !userId(user)) || new Set(users).size !== users.length) {
     throw new Error('--mention-user requires distinct exact Matrix user IDs');
   }
   if (body['m.mentions'] !== undefined) throw new Error('Supply mention targets through --mention-user or native m.mentions, not both');
@@ -113,7 +107,7 @@ function targetedMessage(body: JsonObject, value: Arguments['mention-user']): Js
 }
 
 function selfId(id: string | undefined, account: Account): void {
-  if (id !== undefined && id !== account.user_id) throw new Error('This operation is restricted to the selected agent identity');
+  if (id !== undefined && id !== account.userId) throw new Error('This operation is restricted to the selected agent identity');
 }
 
 function boundedLimit(value: JsonObject): void {
@@ -122,6 +116,7 @@ function boundedLimit(value: JsonObject): void {
 }
 
 export async function executeOperation(client: Matrix, settings: Settings, account: Account, operation: Operation, arguments_: Arguments) {
+  const configuration = clientConfiguration(settings.backend);
   if (operation.access !== 'agent') throw new Error(`${operation.command} is ${operation.access}; it is not an enabled agent operation`);
   const allowed = new Set([...operationOptions(operation), 'project', 'profile', 'max-output-bytes']);
   for (const key of Object.keys(arguments_)) if (!allowed.has(key)) throw new Error('Unsupported option --' + key + ' for ' + operation.command);
@@ -135,11 +130,11 @@ export async function executeOperation(client: Matrix, settings: Settings, accou
   if (operation.body === 'none' && body) throw new Error('This operation has no request body');
   if (operation.body === 'required' && !body) throw new Error('--body or --body-file is required');
   if (operation.response === 'binary' && !output) throw new Error('--output-file is required for binary media');
-  if (parameters.serverName && parameters.serverName !== settings.server_name) throw new Error('Media must belong to this instance');
+  if (parameters.serverName && parameters.serverName !== configuration.serverName) throw new Error('Media must belong to this instance');
   if (option(arguments_, 'server') || option(arguments_, 'via')) throw new Error('Remote routing is disabled in this local instance');
   if (operation.method !== 'GET' || operation.id.startsWith('getAccountData') || operation.id === 'getRoomTags' || operation.id === 'getFilter') selfId(parameters.userId, account);
   if (operation.id === 'setAccountDataPerRoom' && parameters.type === 'm.fully_read') throw new Error('Use set-read-marker for Matrix read state');
-  if (operation.id === 'updateDevice' && parameters.deviceId !== account.device_id) throw new Error('Only this agent device may be updated');
+  if (operation.id === 'updateDevice' && parameters.deviceId !== account.native.deviceId) throw new Error('Only this agent device may be updated');
   const joining = operation.id === 'joinRoom' || operation.id === 'joinRoomById';
   if (operation.id === 'search') {
     const joined = await client.get<{ joined_rooms: string[] }>(API + '/joined_rooms');
@@ -158,7 +153,7 @@ export async function executeOperation(client: Matrix, settings: Settings, accou
   if (joining || operation.id === 'knockRoom') {
     const selected = parameters.roomIdOrAlias ?? parameters.roomId;
     if (!selected) throw new Error('A native Matrix room ID or alias is required');
-    if (selected.startsWith('#') && !selected.endsWith(':' + settings.server_name)) throw new Error('Room alias belongs to another instance');
+    if (selected.startsWith('#') && !selected.endsWith(':' + configuration.serverName)) throw new Error('Room alias belongs to another instance');
     if (!selected.startsWith('!') && !selected.startsWith('#')) throw new Error('A native Matrix room ID or alias is required');
   }
   if (output && operation.response !== 'binary' && operation.method !== 'GET' && !['search', 'queryPublicRooms'].includes(operation.id)) {
@@ -174,10 +169,10 @@ export async function executeOperation(client: Matrix, settings: Settings, accou
       body = messageContent(targetedMessage(body, arguments_['mention-user']));
     } else if (Buffer.byteLength(JSON.stringify(body)) > MAX_MESSAGE_BYTES) throw new Error('Encoded event content exceeds 50000 bytes');
   } else if (option(arguments_, 'markdown') !== undefined || option(arguments_, 'markdown-file')) throw new Error('Markdown requires send-message with event-type m.room.message');
-  const wire = input ? uploadStream(input, settings.max_upload_bytes) : body ? Buffer.from(JSON.stringify(body)) : undefined;
+  const wire = input ? uploadStream(input, settings.maxUploadBytes) : body ? Buffer.from(JSON.stringify(body)) : undefined;
   const response = await client.open(operation.method, request.path, wire, input ? option(arguments_, 'content-type') ?? 'application/octet-stream' : 'application/json');
   if (output) {
-    return saveStream(response, output, operation.response === 'binary' ? settings.max_upload_bytes : MAX_JSON_BYTES);
+    return saveStream(response, output, operation.response === 'binary' ? settings.maxUploadBytes : MAX_JSON_BYTES);
   }
   const result: unknown = JSON.parse(decodeUtf8(await collect(response, MAX_JSON_BYTES)));
   if (!json(result)) throw new Error('Invalid bounded native JSON response');

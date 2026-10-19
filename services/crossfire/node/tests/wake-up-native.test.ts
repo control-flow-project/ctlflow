@@ -1,3 +1,4 @@
+import { connectMatrix } from '@ctlflow/crossfire-adapter-matrix/connection';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -35,9 +36,8 @@ test('real Conduit and stock Codex deliver idle-only scheduled input without cre
   const configuration = { name: 'Fetch fixture data', message: 'Scheduled fixture task; no paid provider.', schedule: { kind: 'interval' as const, seconds: 1 }, enabled: true, agentIds: [agent.id] };
   value(createWakeRule(services, admin.actor, ruleId, configuration, randomUUID()));
   const stop = new AbortController(); let ended: unknown, ready = false;
-  const receiver = listen({ log: (_message: string) => {}, binding: 'fixture', host, control: controller.connection, clock, coordination: createCoordination({ origin, token: agent.token }), settings: {
-    instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: admin.member.principal.matrixUserId, max_upload_bytes: 1024 },
-    account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' }, id: agent.id,
+  const receiver = listen({ ...connectMatrix({ type: 'matrix', parameters: { origin, serverName: 'architecture.localhost' } }, { userId: agent.backendUserId, accessToken: agent.token, native: { deviceId: 'CROSSFIRE_AGENT' } }), log: (_message: string) => {}, binding: 'fixture', host, control: controller.connection, clock, coordination: createCoordination({ origin, token: agent.token }), settings: { instance: 'tests', server: origin, backend: { type: "matrix", parameters: { origin: origin, serverName: 'architecture.localhost' } }, owner: admin.member.principal.backendUserId, maxUploadBytes: 1024 },
+    account: { userId: agent.backendUserId, accessToken: agent.token, native: { deviceId: 'CROSSFIRE_AGENT' } }, id: agent.id,
     release: release.manifest,
     cursorFile: join(directory, 'cursor.json'), limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 10000,
     ready: () => { ready = true; }, runtime: (signal, pollMs, hooks) => resumeFixture({ ...engine, pollMs, timeoutMs: 10000,

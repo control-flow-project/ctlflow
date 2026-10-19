@@ -1,8 +1,11 @@
+use crossfire_adapter_matrix::{
+    agent::Client,
+    protocol::{Protocol, Request, Response},
+};
 mod support;
 use crossfire_agent_core::{
     coordination::Coordination,
     local_state::LocalState,
-    matrix::{Matrix, Request, Response},
     owner_observation::{Observer, Options},
     profile,
     runtime::ObservationEvent,
@@ -56,13 +59,13 @@ impl Coordination for Network {
             }
             OperationId::OwnerConversation => Ok(json!({"roomId":"!private:local"})),
             OperationId::DeliveryPolicy => Ok(
-                json!({"agentId":"00000000-0000-4000-8000-000000000000","matrixUserId":"@agent:local","ownerMatrixId":"@owner:local","maxMessageBytes":65536,"fleetIdleTimeoutSeconds":1800,"status":"active","ownerStatus":"active","ownerConversation":"!private:local","roomGrants":[{"roomId":"!private:local","accessMode":"reply","powerLevel":null,"muted":false}],"wakeMode":"selected","senderMatrixIds":["@owner:local"]}),
+                json!({"agentId":"00000000-0000-4000-8000-000000000000","backendUserId":"@agent:local","ownerBackendUserId":"@owner:local","maxMessageBytes":65536,"fleetIdleTimeoutSeconds":1800,"status":"active","ownerStatus":"active","ownerConversation":"!private:local","roomGrants":[{"roomId":"!private:local","accessMode":"reply","nativeAccess":null,"muted":false}],"wakeMode":"selected","senderBackendUserIds":["@owner:local"]}),
             ),
             _ => Err(failure()),
         }
     }
 }
-impl Matrix for Network {
+impl Protocol for Network {
     async fn request(&self, request: &Request, _stop: CancellationToken) -> Result<Response> {
         if request.path.ends_with("/state") {
             let mut state = vec![
@@ -96,7 +99,7 @@ impl Matrix for Network {
 fn options() -> Result<Options> {
     Ok(Options {
         profile: profile::parse(
-            &json!({"id":"00000000-0000-4000-8000-000000000000","workspace":"/private/workarea","account":{"user_id":"@agent:local","access_token":"private-test-token","device_id":"NATIVE"},"settings":{"instance":"analyst","homeserver":"https://app.example","server_name":"local","owner":"@owner:local","max_upload_bytes":16777216}}),
+            &json!({"id":"00000000-0000-4000-8000-000000000000","workspace":"/private/workarea","account":{"userId":"@agent:local","accessToken":"private-test-token","native":{"deviceId":"NATIVE"}},"settings":{"instance":"analyst","server":"https://app.example","backend":{"type":"matrix","parameters":{"origin":"https://app.example","serverName":"local"}},"owner":"@owner:local","maxUploadBytes":16777216}}),
         )?,
         file: "observation".to_owned(),
         history_mode: HistoryMode::Shared,
@@ -123,7 +126,7 @@ async fn terminal_output_is_private_chunked_and_retries_the_same_native_transact
     let observer = Observer::open(
         storage.clone(),
         network.clone(),
-        network.clone(),
+        Arc::new(Client::from_protocol(network.clone(), "@agent:local")?),
         Time(Arc::new(AtomicI64::new(1))),
         options()?,
         ready,
@@ -148,7 +151,7 @@ async fn terminal_output_is_private_chunked_and_retries_the_same_native_transact
         path.contains("!private")
             && value["body"]
                 .as_str()
-                .is_some_and(|text| text.len() <= 12000)
+                .is_some_and(crossfire_adapter_matrix::notices::fits)
             && value["org.crossfire.listener_notice"] == true
     }));
     assert_eq!(
@@ -176,7 +179,7 @@ async fn room_derived_terminal_output_is_not_sent_when_a_third_person_has_entere
     let observer = Observer::open(
         storage.clone(),
         network.clone(),
-        network.clone(),
+        Arc::new(Client::from_protocol(network.clone(), "@agent:local")?),
         Time(Arc::new(AtomicI64::new(1))),
         options()?,
         ready,
@@ -202,7 +205,7 @@ async fn thinking_moves_to_only_the_latest_room_and_expires_after_thirty_seconds
     let observer = Observer::open(
         storage,
         network.clone(),
-        network.clone(),
+        Arc::new(Client::from_protocol(network.clone(), "@agent:local")?),
         Time(time.clone()),
         options()?,
         ready,

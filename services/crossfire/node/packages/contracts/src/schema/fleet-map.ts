@@ -4,7 +4,7 @@ import { fleet, grant, grantApplication, principal, owner } from './response.js'
 import type { Parsed } from './validation.js';
 import { wakeSelection } from './request.js';
 
-export const mapAgent = check.object({ agentId: check.identifier, matrixUserId: check.matrixUserId, instanceKey: check.name,
+export const mapAgent = check.object({ agentId: check.identifier, backendUserId: check.backendUserId, instanceKey: check.name,
   displayName: check.text(255), status: check.status, owner, sourceId: check.text(64, 64),
   listener: check.choice('online', 'offline', 'disconnecting'), lastSeenAt: check.nullable(check.integer()) });
 export const mapRoom = check.object({ roomId: check.roomId, name: check.nullable(check.text(255)), alias: check.nullable(check.text(255)) });

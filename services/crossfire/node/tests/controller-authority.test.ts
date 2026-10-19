@@ -47,7 +47,7 @@ test('exact authenticated controller generations, not fleet metadata or agent to
   const { controller: _controller, ...withoutController } = body;
   assert.equal(heartbeat(withoutController).ok, false);
   assert.equal(heartbeat({ ...withoutController, controllerBound: true }).ok, false);
-  assert.equal(enrollment({ enrollmentId: randomUUID(), claimSecret: 'a'.repeat(64), ownerMatrixId: fixture.admin.member.principal.matrixUserId,
+  assert.equal(enrollment({ enrollmentId: randomUUID(), claimSecret: 'a'.repeat(64), ownerBackendUserId: fixture.admin.member.principal.backendUserId,
     fleetKey: null, instances: [{ instanceKey: 'independent', name: 'independent' }] }).ok, false);
   value(beat(fixture, agent, runId));
   const stored = value(fixture.services.repositories.listenerRun.find({ id: runId }))!;

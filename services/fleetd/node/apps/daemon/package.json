@@ -1,11 +1,22 @@
 {
-  "name": "@ctlflow/fleetd-daemon", "version": "0.1.22", "private": true, "type": "module",
+  "name": "@ctlflow/fleetd-daemon",
+  "version": "0.1.23",
+  "private": true,
+  "type": "module",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "dependencies": {
-    "@ctlflow/fleetd-adapter-execution": "0.1.22",
-    "@ctlflow/fleetd-contracts": "0.1.22", "@ctlflow/fleetd-domain": "0.1.22", "@ctlflow/fleetd-storage": "0.1.22",
-    "@ctlflow/crossfire-contracts": "0.1.22", "@ctlflow/crossfire-kernel": "0.1.22", "@ctlflow/crossfire-agent-core": "0.1.22",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.22", "@ctlflow/crossfire-adapter-codex": "0.1.22", "@ctlflow/crossfire-adapter-pi": "0.1.22", "@ctlflow/crossfire-adapter-runtime": "0.1.22"
+    "@ctlflow/crossfire-adapter-matrix": "0.1.23",
+    "@ctlflow/fleetd-adapter-execution": "0.1.23",
+    "@ctlflow/fleetd-contracts": "0.1.23",
+    "@ctlflow/fleetd-domain": "0.1.23",
+    "@ctlflow/fleetd-storage": "0.1.23",
+    "@ctlflow/crossfire-contracts": "0.1.23",
+    "@ctlflow/crossfire-kernel": "0.1.23",
+    "@ctlflow/crossfire-agent-core": "0.1.23",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.23",
+    "@ctlflow/crossfire-adapter-codex": "0.1.23",
+    "@ctlflow/crossfire-adapter-pi": "0.1.23",
+    "@ctlflow/crossfire-adapter-runtime": "0.1.23"
   }
 }

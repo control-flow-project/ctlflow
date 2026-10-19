@@ -8,7 +8,7 @@ export type MemberInvitation = {
   expiresAt: number;
   consumedByMemberId: string | null;
   revokedAt: number | null;
-  claimMatrixUserId: string | null;
+  claimBackendUserId: string | null;
   claimDisplayName: string | null;
   claimFingerprint: string | null;
 };
@@ -38,7 +38,7 @@ export type ListenerRun = {
 export type WakeNotice = {
   receiverAgentId: string;
   eventId: string;
-  senderMatrixId: string;
+  senderBackendUserId: string;
   roomId: string;
   reservedAt: number;
   messageBody: string;

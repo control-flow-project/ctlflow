@@ -19,7 +19,7 @@ export function createCoordination(options: ClientOptions): Coordination {
     delivery: (agentId, signal) => data(client.call(operations.deliveryPolicy, { agentId }, {}, undefined, signal)),
     ownerConversation: (agentId, signal) => data(client.call(operations.ownerConversation, { agentId }, {}, undefined, signal)),
     acceptInvitation: (agentId, roomId, signal) => data(client.call(operations.acceptRoomInvitation, { agentId }, { roomId }, undefined, signal)),
-    identities: (matrixUserIds, signal) => data(client.call(operations.resolvePrincipals, {}, { matrixUserIds: [...matrixUserIds] }, undefined, signal)),
+    identities: (backendUserIds, signal) => data(client.call(operations.resolvePrincipals, {}, { backendUserIds: [...backendUserIds] }, undefined, signal)),
     report: (agentId, runId, input, signal) => data(client.call(operations.reportListener, { agentId, runId }, input, undefined, signal)),
     notice: (agentId, roomId, eventId, signal) => data(client.call(operations.wakeNotice, { agentId, eventId }, { roomId }, undefined, signal)),
     wakeMetadata: (agentId, attachment, signal) => data(client.call(operations.wakeMetadata, { agentId }, {}, new URLSearchParams(attachment), signal)),

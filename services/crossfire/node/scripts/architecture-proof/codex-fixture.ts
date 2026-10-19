@@ -93,7 +93,12 @@ trust_level = "trusted"
     if (hooks) {
       await until(async () => (await tmux(["capture-pane", "-p", "-t", "fixture"])).stdout.includes("2. Trust all and continue"),
         "Native hook trust dialog did not appear");
-      await tmux(["send-keys", "-t", "fixture", "2", "Enter"]);
+      await tmux(["send-keys", "-t", "fixture", "Down"]);
+      await until(async () => {
+        pane = (await tmux(["capture-pane", "-p", "-t", "fixture"])).stdout;
+        return /›\s*2\. Trust all and continue/u.test(pane);
+      }, "Native hook trust selection did not change");
+      await tmux(["send-keys", "-t", "fixture", "Enter"]);
     }
     await until(async () => {
       if (observer.notifications.some(value => value.method === "thread/started")) return true;

@@ -1,15 +1,48 @@
 {
   "name": "@ctlflow/fleetd",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": false,
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
-  "devDependencies": { "@ctlflow/fleetd-adapter-execution": "0.1.22", "@ctlflow/crossfire-client": "0.1.22", "@ctlflow/crossfire-test-support": "0.1.22", "@ctlflow/crossfire-operator-support": "0.1.22", "@ctlflow/crossfire-agent-core": "0.1.22", "@ctlflow/fleetd-domain": "0.1.22", "@ctlflow/fleet-daemon-client": "0.1.22", "@ctlflow/fleetd-storage": "0.1.22", "@ctlflow/fleetd-contracts": "0.1.22", "@ctlflow/crossfire-adapter-codex": "0.1.22", "@ctlflow/crossfire-adapter-pi": "0.1.22", "@ctlflow/crossfire-adapter-matrix": "0.1.22", "@ctlflow/crossfire-adapter-runtime": "0.1.22", "@ctlflow/crossfire-adapter-filesystem": "0.1.22", "@ctlflow/crossfire-contracts": "0.1.22", "@ctlflow/crossfire-kernel": "0.1.22", "ws": "8.21.3" },
-  "bin": { "fleetd": "./dist/bin/fleetd.mjs" },
-  "files": ["LICENSE", "dist/bin", "dist/assets", "docs", "README.md"],
-  "exports": { "./executable": "./dist/bin/fleetd.mjs", "./artifacts": "./dist/assets/manifest.json", "./package.json": "./package.json" },
+  "devDependencies": {
+    "@ctlflow/fleetd-adapter-execution": "0.1.23",
+    "@ctlflow/crossfire-client": "0.1.23",
+    "@ctlflow/crossfire-test-support": "0.1.23",
+    "@ctlflow/crossfire-operator-support": "0.1.23",
+    "@ctlflow/crossfire-agent-core": "0.1.23",
+    "@ctlflow/fleetd-domain": "0.1.23",
+    "@ctlflow/fleet-daemon-client": "0.1.23",
+    "@ctlflow/fleetd-storage": "0.1.23",
+    "@ctlflow/fleetd-contracts": "0.1.23",
+    "@ctlflow/crossfire-adapter-codex": "0.1.23",
+    "@ctlflow/crossfire-adapter-pi": "0.1.23",
+    "@ctlflow/crossfire-adapter-matrix": "0.1.23",
+    "@ctlflow/crossfire-adapter-runtime": "0.1.23",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.23",
+    "@ctlflow/crossfire-contracts": "0.1.23",
+    "@ctlflow/crossfire-kernel": "0.1.23",
+    "ws": "8.21.3",
+    "@ctlflow/crossfire-domain": "0.1.23"
+  },
+  "bin": {
+    "fleetd": "./dist/bin/fleetd.mjs"
+  },
+  "files": [
+    "LICENSE",
+    "dist/bin",
+    "dist/assets",
+    "docs",
+    "README.md"
+  ],
+  "exports": {
+    "./executable": "./dist/bin/fleetd.mjs",
+    "./artifacts": "./dist/assets/manifest.json",
+    "./package.json": "./package.json"
+  },
   "engines": {
     "node": ">=26.0.0",
     "npm": ">=11.17.0"

@@ -1,31 +1,25 @@
 using System.Globalization;
 using System.Text.Json;
 using Crossfire.Contracts;
+using Crossfire.Domain;
 using Crossfire.Kernel;
 
 namespace Crossfire.AgentCore;
 
 public static class ReceivedEvents
 {
-    public static readonly IReadOnlySet<string> Important = new HashSet<string>(StringComparer.Ordinal) { "m.room.message", "m.room.encrypted", "m.room.redaction", "m.room.name", "m.room.topic", "m.room.member", "m.room.power_levels", "m.room.join_rules", "m.room.history_visibility", "m.room.encryption", "m.room.tombstone" };
-    public static bool Notice(JsonElement value) => WireJson.Text(value, "type") == "m.room.message" && value.TryGetProperty("content", out var content) && WireJson.Text(content, "msgtype") == "m.notice"
-        && content.TryGetProperty("org.crossfire.listener_notice", out var marker) && marker.ValueKind == JsonValueKind.True;
-    public static bool Notice(ReceivedEvent value) => value.Type == "m.room.message" && WireJson.Text(value.Content, "msgtype") == "m.notice" && value.Content.TryGetProperty("org.crossfire.listener_notice", out var marker) && marker.ValueKind == JsonValueKind.True;
-    public static Result<ReceivedEvent> View(JsonElement value, string room)
+    public static readonly IReadOnlySet<string> Important = MessageCodec.Types.Where(value => value != "other").ToHashSet(StringComparer.Ordinal);
+    public static bool Notice(MessageEvent value) => value.Type == "message" && value.Content.Kind == "notice" && value.Content.Control;
+    public static bool Notice(ReceivedEvent value) => value.Type == "message" && value.Content.Kind == "notice" && value.Content.Control;
+    public static Result<ReceivedEvent> View(MessageEvent value, string room)
     {
-        var id = WireJson.Text(value, "event_id"); var sender = WireJson.Text(value, "sender"); var type = WireJson.Text(value, "type");
-        if (!Validation.RoomId(room) || id is null || !Validation.EventId(id) || sender is null || !Validation.UserId(sender) || type is null || !value.TryGetProperty("content", out var content)
-            || content.ValueKind != JsonValueKind.Object || !Validation.Json(content) || value.TryGetProperty("state_key", out var stateKey) && stateKey.ValueKind != JsonValueKind.String)
-            return Results.Fail<ReceivedEvent>("invalid", "Invalid Matrix event identity or content");
-        string? timestamp = null;
-        if (value.TryGetProperty("origin_server_ts", out var time))
-        {
-            var parsed = Validation.Integer(time, -8640000000000000, 8640000000000000); if (!parsed.IsSuccess) return Result<ReceivedEvent>.Fail(parsed.Error);
-            timestamp = Time(parsed.Value);
-        }
-        var omit = WireJson.Text(content, "body") is not null && content.TryGetProperty("formatted_body", out _);
-        var projected = omit ? WireJson.Object(writer => { foreach (var field in content.EnumerateObject()) if (field.Name != "formatted_body") field.WriteTo(writer); }) : content.Clone();
-        return Result<ReceivedEvent>.Success(new(room, new("unknown", null, null), id, sender, type, projected, timestamp, WireJson.Text(value, "state_key"), omit ? ["content.formatted_body"] : null));
+        if (!Validation.RoomId(room) || value.RoomId != room || !Validation.EventId(value.EventId) || !Validation.UserId(value.Sender) || !MessageCodec.Types.Contains(value.Type)
+            || value.SentAt is < -8640000000000000L or > 8640000000000000L || !MessageCodec.Valid(value.Content)
+            || value.SubjectId is { } subject && !MessageCodec.Text(subject, 255, 0)
+            || value.Omitted is { } omitted && (omitted.Count > 100 || omitted.Any(field => !MessageCodec.Text(field, 255))))
+            return Results.Fail<ReceivedEvent>("invalid", "Invalid normalized messaging event");
+        return Result<ReceivedEvent>.Success(new(room, new("unknown", null, null), value.EventId, value.Sender, value.Type, value.Content,
+            value.SentAt is { } time ? Time(time) : null, value.SubjectId, value.Omitted));
     }
     private static string Time(long milliseconds)
     {
@@ -40,31 +34,32 @@ public static class ReceivedEvents
     }
     public static JsonElement Encode(ReceivedEvent value) => WireJson.Object(writer =>
     {
-        writer.WriteString("room_id", value.RoomId); writer.WritePropertyName("origin"); writer.WriteStartObject(); writer.WriteString("kind", value.Origin.Kind); writer.WriteString("name", value.Origin.Name); writer.WriteString("alias", value.Origin.Alias); writer.WriteEndObject();
-        writer.WriteString("event_id", value.EventId); writer.WriteString("sender", value.Sender); writer.WriteString("type", value.Type); writer.WritePropertyName("content"); value.Content.WriteTo(writer);
-        if (value.StateKey is not null) writer.WriteString("state_key", value.StateKey);
+        writer.WriteString("roomId", value.RoomId); writer.WriteStartObject("origin"); writer.WriteString("kind", value.Origin.Kind); writer.WriteString("name", value.Origin.Name); writer.WriteString("alias", value.Origin.Alias); writer.WriteEndObject();
+        writer.WriteString("eventId", value.EventId); writer.WriteString("sender", value.Sender); writer.WriteString("type", value.Type); writer.WritePropertyName("content"); MessageJson.Content(value.Content).WriteTo(writer);
+        writer.WriteString("subjectId", value.SubjectId); writer.WriteString("timestamp", value.Timestamp);
         if (value.Omitted is not null) { writer.WriteStartArray("omitted"); foreach (var name in value.Omitted) writer.WriteStringValue(name); writer.WriteEndArray(); }
-        writer.WriteString("timestamp", value.Timestamp);
-        if (value.ContentFile is { } file) { writer.WriteStartObject("content_file"); writer.WriteString("file", file.File); writer.WriteNumber("bytes", file.Bytes); writer.WriteString("sha256", file.Sha256); writer.WriteNumber("sourceBytes", file.SourceBytes); writer.WriteNumber("attachmentBytes", file.AttachmentBytes); writer.WriteEndObject(); }
+        if (value.ContentFile is { } file) { writer.WriteStartObject("contentFile"); writer.WriteString("file", file.File); writer.WriteNumber("bytes", file.Bytes); writer.WriteString("sha256", file.Sha256); writer.WriteNumber("sourceBytes", file.SourceBytes); writer.WriteNumber("attachmentBytes", file.AttachmentBytes); writer.WriteEndObject(); }
     });
     public static Result<ReceivedEvent> Decode(JsonElement value)
     {
-        if (!Validation.Fields(value, ["room_id", "origin", "event_id", "sender", "type", "content", "timestamp"], ["state_key", "omitted", "content_file"]).IsSuccess) return Results.Fail<ReceivedEvent>("invalid", "Invalid retained event");
+        if (!Validation.Fields(value, ["roomId", "origin", "eventId", "sender", "type", "content", "timestamp", "subjectId"], ["omitted", "contentFile"]).IsSuccess) return Results.Fail<ReceivedEvent>("invalid", "Invalid retained event");
         var origin = value.GetProperty("origin"); if (!Validation.Fields(origin, ["kind", "name", "alias"]).IsSuccess) return Results.Fail<ReceivedEvent>("invalid", "Invalid retained origin");
         var kind = Validation.Choice(origin.GetProperty("kind"), "unknown", "dm", "room"); var name = origin.GetProperty("name").ValueKind == JsonValueKind.Null ? Result<string?>.Success(null) : Validation.PlainText(origin.GetProperty("name"), 16000).Map<string?>(text => text); var alias = Validation.NullableText(origin.GetProperty("alias"));
-        var native = WireJson.Object(writer => { writer.WriteString("event_id", WireJson.Text(value, "event_id")); writer.WriteString("sender", WireJson.Text(value, "sender")); writer.WriteString("type", WireJson.Text(value, "type")); writer.WritePropertyName("content"); value.GetProperty("content").WriteTo(writer); if (value.TryGetProperty("state_key", out var key)) { writer.WritePropertyName("state_key"); key.WriteTo(writer); } });
-        var parsed = View(native, WireJson.Text(value, "room_id") ?? ""); var timestamp = Validation.NullableText(value.GetProperty("timestamp"), 40);
-        if (!parsed.IsSuccess || !kind.IsSuccess || !name.IsSuccess || !alias.IsSuccess || !timestamp.IsSuccess || timestamp.Value is not null && !ValidTime(timestamp.Value)) return Results.Fail<ReceivedEvent>("invalid", "Invalid retained event identity or timestamp");
+        var content = MessageCodec.Content(value.GetProperty("content")); var timestamp = Validation.NullableText(value.GetProperty("timestamp"), 40);
+        var id = WireJson.Text(value, "eventId"); var room = WireJson.Text(value, "roomId"); var sender = WireJson.Text(value, "sender"); var type = WireJson.Text(value, "type"); var subject = value.GetProperty("subjectId");
+        if (id is null || !Validation.EventId(id) || room is null || !Validation.RoomId(room) || sender is null || !Validation.UserId(sender) || type is null || !MessageCodec.Types.Contains(type)
+            || !content.IsSuccess || !kind.IsSuccess || !name.IsSuccess || !alias.IsSuccess || !timestamp.IsSuccess || timestamp.Value is not null && !ValidTime(timestamp.Value)
+            || subject.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)) return Results.Fail<ReceivedEvent>("invalid", "Invalid retained event identity or timestamp");
         IReadOnlyList<string>? omitted = null; if (value.TryGetProperty("omitted", out var source)) { var list = Validation.List(source, text => Validation.Text(text), 100); if (!list.IsSuccess) return Result<ReceivedEvent>.Fail(list.Error); omitted = list.Value; }
         ContentFile? file = null;
-        if (value.TryGetProperty("content_file", out source))
+        if (value.TryGetProperty("contentFile", out source))
         {
             if (!Validation.Fields(source, ["file", "bytes", "sha256", "sourceBytes", "attachmentBytes"]).IsSuccess) return Results.Fail<ReceivedEvent>("invalid", "Invalid retained message file");
             var path = Validation.Text(source.GetProperty("file"), 4096); var bytes = Validation.Integer(source.GetProperty("bytes"), 1); var digest = Validation.Text(source.GetProperty("sha256"), 64, 64); var contentBytes = Validation.Integer(source.GetProperty("sourceBytes")); var attachment = Validation.Integer(source.GetProperty("attachmentBytes"));
             if (!path.IsSuccess || !bytes.IsSuccess || !digest.IsSuccess || !contentBytes.IsSuccess || !attachment.IsSuccess || digest.Value.Any(character => character is not (>= '0' and <= '9' or >= 'a' and <= 'f'))) return Results.Fail<ReceivedEvent>("invalid", "Invalid retained message file evidence");
             file = new(path.Value, bytes.Value, digest.Value, contentBytes.Value, attachment.Value);
         }
-        return parsed.Map(item => item with { Origin = new(kind.Value, name.Value, alias.Value), Timestamp = timestamp.Value, Omitted = omitted, ContentFile = file });
+        return Result<ReceivedEvent>.Success(new(room, new(kind.Value, name.Value, alias.Value), id, sender, type, content.Value, timestamp.Value, subject.ValueKind == JsonValueKind.Null ? null : subject.GetString(), omitted, file));
     }
     private static bool ValidTime(string value)
     {

@@ -4,13 +4,13 @@ use crossfire_adapter_crossfire::{fleet_connection::Fleet, listener_host::Host a
 use crossfire_adapter_filesystem::{
     absolute_state::AbsoluteState, agent_projects, lock::StateLock,
 };
-use crossfire_adapter_matrix::agent::Client as MatrixClient;
 use crossfire_agent_core::{
     coordination::Coordination,
     listener_hooks::ListenerHooks,
     owned_runtime::{Inspection, OwnedAdapter, SavedContext},
 };
 use crossfire_contracts::{call::Call, operations::OperationId};
+use crossfire_domain::messaging_client::MessagingConnector;
 use crossfire_domain::runtime::values::Runtime;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, secret::Secret};
 use fleetd_domain::{controller_model::*, controller_ports::Execution, model::*};
@@ -26,7 +26,7 @@ use tokio::sync::Mutex as AsyncMutex;
 use tokio_util::sync::CancellationToken;
 
 pub type Clock = fn() -> Result<i64>;
-pub type AgentHooks = ListenerHooks<AbsoluteState, Client, MatrixClient, Clock>;
+pub type AgentHooks<M> = ListenerHooks<AbsoluteState, Client, M, Clock>;
 pub type Connection = Fleet<Client, Remote>;
 pub type FleetReports = Reports<AbsoluteState, Client>;
 pub(crate) struct BoundFleet {
@@ -34,7 +34,8 @@ pub(crate) struct BoundFleet {
     pub reports: Arc<FleetReports>,
     pub stop: CancellationToken,
 }
-pub struct Host {
+pub struct Host<C: MessagingConnector> {
+    pub(crate) messaging: C,
     pub(crate) adapters: BTreeMap<String, Arc<Adapter>>,
     pub(crate) artifacts: PathBuf,
     pub(crate) storage: Arc<AbsoluteState>,
@@ -57,9 +58,10 @@ pub(crate) fn text(path: &Path) -> Result<&str> {
     path.to_str()
         .ok_or_else(|| Failure::new(ErrorCode::Invalid, "Native paths must be valid Unicode"))
 }
-impl Host {
+impl<C: MessagingConnector> Host<C> {
     pub fn new(
         adapters: BTreeMap<String, Arc<Adapter>>,
+        messaging: C,
         artifacts: PathBuf,
         log: Arc<dyn Fn(&str) + Send + Sync>,
         clock: Clock,
@@ -72,6 +74,7 @@ impl Host {
         }
         Ok(Self {
             adapters,
+            messaging,
             artifacts,
             storage: Arc::new(AbsoluteState),
             log,
@@ -160,11 +163,11 @@ impl Host {
         Ok(())
     }
 }
-impl Execution for Host {
+impl<C: MessagingConnector> Execution for Host<C> {
     fn validate(&self, configuration: &Configuration) -> Result<()> {
         for definition in configuration.definitions.values() {
             let adapter = self.adapter(definition.runtime)?;
-            <Adapter as OwnedAdapter<AgentHooks>>::validate(
+            <Adapter as OwnedAdapter<AgentHooks<C::Client>>>::validate(
                 &adapter,
                 &Value::Object(definition.options.clone()),
             )?;
@@ -176,7 +179,7 @@ impl Execution for Host {
                 .ok_or_else(|| {
                     Failure::new(ErrorCode::Invalid, "Unknown native role definition")
                 })?;
-            <Adapter as OwnedAdapter<AgentHooks>>::validate(
+            <Adapter as OwnedAdapter<AgentHooks<C::Client>>>::validate(
                 self.adapter(definition.runtime)?.as_ref(),
                 &Value::Object(configuration.native_options(instance)?),
             )?;
@@ -338,7 +341,7 @@ impl Execution for Host {
                 true,
             )?;
             let definition = &configuration.definitions[&instance.definition];
-            <Adapter as OwnedAdapter<AgentHooks>>::inspect(
+            <Adapter as OwnedAdapter<AgentHooks<C::Client>>>::inspect(
                 self.adapter(definition.runtime)?.as_ref(),
                 &Self::inspection(configuration, instance)?,
                 stop.clone(),
@@ -363,7 +366,7 @@ impl Execution for Host {
             }
             Ok(_) => {}
         }
-        <Adapter as OwnedAdapter<AgentHooks>>::saved_contexts(
+        <Adapter as OwnedAdapter<AgentHooks<C::Client>>>::saved_contexts(
             self.adapter(configuration.definitions[&instance.definition].runtime)?
                 .as_ref(),
             &Self::inspection(configuration, instance)?,

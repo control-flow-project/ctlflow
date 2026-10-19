@@ -3,7 +3,7 @@ using Crossfire.Kernel;
 
 namespace Crossfire.Domain;
 
-public sealed record PlannedGrant(string RoomId, string AccessMode, long? PowerLevel, bool Muted);
+public sealed record PlannedGrant(string RoomId, string AccessMode, System.Text.Json.JsonElement? NativeAccess, bool Muted);
 public sealed record PlannedAgent(string InstanceKey, IReadOnlyList<PlannedGrant> Grants);
 public sealed record RoomPlan(string FleetId, IReadOnlyList<PlannedAgent> Agents);
 public sealed record GrantSnapshot(string RoomId, string Generation, long Revision);
@@ -13,7 +13,7 @@ public sealed record RoomPlanPreview(string Digest, string FleetId, long FleetRe
 
 public static class RoomPlans
 {
-    public static async ValueTask<Result<RoomPlanPreview>> Preview(FleetPorts fleets, RoomGrantPorts grants, MatrixPorts matrix, Actor actor, RoomPlan plan, CancellationToken cancellation = default)
+    public static async ValueTask<Result<RoomPlanPreview>> Preview(FleetPorts fleets, RoomGrantPorts grants, MessagingPorts messaging, Actor actor, RoomPlan plan, CancellationToken cancellation = default)
     {
         if (actor.Kind != "human") return Results.Fail<RoomPlanPreview>("forbidden", "Only a human can review a fleet room plan");
         var fleet = FleetAuthority.Find(fleets, new FleetPrincipalActor(actor), plan.FleetId, true); if (!fleet.IsSuccess) return Result<RoomPlanPreview>.Fail(fleet.Error);
@@ -37,10 +37,10 @@ public static class RoomPlans
             foreach (var roomId in rooms)
             {
                 var before = current.Value.SingleOrDefault(value => value.RoomId == roomId); var next = proposed.Grants.SingleOrDefault(value => value.RoomId == roomId);
-                var change = new GrantChange(binding.AgentId, roomId, target.Value.Principal.Revision, before?.Generation, next?.AccessMode ?? "none", next?.PowerLevel, next?.Muted ?? false);
+                var change = new GrantChange(binding.AgentId, roomId, target.Value.Principal.Revision, before?.Generation, next?.AccessMode ?? "none", next?.NativeAccess, next?.Muted ?? false);
                 var proof = await RoomGrantAuthorization.Authorize(grants, actor, change, cancellation: cancellation); if (!proof.IsSuccess) return Result<RoomPlanPreview>.Fail(proof.Error);
                 var facts = proof.Value.Native;
-                var details = facts is null ? await RoomReads.Read(grants, matrix, actor, roomId, binding.AgentId, cancellation) : Result<RoomDetails>.Success(new(roomId, facts.Name, facts.Topic, facts.Alias, facts));
+                var details = facts is null ? await RoomReads.Read(grants, messaging, actor, roomId, binding.AgentId, cancellation) : Result<RoomDetails>.Success(new(roomId, facts.Name, facts.Topic, facts.Alias, facts));
                 changes.Add(new(proof.Value, target.Value.Name, proposed.InstanceKey, details.IsSuccess ? details.Value.Name : roomId, details.IsSuccess ? details.Value.Alias : null));
             }
         }
@@ -49,9 +49,9 @@ public static class RoomPlans
         return Result<RoomPlanPreview>.Success(new(RoomPlanDigest.Digest(plan.FleetId, fleet.Value.Revision, snapshots, changes), plan.FleetId, fleet.Value.Revision, snapshots, changes));
     }
 
-    public static async ValueTask<Result<IReadOnlyList<string>>> Apply(FleetPorts fleets, RoomGrantPorts grants, MatrixPorts matrix, Actor actor, RoomPlan plan, string digest, IReadOnlyList<AgentGrantSnapshot> snapshots, string requestId, CancellationToken cancellation = default)
+    public static async ValueTask<Result<IReadOnlyList<string>>> Apply(FleetPorts fleets, RoomGrantPorts grants, MessagingPorts messaging, Actor actor, RoomPlan plan, string digest, IReadOnlyList<AgentGrantSnapshot> snapshots, string requestId, CancellationToken cancellation = default)
     {
-        var preview = await Preview(fleets, grants, matrix, actor, plan, cancellation); if (!preview.IsSuccess) return Result<IReadOnlyList<string>>.Fail(preview.Error);
+        var preview = await Preview(fleets, grants, messaging, actor, plan, cancellation); if (!preview.IsSuccess) return Result<IReadOnlyList<string>>.Fail(preview.Error);
         if (preview.Value.Digest != digest || RoomPlanDigest.Snapshots(preview.Value.Snapshots) != RoomPlanDigest.Snapshots(snapshots))
             return Results.Fail<IReadOnlyList<string>>("conflict", "Room plan, native authority or revisions changed; review a new preview");
         return grants.Transaction.Run(() =>

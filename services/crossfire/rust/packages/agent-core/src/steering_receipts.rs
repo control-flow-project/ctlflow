@@ -61,7 +61,7 @@ impl<S: Sink, T: Clock + Send + Sync> Notices for Receipts<S, T> {
         let mut value = json!({"eventId":event.event_id,"source":event.origin,"roomId":event.room_id,"sender":event.sender,"sentAt":event.timestamp,"receivedAt":first.map(iso_timestamp).transpose()?,"stageAt":iso_timestamp(now)?,"sinceReceiptMs":first.map(|first| now.saturating_sub(first).max(0)),"sinceSentMs":sent.map(|sent| now.saturating_sub(sent).max(0))});
         if stage == "received" {
             value["message"] = json!(crossfire_kernel::text::truncate_utf16(
-                event.content["body"].as_str().unwrap_or(""),
+                event.content.body.as_deref().unwrap_or(""),
                 3000
             ));
         }

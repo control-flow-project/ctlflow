@@ -3,8 +3,8 @@ use crate::{
     fleet::{authority::authenticate_controller, values::FleetActor},
     identity::{PrincipalKind, Role, Status, WakeMode},
     port::{
-        AgentRepository, AuthorizationRepository, CredentialRepository, FleetRepository,
-        MatrixIdentity, RepositoryAccess,
+        AgentRepository, AuthorizationRepository, BackendUserIdentity, CredentialRepository,
+        FleetRepository, RepositoryAccess,
     },
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, secret::Secret};
@@ -38,19 +38,7 @@ pub fn validate(input: &Roster) -> Result<()> {
             "Invalid controller descriptor",
         ));
     }
-    let valid_matrix = input
-        .owner_matrix_id
-        .strip_prefix('@')
-        .and_then(|value| value.split_once(':'))
-        .is_some_and(|(name, server)| {
-            !name.is_empty()
-                && !server.is_empty()
-                && !input
-                    .owner_matrix_id
-                    .chars()
-                    .any(crossfire_kernel::text::whitespace)
-        });
-    if !valid_matrix
+    if !crossfire_kernel::identifier::opaque(&input.owner_backend_user_id)
         || !valid_name(&input.fleet_key)
         || input.instances.is_empty()
         || input.instances.len() > 100
@@ -80,19 +68,23 @@ pub fn validate(input: &Roster) -> Result<()> {
     }
     for item in &input.instances {
         let policy = &item.policy;
-        if policy.senders.len() > 2000
+        if policy
+            .senders
+            .iter()
+            .any(|sender| !crossfire_kernel::identifier::opaque(&sender.backend_user_id))
+            || policy.senders.len() > 2000
             || policy.mode == WakeMode::Everyone && !policy.senders.is_empty()
             || policy
                 .senders
                 .iter()
-                .map(|sender| &sender.matrix_user_id)
+                .map(|sender| &sender.backend_user_id)
                 .collect::<BTreeSet<_>>()
                 .len()
                 != policy.senders.len()
         {
             return Err(Failure::new(
                 ErrorCode::Invalid,
-                "Supply a valid wake mode and unique selected Matrix identities",
+                "Supply a valid wake mode and unique selected backend identities",
             ));
         }
     }
@@ -198,9 +190,9 @@ pub fn admit(
     }
     Ok(())
 }
-pub async fn verify<A: RepositoryAccess, M: MatrixIdentity>(
+pub async fn verify<A: RepositoryAccess, M: BackendUserIdentity>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     input: &Roster,
 ) -> Result<Verified>
 where
@@ -209,7 +201,7 @@ where
     validate(input)?;
     let (owner, fleet) = repository.with(|repo| {
         let owner = repo
-            .principal_by_matrix_id(&input.owner_matrix_id)?
+            .principal_by_backend_user_id(&input.owner_backend_user_id)?
             .filter(|owner| owner.kind == PrincipalKind::Human && owner.status == Status::Active)
             .ok_or_else(|| {
                 Failure::new(ErrorCode::Forbidden, "An active human owner is required")
@@ -272,7 +264,7 @@ where
             continue;
         };
         if !retired
-            && matrix
+            && messaging
                 .identify(
                     &item
                         .identity
@@ -281,7 +273,7 @@ where
                         .access_token,
                 )
                 .await?
-                != record.principal.matrix_user_id
+                != record.principal.backend_user_id
         {
             return Err(Failure::new(
                 ErrorCode::Forbidden,
@@ -325,15 +317,15 @@ where
         policies,
     })
 }
-pub async fn preflight<A: RepositoryAccess, M: MatrixIdentity>(
+pub async fn preflight<A: RepositoryAccess, M: BackendUserIdentity>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     input: &Roster,
 ) -> Result<Verified>
 where
     A::Repository: EnrollmentRepository,
 {
-    let verified = verify(repository, matrix, input).await?;
+    let verified = verify(repository, messaging, input).await?;
     repository.with(|repo| admit(repo, input, &verified))?;
     Ok(verified)
 }

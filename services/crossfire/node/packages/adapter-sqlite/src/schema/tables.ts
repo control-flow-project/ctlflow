@@ -36,7 +36,7 @@ export type Tables = {
   fleet_instance_permission: { agent_id: string; permission_code: 'room.agent.invite'; grant_scope: 'agent_room' };
   listener_stat_checkpoint: { run_id: string; sequence: number; digest: string; captured_at: number };
   listener_stat_interval: { run_id: string; bucket_at: number; agent_id: string; started_at: number; ended_at: number; captured_at: number; dropped: number };
-  listener_stat_flow: { run_id: string; bucket_at: number; room_id: string; sender_matrix_id: string; message_type: string; observed: number; delivered: number; content_bytes: number; delivered_bytes: number; attachment_bytes: number; largest_bytes: number };
+  listener_stat_flow: { run_id: string; bucket_at: number; room_id: string; sender_backend_user_id: string; message_type: string; observed: number; delivered: number; content_bytes: number; delivered_bytes: number; attachment_bytes: number; largest_bytes: number };
   listener_stat_usage: { run_id: string; bucket_at: number; runtime: string; session_id: string; input: number; cached_input: number; cache_write_input: number | null; output: number; reasoning_output: number | null; total: number };
   runtime_usage_checkpoint: { agent_id: string; runtime: string; session_id: string; input: number; cached_input: number; cache_write_input: number | null; output: number; reasoning_output: number | null; total: number; captured_at: number };
   runtime_decision: { id: string; agent_id: string; run_id: string; runtime: string; session_id: string; request_id: string; turn_id: string; item_id: string; kind: 'permission' | 'question'; action: string; review_text: string; blocking: number; expires_at: number | null; created_at: number; status: 'pending' | 'answered' | 'responded' | 'cancelled' | 'expired' };
@@ -74,7 +74,7 @@ export type Tables = {
   };
   principal: {
     id: string;
-    matrix_user_id: string;
+    backend_user_id: string;
     kind: 'human' | 'agent';
     status: 'active' | 'suspended' | 'revoked';
     revision: number;
@@ -188,7 +188,7 @@ export type Tables = {
     invitation_event_id: string | null;
     admission_kind: 'managed' | 'invitation';
     access_mode: 'none' | 'read' | 'reply' | 'custom';
-    power_level: number | null;
+    native_access: string | null;
     muted: number;
     revision: number;
     access_revision: number;
@@ -210,8 +210,7 @@ export type Tables = {
     applied_revision: number | null;
     applied_access_revision: number | null;
     membership: 'join' | 'leave' | 'invite' | 'ban' | null;
-    creator: number;
-    power_level: number | null;
+    native_access: string | null;
     last_attempt_at: number | null;
     last_success_at: number | null;
     next_check_at: number;
@@ -233,7 +232,7 @@ export type Tables = {
     expires_at: number;
     consumed_by_member_id: string | null;
     revoked_at: number | null;
-    claim_matrix_user_id: string | null;
+    claim_backend_user_id: string | null;
     claim_display_name: string | null;
     claim_fingerprint: string | null;
   };
@@ -262,7 +261,7 @@ export type Tables = {
   wake_notice: {
     receiver_agent_id: string;
     event_id: string;
-    sender_matrix_id: string;
+    sender_backend_user_id: string;
     room_id: string;
     reserved_at: number;
     message_body: string;

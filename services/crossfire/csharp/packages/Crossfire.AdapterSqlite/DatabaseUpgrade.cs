@@ -17,16 +17,15 @@ public static class DatabaseUpgrade
         if (Metadata.Application(context) != SchemaContract.ApplicationId) throw new IOException("Management backup application identity does not match Crossfire");
         if (!Metadata.Valid(context)) throw new IOException("Management backup integrity or preserved relationships failed");
     }
-    private static bool Current(CrossfireDbContext context) => Metadata.Version(context) == SchemaContract.Version
-        && Metadata.HasMigrations(context) && Metadata.Migrations(context).SequenceEqual(SchemaContract.Migrations);
     public static string? BackupBeforeMigration(string directory)
     {
-        var file = Path.Combine(directory, "management.sqlite"); if (!PrivateFiles.Exists(file)) return null; using var source = Open(file); var application = Metadata.Application(source); var version = Metadata.Version(source);
-        if (application == 0 && version == 0)
-        {
-            if (Metadata.Empty(source)) return null;
-        }
-        if (application != SchemaContract.ApplicationId || version < 13 || version > SchemaContract.Version) throw new IOException("Unsupported Crossfire schema; only inventoried deployed schemas 13–18 may advance through Knex. No data was changed"); Verify(source); if (Current(source)) return null;
+        var file = Path.Combine(directory, "management.sqlite");
+        if (!PrivateFiles.Exists(file)) return null;
+        using var source = Open(file);
+        var valid = Schema.Validate(source);
+        if (!valid.IsSuccess) throw new IOException(valid.Error.Message);
+        Verify(source);
+        var version = Metadata.Version(source);
         var parent = PrivateFiles.Directory(Path.Combine(directory, "backups")); var target = Path.Combine(parent, "management-" + Identity.Identifier() + ".sqlite");
         try
         {

@@ -273,6 +273,28 @@ pub struct PiConnection<P, H> {
     delivery: Delivery<Input, PiPublication<P, H>, EventClock>,
 }
 impl<P: Protocol, H: Hooks> PiConnection<P, H> {
+    pub async fn provider(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Result<crossfire_agent_core::owned_runtime::ProviderState> {
+        let unavailable = || {
+            Failure::new(
+                ErrorCode::Unavailable,
+                "Native provider metadata could not be read without refresh",
+            )
+        };
+        let state = self
+            .native
+            .request("get_state", &serde_json::json!({}), cancellation.clone())
+            .await
+            .map_err(|_| unavailable())?;
+        let available = self
+            .native
+            .request("get_available_models", &serde_json::json!({}), cancellation)
+            .await
+            .map_err(|_| unavailable())?;
+        crate::provider::parse(&state, &available)
+    }
     pub fn open(native: Arc<P>, options: Configuration<H>) -> Result<Self> {
         let options = Arc::new(options);
         let signals = Arc::new(Signals {

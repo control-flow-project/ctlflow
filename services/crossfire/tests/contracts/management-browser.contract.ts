@@ -11,7 +11,7 @@ export async function managementBrowserFixture(fixture: ContractStack) {
   const native = await contractHttp(fixture.native.base, 'POST', '/_matrix/client/v3/createRoom', { name: 'Browser contract room' }, { Authorization: 'Bearer ' + fixture.owner.nativeToken }); assert.equal(native.status, 200);
   const roomId = text(record(native.body).room_id), runId = randomUUID(), sessionId = randomUUID();
   const current = await fixture.data(operations.agent, { agentId: agent.id });
-  await fixture.operation(operations.setGrant, { agentId: agent.id, roomId }, { expectedRevision: integer(current.revision), expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false });
+  await fixture.operation(operations.setGrant, { agentId: agent.id, roomId }, { expectedRevision: integer(current.revision), expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false });
   await observe(async () => { const view = await fixture.data(operations.grant, { agentId: agent.id, roomId }); return view.application !== null && record(view.application).membership === 'join'; }, 'Browser fixture room is actually joined');
   await fixture.operation(operations.reportFleetConnection, { fleetId: agent.fleetId, connectionId: agent.connectionId }, { stopped: false }, agent.credential);
   await fixture.operation(operations.reportListener, { agentId: agent.id, runId }, { release: fixture.release.release.manifest.release, messagesDelivered: 0, stopped: false, statistics: null,
@@ -32,17 +32,17 @@ export async function managementBrowserContracts(page: Page, fixture: ContractSt
   }
   await page.goto(fixture.origin + '/manage/agents/' + agent.id + '/wake'); await page.reload();
   const editor = page.locator('#wake-editor'); await expect(editor).toBeVisible(); await expect(page.getByRole('dialog')).toHaveCount(0);
-  await editor.getByLabel('Search people or Matrix IDs').fill(person.matrixUserId);
-  await editor.getByLabel('Allow ' + person.matrixUserId, { exact: true }).check();
-  await editor.getByLabel('Wake scope for ' + person.matrixUserId).selectOption('group');
+  await editor.getByLabel('Search people or messaging identities').fill(person.backendUserId);
+  await editor.getByLabel('Allow ' + person.backendUserId, { exact: true }).check();
+  await editor.getByLabel('Wake scope for ' + person.backendUserId).selectOption('group');
   await editor.getByRole('link', { name: 'Cancel', exact: true }).click();
   await page.getByRole('link', { name: 'Choose who can wake', exact: true }).click();
-  await editor.getByLabel('Search people or Matrix IDs').fill(person.matrixUserId); await expect(editor.getByLabel('Allow ' + person.matrixUserId, { exact: true })).not.toBeChecked();
-  await editor.getByLabel('Allow ' + person.matrixUserId, { exact: true }).check();
-  await editor.getByLabel('Wake scope for ' + person.matrixUserId).selectOption('group');
+  await editor.getByLabel('Search people or messaging identities').fill(person.backendUserId); await expect(editor.getByLabel('Allow ' + person.backendUserId, { exact: true })).not.toBeChecked();
+  await editor.getByLabel('Allow ' + person.backendUserId, { exact: true }).check();
+  await editor.getByLabel('Wake scope for ' + person.backendUserId).selectOption('group');
   await editor.getByRole('button', { name: 'Save wake-up policy', exact: true }).click(); await expect(page).toHaveURL(fixture.origin + '/manage/agents/' + agent.id);
-  const saved = await fixture.data(operations.wakePolicy, params); assert(list(saved.senders).some(value => record(record(value).identity).matrixUserId === person.matrixUserId && record(value).includeAgents === true));
-  await page.getByRole('link', { name: 'Choose who can wake', exact: true }).click(); await editor.getByLabel('Wake scope for ' + person.matrixUserId).selectOption('person');
+  const saved = await fixture.data(operations.wakePolicy, params); assert(list(saved.senders).some(value => record(record(value).identity).backendUserId === person.backendUserId && record(value).includeAgents === true));
+  await page.getByRole('link', { name: 'Choose who can wake', exact: true }).click(); await editor.getByLabel('Wake scope for ' + person.backendUserId).selectOption('person');
   await fixture.operation(operations.changeWakePolicy, params, { expectedRevision: integer(saved.revision), mode: 'humans', senders: [] });
   await editor.getByRole('button', { name: 'Save wake-up policy', exact: true }).click(); await expect(editor.getByRole('alert')).toContainText('These settings changed elsewhere');
   await editor.getByRole('button', { name: 'Discard edits & load latest' }).click(); await expect(editor.getByLabel('Audience', { exact: true })).toHaveValue('humans');

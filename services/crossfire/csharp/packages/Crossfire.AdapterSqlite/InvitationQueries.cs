@@ -9,7 +9,7 @@ public static class InvitationQueries
     public static Result<MemberInvitation?> Find(CrossfireDbContext context, string id)
         => Stored.Read(() => context.MemberInvitation.AsNoTracking().Where(row => row.Id == id)
             .Select(row => new MemberInvitation(row.Id, row.CreatedByMemberId, row.ClaimHash, row.RoleCode, row.PrincipalKind, row.CreatedAt,
-                row.ExpiresAt, row.ConsumedByMemberId, row.RevokedAt, row.ClaimMatrixUserId, row.ClaimDisplayName, row.ClaimFingerprint)).SingleOrDefault());
+                row.ExpiresAt, row.ConsumedByMemberId, row.RevokedAt, row.ClaimBackendUserId, row.ClaimDisplayName, row.ClaimFingerprint)).SingleOrDefault());
 
     public static Result<Page<MemberInvitation>> List(CrossfireDbContext context, int page, int pageSize, string? creator)
     {
@@ -19,7 +19,7 @@ public static class InvitationQueries
         return Stored.Read(() => context.MemberInvitation.AsNoTracking().Where(row => creator == null || row.CreatedByMemberId == creator)
             .OrderByDescending(row => row.CreatedAt).ThenBy(row => row.Id).Skip(offset).Take(pageSize)
             .Select(row => new MemberInvitation(row.Id, row.CreatedByMemberId, row.ClaimHash, row.RoleCode, row.PrincipalKind, row.CreatedAt,
-                row.ExpiresAt, row.ConsumedByMemberId, row.RevokedAt, row.ClaimMatrixUserId, row.ClaimDisplayName, row.ClaimFingerprint)).ToArray())
+                row.ExpiresAt, row.ConsumedByMemberId, row.RevokedAt, row.ClaimBackendUserId, row.ClaimDisplayName, row.ClaimFingerprint)).ToArray())
             .Map(values => new Page<MemberInvitation>(values, page, pageSize, count.Value));
     }
 }

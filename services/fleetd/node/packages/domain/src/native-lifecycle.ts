@@ -1,8 +1,9 @@
+import { contextRoom, roomContext } from '@ctlflow/crossfire-kernel/history-context';
 import { truncateUtf8 } from '@ctlflow/crossfire-kernel/text';
 import { failure, success, type Result, type Failure } from '@ctlflow/crossfire-kernel/result';
 import type { Clock } from '@ctlflow/crossfire-agent-core/port';
 import type { RuntimeConnection, RuntimeHooks, RuntimeObservationEvent, NativeSessionState, RuntimeApproval, InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
-import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
+import type { NativeDiagnostic, OwnedRuntimeConnection, SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
 import { canRecoverFailure } from '@ctlflow/crossfire-kernel/lifecycle';
 import { resumeInterruptedWork, type ResumeWorkStore } from './resume-work.js';
@@ -38,13 +39,13 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   const observations = new Map<string, Observation>();
   const working = new Set<string>();
   const unsettled = new Map<string, string>();
+  const workRevisions = new Map<string, number>();
   let phase: NativeSessionState['phase'] = 'sleeping';
   let native: OwnedRuntimeConnection | undefined, opening: Promise<OwnedRuntimeConnection> | undefined, closingNative: Promise<void> | undefined;
   let recovery: Promise<void> | undefined, closing: Promise<void> | undefined;
   let preparing: Promise<OwnedRuntimeConnection> | undefined;
   let activeCalls = 0, idleSeconds = 1800, lastActivityAt = services.clock.now();
   let observationGeneration = 0;
-  let workRevision = 0;
   let cancelIdle: (() => void) | undefined;
   let failedEpisode = false;
   let inspectionUncertain = false;
@@ -58,19 +59,21 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     report(nativeError(result.error.code, result.error.message));
     stop.abort(nativeError(result.error.code, result.error.message));
   }
-  function completeIdleWork(connection: OwnedRuntimeConnection, revision: number, idle: { context: string; sessionId: string }[]): void {
-    if (!continuationReady || native !== connection || connection.signal.aborted || revision !== workRevision) return;
+  function reviseWork(context: string): void { workRevisions.set(context, (workRevisions.get(context) ?? 0) + 1); }
+  function completeIdleWork(connection: OwnedRuntimeConnection, revisions: ReadonlyMap<string, number>, idle: { context: string; sessionId: string }[]): void {
+    if (!continuationReady || native !== connection || connection.signal.aborted) return;
     const pending = new Set(unsettled.values());
     const saved = new Map(contexts.map(item => [item.context, item.sessionId]));
-    const completed = idle.filter(item => !pending.has(item.context) && saved.get(item.context) === item.sessionId)
+    const completed = idle.filter(item => !pending.has(item.context) && saved.get(item.context) === item.sessionId
+      && (revisions.get(item.context) ?? 0) === (workRevisions.get(item.context) ?? 0))
       .map(({ context, sessionId }) => ({ context, sessionId }));
     const cleared = services.work.clear(completed);
     if (!cleared.ok) throw nativeError(cleared.error.code, cleared.error.message);
   }
   async function inspectNative(connection: OwnedRuntimeConnection): Promise<{ busy: boolean }> {
-    const revision = workRevision;
+    const revisions = new Map(workRevisions);
     const status = await connection.activity();
-    completeIdleWork(connection, revision, status.contexts.filter(item => !item.busy));
+    completeIdleWork(connection, revisions, status.contexts.filter(item => !item.busy));
     return { busy: status.busy };
   }
 
@@ -82,7 +85,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   function emit(state: Observation['state'], selected = contexts, errorMessage: string | null = null): void {
     for (const context of selected) {
       const previous = observations.get(context.sessionId);
-      const observation: Observation = { sessionId: context.sessionId, roomId: context.context === 'shared' || context.context === 'control' ? null : context.context,
+      const observation: Observation = { sessionId: context.sessionId, roomId: contextRoom(context.context),
         runtime: services.runtime, state, observedAt: services.clock.now(), settings: previous?.settings ?? services.initialSettings, errorMessage };
       observations.set(context.sessionId, observation);
       services.hooks.observe?.({ kind: 'state', observation });
@@ -106,7 +109,10 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       if (['working', 'waiting-answer', 'waiting-approval'].includes(event.observation.state)) working.add(event.observation.sessionId);
       else if (event.observation.state === 'idle' || event.observation.state === 'sleeping') working.delete(event.observation.sessionId);
       if (recordingWork) {
-        if (working.has(event.observation.sessionId)) { workRevision++; checkpoint(services.work.capture([{ context: event.observation.roomId ?? services.primary, sessionId: event.observation.sessionId }])); }
+        if (working.has(event.observation.sessionId)) {
+          const context = event.observation.roomId === null ? services.primary : roomContext(event.observation.roomId);
+          reviseWork(context); checkpoint(services.work.capture([{ context, sessionId: event.observation.sessionId }]));
+        }
       }
       if (['working', 'waiting-answer', 'waiting-approval'].includes(event.observation.state)
         || event.observation.state === 'idle' && previous && ['working', 'waiting-answer', 'waiting-approval'].includes(previous.state)) touch();
@@ -266,7 +272,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         for (const context of contexts) {
           const previous = observations.get(context.sessionId);
           services.hooks.observe?.({ kind: 'state', observation: { sessionId: context.sessionId,
-            roomId: context.context === 'shared' || context.context === 'control' ? null : context.context,
+            roomId: contextRoom(context.context),
             runtime: services.runtime, state: 'unavailable', observedAt: services.clock.now(), settings: previous?.settings ?? services.initialSettings,
             errorMessage: truncateUtf8(error instanceof Error ? error.message : 'Native idle state could not be verified', 4000) } });
         }
@@ -285,7 +291,8 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
   }
   function logical(context: string, expectedSession: string): RuntimeConnection {
     async function selected(connection: OwnedRuntimeConnection, admission?: InputAdmission): Promise<RuntimeConnection> {
-      const target = context === services.primary ? connection : connection.conversation ? await connection.conversation(context, admission) : undefined;
+      const room = contextRoom(context);
+      const target = context === services.primary ? connection : room !== null && connection.conversation ? await connection.conversation(room, admission) : undefined;
       if (!target || target.sessionId !== expectedSession) throw nativeError('conflict', 'The captured room history is not the resumed native history');
       return target;
     }
@@ -307,7 +314,7 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         await call(async connection => {
           cancelled?.throwIfAborted();
           const target = await selected(connection, priority ? { priority, signal: cancelled ?? lifetime } : undefined);
-          workRevision++;
+          reviseWork(context);
           const captured = services.work.capture([{ context, sessionId: expectedSession }]);
           if (!captured.ok) throw nativeError(captured.error.code, captured.error.message);
           lifetime.throwIfAborted();
@@ -327,14 +334,14 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
       },
       acknowledge: ids => {
         if (!ids.length) return;
-        if (!native || native.signal.aborted) throw nativeError('unavailable', 'Exact native receipt acknowledgment is waiting for recovery');
+        if (!continuationReady || !native || native.signal.aborted) throw nativeError('unavailable', 'Exact native receipt acknowledgment is waiting for recovery');
         native.acknowledge(ids);
         for (const id of ids) unsettled.delete(id);
         schedule();
       },
       turnControl: {
         activeTurn: async (room, admission) => {
-          const selectedRoom = room ?? (context === services.primary ? undefined : context);
+          const selectedRoom = room ?? contextRoom(context) ?? undefined;
           return admission ? call(connection => connection.turnControl.activeTurn(selectedRoom, admission), false, admission, openNative)
             : native && !native.signal.aborted ? native.turnControl.activeTurn(selectedRoom) : null;
         },
@@ -344,7 +351,9 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
         if (!connection.conversation) throw nativeError('invalid', 'This native runtime does not support room histories');
         const target = await connection.conversation(room, admission);
         await refreshContexts();
-        return logical(room, target.sessionId);
+        const saved = contexts.find(item => item.sessionId === target.sessionId);
+        if (!saved) throw nativeError('conflict', 'The selected room has no saved native history');
+        return logical(saved.context, target.sessionId);
       }, false, admission),
       close,
     };
@@ -370,6 +379,24 @@ export async function createNativeLifecycle(services: NativeLifecycleServices, s
     else emit('sleeping');
     const runtime = logical(services.primary, sessionId);
     return success({ runtime, nativeState: runtime.lifecycle!.current,
+      async diagnostics(signal: AbortSignal): Promise<NativeDiagnostic> {
+        const connection = native;
+        const values = [...observations.values()];
+        const observed = (['failed', 'unavailable', 'waiting-approval', 'waiting-answer', 'working', 'idle'] as const)
+          .find(state => values.some(value => value.state === state));
+        const latest = values.filter(value => value.state === observed).toSorted((left, right) => right.observedAt - left.observedAt)[0];
+        const checkedAt = services.clock.now(), state = phase !== 'running' ? phase : observed ?? 'unknown';
+        const diagnostic: NativeDiagnostic = { checkedAt, state, observedAt: phase === 'running' ? latest?.observedAt ?? null : checkedAt, provider: 'unknown', providerObservedAt: null,
+          pendingInput: unsettled.size > 0 || services.hooks.pendingInput?.() === true, pendingDecision: services.hooks.pendingDecisions?.() === true };
+        if (!connection || connection.signal.aborted || signal.aborted) return diagnostic;
+        try {
+          const provider = await connection.provider(AbortSignal.any([signal, lifetime]));
+          if (native === connection && !connection.signal.aborted && !signal.aborted && provider.ok) {
+            diagnostic.provider = provider.value; diagnostic.providerObservedAt = services.clock.now();
+          }
+        } catch { }
+        return diagnostic;
+      },
       activate(): Promise<void> {
         return activation ??= (async () => {
           lifetime.throwIfAborted();

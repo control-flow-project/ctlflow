@@ -22,7 +22,7 @@ public static class AgentDirectoryQueries
             .Join(context.Fleet.Where(row => row.ArchivedAt == null), joined => joined.agent.OwnerId, fleet => fleet.OwnerId, (joined, fleet) => new { joined.agent, joined.principal, joined.name, joined.instance, fleet })
             .Where(joined => joined.instance.FleetKey == joined.fleet.FleetKey && (owner == null || joined.agent.OwnerId == owner) && statuses.Contains(joined.principal.Status)
                 && (!hasSelection || selected.Contains(joined.agent.PrincipalId)) && (!include || joined.principal.Status == "active" && activity.Contains(joined.agent.PrincipalId)) && (!exclude || joined.principal.Status != "active" || !activity.Contains(joined.agent.PrincipalId))
-                && (EF.Functions.Like(joined.principal.MatrixUserId, search) || EF.Functions.Like(joined.name.Name, search))).LongCount());
+                && (EF.Functions.Like(joined.principal.BackendUserId, search) || EF.Functions.Like(joined.name.Name, search))).LongCount());
         if (!count.IsSuccess) return Result<Page<string>>.Fail(count.Error);
         return Stored.Read(() => context.Agent.AsNoTracking().Join(context.Principal, agent => agent.PrincipalId, principal => principal.Id, (agent, principal) => new { agent, principal })
             .Join(context.AgentName, joined => joined.agent.PrincipalId, name => name.AgentId, (joined, name) => new { joined.agent, joined.principal, name })
@@ -30,7 +30,7 @@ public static class AgentDirectoryQueries
             .Join(context.Fleet.Where(row => row.ArchivedAt == null), joined => joined.agent.OwnerId, fleet => fleet.OwnerId, (joined, fleet) => new { joined.agent, joined.principal, joined.name, joined.instance, fleet })
             .Where(joined => joined.instance.FleetKey == joined.fleet.FleetKey && (owner == null || joined.agent.OwnerId == owner) && statuses.Contains(joined.principal.Status)
                 && (!hasSelection || selected.Contains(joined.agent.PrincipalId)) && (!include || joined.principal.Status == "active" && activity.Contains(joined.agent.PrincipalId)) && (!exclude || joined.principal.Status != "active" || !activity.Contains(joined.agent.PrincipalId))
-                && (EF.Functions.Like(joined.principal.MatrixUserId, search) || EF.Functions.Like(joined.name.Name, search)))
+                && (EF.Functions.Like(joined.principal.BackendUserId, search) || EF.Functions.Like(joined.name.Name, search)))
             .OrderBy(joined => joined.principal.CreatedAt).ThenBy(joined => joined.principal.Id).Skip(offset).Take(size).Select(joined => joined.agent.PrincipalId).ToArray())
             .Map(values => new Page<string>(values, input.Page, input.PageSize, count.Value));
     }

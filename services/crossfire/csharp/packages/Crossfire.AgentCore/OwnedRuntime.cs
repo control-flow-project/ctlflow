@@ -11,6 +11,8 @@ public sealed record ContextAttachment(string Context, RuntimeAttachment Attachm
 public sealed record SavedRuntimeContext(string Context, string Runtime, string SessionId, string Workspace);
 public sealed record NativeContextActivity(string Context, string SessionId, bool Busy);
 public sealed record NativeActivity(bool Busy, IReadOnlyList<NativeContextActivity> Contexts);
+public enum ProviderState { Present, Missing, NotRequired, Unknown }
+public sealed record NativeDiagnostic(string State, long? ObservedAt, ProviderState Provider, long? ProviderObservedAt, bool PendingInput, bool PendingDecision, long CheckedAt);
 public sealed record RuntimeInspectionInput(string Workspace, string StateDirectory, JsonElement Options);
 public sealed record RuntimeResetInput(string Workspace, string StateDirectory, string ResetId);
 public sealed record ValidatedRuntime(JsonElement Options, RuntimeApproval Approval);
@@ -20,6 +22,7 @@ public interface OwnedRuntimeConnection : RuntimeConnection
 {
     RuntimeAttachment? Attachment { get; }
     ValueTask<Result<NativeActivity>> Activity();
+    ValueTask<Result<ProviderState>> Provider(CancellationToken cancellation);
     ValueTask<Result<IReadOnlyList<ContextAttachment>>> Attachments();
 }
 public sealed record OwnedRuntimeAdapter(

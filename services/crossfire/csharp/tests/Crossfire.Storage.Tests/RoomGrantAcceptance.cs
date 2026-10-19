@@ -1,4 +1,5 @@
 using Crossfire.AdapterSqlite;
+using Crossfire.AdapterMatrix;
 using Crossfire.Domain;
 using Crossfire.Kernel;
 using Microsoft.EntityFrameworkCore;
@@ -15,14 +16,17 @@ public static class RoomGrantAcceptance
         var other = FleetFixture.Create(context, owner, now);
         const string roomId = "!grant-native:example.test";
         var nativeCalls = 0;
-        var facts = new RoomFacts(roomId, "Native room", "", null, ((NativeAuthentication)owner.Authentication!).MatrixUserId,
+        var facts = new MatrixRoomFacts(roomId, "Native room", "", null, ((NativeAuthentication)owner.Authentication!).BackendUserId,
             false, 50, [], -1, 0, 0, 50, 50, [new("m.room.message", 0)]);
-        var ports = RoomGrantCommands.Ports(context, () => now, (matrixId, id, cancellation) =>
-        {
-            Equal(context.Database.CurrentTransaction is null, true, "native grant authority read is outside storage transaction");
-            nativeCalls++;
-            return ValueTask.FromResult(Result<RoomFacts>.Success(facts with { MatrixUserId = matrixId, RoomId = id }));
-        });
+        var messaging = MessagingFixture.Ports() with { AuthorizeRoomAccess = (user, target, id, intent, cancellation) =>
+            {
+                Equal(context.Database.CurrentTransaction is null, true, "native grant authority read is outside storage transaction");
+                nativeCalls++;
+                var current = facts with { BackendUserId = user, RoomId = id };
+                var requested = AuthorityValues.RequestedPower(current, target, intent);
+                return ValueTask.FromResult(requested.IsSuccess ? Result<RoomFacts>.Success(AuthorityValues.View(current, target)) : Result<RoomFacts>.Fail(requested.Error));
+            } };
+        var ports = RoomGrantCommands.Ports(context, () => now, messaging);
         var initial = new GrantChange(inviter.AgentId, roomId, 0, null, "reply", null, false);
         var created = await RoomGrantChanges.Change(ports, owner, initial, Identity.Identifier());
         Equal(created.IsSuccess, true, "owner grants room reply access");
@@ -43,7 +47,7 @@ public static class RoomGrantAcceptance
         Equal((await RoomGrantChanges.Change(ports, inviter.Actor, new(inviter.AgentId, roomId, 2, generation, "reply", null, false), Identity.Identifier())).Error.Code,
             "forbidden", "agent cannot grant itself access");
         var invited = await RoomGrantChanges.Change(ports, inviter.Actor, new(target.AgentId, roomId, 0, null, "reply", null, false), Identity.Identifier(),
-            new(roomId, ((NativeAuthentication)inviter.Actor.Authentication!).MatrixUserId, "$native-invite"));
+            new(roomId, ((NativeAuthentication)inviter.Actor.Authentication!).BackendUserId, "$native-invite"));
         Equal(invited.IsSuccess, true, "agent admits invited target through canonical grant path");
         Equal(invited.Value.Grant!.AddedById, inviter.AgentId, "invitation admission retains adding agent provenance");
         Equal(invited.Value.Grant.AdmissionKind, "invitation", "native invitation admission type");
@@ -62,15 +66,15 @@ public static class RoomGrantAcceptance
         Equal(removed.Value.Grant!.AccessMode, "none", "agent can remove participant it admitted");
         Equal(removed.Value.Grant.Generation, targetGeneration, "withdrawn grant retains historical generation");
         Equal((await RoomGrantChanges.Change(ports, inviter.Actor, new(target.AgentId, roomId, 2, targetGeneration, "reply", null, false), Identity.Identifier(),
-            new(roomId, ((NativeAuthentication)inviter.Actor.Authentication!).MatrixUserId, "$native-invite"))).Error.Code, "forbidden", "withdrawn native invitation cannot be replayed");
+            new(roomId, ((NativeAuthentication)inviter.Actor.Authentication!).BackendUserId, "$native-invite"))).Error.Code, "forbidden", "withdrawn native invitation cannot be replayed");
         var reinvited = await RoomGrantChanges.Change(ports, inviter.Actor, new(target.AgentId, roomId, 2, targetGeneration, "reply", null, false), Identity.Identifier(),
-            new(roomId, ((NativeAuthentication)inviter.Actor.Authentication!).MatrixUserId, "$new-native-invite"));
+            new(roomId, ((NativeAuthentication)inviter.Actor.Authentication!).BackendUserId, "$new-native-invite"));
         Equal(reinvited.Value.Grant!.Generation != targetGeneration, true, "new admission obtains fresh membership generation");
-        Equal((await RoomGrantChanges.Change(ports, owner, new(target.AgentId, roomId, 3, reinvited.Value.Grant.Generation, "custom", 51, false), Identity.Identifier())).Error.Code,
+        Equal((await RoomGrantChanges.Change(ports, owner, new(target.AgentId, roomId, 3, reinvited.Value.Grant.Generation, "custom", WireJson.Object(writer => writer.WriteNumber("powerLevel", 51)), false), Identity.Identifier())).Error.Code,
             "forbidden", "requested native power cannot exceed authorizer ceiling");
-        Equal((await RoomGrantChanges.Change(ports, owner, new(target.AgentId, roomId, 3, reinvited.Value.Grant.Generation, "reply", 5, false), Identity.Identifier())).Error.Code,
+        Equal((await RoomGrantChanges.Change(ports, owner, new(target.AgentId, roomId, 3, reinvited.Value.Grant.Generation, "reply", WireJson.Object(writer => writer.WriteNumber("powerLevel", 5)), false), Identity.Identifier())).Error.Code,
             "invalid", "noncustom grant cannot include custom level");
-        facts = facts with { CreatorIds = [((NativeAuthentication)target.Actor.Authentication!).MatrixUserId] };
+        facts = facts with { CreatorIds = [((NativeAuthentication)target.Actor.Authentication!).BackendUserId] };
         Equal((await RoomGrantChanges.Change(ports, owner, new(target.AgentId, roomId, 3, reinvited.Value.Grant.Generation, "read", null, false), Identity.Identifier())).Error.Code,
             "forbidden", "native room creator cannot be artificially restricted");
         facts = facts with { CreatorIds = [] };

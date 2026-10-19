@@ -7,9 +7,6 @@ import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result'
 import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 
 export function operationStorage(root: string): Pick<Registry, 'pendingOperations' | 'operation' | 'saveOperation' | 'pruneOperations'> {
-  for (const name of ['operations.json', 'daemon.log']) {
-    if (lstatSync(join(root, name), { throwIfNoEntry: false })) throw new Error('Unsupported controller state: ' + name + '; normal startup does not import obsolete files');
-  }
   const directory = privateDir(join(root, 'operations'));
   function read(id: string) {
     const valid = check.identifier(id); if (!valid.ok) return valid;

@@ -1,4 +1,5 @@
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { equalJson } from '@ctlflow/crossfire-kernel/json';
 import type { Services, Actor } from '../port/services.js';
 import { activeActor, authorizeAgent } from '../authorization/authorize.js';
 import { recordEvent } from '../audit/record-event.js';
@@ -40,7 +41,7 @@ export function commitGrantChange(services: Dependencies, actor: Actor, proof: G
   const newGeneration = !previous || previous.accessMode === 'none' && input.accessMode !== 'none'
     || proof.invitationEventId !== null && proof.invitationEventId !== previous.invitationEventId;
   const generation = newGeneration ? services.identity.id() : previous.generation;
-  const accessChanged = !previous || previous.accessMode !== input.accessMode || previous.powerLevel !== input.powerLevel;
+  const accessChanged = !previous || previous.accessMode !== input.accessMode || !equalJson(previous.nativeAccess, input.nativeAccess);
   if (newGeneration || input.accessMode === 'none') {
     const permissions = services.collection.roomPermissions({ agentId: input.agentId, roomId: input.roomId });
     if (!permissions.ok) return permissions;
@@ -52,7 +53,7 @@ export function commitGrantChange(services: Dependencies, actor: Actor, proof: G
   const grant: AgentRoomGrant = { agentId: input.agentId, roomId: input.roomId, generation, authorizerId: proof.authorizerId,
     addedById: newGeneration ? actor.principalId : previous.addedById, invitationEventId: proof.invitationEventId,
     admissionKind: proof.admissionKind,
-    accessMode: input.accessMode, powerLevel: input.powerLevel, muted: input.muted,
+    accessMode: input.accessMode, nativeAccess: input.nativeAccess, muted: input.muted,
     revision: (previous?.revision ?? -1) + 1, accessRevision: (previous?.accessRevision ?? -1) + (accessChanged ? 1 : 0), updatedAt: services.clock.now() };
   const saved = previous ? services.repositories.agentRoomGrant.update(grant) : services.repositories.agentRoomGrant.insert(grant);
   if (!saved.ok) return saved;
@@ -65,7 +66,7 @@ export function commitGrantChange(services: Dependencies, actor: Actor, proof: G
   const scheduled = application.value
     ? services.repositories.roomGrantApplication.update({ ...application.value, nextCheckAt: services.clock.now() })
     : services.repositories.roomGrantApplication.insert({ agentId: input.agentId, roomId: input.roomId, observedGeneration: null,
-      appliedRevision: null, appliedAccessRevision: null, membership: null, creator: false, powerLevel: null, lastAttemptAt: null, lastSuccessAt: null,
+      appliedRevision: null, appliedAccessRevision: null, membership: null, nativeAccess: null, lastAttemptAt: null, lastSuccessAt: null,
       nextCheckAt: services.clock.now(), errorCode: null, errorMessage: null });
   if (!scheduled.ok) return scheduled;
   const target = services.repositories.agent.find({ principalId: input.agentId });

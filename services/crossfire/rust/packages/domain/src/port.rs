@@ -7,7 +7,7 @@ use crossfire_kernel::secret::Secret;
 
 pub trait AuthorizationRepository {
     fn principal(&mut self, id: &str) -> Result<Option<Principal>>;
-    fn principal_by_matrix_id(&mut self, matrix_id: &str) -> Result<Option<Principal>>;
+    fn principal_by_backend_user_id(&mut self, backend_user_id: &str) -> Result<Option<Principal>>;
     fn agent(&mut self, id: &str) -> Result<Option<Agent>>;
     fn agent_binding(&mut self, id: &str) -> Result<Option<AgentBinding>>;
     fn session(&mut self, secret_hash: &str) -> Result<Option<MemberSession>>;
@@ -105,7 +105,7 @@ pub trait CoreRepository: AuthorizationRepository + UnitOfWork {
     fn remove_session(&mut self, secret_hash: &str) -> Result<()>;
 }
 
-pub trait MatrixIdentity {
+pub trait BackendUserIdentity {
     fn identify(
         &self,
         native_token: &Secret,

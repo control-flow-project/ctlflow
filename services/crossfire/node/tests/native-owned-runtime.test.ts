@@ -14,6 +14,15 @@ import { builtRelease } from '../scripts/test-support/release.js';
 import { codexProtocol } from '@ctlflow/crossfire-adapter-codex/protocol';
 import type { OwnedRuntimeConnection } from '@ctlflow/crossfire-agent-core/owned-runtime';
 
+async function commandMarker(provider: Awaited<ReturnType<typeof nativeProvider>>, marker: string) {
+  try { await until(() => existsSync(marker), 'The synchronous native command did not create its marker'); }
+  catch (error) {
+    const outputs = provider.requests.flatMap(request => (request as { input?: { type: string; output?: string }[] }).input ?? [])
+      .filter(item => item.type === 'function_call_output').slice(-2).map(item => String(item.output).slice(0, 2048));
+    throw new Error('Native command marker is absent; tool outputs: ' + JSON.stringify(outputs), { cause: error });
+  }
+}
+
 async function instructionItems(runtime: OwnedRuntimeConnection) {
   assert(runtime.attachment);
   const connection = runtime.attachment.connection;
@@ -73,9 +82,9 @@ test('stock Codex default and native bypass execute synchronous subprocess IPC a
       + 'if(child.error||child.status!==0||child.stdout!=="captured-IPC")throw child.error||new Error(JSON.stringify(child));'
       + 'const git=spawnSync("git",["--version"],{encoding:"utf8"});if(git.error||git.status!==0)throw git.error||new Error("Git failed");'
       + 'const marker=' + JSON.stringify(marker) + ';writeFileSync(marker+".tmp",child.stdout);renameSync(marker+".tmp",marker);';
-    provider.tool('exec_command', { cmd: 'node -e ' + JSON.stringify(source), yield_time_ms: 1000, max_output_tokens: 1024 });
+    provider.tool('exec_command', { cmd: 'node -e ' + JSON.stringify(source), yield_time_ms: 10000, max_output_tokens: 1024 });
     await runtime.deliver('Run the inert synchronous IPC control', 'native-default-' + bypass, stop.signal);
-    await until(() => existsSync(marker));
+    await commandMarker(provider, marker);
     assert.equal(readFileSync(marker, 'utf8'), 'captured-IPC');
     await until(async () => await runtime.turnControl.activeTurn() === null, 'Native IPC control did not become idle');
   }
@@ -105,9 +114,9 @@ test('external native workspaces retain private managed state, explicit role ski
   assert.equal(provider.requests.length, 0);
   const source = 'const fs=require("node:fs"), marker=' + JSON.stringify(marker)
     + ';fs.writeFileSync(marker+".tmp",JSON.stringify({cwd:process.cwd(),home:process.env.CODEX_HOME,state:process.env.CROSSFIRE_PROJECT,name:process.env.CROSSFIRE_AGENT_NAME}));fs.renameSync(marker+".tmp",marker);';
-  provider.tool('exec_command', { cmd: 'node -e ' + JSON.stringify(source), yield_time_ms: 1000, max_output_tokens: 1024 });
+  provider.tool('exec_command', { cmd: 'node -e ' + JSON.stringify(source), yield_time_ms: 10000, max_output_tokens: 1024 });
   await runtime.deliver('Retain external native history: silver orchard 913.', 'external-environment-proof');
-  await until(() => existsSync(marker), 'Native tools did not retain the explicit private state binding');
+  await commandMarker(provider, marker);
   assert.deepEqual(JSON.parse(readFileSync(marker, 'utf8')), { cwd: workspace, home, state: stateDirectory, name: input.profile });
   runtime.acknowledge(['external-environment-proof']); await until(async () => !(await runtime.inspect()).busy);
   assert.equal(provider.requests.length, 2);
@@ -124,9 +133,9 @@ test('external native workspaces retain private managed state, explicit role ski
   runtime = value(await adapter.start(input, new AbortController().signal)); assert.equal(runtime.sessionId, sessionId);
   assert.equal((await instructionItems(runtime)).length, 2, 'One changed role creates one native developer revision');
   const resumedMarker = join(stateDirectory, 'resumed-environment.json');
-  provider.tool('exec_command', { cmd: 'node -e ' + JSON.stringify(source.replace(JSON.stringify(marker), JSON.stringify(resumedMarker))), yield_time_ms: 1000, max_output_tokens: 1024 });
+  provider.tool('exec_command', { cmd: 'node -e ' + JSON.stringify(source.replace(JSON.stringify(marker), JSON.stringify(resumedMarker))), yield_time_ms: 10000, max_output_tokens: 1024 });
   await runtime.deliver('Use the original historical fact.', 'external-resume-proof');
-  await until(() => existsSync(resumedMarker));
+  await commandMarker(provider, resumedMarker);
   const resumedRequest = provider.requests[2];
   assert.deepEqual(JSON.parse(readFileSync(resumedMarker, 'utf8')), { cwd: workspace, home, state: stateDirectory, name: input.profile });
   runtime.acknowledge(['external-resume-proof']); await until(async () => !(await runtime.inspect()).busy);

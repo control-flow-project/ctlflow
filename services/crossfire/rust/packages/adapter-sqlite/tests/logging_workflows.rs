@@ -31,9 +31,20 @@ fn expired_workflow_logs_are_removed_without_erasing_pending_claims_rules_or_res
         diesel::insert_into(wake_notice::table)
             .values((
                 wake_notice::receiver_agent_id.eq(&scenario.agent.principal_id),
-                wake_notice::event_id.eq(format!("$wake-{status}")),
-                wake_notice::sender_matrix_id.eq("@owner:example.test"),
-                wake_notice::room_id.eq("!room:example.test"),
+                wake_notice::event_id.eq(format!(
+                    "$wake-{}",
+                    if status == "denied" {
+                        "pending"
+                    } else {
+                        status
+                    }
+                )),
+                wake_notice::sender_backend_user_id.eq("@owner:example.test"),
+                wake_notice::room_id.eq(if status == "denied" {
+                    "!other:example.test"
+                } else {
+                    "!room:example.test"
+                }),
                 wake_notice::reserved_at.eq(OLD),
                 wake_notice::message_body.eq("Notice"),
                 wake_notice::status.eq(status),
@@ -116,7 +127,7 @@ fn expired_workflow_logs_are_removed_without_erasing_pending_claims_rules_or_res
                 member_invitation::principal_kind.eq("human"),
                 member_invitation::created_at.eq(OLD),
                 member_invitation::expires_at.eq(OLD + 1),
-                member_invitation::claim_matrix_user_id.eq(claim.then_some("@new:example.test")),
+                member_invitation::claim_backend_user_id.eq(claim.then_some("@new:example.test")),
                 member_invitation::claim_display_name.eq(claim.then_some("New member")),
                 member_invitation::claim_fingerprint.eq(claim.then_some("fingerprint")),
             ))

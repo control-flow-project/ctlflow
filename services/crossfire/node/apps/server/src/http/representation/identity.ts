@@ -8,7 +8,7 @@ export function application(value: PrincipalApplication) {
     lastAttemptAt: value.lastAttemptAt, lastSuccessAt: value.lastSuccessAt, errorCode: value.errorCode, errorMessage: value.errorMessage };
 }
 export function member(value: MemberRecord) {
-  return { memberId: value.principal.id, matrixUserId: value.principal.matrixUserId, displayName: value.member.displayName,
+  return { memberId: value.principal.id, backendUserId: value.principal.backendUserId, displayName: value.member.displayName,
     roleCode: value.role.roleCode, status: value.principal.status, revision: value.principal.revision, createdAt: value.principal.createdAt,
     application: application(value.application) };
 }
@@ -18,9 +18,9 @@ export function listenerRun(value: ListenerRun) {
 }
 export function agent(value: AgentDetails) {
   const { record, activity } = value;
-  return { agentId: record.principal.id, matrixUserId: record.principal.matrixUserId, name: record.name,
+  return { agentId: record.principal.id, backendUserId: record.principal.backendUserId, name: record.name,
     displayName: agentDisplayName(record.name, record.ownerMember.displayName),
-    owner: { memberId: record.owner.id, matrixUserId: record.owner.matrixUserId, displayName: record.ownerMember.displayName, status: record.owner.status },
+    owner: { memberId: record.owner.id, backendUserId: record.owner.backendUserId, displayName: record.ownerMember.displayName, status: record.owner.status },
     status: record.principal.status, revision: record.principal.revision, createdAt: record.principal.createdAt,
     application: application(record.application), activity: { status: activity.status, activeMs: activity.activeMs,
       messagesDelivered: activity.messagesDelivered, lastSeenAt: activity.lastSeenAt, activeRuns: activity.activeRuns.map(listenerRun) },

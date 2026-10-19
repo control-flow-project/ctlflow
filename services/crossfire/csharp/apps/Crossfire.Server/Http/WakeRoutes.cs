@@ -104,7 +104,7 @@ public static class WakeRoutes
         foreach (var agent in value.Agents)
         {
             var identity = agent.Identity; var assignment = agent.Assignment;
-            writer.WriteStartObject(); writer.WriteString("principalId", identity.PrincipalId); writer.WriteString("matrixUserId", identity.MatrixUserId); writer.WriteString("kind", identity.Kind); writer.WriteString("displayName", identity.DisplayName); writer.WriteString("ownerId", identity.OwnerId); writer.WriteString("ownerMatrixId", identity.OwnerMatrixId);
+            writer.WriteStartObject(); writer.WriteString("principalId", identity.PrincipalId); writer.WriteString("backendUserId", identity.BackendUserId); writer.WriteString("kind", identity.Kind); writer.WriteString("displayName", identity.DisplayName); writer.WriteString("ownerId", identity.OwnerId); writer.WriteString("ownerBackendUserId", identity.OwnerBackendUserId);
             writer.WriteString("ruleId", assignment.RuleId); writer.WriteString("agentId", assignment.AgentId); writer.WriteNumber("nextDueAt", assignment.NextDueAt); JsonValues.Number(writer, "lastDeliveredAt", assignment.LastDeliveredAt); writer.WriteEndObject();
         }
         writer.WriteEndArray();
@@ -113,6 +113,6 @@ public static class WakeRoutes
     private static JsonElement Command(ScheduledWake value) => JsonValues.Object(writer =>
     {
         writer.WriteString("deliveryId", value.DeliveryId); writer.WriteString("ruleId", value.RuleId); writer.WriteNumber("ruleRevision", value.RuleRevision); writer.WriteString("name", value.Name); writer.WriteString("message", value.Message);
-        writer.WriteNumber("scheduledAt", value.ScheduledAt); writer.WriteString("sessionId", value.SessionId); writer.WriteString("ownerMatrixId", value.OwnerMatrixId); writer.WriteString("authorizerMatrixId", value.AuthorizerMatrixId);
+        writer.WriteNumber("scheduledAt", value.ScheduledAt); writer.WriteString("sessionId", value.SessionId); writer.WriteString("ownerBackendUserId", value.OwnerBackendUserId); writer.WriteString("authorizerBackendUserId", value.AuthorizerBackendUserId);
     });
 }

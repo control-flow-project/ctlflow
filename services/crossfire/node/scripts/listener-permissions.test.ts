@@ -1,3 +1,4 @@
+import { messageEvent } from '@ctlflow/crossfire-adapter-matrix/events';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { withClock } from './test-support/clock.js';
 import assert from 'node:assert/strict';
@@ -41,7 +42,7 @@ for (const mode of ['paused', 'nobody'] as const) test('the single ' + mode + ' 
   const pending = hooks.requestDecision(permission, stop.signal);
   await clock.until(() => fixture.rooms.get(OWNER_DM)!.some(event => event.sender === SELF && String(event.content.body).includes('review and answer')));
   const request = fixture.rooms.get(OWNER_DM)!.find(event => event.sender === SELF && String(event.content.body).includes('review and answer'))!;
-  assert(isListenerNotice(request), 'Automatic native approvals cannot wake peer models');
+  assert(isListenerNotice(messageEvent(request, ROOM)), 'Automatic native approvals cannot wake peer models');
   assert(String(request.content.body).includes('/manage/agents/' + AGENT_ID + '/decisions/'));
   fixture.answerDecision([...fixture.decisions.keys()][0]!);
   assert.deepEqual(await clock.complete(pending), success({ decision: 'accept' }));

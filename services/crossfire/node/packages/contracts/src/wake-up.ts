@@ -21,8 +21,8 @@ const summary = { ruleId: check.identifier, owner: principal, configuredById: ch
   enabled: check.boolean, revision: check.integer(), createdAt: check.integer(), updatedAt: check.integer(), agentCount: check.integer(0, 1000),
   nextDueAt: check.nullable(check.integer()), lastDeliveredAt: check.nullable(check.integer()) };
 export const wakeRuleSummary = check.object(summary);
-export const wakeRuleAgent = check.object({ principalId: check.identifier, matrixUserId: check.matrixUserId, kind: check.choice('agent'),
-  displayName: check.text(255), ownerId: check.identifier, ownerMatrixId: check.matrixUserId,
+export const wakeRuleAgent = check.object({ principalId: check.identifier, backendUserId: check.backendUserId, kind: check.choice('agent'),
+  displayName: check.text(255), ownerId: check.identifier, ownerBackendUserId: check.backendUserId,
   ruleId: check.identifier, agentId: check.identifier, nextDueAt: check.integer(), lastDeliveredAt: check.nullable(check.integer()) });
 export const wakeRuleDetails = check.object({ ...summary, agents: check.list(wakeRuleAgent, 1000) });
 export const wakeAttachment = check.object({ runId: check.identifier, sessionId: check.text(200) });
@@ -32,7 +32,7 @@ export function wakeAttachmentQuery(input: unknown) {
 }
 export const wakeMetadata = check.object({ now: check.integer(), nextDueAt: check.nullable(check.integer()) });
 export const scheduledWake = check.object({ deliveryId: check.identifier, ruleId: check.identifier, ruleRevision: check.integer(), name, message,
-  scheduledAt: check.integer(), sessionId: check.text(200), ownerMatrixId: check.matrixUserId, authorizerMatrixId: check.matrixUserId });
+  scheduledAt: check.integer(), sessionId: check.text(200), ownerBackendUserId: check.backendUserId, authorizerBackendUserId: check.backendUserId });
 export type WakeRuleSummary = check.Parsed<typeof wakeRuleSummary>;
 export type WakeRuleDetails = check.Parsed<typeof wakeRuleDetails>;
 export type WakeAttachment = check.Parsed<typeof wakeAttachment>;

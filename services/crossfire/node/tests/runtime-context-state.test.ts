@@ -24,12 +24,12 @@ test('saved native contexts are read without starting an engine, initializing a 
   const shared = randomUUID(), control = randomUUID(), room = randomUUID();
   for (const mode of ['shared', 'per-room']) {
     writeFileSync(join(home, CONTEXT_REGISTRY), JSON.stringify({ mode, bindings: [{ context: 'shared', sessionId: shared },
-      { context: 'control', sessionId: control }, { context: '!alpha:test', sessionId: room }] }), { mode: 0o600 });
+      { context: 'control', sessionId: control }, { context: 'room/control', sessionId: room }] }), { mode: 0o600 });
     const result = await adapter.savedContexts({ workspace: directory, stateDirectory: directory }); assert(result.ok);
     assert.deepEqual(result.value, [
       { context: 'shared', runtime: 'codex', sessionId: shared, workspace: directory },
       { context: 'control', runtime: 'codex', sessionId: control, workspace: directory },
-      { context: '!alpha:test', runtime: 'codex', sessionId: room, workspace: directory },
+      { context: 'room/control', runtime: 'codex', sessionId: room, workspace: directory },
     ]);
     assert.deepEqual(readdirSync(home), [CONTEXT_REGISTRY]);
   }
@@ -40,9 +40,9 @@ test('invalid or unsafe native metadata never becomes an empty or guessed histor
   mkdirSync(home, { mode: 0o700 });
   const shared = randomUUID(), file = join(home, CONTEXT_REGISTRY);
   for (const invalid of [{ mode: 'shared', bindings: [{ context: 'shared', sessionId: shared }, { context: 'control', sessionId: shared }] },
-    { mode: 'shared', bindings: [{ context: '!alpha:test', sessionId: randomUUID() }, { context: '!alpha:test', sessionId: randomUUID() }] },
-    { mode: 'per-room', bindings: [{ context: 'shared', sessionId: shared }, { context: '!alpha:test', sessionId: shared }] },
-    { mode: 'per-room', bindings: [{ context: '!alpha:test', sessionId: 'unknown-native-session' }] },
+    { mode: 'shared', bindings: [{ context: 'room/control', sessionId: randomUUID() }, { context: 'room/control', sessionId: randomUUID() }] },
+    { mode: 'per-room', bindings: [{ context: 'shared', sessionId: shared }, { context: 'room/control', sessionId: shared }] },
+    { mode: 'per-room', bindings: [{ context: 'room/control', sessionId: 'unknown-native-session' }] },
     { mode: 'legacy', bindings: [] }, { mode: 'shared', bindings: [], extra: true }]) {
     writeFileSync(file, JSON.stringify(invalid), { mode: 0o600 });
     const result = await adapter.savedContexts({ workspace: directory, stateDirectory: directory }); assert.equal(result.ok, false, JSON.stringify(invalid));

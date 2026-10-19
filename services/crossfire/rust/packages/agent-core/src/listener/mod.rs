@@ -1,3 +1,4 @@
+use crossfire_domain::messaging_client::MessagingClient;
 mod acquisition;
 mod chat_acquisition;
 mod endpoint;
@@ -19,7 +20,6 @@ use crate::{
     listener_maintenance::{self, Maintenance},
     listener_reporting::Reporter,
     local_state::LocalState,
-    matrix::Matrix,
     owner_observation::{self, Observer},
     profile::Profile,
     receive_snapshots::{self, Wake},
@@ -88,7 +88,7 @@ impl Options {
 pub struct Resources<S, C, M, A, T> {
     pub storage: Arc<S>,
     pub coordination: Arc<C>,
-    pub matrix: Arc<M>,
+    pub messaging: Arc<M>,
     pub acknowledgment: Arc<A>,
     pub control: Arc<Control>,
     pub budget: Arc<Budget>,
@@ -152,7 +152,7 @@ pub async fn run<S, C, M, A, T, F>(
 where
     S: LocalState + 'static,
     C: Coordination + 'static,
-    M: Matrix + 'static,
+    M: MessagingClient + crossfire_domain::messaging_client::InvitationReader + 'static,
     A: Acknowledgment + 'static,
     T: Clock + Clone + Send + Sync + 'static,
     F: Factory<ListenerHooks<S, C, M, T>>,
@@ -181,7 +181,7 @@ where
     let observer = Arc::new(Observer::open(
         resources.storage.clone(),
         resources.coordination.clone(),
-        resources.matrix.clone(),
+        resources.messaging.clone(),
         resources.clock.clone(),
         owner_observation::Options {
             profile: options.profile.clone(),
@@ -193,7 +193,7 @@ where
     let broker = Arc::new(Broker::open(
         resources.storage.clone(),
         resources.coordination.clone(),
-        resources.matrix.clone(),
+        resources.messaging.clone(),
         resources.clock.clone(),
         options.profile.clone(),
         &format!("{}.decisions", options.file),
@@ -256,7 +256,12 @@ where
     hooks.check()?;
     result.and(closed).and(reporting)
 }
-async fn close_reporting<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync>(
+async fn close_reporting<
+    S: LocalState,
+    C: Coordination,
+    M: MessagingClient + crossfire_domain::messaging_client::InvitationReader,
+    T: Clock + Send + Sync,
+>(
     hooks: &ListenerHooks<S, C, M, T>,
 ) -> Result<()> {
     let deadline = async {
@@ -271,7 +276,7 @@ async fn close_reporting<S: LocalState, C: Coordination, M: Matrix, T: Clock + S
 impl<
     S: LocalState,
     C: Coordination,
-    M: Matrix,
+    M: MessagingClient + crossfire_domain::messaging_client::InvitationReader,
     N: Connection + TurnControl + Lifecycle + 'static,
     A: Acknowledgment,
     T: Clock + Clone + Send + Sync + 'static,
@@ -315,7 +320,7 @@ impl<
         let gate = Gate::default();
         let queries = Arc::new(Queries {
             storage: resources.storage.clone(),
-            matrix: resources.matrix.clone(),
+            messaging: resources.messaging.clone(),
             coordination: resources.coordination.clone(),
             artifacts: artifacts.clone(),
             clock: resources.clock.clone(),
@@ -409,14 +414,14 @@ impl<
         self.refresh(self.hooks.stop.clone()).await?;
         crate::owner_authority::authorize(
             self.resources.coordination.as_ref(),
-            self.resources.matrix.as_ref(),
+            self.resources.messaging.as_ref(),
             &self.options.profile,
             self.hooks.stop.clone(),
         )
         .await?;
         receive_state::flush(
             self.resources.storage.as_ref(),
-            self.resources.matrix.as_ref(),
+            self.resources.messaging.as_ref(),
             &self.options.file,
             self.hooks.stop.clone(),
         )
@@ -424,9 +429,11 @@ impl<
         self.controls
             .recover(self.native.as_ref(), self.hooks.stop.clone())
             .await?;
-        let joined =
-            crate::receive_pages::joined(self.resources.matrix.as_ref(), self.hooks.stop.clone())
-                .await?;
+        let joined = crate::receive_pages::joined(
+            self.resources.messaging.as_ref(),
+            self.hooks.stop.clone(),
+        )
+        .await?;
         receive_state::retain_joined(self.resources.storage.as_ref(), &self.options.file, &joined)?;
         self.state
             .lock()
@@ -456,7 +463,7 @@ impl<
     }
     fn accept(&self, event: &Event) -> bool {
         !crate::events::notice_content(&event.content)
-            && !(event.kind == "m.room.message"
+            && !(event.kind == crossfire_domain::messaging_client::EventType::Message
                 && event.sender == self.options.profile.account.user_id)
             && self.controls.accepts(event).unwrap_or_else(|error| {
                 self.hooks.fail(error);

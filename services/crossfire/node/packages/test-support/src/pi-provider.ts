@@ -4,7 +4,7 @@ import { createServer, type ServerResponse } from 'node:http';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { collect } from '@ctlflow/crossfire-adapter-matrix/http';
+import { collect } from '@ctlflow/crossfire-kernel/collect';
 import { cleanup } from './cleanup.js';
 
 export async function piProvider(scope: TestContext) {

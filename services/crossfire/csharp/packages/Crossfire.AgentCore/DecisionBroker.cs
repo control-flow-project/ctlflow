@@ -13,7 +13,7 @@ public sealed class DecisionBroker : IAsyncDisposable
     private readonly HashSet<string> pending = new(StringComparer.Ordinal);
     private readonly AgentProfile profile;
     private readonly Coordination coordination;
-    private readonly AgentMatrix matrix;
+    private readonly MessagingClient messaging;
     private readonly LocalState storage;
     private readonly string file;
     private readonly TimeProvider clock;
@@ -21,9 +21,9 @@ public sealed class DecisionBroker : IAsyncDisposable
     private readonly CancellationTokenSource lifetime;
     private Task? running;
     private Task? closing;
-    public DecisionBroker(AgentProfile profile, Coordination coordination, AgentMatrix matrix, LocalState storage, string file, TimeProvider clock, Func<CancellationToken, ValueTask<Result<string>>> run, CancellationToken stop)
+    public DecisionBroker(AgentProfile profile, Coordination coordination, MessagingClient messaging, LocalState storage, string file, TimeProvider clock, Func<CancellationToken, ValueTask<Result<string>>> run, CancellationToken stop)
     {
-        this.profile = profile; this.coordination = coordination; this.matrix = matrix; this.storage = storage; this.file = file; this.clock = clock; this.run = run;
+        this.profile = profile; this.coordination = coordination; this.messaging = messaging; this.storage = storage; this.file = file; this.clock = clock; this.run = run;
         if (storage.Exists(file))
         {
             var source = AgentIO.Read(storage, file); if (source.ValueKind != JsonValueKind.Array || source.GetArrayLength() > 4096) throw new InvalidDataException("Invalid native decision journal; retained decisions require owner inspection");
@@ -78,23 +78,23 @@ public sealed class DecisionBroker : IAsyncDisposable
             {
                 scope.Token.ThrowIfCancellationRequested(); var ready = await run(scope.Token); if (!ready.IsSuccess) return Result<JsonElement>.Fail(ready.Error); Start();
                 lock (gate) { if (receipts.Count >= 4096) return Results.Fail<JsonElement>("limit", "Native decision receipt capacity reached; original decisions remain retained"); receipts.Add(receipt); Save(); }
-                var authorized = await OwnerAuthority.Authorize(coordination, matrix, profile, scope.Token); if (!authorized.IsSuccess) return Result<JsonElement>.Fail(authorized.Error);
+                var authorized = await OwnerAuthority.Authorize(coordination, messaging, profile, scope.Token); if (!authorized.IsSuccess) return Result<JsonElement>.Fail(authorized.Error);
                 IReadOnlyList<DecisionQuestion> questions = decision.Questions ?? [new("decision", decision.Action, "Review the complete native scope before selecting a choice.", false, false, decision.Choices.Select((choice, index) => new DecisionOption(index.ToString(System.Globalization.CultureInfo.InvariantCulture), choice.Label, "")).ToArray())];
                 var created = await coordination.Agent("createRuntimeDecision", profile.Id, WireJson.Object(writer =>
                 {
                     writer.WriteString("id", receipt.Id); writer.WriteString("runId", ready.Value); writer.WriteString("runtime", decision.Runtime); writer.WriteString("sessionId", decision.Session); writer.WriteString("requestId", decision.Request); writer.WriteString("turnId", decision.Turn); writer.WriteString("itemId", decision.Item); writer.WriteString("kind", decision.Questions is null ? "permission" : "question"); writer.WriteString("action", decision.Action); writer.WriteString("review", WireJson.Pretty(decision.Scope).TrimEnd('\n')); writer.WriteBoolean("blocking", decision.Blocking ?? true); AgentWire.Number(writer, "expiresAt", decision.ExpiresMs is null ? null : clock.GetUtcNow().ToUnixTimeMilliseconds() + decision.ExpiresMs.Value); writer.WritePropertyName("questions"); AgentWire.Questions(questions).WriteTo(writer);
                 }), scope.Token);
-                if (!created.IsSuccess) return created; var room = await OwnerAuthority.Conversation(coordination, matrix, profile, scope.Token); if (!room.IsSuccess) return Result<JsonElement>.Fail(room.Error);
+                if (!created.IsSuccess) return created; var room = await OwnerAuthority.Conversation(coordination, messaging, profile, scope.Token); if (!room.IsSuccess) return Result<JsonElement>.Fail(room.Error);
                 var page = coordination.Origin + "/manage/agents/" + profile.Id + "/decisions/" + receipt.Id; var links = questions.Count == 1 ? string.Join('\n', questions[0].Options.Select(option => option.Label + ": " + page + "?choice=" + Uri.EscapeDataString(option.Id))) : "";
                 var notice = decision.Action + ": review and answer at " + page + ".\n\n" + string.Join("\n\n", questions.Select(question => question.Title + ": " + question.Prompt)) + (links.Length == 0 ? "" : "\n\n" + links) + "\n\nLinks only open a review. Submit explicitly. " + (decision.Blocking == true ? "The native request is waiting." : "This request is nonblocking and may expire.");
-                var position = 0; foreach (var text in OwnerNotices.Chunks(notice)) { var sent = await AgentIO.Request(matrix, new("PUT", AgentWire.Room(room.Value) + "/send/m.room.message/" + receipt.Id + "-" + position++, OwnerNotices.Content(text)), scope.Token); if (!sent.IsSuccess) return sent; }
+                var position = 0; foreach (var text in messaging.NoticeChunks(notice)) { var sent = await messaging.SendNotice(room.Value, receipt.Id + "-" + position++, text, scope.Token); if (!sent.IsSuccess) return Result<JsonElement>.Fail(sent.Error); }
                 for (;;)
                 {
                     scope.Token.ThrowIfCancellationRequested(); var answer = await coordination.Agent("pollRuntimeDecision", profile.Id, null, scope.Token, new Dictionary<string, string> { ["decisionId"] = receipt.Id }); if (!answer.IsSuccess) return answer;
                     var status = WireJson.Text(answer.Value, "status");
                     if (status == "answered")
                     {
-                        authorized = await OwnerAuthority.Authorize(coordination, matrix, profile, scope.Token); if (!authorized.IsSuccess) return Result<JsonElement>.Fail(authorized.Error); scope.Token.ThrowIfCancellationRequested();
+                        authorized = await OwnerAuthority.Authorize(coordination, messaging, profile, scope.Token); if (!authorized.IsSuccess) return Result<JsonElement>.Fail(authorized.Error); scope.Token.ThrowIfCancellationRequested();
                         if (!answer.Value.TryGetProperty("answers", out var rows) || rows.ValueKind != JsonValueKind.Array) return Results.Fail<JsonElement>("invalid", "Invalid native decision answer");
                         var values = rows.EnumerateArray().ToArray(); if (values.Length != questions.Count || values.Any(value => value.ValueKind != JsonValueKind.Object) || values.Select(value => WireJson.Text(value, "questionId")).Distinct(StringComparer.Ordinal).Count() != values.Length) return Results.Fail<JsonElement>("invalid", "Incomplete or duplicated native answers");
                         if (decision.Questions is null)

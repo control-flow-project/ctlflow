@@ -9,7 +9,7 @@ export function OwnerFilter() {
   return <div className="owner-filter"><Loaded {...resource} retry={resource.refresh}>{page => <><Field label="Owner">{id => <select id={id} name="ownerId" value={selected} onChange={event => {
     setSelected(event.target.value); setLabel(event.target.selectedOptions[0]?.textContent ?? '');
   }}><option value="">All owners</option>{selected && !page.data.some(member => member.memberId === selected) && <option value={selected}>{label}</option>}
-    {page.data.map(member => <option value={member.memberId} key={member.memberId}>{member.displayName} · {member.matrixUserId}</option>)}</select>}</Field>
+    {page.data.map(member => <option value={member.memberId} key={member.memberId}>{member.displayName} · {member.backendUserId}</option>)}</select>}</Field>
     {(page.meta.totalPages ?? 0) > 1 && <Pagination key={number} meta={{ page: number, totalPages: page.meta.totalPages ?? 1 }} onPage={setNumber}/>}</>}</Loaded></div>;
 }
 export function AgentFilters() {

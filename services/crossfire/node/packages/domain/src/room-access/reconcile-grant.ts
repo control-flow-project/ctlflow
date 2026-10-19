@@ -1,8 +1,7 @@
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Services } from '../port/services.js';
-import type { RoomMembership } from '../port/matrix-authority.js';
-import { requestedPower } from './authorize-change.js';
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'matrix' | 'clock' | 'unitOfWork' | 'roomOperations'>;
+import type { RoomMembership } from '../port/messaging.js';
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'messaging' | 'clock' | 'unitOfWork' | 'roomOperations'>;
 
 export function reconcileRoomGrant(services: Dependencies, agentId: string, roomId: string): Promise<Result<void>> {
   return services.roomOperations.run(roomId, () => applyRoomGrant(services, agentId, roomId));
@@ -25,11 +24,11 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
   if (!authorizer.ok) return authorizer;
   let observed: RoomMembership | null = null;
   function departed(): RoomMembership {
-    const identity = { matrixUserId: agent.principal.matrixUserId, displayName: '', membership: 'leave' as const };
-    return observed?.creator || previous.creator ? { ...identity, creator: true, powerLevel: null } : { ...identity, creator: false, powerLevel: 0 };
+    const identity = { backendUserId: agent.principal.backendUserId, displayName: '', membership: 'leave' as const };
+    return { ...identity, nativeAccess: observed?.nativeAccess ?? previous.nativeAccess };
   }
   async function remove(): Promise<Result<void>> {
-    const rooms = await services.matrix.joined(agent.principal.matrixUserId);
+    const rooms = await services.messaging.joined(agent.principal.backendUserId);
     if (!rooms.ok) {
       if (agent.principal.status === 'revoked' || agent.owner.status === 'revoked') {
         const account = services.repositories.principalApplication.find({ principalId: agentId });
@@ -38,13 +37,13 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
       return rooms;
     }
     if (rooms.value.includes(roomId)) {
-      const left = await services.matrix.leave(agent.principal.matrixUserId, roomId);
+      const left = await services.messaging.leave(agent.principal.backendUserId, roomId);
       if (!left.ok) return left;
     } else if (grant.invitationEventId !== null) {
-      const invitation = await services.matrix.invitation(agent.principal.matrixUserId, roomId);
+      const invitation = await services.messaging.invitation(agent.principal.backendUserId, roomId);
       if (!invitation.ok) return invitation;
       if (invitation.value?.eventId === grant.invitationEventId) {
-        const left = await services.matrix.leave(agent.principal.matrixUserId, roomId);
+        const left = await services.messaging.leave(agent.principal.backendUserId, roomId);
         if (!left.ok) return left;
       }
     }
@@ -54,7 +53,7 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
   async function apply(): Promise<Result<void>> {
     if (grant.accessMode === 'none' || agent.principal.status !== 'active' || agent.owner.status !== 'active') return remove();
     if (repairOwnerDirect) {
-      const verified = await services.matrix.ownerConversation(agent.owner.matrixUserId, agent.principal.matrixUserId, roomId, null);
+      const verified = await services.messaging.ownerConversation(agent.owner.backendUserId, agent.principal.backendUserId, roomId, null);
       if (!verified.ok) return verified;
       if (verified.value !== roomId) return failure('conflict', 'The owner DM changed during reconciliation');
     }
@@ -73,25 +72,15 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
         return left.ok ? failure('forbidden', 'The inviting agent no longer has delegation for this room') : left;
       }
     }
-    const facts = await services.matrix.room(authorizer.value.matrixUserId, roomId);
-    if (!facts.ok) {
-      const left = await remove();
-      return left.ok ? facts : left;
-    }
-    const native = await services.matrix.membership(authorizer.value.matrixUserId, agent.principal.matrixUserId, roomId);
+    const command = repairOwnerDirect || previous.observedGeneration !== grant.generation || previous.appliedAccessRevision !== grant.accessRevision;
+    const native = await services.messaging.membership(authorizer.value.backendUserId, agent.principal.backendUserId, roomId);
     if (!native.ok) return native;
     observed = native.value;
-    const command = repairOwnerDirect || previous.observedGeneration !== grant.generation || previous.appliedAccessRevision !== grant.accessRevision;
-    if (!command && native.value.membership !== 'join') { observed = native.value; return success(undefined); }
-    const requested = requestedPower(facts.value, grant.accessMode === 'custom' && !facts.value.creator
-      ? { ...grant, powerLevel: Math.min(grant.powerLevel!, facts.value.powerLevel) }
-      : grant);
-    if (!requested.ok) { const left = await remove(); return left.ok ? requested : left; }
-    const powerLevel = command || native.value.creator ? requested.value : Math.min(requested.value, native.value.powerLevel);
+    if (!command && native.value.membership !== 'join') return success(undefined);
     const admission = command ? grant.admissionKind === 'managed' ? { kind: 'managed' as const }
-      : { kind: 'invitation' as const, eventId: grant.invitationEventId!, senderMatrixId: authorizer.value.matrixUserId } : null;
-    const changed = await services.matrix.setRoomAccess(authorizer.value.matrixUserId, agent.principal.matrixUserId, roomId,
-      { mode: grant.accessMode, powerLevel }, admission);
+      : { kind: 'invitation' as const, eventId: grant.invitationEventId!, senderBackendUserId: authorizer.value.backendUserId } : null;
+    const changed = await services.messaging.setRoomAccess(authorizer.value.backendUserId, agent.principal.backendUserId, roomId,
+      grant, admission);
     if (!changed.ok) { const left = await remove(); return left.ok ? changed : left; }
     observed = changed.value;
     return success(undefined);
@@ -108,7 +97,7 @@ async function applyRoomGrant(services: Dependencies, agentId: string, roomId: s
     if (currentAuthorizer.value?.revision !== authorizer.value?.revision) return failure('conflict', 'Grant authorizer changed during native application');
     return services.repositories.roomGrantApplication.update({ ...previous, lastAttemptAt: services.clock.now(),
       nextCheckAt: services.clock.now() + policy.value!.reconcileSeconds * 1000,
-      ...(observed ? { membership: observed.membership, creator: observed.creator, powerLevel: observed.powerLevel } : {}),
+      ...(observed ? { membership: observed.membership, nativeAccess: observed.nativeAccess } : {}),
       ...(result.ok ? { observedGeneration: grant.generation, appliedRevision: grant.revision, appliedAccessRevision: grant.accessRevision,
         lastSuccessAt: services.clock.now(), errorCode: null, errorMessage: null } : { errorCode: result.error.code, errorMessage: result.error.message }) });
   });

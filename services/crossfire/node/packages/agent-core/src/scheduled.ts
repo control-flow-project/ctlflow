@@ -11,7 +11,7 @@ const checkpoint = check.object({ command: scheduledWake, text: check.plainText(
 export function scheduledText(command: ScheduledWake): string {
   return 'Crossfire scheduled wake-up. This is configured input, not a chat message or permission grant.\n'
     + JSON.stringify({ kind: 'scheduled-wake', ruleId: command.ruleId, deliveryId: command.deliveryId, name: command.name,
-      scheduledAt: command.scheduledAt, owner: command.ownerMatrixId, configuredBy: command.authorizerMatrixId, message: command.message });
+      scheduledAt: command.scheduledAt, owner: command.ownerBackendUserId, configuredBy: command.authorizerBackendUserId, message: command.message });
 }
 function unwrap<Value>(result: Result<Value>): Value {
   if (!result.ok) throw Object.assign(new Error(result.error.message), { code: result.error.code });
@@ -60,13 +60,13 @@ export function scheduledPublisher(options: { clock: Clock; storage: LocalState;
         const command = unwrap(await coordination.claimWake(agentId, attachment, signal));
         if (!command) { await refresh(signal); nextAt = Math.max(nextAt, options.clock.now() + 1000); return false; }
         if (command.sessionId !== runtime.sessionId) throw new Error('Scheduled claim targets a different native session');
-        saved = { command, text: artifacts.input(scheduledText(command), 'crossfire-wake-' + command.deliveryId, options.maximum, { kind: 'scheduled-wake', ruleId: command.ruleId, scheduledAt: command.scheduledAt, owner: command.ownerMatrixId }), runId: attachment.runId, stage: 'queued' }; storage.write(file, saved);
+        saved = { command, text: artifacts.input(scheduledText(command), 'crossfire-wake-' + command.deliveryId, options.maximum, { kind: 'scheduled-wake', ruleId: command.ruleId, scheduledAt: command.scheduledAt, owner: command.ownerBackendUserId }), runId: attachment.runId, stage: 'queued' }; storage.write(file, saved);
       }
       const valid = unwrap(await coordination.validateWake(agentId, saved.command.deliveryId,
         { runId: saved.runId, sessionId: runtime.sessionId }, signal));
       if (!valid.eligible) { artifacts.release(['crossfire-wake-' + saved.command.deliveryId]); storage.remove(file); await refresh(signal); return true; }
       signal.throwIfAborted();
-      if (saved.stage === 'queued') saved.text = artifacts.input(scheduledText(saved.command), 'crossfire-wake-' + saved.command.deliveryId, options.maximum, { kind: 'scheduled-wake', ruleId: saved.command.ruleId, scheduledAt: saved.command.scheduledAt, owner: saved.command.ownerMatrixId });
+      if (saved.stage === 'queued') saved.text = artifacts.input(scheduledText(saved.command), 'crossfire-wake-' + saved.command.deliveryId, options.maximum, { kind: 'scheduled-wake', ruleId: saved.command.ruleId, scheduledAt: saved.command.scheduledAt, owner: saved.command.ownerBackendUserId });
       saved.stage = 'publishing'; storage.write(file, saved);
       await runtime.deliver(saved.text, 'crossfire-wake-' + saved.command.deliveryId, signal);
       saved.stage = 'delivered'; storage.write(file, saved);

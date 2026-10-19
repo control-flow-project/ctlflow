@@ -4,7 +4,7 @@ import type { Principal } from '../identity/types.js';
 import { agentDisplayName } from '../identity/display-name.js';
 import { reconcileRoomGrant } from '../room-access/reconcile-grant.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'identity' | 'clock' | 'unitOfWork' | 'roomOperations' | 'runtime'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'messaging' | 'identity' | 'clock' | 'unitOfWork' | 'roomOperations' | 'runtime'>;
 export async function reconcilePrincipal(services: Dependencies, principalId: string): Promise<Result<void>> {
   const applied = await services.roomOperations.run('agent:' + principalId, () => applyPrincipal(services, principalId));
   if (!applied.ok) return applied;
@@ -29,7 +29,7 @@ async function applyPrincipal(services: Dependencies, principalId: string): Prom
   const principal = found.value;
   const nextCheckAt = services.clock.now() + policy.value.reconcileSeconds * 1000;
   let status: Principal['status'] = principal.status;
-  let displayName = principal.matrixUserId;
+  let displayName = principal.backendUserId;
   let ownerRevision: number | null = null;
   let ownerId: string | null = null;
   let token: string | null = null;
@@ -51,37 +51,37 @@ async function applyPrincipal(services: Dependencies, principalId: string): Prom
     if (!member.value) return failure('missing', 'Member not found');
     displayName = member.value.displayName;
   }
-  const intentHash = services.identity.hash(JSON.stringify({ matrixUserId: principal.matrixUserId, status, displayName }));
+  const intentHash = services.identity.hash(JSON.stringify({ backendUserId: principal.backendUserId, status, displayName }));
   async function apply(): Promise<Result<void>> {
     if (status === 'revoked') {
-      const present = await services.matrix.exists(principal.matrixUserId);
+      const present = await services.messaging.exists(principal.backendUserId);
       if (!present.ok) return present;
       token = null;
-      return present.value ? services.matrix.deactivate(principal.matrixUserId) : success(undefined);
+      return present.value ? services.messaging.deactivate(principal.backendUserId) : success(undefined);
     }
     if (principal.kind === 'agent') {
       const credentials = services.repositories.agentCredential.find({ agentId: principal.id });
       if (!credentials.ok) return credentials;
       if (!credentials.value) return failure('missing', 'Agent credentials are missing');
-      const valid = token ? await services.matrix.identify(token) : null;
-      if (!valid?.ok || valid.value !== principal.matrixUserId) {
-        const created = await services.matrix.provision(principal.matrixUserId, credentials.value.provisioningPassword, 'CROSSFIRE_AGENT');
+      const valid = token ? await services.messaging.identify(token) : null;
+      if (!valid?.ok || valid.value !== principal.backendUserId) {
+        const created = await services.messaging.provision(principal.backendUserId, credentials.value.provisioningPassword);
         if (!created.ok) return created;
         token = created.value.accessToken;
       }
     }
-    const rooms = await services.matrix.joined(principal.matrixUserId);
+    const rooms = await services.messaging.joined(principal.backendUserId);
     if (!rooms.ok) return rooms;
     const permitted = principal.kind === 'agent' ? services.collection.roomGrants({ agentId: principal.id }) : success([]);
     if (!permitted.ok) return permitted;
     for (const roomId of rooms.value) {
       if (status !== 'active' || principal.kind === 'agent' && !permitted.value.some(grant => grant.roomId === roomId && grant.accessMode !== 'none')) {
-        const left = await services.matrix.leave(principal.matrixUserId, roomId);
+        const left = await services.messaging.leave(principal.backendUserId, roomId);
         if (!left.ok) return left;
       }
     }
     if (application.ok && application.value?.appliedIntentHash !== intentHash) {
-      const named = await services.matrix.setDisplayName(principal.matrixUserId, displayName);
+      const named = await services.messaging.setDisplayName(principal.backendUserId, displayName);
       if (!named.ok) return named;
       if (principal.kind === 'agent' && ownerId !== null && application.value?.nativeDisplayName !== displayName) {
         const conversation = services.repositories.ownerConversation.find({ agentId: principalId });
@@ -90,7 +90,7 @@ async function applyPrincipal(services: Dependencies, principalId: string): Prom
           const owner = services.repositories.principal.find({ id: ownerId });
           if (!owner.ok) return owner;
           if (!owner.value) return failure('missing', 'Owner no longer exists');
-          const updated = await services.matrix.ownerConversation(owner.value.matrixUserId, principal.matrixUserId,
+          const updated = await services.messaging.ownerConversation(owner.value.backendUserId, principal.backendUserId,
             conversation.value.roomId, application.value?.nativeDisplayName ?? null);
           if (!updated.ok) return updated;
           if (updated.value !== conversation.value.roomId) return failure('conflict', 'Owner conversation changed during renaming');

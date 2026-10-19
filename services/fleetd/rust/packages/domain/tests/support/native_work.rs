@@ -3,7 +3,12 @@ use super::*;
 #[tokio::test]
 async fn completed_room_is_cleared_without_erasing_another_room_with_unacknowledged_input()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
-    for action in ["inspect", "stop", "stop-during-inspection"] {
+    for action in [
+        "inspect",
+        "stop",
+        "stop-during-inspection",
+        "other-room-during-inspection",
+    ] {
         let state = Arc::new(State::default());
         let work = Arc::new(Work::default());
         let owner = Owner::open(
@@ -16,16 +21,16 @@ async fn completed_room_is_cleared_without_erasing_another_room_with_unacknowled
             Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
         )
         .await?;
-        for (context, session, busy) in [
-            ("!active:fixture", "active-history", true),
-            ("!completed:fixture", "completed-history", false),
+        for (room, session, busy) in [
+            ("control", "active-history", true),
+            ("completed", "completed-history", false),
         ] {
             state
                 .contexts
                 .lock()
                 .map_err(|_| failed())?
                 .push(SavedContext {
-                    context: context.into(),
+                    context: crossfire_kernel::history_context::for_room(room),
                     session_id: session.into(),
                     runtime: "codex".into(),
                     workspace: PathBuf::from("/fixture"),
@@ -34,12 +39,9 @@ async fn completed_room_is_cleared_without_erasing_another_room_with_unacknowled
                 .context_busy
                 .lock()
                 .map_err(|_| failed())?
-                .insert(context.into(), busy);
+                .insert(crossfire_kernel::history_context::for_room(room), busy);
         }
-        let completed = owner
-            .runtime()?
-            .conversation("!completed:fixture", None)
-            .await?;
+        let completed = owner.runtime()?.conversation("completed", None).await?;
         completed
             .deliver(
                 "Completed room task",
@@ -49,10 +51,7 @@ async fn completed_room_is_cleared_without_erasing_another_room_with_unacknowled
             )
             .await?;
         completed.acknowledge(&["completed".into()])?;
-        let active = owner
-            .runtime()?
-            .conversation("!active:fixture", None)
-            .await?;
+        let active = owner.runtime()?.conversation("control", None).await?;
         active
             .deliver(
                 "Unfinished room task",
@@ -62,20 +61,36 @@ async fn completed_room_is_cleared_without_erasing_another_room_with_unacknowled
             )
             .await?;
         assert_eq!(work.work()?.len(), 2);
-        let inspection = if action == "stop-during-inspection" {
-            let entered = Arc::new(tokio::sync::Notify::new());
-            let release = Arc::new(tokio::sync::Notify::new());
-            *state.inspection_gate.lock().map_err(|_| failed())? =
-                Some((entered.clone(), release.clone()));
-            let runtime = owner.runtime()?;
-            let reader = tokio::spawn(async move { runtime.inspect().await });
-            tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified()).await?;
-            state.inspection_gate.lock().map_err(|_| failed())?.take();
-            Some((reader, release))
-        } else {
-            None
-        };
-        if action == "inspect" {
+        let mut inspection =
+            if action == "stop-during-inspection" || action == "other-room-during-inspection" {
+                let entered = Arc::new(tokio::sync::Notify::new());
+                let release = Arc::new(tokio::sync::Notify::new());
+                *state.inspection_gate.lock().map_err(|_| failed())? =
+                    Some((entered.clone(), release.clone()));
+                let runtime = owner.runtime()?;
+                let reader = tokio::spawn(async move { runtime.inspect().await });
+                tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified()).await?;
+                state.inspection_gate.lock().map_err(|_| failed())?.take();
+                Some((reader, release))
+            } else {
+                None
+            };
+        if action == "other-room-during-inspection" {
+            for observer in state.observations.lock().map_err(|_| failed())?.clone() {
+                observer(ObservationEvent::State {
+                    runtime: Runtime::Codex,
+                    session_id: "active-history".into(),
+                    room_id: Some("control".into()),
+                    state: NativeState::Working,
+                    observed_at: 1001,
+                    settings: vec![],
+                    error_message: None,
+                });
+            }
+            let (reader, release) = inspection.take().ok_or("Missing bounded inspection")?;
+            release.notify_one();
+            reader.await??;
+        } else if action == "inspect" {
             assert!(owner.runtime()?.inspect().await?);
         } else {
             let stopped = owner.close().await;
@@ -90,7 +105,7 @@ async fn completed_room_is_cleared_without_erasing_another_room_with_unacknowled
                 .iter()
                 .map(|value| value.context.as_str())
                 .collect::<Vec<_>>(),
-            vec!["!active:fixture"]
+            vec!["room/control"]
         );
         owner.close().await?;
     }

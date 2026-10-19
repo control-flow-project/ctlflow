@@ -1,3 +1,4 @@
+using Crossfire.Domain;
 using System.Text;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
@@ -21,9 +22,9 @@ public static class PiState
     private static Result<PiBinding> DecodeBinding(JsonElement value)
     {
         if (!Validation.Fields(value, ["context", "file", "sessionId", "instructionsDigest"]).IsSuccess) return Results.Fail<PiBinding>("invalid", "Invalid Pi history allocation");
-        var context = Validation.Text(value.GetProperty("context"), 255); var file = Validation.Text(value.GetProperty("file"), 80);
+        var context = Validation.Text(value.GetProperty("context"), HistoryContext.MaximumLength); var file = Validation.Text(value.GetProperty("file"), 80);
         var session = Validation.NullableText(value.GetProperty("sessionId"), 100); var digest = Validation.NullableText(value.GetProperty("instructionsDigest"), 64);
-        return context.IsSuccess && file.IsSuccess && file.Value == Allocate(context.Value).File && session.IsSuccess && (session.Value is null || Validation.Identifier(session.Value))
+        return context.IsSuccess && HistoryContext.Valid(context.Value) && file.IsSuccess && file.Value == Allocate(context.Value).File && session.IsSuccess && (session.Value is null || Validation.Identifier(session.Value))
             && digest.IsSuccess && (digest.Value is null || digest.Value.Length == 64 && digest.Value.All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f'))
             ? Result<PiBinding>.Success(new(context.Value, file.Value, session.Value, digest.Value)) : Results.Fail<PiBinding>("invalid", "Invalid canonical Pi context allocation");
     }

@@ -1,6 +1,8 @@
 using System.Buffers;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Security;
+using System.Net.Sockets;
 using System.Text.Json;
 using Crossfire.Contracts;
 using Crossfire.Kernel;
@@ -22,8 +24,28 @@ public static class NativeHttp
         => new(new SocketsHttpHandler
         {
             AllowAutoRedirect = false, UseCookies = false, UseProxy = false, AutomaticDecompression = DecompressionMethods.None,
-            PooledConnectionLifetime = TimeSpan.FromMinutes(10), ConnectTimeout = TimeSpan.FromSeconds(15)
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10), ConnectTimeout = TimeSpan.FromSeconds(15), ConnectCallback = Connect
         }) { Timeout = Timeout.InfiniteTimeSpan };
+
+    private static async ValueTask<Stream> Connect(SocketsHttpConnectionContext context, CancellationToken cancellation)
+    {
+        var socket = new Socket(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        try
+        {
+            await socket.ConnectAsync(context.DnsEndPoint, cancellation);
+            var stream = new NetworkStream(socket, ownsSocket: true);
+            if (context.InitialRequestMessage.RequestUri?.Scheme != Uri.UriSchemeHttps) return stream;
+            var secure = new SslStream(stream);
+            try
+            {
+                await secure.AuthenticateAsClientAsync(new SslClientAuthenticationOptions
+                { TargetHost = context.DnsEndPoint.Host, ApplicationProtocols = [SslApplicationProtocol.Http11] }, cancellation);
+                return secure;
+            }
+            catch { await secure.DisposeAsync(); throw; }
+        }
+        catch { socket.Dispose(); throw; }
+    }
 
     public static async ValueTask<Result<NativeJsonResponse>> Json(HttpClient client, NativeEndpoint endpoint, string method,
         string path, JsonElement? body = null, int maximumBytes = MaxJsonBytes, CancellationToken cancellation = default, int maximumRequestBytes = MaxJsonBytes)

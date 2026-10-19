@@ -101,7 +101,7 @@ Open the instance's management Set up an agent page and use its personalized
 descriptor with the installed CLI:
 
 ```sh
-fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerMatrixId=%40member%3Aexample.test'
+fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerBackendUserId=%40member%3Aexample.test'
 fleet list
 ```
 

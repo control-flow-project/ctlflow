@@ -14,7 +14,7 @@ function command(services: Services, rule: WakeRule, delivery: WakeDelivery): Re
   const authorizer = services.repositories.principal.find({ id: rule.configuredById }); if (!authorizer.ok) return authorizer;
   if (!owner.value || !authorizer.value) return failure('unavailable', 'Wake-up authority is missing');
   return success({ deliveryId: delivery.id, ruleId: rule.id, ruleRevision: delivery.ruleRevision, name: rule.name, message: rule.message,
-    scheduledAt: delivery.scheduledAt, sessionId: delivery.sessionId, ownerMatrixId: owner.value.matrixUserId, authorizerMatrixId: authorizer.value.matrixUserId });
+    scheduledAt: delivery.scheduledAt, sessionId: delivery.sessionId, ownerBackendUserId: owner.value.backendUserId, authorizerBackendUserId: authorizer.value.backendUserId });
 }
 export function wakeMetadata(services: Services, actor: Actor, agentId: string, input: WakeAttachment) {
   const parsed = attachment(input); if (!parsed.ok) return parsed;

@@ -5,6 +5,7 @@ import { randomBytes } from 'node:crypto';
 import { captureDocker, cgroupArguments, runArguments, migrationArguments } from './container-commands.js';
 import { config } from './config.js';
 import { privateDir, readJson, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
+import { administratorUser, matrixConfiguration } from '@ctlflow/crossfire-adapter-matrix/config';
 import { backupBeforeMigration, prepareDatabaseUpgrade } from './database-upgrade.js';
 import { standalone } from './standalone.js';
 import { acquireFileLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
@@ -38,12 +39,15 @@ export async function main(args = process.argv.slice(2)): Promise<void> {
   const directory = resolve(parsed.values.directory);
   if (action === 'init') {
     if (existsSync(directory) && readdirSync(directory).length) throw new Error('Initialization requires an empty directory; existing data is never overwritten');
-    const username = parsed.values.administrator;
-    if (!username || !/^[a-z0-9._=-]{1,80}$/u.test(username) || username === 'conduit' || username.startsWith('crossfire-') || username.startsWith('agent-')) throw new Error('Supply a regular human --administrator username');
+    const administrator = administratorUser(parsed.values.administrator, parsed.values['server-name']);
+    if (!administrator.ok) throw new Error(administrator.error.message);
     const token = () => randomBytes(32).toString('base64url');
-    const configuration = config({ instance: parsed.values.instance, serverName: parsed.values['server-name'], publicOrigin: parsed.values.origin,
-      contentOrigin: parsed.values['content-origin'], matrixOrigin: 'http://127.0.0.1:6167', administrator: '@' + username + ':' + parsed.values['server-name'], jwtSecret: token(), registrationSecret: token() });
+    const configuration = config({ instance: parsed.values.instance, publicOrigin: parsed.values.origin, contentOrigin: parsed.values['content-origin'],
+      messaging: { type: 'matrix', parameters: { serverName: parsed.values['server-name'], origin: 'http://127.0.0.1:6167', jwtSecret: token(), registrationSecret: token() } },
+      administrator: administrator.value });
     if (!configuration.ok) throw new Error(configuration.error.message);
+    const backend = matrixConfiguration(configuration.value.messaging);
+    if (!backend.ok) throw new Error(backend.error.message);
     privateDir(directory);
     writeJson(join(directory, 'config.json'), configuration.value);
     writeJson(join(directory, 'bootstrap.json'), { servicePassword: token(), administratorPassword: token() });

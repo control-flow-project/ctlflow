@@ -1,31 +1,51 @@
 use crossfire_agent_core::events::{self, Event};
+use crossfire_domain::messaging_client::{EventType, MessageContent, MessageEvent, MessageKind};
 use serde_json::json;
 
+fn message(milliseconds: Option<i64>) -> MessageEvent {
+    MessageEvent {
+        event_id: "event/exact".to_owned(),
+        room_id: "room/main".to_owned(),
+        sender: "person/human".to_owned(),
+        event_type: EventType::Message,
+        subject_id: None,
+        sent_at: milliseconds,
+        omitted: None,
+        content: MessageContent {
+            kind: MessageKind::Text,
+            body: Some("plain".to_owned()),
+            mentions: vec!["agent/name".to_owned()],
+            edited: false,
+            control: false,
+            attachments: vec![],
+            attributes: Default::default(),
+        },
+    }
+}
 #[test]
-fn native_events_preserve_attribution_calendar_and_state_without_formatted_duplicates()
+fn events_preserve_attribution_calendar_and_state_without_backend_dependencies()
 -> Result<(), Box<dyn std::error::Error>> {
     for (milliseconds, expected) in [
         (-8640000000000000i64, "-271821-04-20T00:00:00.000Z"),
         (-1, "1969-12-31T23:59:59.999Z"),
         (8640000000000000, "+275760-09-13T00:00:00.000Z"),
     ] {
-        let native = json!({"event_id":"$exact","sender":"@human:local","type":"m.room.message","content":{"body":"plain","formatted_body":"<p>plain</p>","m.mentions":{"user_ids":["@agent:local"]}},"origin_server_ts":milliseconds});
-        let value = events::view(&native, "!room:local")?;
+        let value = events::view(&message(Some(milliseconds)), "room/main")?;
         assert_eq!(value.timestamp.as_deref(), Some(expected));
-        assert!(value.content.get("formatted_body").is_none());
-        assert_eq!(value.content["m.mentions"]["user_ids"][0], "@agent:local");
+        assert_eq!(value.content.mentions[0], "agent/name");
         let encoded = serde_json::to_value(&value)?;
         let decoded: Event = serde_json::from_value(encoded.clone())?;
         decoded.validate()?;
         assert_eq!(value, decoded);
         for field in [
-            "room_id",
+            "roomId",
             "origin",
-            "event_id",
+            "eventId",
             "sender",
             "type",
             "content",
             "timestamp",
+            "subjectId",
         ] {
             let mut damaged = encoded.clone();
             damaged
@@ -48,30 +68,30 @@ fn native_events_preserve_attribution_calendar_and_state_without_formatted_dupli
             damaged.timestamp = Some(timestamp.to_owned());
             assert!(damaged.validate().is_err());
         }
+        let mut damaged = encoded;
+        damaged
+            .as_object_mut()
+            .ok_or("event must be object")?
+            .insert("unrecognized".to_owned(), json!(true));
+        assert!(serde_json::from_value::<Event>(damaged).is_err());
     }
-    assert!(events::notice(
-        &json!({"type":"m.room.message","content":{"msgtype":"m.notice","org.crossfire.listener_notice":true}})
-    ));
-    assert!(!events::notice(
-        &json!({"type":"m.room.message","content":{"msgtype":"m.text","body":"org.crossfire.listener_notice"}})
-    ));
+    let mut value = message(None);
+    value.content.kind = MessageKind::Notice;
+    value.content.control = true;
+    assert!(events::notice(&value));
+    value.content.control = false;
+    assert!(!events::notice(&value));
     Ok(())
 }
-
 #[test]
-fn acquisition_moves_large_content_without_copying_the_native_string_allocation()
+fn acquisition_moves_large_content_without_copying_its_allocation()
 -> Result<(), Box<dyn std::error::Error>> {
-    let native = json!({"event_id":"$large","sender":"@human:local","type":"m.room.message","content":{"body":"content".repeat(100000),"msgtype":"m.text"}});
-    let allocation = native["content"]["body"]
-        .as_str()
-        .ok_or("body required")?
-        .as_ptr() as usize;
-    let event = events::take(native, "!room:local")?;
+    let mut value = message(None);
+    value.content.body = Some("content".repeat(100000));
+    let allocation = value.content.body.as_ref().ok_or("body required")?.as_ptr() as usize;
+    let event = events::take(value, "room/main")?;
     assert_eq!(
-        event.content["body"]
-            .as_str()
-            .ok_or("body required")?
-            .as_ptr() as usize,
+        event.content.body.as_ref().ok_or("body required")?.as_ptr() as usize,
         allocation
     );
     Ok(())

@@ -53,17 +53,17 @@ test('operator release verification compares immutable artifact hashes with the 
 
 test('operator enrollment is read-only until explicit execution and verifies the complete pending introduction', async scope => {
   const fixture = await operatorFixture(scope);
-  const enrollmentId = randomUUID(), ownerMatrixId = fixture.account.matrixUserId;
-  const introduced = value(await introduceEnrollment(fixture.services, { enrollmentId, claimSecret: secret(), ownerMatrixId,
-    fleetKey: 'research', controller: { name: 'laptop', metadata: {} }, instances: [{ instanceKey: 'helper', name: 'helper', coordinationPolicy: defaultCoordinationPolicy(ownerMatrixId) }] }));
-  const plan = { enrollmentId, ownerMatrixId, verificationCode: introduced.request.verificationCode, fleetKey: 'research', controllerName: 'laptop',
-    instances: [{ instanceKey: 'helper', currentName: null, requestedName: 'helper', coordinationPolicy: defaultCoordinationPolicy(ownerMatrixId) }] };
+  const enrollmentId = randomUUID(), ownerBackendUserId = fixture.account.backendUserId;
+  const introduced = value(await introduceEnrollment(fixture.services, { enrollmentId, claimSecret: secret(), ownerBackendUserId,
+    fleetKey: 'research', controller: { name: 'laptop', metadata: {} }, instances: [{ instanceKey: 'helper', name: 'helper', coordinationPolicy: defaultCoordinationPolicy(ownerBackendUserId) }] }));
+  const plan = { enrollmentId, ownerBackendUserId, verificationCode: introduced.request.verificationCode, fleetKey: 'research', controllerName: 'laptop',
+    instances: [{ instanceKey: 'helper', currentName: null, requestedName: 'helper', coordinationPolicy: defaultCoordinationPolicy(ownerBackendUserId) }] };
   value(await reviewEnrollment(fixture.origin, fixture.account, plan, false, new AbortController().signal));
   assert.equal(fixture.requests.filter(request => request.method === 'POST' && request.path.endsWith('/decision')).length, 0);
-  for (const changes of [{ ownerMatrixId: '@wrong:test' }, { controllerName: 'wrong' }, { verificationCode: 'WRONGWRONG00' },
-    { instances: [{ instanceKey: 'wrong', currentName: null, requestedName: 'helper', coordinationPolicy: defaultCoordinationPolicy(ownerMatrixId) }] },
+  for (const changes of [{ ownerBackendUserId: '@wrong:test' }, { controllerName: 'wrong' }, { verificationCode: 'WRONGWRONG00' },
+    { instances: [{ instanceKey: 'wrong', currentName: null, requestedName: 'helper', coordinationPolicy: defaultCoordinationPolicy(ownerBackendUserId) }] },
     { instances: [{ ...plan.instances[0]!, currentName: 'other-name' }] },
-    { instances: [{ ...plan.instances[0]!, coordinationPolicy: { ...defaultCoordinationPolicy(ownerMatrixId), permissions: ['room.agent.invite' as const] } }] }]) {
+    { instances: [{ ...plan.instances[0]!, coordinationPolicy: { ...defaultCoordinationPolicy(ownerBackendUserId), permissions: ['room.agent.invite' as const] } }] }]) {
     assert.equal((await reviewEnrollment(fixture.origin, fixture.account, { ...plan, ...changes }, true, new AbortController().signal)).ok, false);
   }
   assert.equal(value(fixture.services.repositories.enrollmentRequest.find({ id: enrollmentId }))?.status, 'pending');

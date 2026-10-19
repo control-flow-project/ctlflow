@@ -3,6 +3,30 @@ use crossfire_domain::permission::Permission;
 
 pub const OPERATIONS: &[Operation] = &[
     Operation {
+        id: OperationId::MessagingBackend,
+        name: "messagingBackend",
+        method: Method::Get,
+        path: "/api/messaging-backend",
+        auth: Authentication::Public,
+        status: 200,
+        collection: false,
+        request_bytes: 2097152,
+        binary: false,
+        permissions: &[],
+    },
+    Operation {
+        id: OperationId::AuthenticateBackend,
+        name: "authenticateBackend",
+        method: Method::Post,
+        path: "/api/backend-authentication",
+        auth: Authentication::Public,
+        status: 200,
+        collection: false,
+        request_bytes: 2097152,
+        binary: false,
+        permissions: &[],
+    },
+    Operation {
         id: OperationId::CreateSession,
         name: "createSession",
         method: Method::Post,

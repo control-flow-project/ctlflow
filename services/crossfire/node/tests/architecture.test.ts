@@ -9,7 +9,7 @@ import { auditSource, imports, type PackageManifest } from './support/architectu
 
 function files(directory: string): string[] {
   if (!existsSync(directory)) return [];
-  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => ['node_modules', 'dist'].includes(entry.name) ? []
+  return readdirSync(directory, { withFileTypes: true }).flatMap(entry => ['node_modules', 'dist', 'bin', 'obj', 'target', '.temp'].includes(entry.name) ? []
     : entry.isDirectory() ? files(join(directory, entry.name)) : [join(directory, entry.name)]);
 }
 
@@ -33,12 +33,46 @@ test('all services have one strict implementation and declared package-export bo
   }
   const dependencies = (service: string, name: string) => Object.keys(manifests.get('services/' + service + '/node/packages/' + name)!.dependencies ?? {});
   assert.deepEqual(dependencies('crossfire', 'domain'), ['@ctlflow/crossfire-kernel']);
-  assert.deepEqual(dependencies('crossfire', 'agent-core').sort(), ['@ctlflow/crossfire-contracts', '@ctlflow/crossfire-kernel']);
+  assert.deepEqual(dependencies('crossfire', 'agent-core').sort(), ['@ctlflow/crossfire-contracts', '@ctlflow/crossfire-domain', '@ctlflow/crossfire-kernel']);
   assert.deepEqual(dependencies('crossfire', 'contracts').sort(), ['@ctlflow/crossfire-domain', '@ctlflow/crossfire-kernel', 'smol-toml']);
   for (const name of ['files', 'matrix']) assert.equal(files(join(root, 'services/crossfire/node/packages', name, 'src')).length, 0);
   for (const manifest of manifests.values()) if (manifest.name.startsWith('@ctlflow/crossfire-')) {
     assert(!Object.keys(manifest.dependencies ?? {}).some(name => /^@ctlflow\/(?:fleet|fleetd)(?:-|$)/u.test(name)));
   }
+});
+
+test('generic messaging owners in every target contain no Matrix protocol or historical schema fields', () => {
+  const root = resolve(process.cwd(), '../..');
+  const owners = [
+    ...['kernel', 'domain', 'agent-core', 'contracts', 'client'].map(owner => 'services/crossfire/node/packages/' + owner + '/src'),
+    ...['Crossfire.Kernel', 'Crossfire.Domain', 'Crossfire.AgentCore', 'Crossfire.Contracts', 'Crossfire.AdapterHttp'].map(owner => 'services/crossfire/csharp/packages/' + owner),
+    ...['kernel', 'domain', 'agent-core', 'contracts', 'adapter-http'].map(owner => 'services/crossfire/rust/packages/' + owner + '/src'),
+    ...['domain', 'contracts'].map(owner => 'services/fleetd/node/packages/' + owner + '/src'),
+    ...['Fleetd.Domain', 'Fleetd.Contracts'].map(owner => 'services/fleetd/csharp/packages/' + owner),
+    ...['domain', 'contracts'].map(owner => 'services/fleetd/rust/packages/' + owner + '/src'),
+    'services/fleet/node/packages/daemon-client/src',
+    'services/fleet/csharp/packages/Fleet.DaemonClient',
+    'services/fleet/rust/packages/daemon-client/src',
+    'services/crossfire/node/apps/server/src/http',
+    'services/crossfire/csharp/apps/Crossfire.Server/Http',
+    'services/crossfire/rust/apps/server/src/http',
+    'services/crossfire/apps/web/src',
+  ];
+  const forbidden = ['/_matrix', '"m.room.', "'m.room.", '"m.mentions', "'m.mentions", 'matrix_user_id', 'sender_matrix_id', 'claim_matrix_user_id', 'power_level', 'powerLevel', 'PowerLevel', '^@'];
+  for (const owner of owners) {
+    assert(existsSync(join(root, owner)), 'Architecture verification requires its declared owner: ' + owner);
+    for (const file of files(join(root, owner)).filter(file => /\.(tsx?|cs|rs)$/u.test(file))) {
+      const source = readFileSync(file, 'utf8');
+      for (const literal of forbidden) assert.equal(source.includes(literal), false, relative(root, file) + ': native or historical field ' + literal);
+      assert.equal(/\b(?:Matrix[A-Za-z_]*|matrix|matrixId)\b/u.test(source), false, relative(root, file) + ': use neutral messaging names');
+    }
+  }
+  const schema = readFileSync(join(root, 'services/crossfire/database/management/sqlite/schema.json'), 'utf8');
+  for (const field of ['matrix_user_id', 'sender_matrix_id', 'claim_matrix_user_id', 'power_level']) assert.equal(schema.includes(field), false, field);
+  for (const file of ['services/crossfire/node/packages/adapter-codex/src/context-migration.ts',
+    'services/crossfire/csharp/packages/Crossfire.AdapterCodex/ContextMigration.cs',
+    'services/crossfire/rust/packages/adapter-codex/src/context_migration.rs',
+    'services/fleetd/node/tools/observation-migration.ts']) assert.equal(existsSync(join(root, file)), false, 'No historical converter: ' + file);
 });
 
 test('all TOML dependency owners lock one patched parser', () => {
@@ -112,11 +146,12 @@ test('the common UI and HTTP client reject backend and native-platform dependenc
     ] as const)
       assert.equal(auditSource(root, owner, file, text, manifests).includes(violation), true, owner + ':' + violation);
   }
-  for (const file of ['src/client.ts', 'src/binary-request.ts', 'src/matrix-login.ts']) {
+  for (const file of ['src/client.ts', 'src/binary-request.ts']) {
     const owner = 'services/crossfire/node/packages/client', path = join(root, owner, file);
     assert.deepEqual(auditSource(root, owner, path, readFileSync(path, 'utf8'), manifests), []);
   }
   for (const file of ['client.ts', 'binary-request.ts']) assert.equal(existsSync(join(root, 'services/crossfire/node/packages/adapter-crossfire/src', file)), false);
+  assert.equal(existsSync(join(root, 'services/crossfire/node/packages/client/src/matrix-login.ts')), false);
   assert.equal(existsSync(join(root, 'services/crossfire/node/packages/adapter-matrix/src/browser-session.ts')), false);
 });
 

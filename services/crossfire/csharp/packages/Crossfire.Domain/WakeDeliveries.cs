@@ -5,7 +5,7 @@ namespace Crossfire.Domain;
 public sealed record WakeAttachment(string RunId, string SessionId);
 public sealed record WakeDelivery(string Id, string RuleId, string AgentId, long RuleRevision, string RunId, string SessionId, long ScheduledAt, long CreatedAt, string Status, long? DeliveredAt);
 public sealed record DueWake(WakeRule Rule, WakeAssignment Assignment);
-public sealed record ScheduledWake(string DeliveryId, string RuleId, long RuleRevision, string Name, string Message, long ScheduledAt, string SessionId, string OwnerMatrixId, string AuthorizerMatrixId);
+public sealed record ScheduledWake(string DeliveryId, string RuleId, long RuleRevision, string Name, string Message, long ScheduledAt, string SessionId, string OwnerBackendUserId, string AuthorizerBackendUserId);
 public sealed record WakeMetadata(long Now, long? NextDueAt);
 public sealed record WakeDeliveryPorts(WakeRulePorts Rules, ListenerPorts Listener,
     Func<string, Result<WakeDelivery?>> Find, Func<string, Result<WakeDelivery?>> Pending, Func<WakeDelivery, bool, Result<Unit>> Save,
@@ -55,7 +55,7 @@ public static class WakeDeliveries
         var owner = ports.Rules.Discovery.Authorization.Principal(rule.OwnerId); if (!owner.IsSuccess) return Result<ScheduledWake>.Fail(owner.Error);
         var authorizer = ports.Rules.Discovery.Authorization.Principal(rule.ConfiguredById); if (!authorizer.IsSuccess) return Result<ScheduledWake>.Fail(authorizer.Error);
         return owner.Value is null || authorizer.Value is null ? Results.Fail<ScheduledWake>("unavailable", "Wake-up authority is missing")
-            : Result<ScheduledWake>.Success(new(delivery.Id, rule.Id, delivery.RuleRevision, rule.Name, rule.Message, delivery.ScheduledAt, delivery.SessionId, owner.Value.MatrixUserId, authorizer.Value.MatrixUserId));
+            : Result<ScheduledWake>.Success(new(delivery.Id, rule.Id, delivery.RuleRevision, rule.Name, rule.Message, delivery.ScheduledAt, delivery.SessionId, owner.Value.BackendUserId, authorizer.Value.BackendUserId));
     }
 
     public static Result<WakeMetadata> Metadata(WakeDeliveryPorts ports, Actor actor, string agentId, WakeAttachment input)

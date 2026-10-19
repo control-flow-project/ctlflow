@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Crossfire.Kernel;
+using Crossfire.Domain;
 
 namespace Crossfire.AgentCore;
 
@@ -27,9 +28,9 @@ public sealed partial class ListenerReceiver
                 using var deadline = new CancellationTokenSource(TimeSpan.FromMilliseconds(options.ReconcileMs), options.Clock); using var scope = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token, generation, deadline.Token);
                 try
                 {
-                    var sync = await Retry(() => ReceivePages.Sync(options.Matrix, since, Math.Min(options.PollMs, options.ReconcileMs / 2), scope.Token), scope.Token); lock (gate) controlling = true;
-                    var membership = Take(await ReceivePages.Joined(options.Matrix, scope.Token)); if (!membership.SetEquals(joined) || lastAccess == long.MinValue || Now - lastAccess >= options.ReconcileMs) await Access(scope.Token);
-                    var reset = Take(await SyncEvents.MembershipResets(options.Matrix, sync, options.Profile.Account, since, scope.Token)).Concat(joined.Where(room => !membership.Contains(room))).ToHashSet(StringComparer.Ordinal);
+                    var sync = await Retry(() => ReceivePages.Sync(options.Messaging, since, Math.Min(options.PollMs, options.ReconcileMs / 2), scope.Token), scope.Token); lock (gate) controlling = true;
+                    var membership = Take(await ReceivePages.Joined(options.Messaging, scope.Token)); if (!membership.SetEquals(joined) || lastAccess == long.MinValue || Now - lastAccess >= options.ReconcileMs) await Access(scope.Token);
+                    var reset = sync.ResetRooms.Concat(joined.Where(room => !membership.Contains(room))).ToHashSet(StringComparer.Ordinal);
                     if (reset.Count != 0)
                     {
                         await CancelDelivery(); lock (gate)
@@ -38,20 +39,20 @@ public sealed partial class ListenerReceiver
                             membershipRevision++; retiredRooms.UnionWith(reset); ReceiveSnapshots.Retire(Storage, File, reset); SyncEvents.RetainJoined(Storage, File, membership.Where(room => !reset.Contains(room)).ToHashSet(StringComparer.Ordinal)); state = state with { Controls = state.Controls.Where(control => !reset.Contains(control.Room)).ToArray() };
                         }
                     }
-                    if (since is not null && SyncEvents.Section(sync, "join") is { } rooms)
+                    if (since is not null)
                     {
-                        var filter = WireJson.Object(writer => { writer.WriteStartArray("types"); writer.WriteStringValue("m.room.message"); writer.WriteEndArray(); });
-                        foreach (var room in rooms.EnumerateObject())
+                        var filter = new EventFilter(["message"]);
+                        foreach (var room in sync.Rooms.Keys)
                         {
-                            if (options.Room is not null && room.Name != options.Room || !joined.Contains(room.Name) || !membership.Contains(room.Name) || reset.Contains(room.Name)) continue;
-                            await foreach (var native in SyncEvents.Incremental(options.Matrix, sync, since, room.Name, filter, scope.Token))
+                            if (options.Room is not null && room != options.Room || !joined.Contains(room) || !membership.Contains(room) || reset.Contains(room)) continue;
+                            await foreach (var native in SyncEvents.Incremental(options.Messaging, sync, since, room, filter, scope.Token))
                             {
-                                var value = Take(ReceivedEvents.View(Take(native), room.Name)); if (value.Type != "m.room.message") continue; statistics.Record([value], false);
+                                var value = Take(ReceivedEvents.View(Take(native), room)); if (value.Type != "message") continue; statistics.Record([value], false);
                                 lock (gate) if (state.Controls.Any(control => control.Room == value.RoomId && control.Event == value.EventId)) continue;
-                                var candidate = SteeringControl.Mention(value, options.Profile.Account.UserId) || value.Sender == options.Profile.Settings.Owner && WireJson.Text(value.Content, "body")?.Trim() == "!!";
+                                var candidate = SteeringControl.Mention(value, options.Profile.Account.UserId) || value.Sender == options.Profile.Settings.Owner && value.Content.Body?.Trim() == "!!";
                                 if (candidate) await Access(scope.Token); if (!allowed.Contains(value.RoomId)) continue;
                                 if (!senders.Contains(value.Sender) && SteeringControl.Mention(value, options.Profile.Account.UserId)) maintenance.Notice(value);
-                                if (!Take(await SteeringControl.Authorized(options.Matrix, options.Coordination, options.Profile, value, senders, scope.Token)))
+                                if (!Take(await SteeringControl.Authorized(options.Messaging, options.Coordination, options.Profile, value, senders, scope.Token)))
                                 { lock (gate) if (state.Paused && SteeringControl.SourceText(value, options.Profile.Settings.Owner)) { state = state with { Paused = false }; SaveControl(); Change(); } continue; }
                                 await Interrupt(value, scope.Token);
                             }
@@ -59,7 +60,7 @@ public sealed partial class ListenerReceiver
                     }
                     lock (gate)
                     {
-                        joined = membership; controlling = false; maintenance.Observe(sync); SaveControl(); since = WireJson.Text(sync, "next_batch") ?? throw new InvalidDataException("Missing native sync continuation"); ReceiveState.CheckpointSync(Storage, File, since); synchronized = true; RenewOrdinary();
+                        joined = membership; controlling = false; maintenance.Observe(sync); SaveControl(); since = sync.Cursor; ReceiveState.CheckpointSync(Storage, File, since); synchronized = true; RenewOrdinary();
                     }
                     Change();
                 }
@@ -75,7 +76,7 @@ public sealed partial class ListenerReceiver
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (ReceiverFailure error) { Fail(error.Failure); }
-        catch (Exception error) when (error is IOException or InvalidDataException or JsonException or ArgumentException or InvalidOperationException or OverflowException) { Fail(new("invalid", "Matrix receiver acquisition failed: " + error.Message)); }
+        catch (Exception error) when (error is IOException or InvalidDataException or JsonException or ArgumentException or InvalidOperationException or OverflowException) { Fail(new("invalid", "Messaging receiver acquisition failed: " + error.Message)); }
         finally { lock (gate) controlling = false; Change(); }
     }
     private void RenewOrdinary()
@@ -84,7 +85,7 @@ public sealed partial class ListenerReceiver
     { lock (gate) { ordinaryUsers--; if (ordinaryUsers == 0) { foreach (var source in retired) source.Dispose(); retired.Clear(); } } }
     private async ValueTask Interrupt(ReceivedEvent value, CancellationToken cancellation)
     {
-        var source = Take(await ReceivePages.Origins(options.Matrix, options.Profile.Account.UserId, [value], cancellation))[0]; receipts.Publish(source, "received");
+        var source = Take(await ReceivePages.Origins(options.Messaging, options.Profile.Account.UserId, [value], cancellation))[0]; receipts.Publish(source, "received");
         lock (gate) ordinary.Cancel(); var previousPublication = CancelDelivery().AsTask();
         try
         {
@@ -93,17 +94,17 @@ public sealed partial class ListenerReceiver
                 await previousPublication; receipts.Publish(source, "failed", "This runtime has no captured-turn interruption capability"); lock (gate) { state = state with { Paused = true, Controls = [..state.Controls, new(value.RoomId, value.EventId, true, null, "delivered")] }; SaveControl(); }
                 var policy = Take(await OwnerAuthority.Policy(options.Coordination, options.Profile, cancellation)); if (policy.Rooms.Any(room => room.RoomId == value.RoomId && room.AccessMode != "read" && !room.Muted))
                 {
-                    var sent = await AgentIO.Request(options.Matrix, new("PUT", AgentWire.Room(value.RoomId) + "/send/m.room.message/crossfire-control-" + Identity.Hash(value.EventId), OwnerNotices.Content("Listener delivery is paused. This runtime connection cannot interrupt the current turn; stop it in the coding session. A subsequent owner message resumes delivery.")), cancellation); if (!sent.IsSuccess && sent.Error.Code != "forbidden") Take(sent);
+                    var sent = await options.Messaging.SendNotice(value.RoomId, "crossfire-control-" + Identity.Hash(value.EventId), "Listener delivery is paused. This runtime connection cannot interrupt the current turn; stop it in the coding session. A subsequent owner message resumes delivery.", cancellation); if (!sent.IsSuccess && sent.Error.Code != "forbidden") Take(sent);
                 }
                 return;
             }
             var turn = Take(await Runtime.TurnControl.ActiveTurn(options.HistoryMode == NativeHistoryMode.PerRoom ? value.RoomId : null, new(InputPriority.Steering, cancellation)));
-            await Access(cancellation); if (!allowed.Contains(value.RoomId) || !Take(await SteeringControl.Authorized(options.Matrix, options.Coordination, options.Profile, value, senders, cancellation))) { receipts.Publish(source, "failed", "Source or room authority changed before cancellation"); await previousPublication; return; }
+            await Access(cancellation); if (!allowed.Contains(value.RoomId) || !Take(await SteeringControl.Authorized(options.Messaging, options.Coordination, options.Profile, value, senders, cancellation))) { receipts.Publish(source, "failed", "Source or room authority changed before cancellation"); await previousPublication; return; }
             cancellation.ThrowIfCancellationRequested(); SourceControl control;
             lock (gate)
             {
                 foreach (var earlier in state.Controls.Where(control => control.Status == "interrupted" && (options.HistoryMode != NativeHistoryMode.PerRoom || control.Room == value.RoomId)).ToArray()) { SetControl(earlier, earlier with { Status = "superseded" }); receipts.Superseded(earlier, source); }
-                control = new(value.RoomId, value.EventId, value.Sender == options.Profile.Settings.Owner && WireJson.Text(value.Content, "body")?.Trim() == "!!", turn, "interrupting"); state = state with { Controls = [..state.Controls, control] }; SaveControl();
+                control = new(value.RoomId, value.EventId, value.Sender == options.Profile.Settings.Owner && value.Content.Body?.Trim() == "!!", turn, "interrupting"); state = state with { Controls = [..state.Controls, control] }; SaveControl();
             }
             var outcome = turn is null ? "inactive" : Take(await Runtime.TurnControl.Interrupt(turn, false, new(InputPriority.Steering, cancellation))); receipts.Publish(source, outcome == "interrupted" ? "interrupted" : "already-idle");
             await previousPublication; lock (gate) { SetControl(control, control with { Status = control.Stop ? "delivered" : "interrupted" }); state = state with { Paused = control.Stop }; SaveControl(); }

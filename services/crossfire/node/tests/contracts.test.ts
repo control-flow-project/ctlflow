@@ -8,23 +8,24 @@ import { page } from "@ctlflow/crossfire-contracts/schema/query";
 import { memberChange } from '@ctlflow/crossfire-contracts/schema/request';
 import { owner } from '@ctlflow/crossfire-contracts/schema/response';
 import * as validation from '@ctlflow/crossfire-contracts/schema/validation';
-import { json } from '@ctlflow/crossfire-contracts/matrix';
+import { json } from '@ctlflow/crossfire-kernel/json';
 import { truncateUtf16, truncateUtf8 } from '@ctlflow/crossfire-kernel/text';
 
 
-test("native room identities remain opaque, including version 12 IDs", () => {
+test("backend room identities are opaque and reject controls or excessive length", () => {
   const room = "!Z1lqALvgesu1ZL4m19nCNHXvw5TCMT8Os8gljGrpmug";
   assert.equal(roomId(room), true);
   assert.equal(roomId("!native:example.org"), true);
-  for (const invalid of ["", "!", "room", "!room id", "!room\n"]) assert.equal(roomId(invalid), false);
-  assert.equal(deliveryGrant({ roomId: room, accessMode: "read", powerLevel: null, muted: false }).ok, true);
+  for (const valid of ['!', 'room', '!room id', '__proto__', 'constructor']) assert.equal(roomId(valid), true);
+  for (const invalid of ["", "!room\n", 'x'.repeat(256), '\u007f']) assert.equal(roomId(invalid), false);
+  assert.equal(deliveryGrant({ roomId: room, accessMode: "read", nativeAccess: null, muted: false }).ok, true);
 });
 
 test('portable text rejects unpaired surrogates without replacement and truncates whole characters', () => {
   for (const value of ['\ud800', '\udfff', 'before\ud800after', '\ud800🚀']) {
     assert.equal(validation.text()(value).ok, false);
     assert.equal(validation.plainText(8192)(value).ok, false);
-    assert.equal(validation.matrixUserId('@' + value + ':example.test').ok, false);
+    assert.equal(validation.backendUserId('@' + value + ':example.test').ok, false);
     assert.equal(validation.roomId('!' + value).ok, false);
     assert.equal(validation.eventId('$' + value).ok, false);
     assert.equal(json(value), false);
@@ -52,23 +53,22 @@ test('portable text rejects unpaired surrogates without replacement and truncate
   }
 });
 
-test('room authority and observations distinguish immutable creators from finite power levels', () => {
-  const authority = { matrixUserId: '@alice:test.localhost', powerLevel: null, creator: true, creatorIds: ['@alice:test.localhost'],
-    readLevel: -1, replyLevel: 0, inviteLevel: 0, kickLevel: 50, changePowerLevel: 50, nativePermissions: [] };
+test('room authority exposes backend capabilities and retains opaque observed access without interpreting native fields', () => {
+  const authority = { backendUserId: 'alice', canInvite: true, authorityRevision: 'opaque', accessModes: ['reply'], accessFields: [], permissions: [] };
   assert(roomAuthority(authority).ok);
-  assert(roomAuthority({ ...authority, creator: false, powerLevel: 0 }).ok);
+  assert(roomAuthority({ ...authority, canInvite: false }).ok);
   assert.equal(roomAuthority({ ...authority, powerLevel: 100 }).ok, false);
   assert.equal(roomAuthority({ ...authority, creator: false }).ok, false);
   const observation = { observedGeneration: null, appliedRevision: null, appliedAccessRevision: null, membership: 'join',
-    creator: true, powerLevel: null, lastAttemptAt: null, lastSuccessAt: null, errorCode: null, errorMessage: null };
+    nativeAccess: { roles: ['reviewer'], tenant: 'credit' }, lastAttemptAt: null, lastSuccessAt: null, errorCode: null, errorMessage: null };
   assert(grantApplication(observation).ok);
-  assert(grantApplication({ ...observation, creator: false, membership: null }).ok);
-  assert(grantApplication({ ...observation, creator: false, powerLevel: 0 }).ok);
+  assert(grantApplication({ ...observation, nativeAccess: null, membership: null }).ok);
+  assert(grantApplication({ ...observation, nativeAccess: { creator: true, powerLevel: null } }).ok);
   assert.equal(grantApplication({ ...observation, powerLevel: 100 }).ok, false);
 });
 
 test('member labels retain every accepted signup username across requests and owner views', () => {
-  const identity = { memberId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', matrixUserId: '@member:test.localhost', status: 'active' };
+  const identity = { memberId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', backendUserId: '@member:test.localhost', status: 'active' };
   const displayName = 'x'.repeat(100);
   assert(memberChange({ expectedRevision: 0, displayName }).ok);
   assert(owner({ ...identity, displayName }).ok);
@@ -79,13 +79,13 @@ test('member labels retain every accepted signup username across requests and ow
 });
 
 test('listener policy is explicit and rejects missing authority, self triggers and competing fields', () => {
-  const policy = { agentId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', ownerMatrixId: '@owner:test.localhost', matrixUserId: '@agent:test.localhost',
-    status: 'active', ownerStatus: 'active', ownerConversation: null, fleetIdleTimeoutSeconds: 1800, maxMessageBytes: 65536, roomGrants: [], wakeMode: 'selected', senderMatrixIds: ['@owner:test.localhost'] };
+  const policy = { agentId: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', ownerBackendUserId: '@owner:test.localhost', backendUserId: '@agent:test.localhost',
+    status: 'active', ownerStatus: 'active', ownerConversation: null, fleetIdleTimeoutSeconds: 1800, maxMessageBytes: 65536, roomGrants: [], wakeMode: 'selected', senderBackendUserIds: ['@owner:test.localhost'] };
   assert(deliveryPolicy(policy).ok);
-  assert(deliveryPolicy({ ...policy, wakeMode: 'selected', senderMatrixIds: [] }).ok);
+  assert(deliveryPolicy({ ...policy, wakeMode: 'selected', senderBackendUserIds: [] }).ok);
   assert(deliveryPolicy({ ...policy, wakeMode: 'selected' }).ok);
-  for (const invalid of [{ ...policy, wakeMode: 'all' }, { ...policy, wakeMode: 'owner' }, { ...policy, status: 'suspended' }, { ...policy, senderMatrixIds: ['@owner:test.localhost', '@agent:test.localhost'] },
-    { ...policy, senderMatrixIds: ['@owner:test.localhost', '@owner:test.localhost'] }, { ...policy, senderMatrixIds: ['Alice'] }, { ...policy, wake: true }]) {
+  for (const invalid of [{ ...policy, wakeMode: 'all' }, { ...policy, wakeMode: 'owner' }, { ...policy, status: 'suspended' }, { ...policy, senderBackendUserIds: ['@owner:test.localhost', '@agent:test.localhost'] },
+    { ...policy, senderBackendUserIds: ['@owner:test.localhost', '@owner:test.localhost'] }, { ...policy, senderBackendUserIds: ['Alice\n'] }, { ...policy, wake: true }]) {
     assert.equal(deliveryPolicy(invalid).ok, false);
   }
   const { wakeMode, ...missing } = policy;

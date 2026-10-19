@@ -2,13 +2,17 @@
 
 ## Inspect before acting
 
-Use `fleet daemon status`, `fleet show`, `fleet agent list` and `fleet test`.
+Use `fleet diagnose`, `fleet diagnose FLEET`, `fleet daemon status`, `fleet show`
+and `fleet agent list`. Use `fleet test` when an explicit readiness assertion is
+needed, not to diagnose every independent failure.
 Read controller contact, listener readiness, native state and original error
 separately. Saved credentials are not readiness evidence.
 
 Model-free checks do not create chats, advance unread state or submit dummy
 turns. Busy, paused, unavailable and stopped remain distinct.
 Sleeping can be ready without a running native engine.
+
+- [Read-only diagnostics](diagnostics.md)
 
 ## Update software
 

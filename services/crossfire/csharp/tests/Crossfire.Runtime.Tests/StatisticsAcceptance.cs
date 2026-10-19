@@ -8,11 +8,7 @@ namespace Crossfire.Runtime.Tests;
 public static class StatisticsAcceptance
 {
     private static ReceivedEvent Message(string id, string type, long? size = null)
-        => new("!room:example.test", new("unknown", null, null), id, "@human:example.test", "m.room.message", WireJson.Object(writer =>
-        {
-            writer.WriteString("msgtype", type); writer.WriteString("body", "fixture");
-            if (size is not null) { writer.WriteStartObject("info"); writer.WriteNumber("size", size.Value); writer.WriteEndObject(); }
-        }), null);
+        => new("!room:example.test", new("unknown", null, null), id, "@human:example.test", "message", new(type, "fixture", [], false, false, size is null ? [] : [new("attachment", null, null, size)], WireJson.Object(_ => { })), null, null);
     public static void Verify()
     {
         var collector = new ListenerStatistics("@self:example.test", new ManualTime());

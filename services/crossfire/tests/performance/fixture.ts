@@ -23,7 +23,7 @@ export function populatePerformanceHistory(file: string, agentId: string) {
       for (let index = 0; index < 50; index++) {
         const id = index === 0 ? agentId : randomUUID();
         if (index !== 0) {
-          value(repositories.principal.insert({ id, matrixUserId: '@performance-' + index + ':architecture.localhost', kind: 'agent', status: 'active', revision: 0, createdAt: started }));
+          value(repositories.principal.insert({ id, backendUserId: '@performance-' + index + ':architecture.localhost', kind: 'agent', status: 'active', revision: 0, createdAt: started }));
           value(repositories.agent.insert({ principalId: id, principalKind: 'agent', ownerId: identity.ownerId, wakeMode: 'selected' }));
           value(repositories.agentName.insert({ name: 'performance-' + index, agentId: id, requestId: null, instanceKey: null }));
           value(repositories.principalRole.insert({ principalId: id, principalKind: 'agent', roleCode: 'agent', assignedByMemberId: identity.ownerId, assignedAt: started }));

@@ -6,8 +6,8 @@ use crossfire_domain::{
     enrollment::{port::EnrollmentRepository, preflight, values::*},
     identity::Status,
     port::{
-        AgentRepository, AuthorizationRepository, CoreRepository, CredentialRepository,
-        MatrixIdentity, RepositoryAccess,
+        AgentRepository, AuthorizationRepository, BackendUserIdentity, CoreRepository,
+        CredentialRepository, RepositoryAccess,
     },
 };
 use crossfire_domain::{
@@ -26,7 +26,7 @@ struct Native {
     calls: AtomicUsize,
     identity: String,
 }
-impl MatrixIdentity for Native {
+impl BackendUserIdentity for Native {
     async fn identify(&self, _token: &Secret) -> Result<String> {
         self.calls.fetch_add(1, Ordering::AcqRel);
         Ok(self.identity.clone())
@@ -39,7 +39,7 @@ fn roster(owner: &str, name: &str) -> Roster {
             metadata: BTreeMap::new(),
         },
         controller_credential: None,
-        owner_matrix_id: owner.to_owned(),
+        owner_backend_user_id: owner.to_owned(),
         fleet_key: "new-fleet".to_owned(),
         instances: vec![Entry {
             instance_key: "worker".to_owned(),
@@ -96,7 +96,7 @@ async fn enrollment_is_repeatable_owner_reviewed_atomic_and_exchanges_only_ready
                 &input.enrollment_id,
                 &wrong,
                 "request",
-                "example.test",
+                &crossfire_test_support::messaging::Fixture,
                 NOW + 2
             ))
             .err()
@@ -116,7 +116,7 @@ async fn enrollment_is_repeatable_owner_reviewed_atomic_and_exchanges_only_ready
             &input.enrollment_id,
             &good,
             "request",
-            "example.test",
+            &crossfire_test_support::messaging::Fixture,
             NOW + 3,
         )
     })?;
@@ -128,7 +128,13 @@ async fn enrollment_is_repeatable_owner_reviewed_atomic_and_exchanges_only_ready
         0
     );
     let pending = repository.with(|repo| {
-        exchange::exchange(repo, &input.enrollment_id, &input.claim_secret, NOW + 4)
+        exchange::exchange(
+            repo,
+            &input.enrollment_id,
+            &input.claim_secret,
+            NOW + 4,
+            &crossfire_test_support::messaging::Fixture,
+        )
     })?;
     assert_eq!(pending.status, "provisioning");
     assert!(pending.instances[0].account.is_none());
@@ -154,7 +160,13 @@ async fn enrollment_is_repeatable_owner_reviewed_atomic_and_exchanges_only_ready
         })
     })?;
     let ready = repository.with(|repo| {
-        exchange::exchange(repo, &input.enrollment_id, &input.claim_secret, NOW + 5)
+        exchange::exchange(
+            repo,
+            &input.enrollment_id,
+            &input.claim_secret,
+            NOW + 5,
+            &crossfire_test_support::messaging::Fixture,
+        )
     })?;
     assert_eq!(ready.status, "ready");
     assert_eq!(
@@ -187,7 +199,8 @@ async fn enrollment_is_repeatable_owner_reviewed_atomic_and_exchanges_only_ready
                 repo,
                 &input.enrollment_id,
                 &input.claim_secret,
-                NOW + 6
+                NOW + 6,
+                &crossfire_test_support::messaging::Fixture
             ))
             .err()
             .ok_or("Suspended identity")?
@@ -247,7 +260,7 @@ async fn enrollment_expiration_releases_names_and_rejection_never_creates_agents
                 verification_code: receipt.request.verification_code,
             },
             "reject",
-            "example.test",
+            &crossfire_test_support::messaging::Fixture,
             NOW + 11,
         )
     })?;

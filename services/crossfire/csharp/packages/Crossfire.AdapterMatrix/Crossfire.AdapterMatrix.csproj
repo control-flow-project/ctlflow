@@ -1,5 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><AllowUnsafeBlocks>true</AllowUnsafeBlocks></PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Crossfire.AdapterFilesystem/Crossfire.AdapterFilesystem.csproj" />
+    <Using Include="Microsoft.AspNetCore.Http" />
+    <Using Include="Crossfire.Kernel.Results" Alias="Results" />
     <ProjectReference Include="../Crossfire.Kernel/Crossfire.Kernel.csproj" />
     <ProjectReference Include="../Crossfire.Contracts/Crossfire.Contracts.csproj" />
     <ProjectReference Include="../Crossfire.Domain/Crossfire.Domain.csproj" />

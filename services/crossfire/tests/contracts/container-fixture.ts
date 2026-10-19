@@ -10,6 +10,7 @@ import { contractHttp } from '@ctlflow/crossfire-test-support/contract-http';
 import { secureProxy } from '@ctlflow/crossfire-test-support/tls';
 import { builtRelease } from '../../node/scripts/test-support/release.js';
 import { contractClient } from './fixture.js';
+import { config as parseConfiguration } from '../../node/apps/server/src/config.js';
 
 export type ContainerStack = Awaited<ReturnType<typeof containerStack>>;
 export async function containerStack(scope: TestContext, initial: ContractTarget, targets: readonly ContractTarget[], packages: string) {
@@ -22,8 +23,9 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
   const [port, contentPort] = await freePorts(scope), { origin } = await secureProxy(scope, 'http://127.0.0.1:' + port), contentOrigin = 'http://localhost:' + contentPort;
   const initialized = contractProcess(scope, initial.server, ['init', '--directory', state, '--instance', 'verification', '--origin', origin, '--content-origin', contentOrigin, '--server-name', 'verification.localhost', '--administrator', 'admin'], repository);
   assert.equal(await initialized.ended, 0, initialized.errors() + '\n' + initialized.output());
-  const config = record(JSON.parse(readFileSync(join(state, 'config.json'), 'utf8')) as unknown);
-  const configuration = { instance: text(config.instance), serverName: text(config.serverName), publicOrigin: text(config.publicOrigin), contentOrigin: text(config.contentOrigin), matrixOrigin: text(config.matrixOrigin), administrator: text(config.administrator), jwtSecret: text(config.jwtSecret), registrationSecret: text(config.registrationSecret) };
+  const parsed = parseConfiguration(JSON.parse(readFileSync(join(state, 'config.json'), 'utf8')) as unknown);
+  assert(parsed.ok, parsed.ok ? '' : parsed.error.message);
+  const configuration = parsed.value;
   const bootstrap = record(JSON.parse(readFileSync(join(state, 'bootstrap.json'), 'utf8')) as unknown), containerName = 'crossfire-' + createHash('sha256').update(state).digest('hex').slice(0, 16);
   let selected = initial, running: ContractProcess | undefined;
   const abandoned = new Set<string>();

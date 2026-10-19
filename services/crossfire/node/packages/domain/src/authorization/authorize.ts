@@ -7,7 +7,7 @@ export function activeActor(services: Pick<Services, 'repositories' | 'clock'>, 
   const principal = services.repositories.principal.find({ id: actor.principalId });
   if (!principal.ok) return principal;
   if (!principal.value || principal.value.kind !== actor.kind || principal.value.status !== 'active') return failure('forbidden', 'An active registered identity is required');
-  if (actor.authentication?.kind === 'native' && actor.authentication.matrixUserId !== principal.value.matrixUserId) return failure('unauthorized', 'Native session identity changed');
+  if (actor.authentication?.kind === 'native' && actor.authentication.backendUserId !== principal.value.backendUserId) return failure('unauthorized', 'Native session identity changed');
   if (actor.kind === 'human' && actor.authentication?.kind !== 'native') {
     if (actor.authentication?.kind !== 'management') return failure('unauthorized', 'A verified human session is required');
     const session = services.repositories.memberSession.find({ secretHash: actor.authentication.sessionHash });

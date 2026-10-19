@@ -117,7 +117,7 @@ pub fn continuation_text(work: &ResumeWork) -> Result<String> {
         } else {
             format!(
                 "\nThis notice belongs only to the saved room history {}. Do not disclose its contents to other rooms.",
-                work.context
+                crossfire_kernel::history_context::room(&work.context).unwrap_or_default()
             )
         } + "\nIf the task is already complete or no longer authorized, do not repeat its effects."
     ))
@@ -148,7 +148,13 @@ pub async fn resume<
         if work.context == primary {
             continue_context(connection, &work, store, now).await?;
         } else {
-            let target = connection.conversation(&work.context, None).await?;
+            let room = crossfire_kernel::history_context::room(&work.context).ok_or_else(|| {
+                Failure::new(
+                    ErrorCode::Conflict,
+                    "Interrupted task cannot use a different room history",
+                )
+            })?;
+            let target = connection.conversation(room, None).await?;
             continue_context(&target, &work, store, now).await?;
         }
     }

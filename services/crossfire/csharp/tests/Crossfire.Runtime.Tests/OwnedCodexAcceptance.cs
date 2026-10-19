@@ -1,3 +1,4 @@
+using Crossfire.Domain;
 using System.Text;
 using System.Text.Json;
 using Crossfire.AdapterCodex;
@@ -27,12 +28,12 @@ public static class OwnedCodexAcceptance
         IReadOnlyList<SavedRuntimeContext> original;
         try
         {
-            var roomA = await owner.Conversation("!room-a:example.test"); var roomB = await owner.Conversation("!room-b:example.test");
+            var roomA = await owner.Conversation("control"); var roomB = await owner.Conversation("!room-b:example.test");
             Equal(roomA.IsSuccess && roomB.IsSuccess, true, "each exact room opens a distinct native history");
             Equal(roomA.Value.SessionId != roomB.Value.SessionId && roomA.Value.SessionId != first && roomB.Value.SessionId != first, true,
                 "room histories and the private control history never share an identity in per-room mode");
-            Equal((await owner.Conversation("!room-a:example.test")).Value.SessionId, roomA.Value.SessionId, "repeat room access reuses the exact native history");
-            Equal((await owner.Conversation("not-a-room")).IsSuccess, false, "room admission validates the Matrix identity");
+            Equal((await owner.Conversation("control")).Value.SessionId, roomA.Value.SessionId, "repeat room access reuses the exact native history");
+            Equal((await owner.Conversation("bad\nroom")).IsSuccess, false, "room admission rejects control characters in opaque identities");
             Equal((await owner.Attachments()).Value.Count, 3, "terminal metadata includes every retained native history");
             Equal(owner.Attachment!.SessionId, first, "primary terminal metadata identifies the actual control history");
             Equal((await adapter.Start(input, cancellation)).IsSuccess, false, "a second Codex native owner is rejected before another process writes its home");
@@ -54,7 +55,7 @@ public static class OwnedCodexAcceptance
             {
                 Equal(current.SessionId, first, "controller resume preserves the exact native control history");
                 foreach (var saved in original.Where(value => value.Context != "control"))
-                    Equal((await current.Conversation(saved.Context)).Value.SessionId, saved.SessionId, "room resume preserves each exact saved native history");
+                    Equal((await current.Conversation(HistoryContext.Room(saved.Context)!)).Value.SessionId, saved.SessionId, "room resume preserves each exact saved native history");
                 Equal(Encoding.UTF8.GetString(PrivateFiles.Read(Path.Combine(state, ".codex/auth.json"), 65536)), Encoding.UTF8.GetString(PrivateFiles.Read(auth, 65536)),
                     "every owned-runtime resume recopies current host authentication bytes");
             }
@@ -63,7 +64,7 @@ public static class OwnedCodexAcceptance
             await using (var current = shared.Value)
             {
                 sharedId = current.SessionId;
-                Equal((await current.Conversation("!room-a:example.test")).Value.SessionId, sharedId, "shared mode uses one context across rooms");
+                Equal((await current.Conversation("control")).Value.SessionId, sharedId, "shared mode uses one context across rooms");
                 Equal((await current.Conversation("!room-b:example.test")).Value.SessionId, sharedId, "shared mode does not create room-specific histories");
                 Equal((await current.Attachments()).Value.Count, 4, "switching history mode does not discard saved room identities");
             }

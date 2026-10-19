@@ -1,9 +1,9 @@
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Services } from '../port/services.js';
 import { resolveWakePolicy } from '../wake/resolve-policy.js';
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'clock' | 'identity' | 'matrix'>;
-export async function publishWakeNotice(services: Dependencies, receiverAgentId: string, eventId: string): Promise<Result<void>> {
-  const found = services.repositories.wakeNotice.find({ receiverAgentId, eventId });
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'clock' | 'identity' | 'messaging'>;
+export async function publishWakeNotice(services: Dependencies, receiverAgentId: string, roomId: string, eventId: string): Promise<Result<void>> {
+  const found = services.repositories.wakeNotice.find({ receiverAgentId, roomId, eventId });
   if (!found.ok) return found;
   if (!found.value || found.value.status !== 'pending') return success(undefined);
   const notice = found.value;
@@ -17,14 +17,14 @@ export async function publishWakeNotice(services: Dependencies, receiverAgentId:
   } else {
     const wake = resolveWakePolicy(services, agent.value);
     if (!wake.ok) return wake;
-    if (wake.value.senders.includes(notice.senderMatrixId) && notice.lastError === null) result = failure('forbidden', 'The sender now has wake authority');
+    if (wake.value.senders.includes(notice.senderBackendUserId) && notice.lastError === null) result = failure('forbidden', 'The sender now has wake authority');
     else {
-      const transactionId = services.identity.hash('wake-notice:' + receiverAgentId + ':' + eventId);
-      result = await services.matrix.sendNotice(agent.value.principal.matrixUserId, notice.roomId, transactionId, notice.messageBody, notice.senderMatrixId);
+      const transactionId = services.identity.hash(['wake-notice', receiverAgentId, roomId, eventId].join('\0'));
+      result = await services.messaging.sendNotice(agent.value.principal.backendUserId, notice.roomId, transactionId, notice.messageBody, notice.senderBackendUserId);
     }
   }
   return services.unitOfWork.run(() => {
-    const current = services.repositories.wakeNotice.find({ receiverAgentId, eventId });
+    const current = services.repositories.wakeNotice.find({ receiverAgentId, roomId, eventId });
     if (!current.ok) return current;
     if (!current.value || current.value.status !== 'pending') return success(undefined);
     const denied = !result.ok && result.error.code === 'forbidden' && notice.lastError === null;

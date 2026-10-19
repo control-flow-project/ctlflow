@@ -116,8 +116,8 @@ pub fn scheduled(value: &Value) -> Result<ScheduledWake> {
             "message",
             "scheduledAt",
             "sessionId",
-            "ownerMatrixId",
-            "authorizerMatrixId",
+            "ownerBackendUserId",
+            "authorizerBackendUserId",
         ],
         &[],
     )?;
@@ -129,8 +129,9 @@ pub fn scheduled(value: &Value) -> Result<ScheduledWake> {
         message: check::plain_text(&value["message"], 16384)?.to_owned(),
         scheduled_at: check::integer(&value["scheduledAt"], 0, check::SAFE_INTEGER)?,
         session_id: check::text(&value["sessionId"], 1, 200)?.to_owned(),
-        owner_matrix_id: check::matrix_user_id(&value["ownerMatrixId"])?.to_owned(),
-        authorizer_matrix_id: check::matrix_user_id(&value["authorizerMatrixId"])?.to_owned(),
+        owner_backend_user_id: check::backend_user_id(&value["ownerBackendUserId"])?.to_owned(),
+        authorizer_backend_user_id: check::backend_user_id(&value["authorizerBackendUserId"])?
+            .to_owned(),
     })
 }
 
@@ -255,8 +256,11 @@ impl Serialize for ScheduledView<'_> {
         value.serialize_field("message", &self.0.message)?;
         value.serialize_field("scheduledAt", &self.0.scheduled_at)?;
         value.serialize_field("sessionId", &self.0.session_id)?;
-        value.serialize_field("ownerMatrixId", &self.0.owner_matrix_id)?;
-        value.serialize_field("authorizerMatrixId", &self.0.authorizer_matrix_id)?;
+        value.serialize_field("ownerBackendUserId", &self.0.owner_backend_user_id)?;
+        value.serialize_field(
+            "authorizerBackendUserId",
+            &self.0.authorizer_backend_user_id,
+        )?;
         value.end()
     }
 }

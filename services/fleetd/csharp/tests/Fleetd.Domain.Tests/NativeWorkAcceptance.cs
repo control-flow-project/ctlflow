@@ -1,3 +1,4 @@
+using Crossfire.Domain;
 using Crossfire.AgentCore;
 using Crossfire.Kernel;
 using Fleetd.Domain;
@@ -9,6 +10,21 @@ public static class NativeWorkAcceptance
     public static async Task Run(Action<bool, string> check)
     {
         var fixture = new Harness();
+        fixture.Receipts.Add("producer-receipt");
+        await using (var owner = await fixture.Open("running", false))
+        {
+            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            fixture.SettlementBarrier = () => { entered.TrySetResult(); return new(release.Task); };
+            var activating = owner.Activate().AsTask(); await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var retired = owner.Runtime.Acknowledge(["producer-receipt"]); var retained = fixture.Receipts.Contains("producer-receipt");
+            release.TrySetResult(); var activated = await activating;
+            check(!retired.IsSuccess && retired.Error.Code == "unavailable", "Receipt retirement waits for all retained native histories to initialize");
+            check(retained, "Premature retirement cannot lose a producer's original receipt");
+            check(activated.IsSuccess, "Controlled native initialization completes");
+            check(owner.Runtime.Acknowledge(["producer-receipt"]).IsSuccess && fixture.Receipts.Count == 0, "Receipt retirement succeeds after native initialization");
+        }
+        fixture = new Harness();
         await using (var owner = await fixture.Open("running"))
         {
             check((await owner.Runtime.Deliver("First task", "first")).IsSuccess, "Submission succeeds after its durable checkpoint");
@@ -49,10 +65,10 @@ public static class NativeWorkAcceptance
             check(!(await current.Runtime.Inspect()).Value && fixture.Work.Count == 0, "Completion after repeated restarts clears the retained task");
         }
         finally { await current.DisposeAsync(); }
-        foreach (var action in new[] { "inspect", "stop", "stop-during-inspection" })
+        foreach (var action in new[] { "inspect", "stop", "stop-during-inspection", "other-room-during-inspection" })
         {
             fixture = new Harness();
-            fixture.Contexts.AddRange([new("!active:fixture", "codex", "active-history", "/fixture"), new("!completed:fixture", "codex", "completed-history", "/fixture")]);
+            fixture.Contexts.AddRange([new("room/control", "codex", "active-history", "/fixture"), new("room/completed", "codex", "completed-history", "/fixture")]);
             fixture.ContextBusy["active-history"] = true; fixture.ContextBusy["completed-history"] = false;
             var owner = await fixture.Open("running");
             var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -60,20 +76,25 @@ public static class NativeWorkAcceptance
             Task<Result<bool>>? older = null;
             try
             {
-                var completed = (await owner.Runtime.Conversation("!completed:fixture")).Value;
+                var completed = (await owner.Runtime.Conversation("completed")).Value;
                 check((await completed.Deliver("Completed room task", "completed")).IsSuccess, "Room submission has an exact durable checkpoint"); completed.Acknowledge(["completed"]);
-                var active = (await owner.Runtime.Conversation("!active:fixture")).Value;
+                var active = (await owner.Runtime.Conversation("control")).Value;
                 check((await active.Deliver("Unfinished room task", "active")).IsSuccess && fixture.Work.Count == 2, "Both room tasks are independently checkpointed");
-                await active.TurnControl!.ActiveTurn(); check(fixture.CapturedRooms[^1] == "!active:fixture", "A room defaults turn inspection to its own native history");
-                if (action == "stop-during-inspection")
+                await active.TurnControl!.ActiveTurn(); check(fixture.CapturedRooms[^1] == "control", "A room defaults turn inspection to its own native history");
+                if (action is "stop-during-inspection" or "other-room-during-inspection")
                 {
                     fixture.ActivityBarrier = () => { fixture.ActivityBarrier = null; entered.SetResult(); return new(release.Task); };
                     older = owner.Runtime.Inspect().AsTask(); await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
                 }
-                if (action == "inspect") check((await owner.Runtime.Inspect()).Value, "Another room remains busy after exact-context inspection");
+                if (action == "other-room-during-inspection")
+                {
+                    fixture.Observe!(new NativeState("codex", "active-history", "control", "working", 1001, [], null));
+                    release.TrySetResult(); await older!; older = null;
+                }
+                else if (action == "inspect") check((await owner.Runtime.Inspect()).Value, "Another room remains busy after exact-context inspection");
                 else await owner.DisposeAsync();
                 release.TrySetResult(); if (older is not null) await older;
-                check(fixture.Work.Count == 1 && fixture.Work[0].Context == "!active:fixture", "Inspection and stop clear only the verified completed room");
+                check(fixture.Work.Count == 1 && fixture.Work[0].Context == "room/control", "Inspection and stop clear only the verified completed room");
             }
             finally { release.TrySetResult(); if (older is not null) await older; await owner.DisposeAsync(); }
         }
@@ -90,6 +111,7 @@ public static class NativeWorkAcceptance
         public Dictionary<string, bool> ContextBusy { get; } = new(StringComparer.Ordinal);
         public List<string?> CapturedRooms { get; } = [];
         public Func<ValueTask>? ActivityBarrier { get; set; }
+        public Func<ValueTask>? SettlementBarrier { get; set; }
         public bool FailCapture { get; set; }
         public Action<RuntimeObservationEvent>? Observe { get; private set; }
         public Probe? Native { get; private set; }
@@ -99,7 +121,7 @@ public static class NativeWorkAcceptance
             foreach (var context in contexts) if (!work.Any(value => value.Context == context.Context)) work.Add(new(context.Context, context.SessionId, Identity.Identifier(), 1000));
             return Results.Done();
         }
-        public async Task<NativeLifecycle> Open(string initial)
+        public async Task<NativeLifecycle> Open(string initial, bool activate = true)
         {
             var store = new ResumeWorkStore(() => Result<IReadOnlyList<ResumeWork>>.Success(work.ToArray()), Capture,
                 id => {
@@ -116,13 +138,14 @@ public static class NativeWorkAcceptance
                 }, (_, _) => { }, () => { }, TimeProvider.System);
             var opened = await NativeLifecycle.Start(services, CancellationToken.None);
             if (!opened.IsSuccess) throw new InvalidOperationException(opened.Error.Message);
-            var active = await opened.Value.Activate(); if (!active.IsSuccess) { await opened.Value.DisposeAsync(); throw new InvalidOperationException(active.Error.Message); }
+            if (activate) { var active = await opened.Value.Activate(); if (!active.IsSuccess) { await opened.Value.DisposeAsync(); throw new InvalidOperationException(active.Error.Message); } }
             return opened.Value;
         }
     }
 
     private sealed class Probe(Harness fixture, string session = Harness.Session) : OwnedRuntimeConnection, TurnControl
     {
+        public ValueTask<Result<ProviderState>> Provider(CancellationToken cancellation) => ValueTask.FromResult(Result<ProviderState>.Success(ProviderState.Unknown));
         private readonly CancellationTokenSource stop = new();
         public bool Busy { get; set; }
         public Func<ValueTask<Result<bool>>>? Inspection { get; set; }
@@ -147,11 +170,12 @@ public static class NativeWorkAcceptance
             if (!fixture.Work.Any(value => value.SessionId == SessionId)) throw new InvalidOperationException("Missing write-ahead checkpoint");
             fixture.Inputs.Add((messageId, text)); fixture.Receipts.Add(messageId); Busy = true; return ValueTask.FromResult(Results.Done());
         }
-        public ValueTask<Result<bool>> Settle(CancellationToken cancellation = default) => ValueTask.FromResult(Result<bool>.Success(false));
+        public async ValueTask<Result<bool>> Settle(CancellationToken cancellation = default)
+        { if (fixture.SettlementBarrier is { } barrier) await barrier(); return Result<bool>.Success(false); }
         public ValueTask<Result<bool>> Recover(string text, string messageId, CancellationToken cancellation = default) => ValueTask.FromResult(Result<bool>.Success(false));
         public Result<Unit> Acknowledge(IReadOnlyList<string> messageIds) { foreach (var id in messageIds) fixture.Receipts.Remove(id); return Results.Done(); }
         public ValueTask<Result<RuntimeConnection>> Conversation(string room, InputAdmission? admission = null)
-            => ValueTask.FromResult(fixture.Contexts.FirstOrDefault(value => value.Context == room) is { } context
+            => ValueTask.FromResult(fixture.Contexts.FirstOrDefault(value => value.Context == HistoryContext.ForRoom(room)) is { } context
                 ? Result<RuntimeConnection>.Success(new Probe(fixture, context.SessionId)) : Results.Fail<RuntimeConnection>("missing", "No room history in this fixture"));
         public ValueTask<Result<string?>> ActiveTurn(string? room = null, InputAdmission? admission = null) { fixture.CapturedRooms.Add(room); return ValueTask.FromResult(Result<string?>.Success(null)); }
         public ValueTask<Result<string>> Interrupt(string turnId, bool recovery = false, InputAdmission? admission = null) => ValueTask.FromResult(Result<string>.Success("inactive"));

@@ -35,29 +35,8 @@ pub fn failure(error: Failure, request_id: &str) -> Result<Response<Body>> {
             )
         })
 }
-pub fn secure(response: &mut Response<Body>, request_id: &str) -> Result<()> {
-    let headers = response.headers_mut();
-    headers.insert(
-        header::CACHE_CONTROL,
-        hyper::header::HeaderValue::from_static("no-store"),
-    );
-    headers.insert(
-        header::X_CONTENT_TYPE_OPTIONS,
-        hyper::header::HeaderValue::from_static("nosniff"),
-    );
-    headers.insert(
-        header::CONTENT_SECURITY_POLICY,
-        hyper::header::HeaderValue::from_static("default-src 'none'; frame-ancestors 'none'"),
-    );
-    headers.insert(
-        "x-request-id",
-        hyper::header::HeaderValue::from_str(request_id)
-            .map_err(|_| Failure::new(ErrorCode::Unavailable, "Invalid response identity"))?,
-    );
-    Ok(())
-}
 pub async fn handle(
-    state: Arc<State>,
+    state: Arc<State<impl crossfire_domain::messaging::MessagingAuthority>>,
     input: Request<Incoming>,
     peer: Peer,
     request_id: String,
@@ -78,29 +57,43 @@ pub async fn handle(
         Ok(value) => value,
         Err(error) => failure(error, &request_id)?,
     };
-    secure(&mut response, &request_id)?;
+    crossfire_adapter_http::security::secure(&mut response, &request_id)?;
     Ok(response)
 }
 async fn apply(
-    state: &State,
+    state: &State<impl crossfire_domain::messaging::MessagingAuthority>,
     input: Request<Incoming>,
     peer: Peer,
     request_id: &str,
 ) -> Result<Response<Body>> {
-    security::host(input.headers(), &state.configuration.public_origin)?;
-    security::same_origin(input.headers(), &state.configuration.public_origin, false)?;
+    crossfire_adapter_http::security::host(input.headers(), &state.configuration.public_origin)?;
+    crossfire_adapter_http::security::same_origin(
+        input.headers(),
+        &state.configuration.public_origin,
+        false,
+    )?;
     let path = request::path(&input)?;
     let selection = request::select(input.method(), path)?;
     let operation = selection.operation;
     if operation.auth == Authentication::Public && input.method() != Method::GET {
         state.rate.admit(peer, input.headers(), identity::now()?)?;
     }
-    if [OperationId::CreateSession, OperationId::ClaimInvitation].contains(&operation.id) {
-        security::same_origin(input.headers(), &state.configuration.public_origin, true)?;
+    if [
+        OperationId::CreateSession,
+        OperationId::ClaimInvitation,
+        OperationId::AuthenticateBackend,
+    ]
+    .contains(&operation.id)
+    {
+        crossfire_adapter_http::security::same_origin(
+            input.headers(),
+            &state.configuration.public_origin,
+            true,
+        )?;
     }
     let auth = security::authenticate(
         &state.repository,
-        &state.matrix,
+        state.messaging.as_ref(),
         input.headers(),
         input.method(),
         operation.auth,
@@ -108,7 +101,7 @@ async fn apply(
     )
     .await?;
     selection.validate()?;
-    let query = request::Query::parse(
+    let query = crossfire_adapter_http::query::Query::parse(
         input.uri().query(),
         crossfire_contracts::query::operations::fields(operation.id),
     )?;
@@ -129,7 +122,7 @@ async fn apply(
         reply::of(json!({"uploaded":true}))?
     } else {
         let value = if mutation {
-            if security::single(input.headers(), "content-type")?
+            if crossfire_adapter_http::security::single(input.headers(), "content-type")?
                 .is_none_or(|value| value.split(';').next() != Some("application/json"))
             {
                 return Err(Failure::new(

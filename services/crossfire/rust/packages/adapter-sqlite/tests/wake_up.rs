@@ -361,7 +361,7 @@ fn scheduled_delivery_retains_cadence_one_pending_input_and_exact_history_receip
     assert!(scenario.store.pending_wake_delivery(&agent_id)?.is_none());
     let wire = serde_json::to_value(ScheduledView(&command))?;
     assert_eq!(wire["sessionId"], "history-one");
-    assert_eq!(wire["ownerMatrixId"], "@owner:example.test");
+    assert_eq!(wire["ownerBackendUserId"], "@owner:example.test");
     assert!(wire.get("runId").is_none());
     Ok(())
 }

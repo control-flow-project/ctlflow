@@ -39,8 +39,8 @@ async function publish(client: Client, title: string, assets = false) {
 test('Reports browser inventory, durable files view and confirmed deletion use the canonical publication APIs', { timeout: 120000 }, async scope => {
   const release = await releaseFixture(), fixture = await nativeServer(scope, release), { admin, origin } = fixture;
   const alice = await fixture.member('alice'), owned = await fixture.agent(admin.actor, 'ada'), foreign = await fixture.agent(alice.actor, 'visitor');
-  const client = await browserPublisher(scope, { origin, agent: owned, owner: admin.member.principal.matrixUserId, release: release.manifest.release });
-  const otherClient = await browserPublisher(scope, { origin, agent: foreign, owner: alice.member.principal.matrixUserId, release: release.manifest.release });
+  const client = await browserPublisher(scope, { origin, agent: owned, owner: admin.member.principal.backendUserId, release: release.manifest.release });
+  const otherClient = await browserPublisher(scope, { origin, agent: foreign, owner: alice.member.principal.backendUserId, release: release.manifest.release });
   const title = 'Credit review <img src=x onerror="globalThis.reportSideEffect=true">';
   const report = await publish(client, title, true), otherReport = await publish(otherClient, 'Alice credit review');
   for (let index = 0; index < 21; index++) await stage(client, 'Draft review ' + String(index).padStart(2, '0'));

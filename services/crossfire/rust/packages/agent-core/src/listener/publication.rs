@@ -2,17 +2,16 @@ use super::*;
 use crate::listener_budget::Work;
 use crate::{
     chat_publication::Outcome,
-    matrix::{self, API, Request},
     origins,
     source_control::{Control as SourceControl, Notices},
     steering,
 };
-use crossfire_contracts::{operations::Method, origin::segment};
+use crossfire_domain::messaging_client::MessagingClient;
 
 impl<
     S: LocalState,
     C: Coordination,
-    M: Matrix,
+    M: MessagingClient + crossfire_domain::messaging_client::InvitationReader,
     N: Connection + TurnControl + Lifecycle + 'static,
     A: Acknowledgment,
     T: Clock + Clone + Send + Sync + 'static,
@@ -109,7 +108,7 @@ impl<
         if !priority {
             receive_state::acknowledge(
                 self.resources.storage.as_ref(),
-                self.resources.matrix.as_ref(),
+                self.resources.messaging.as_ref(),
                 &self.options.file,
                 &outcome.batch,
                 stop,
@@ -140,19 +139,11 @@ impl<
         Ok(())
     }
     async fn urgent(&self, urgent: SourceControl, stop: CancellationToken) -> Result<()> {
-        let native = matrix::request(
-            self.resources.matrix.as_ref(),
-            &Request::new(
-                Method::Get,
-                format!(
-                    "{API}/rooms/{}/event/{}",
-                    segment(&urgent.room),
-                    segment(&urgent.event)
-                ),
-            ),
-            stop.clone(),
-        )
-        .await?;
+        let native = self
+            .resources
+            .messaging
+            .event(&urgent.room, &urgent.event, stop.clone())
+            .await?;
         let event = crate::events::take(native, &urgent.room)?;
         if event.event_id != urgent.event {
             return Err(invalid("Original urgent event identity changed"));
@@ -161,7 +152,7 @@ impl<
         let policy = self.policy()?;
         if !self.rooms()?.contains(&urgent.room)
             || !steering::authorized(
-                self.resources.matrix.as_ref(),
+                self.resources.messaging.as_ref(),
                 self.resources.coordination.as_ref(),
                 &self.options.profile,
                 &event,
@@ -180,7 +171,7 @@ impl<
         }
         if !self.priority.pending()? {
             let events = origins::enrich(
-                self.resources.matrix.as_ref(),
+                self.resources.messaging.as_ref(),
                 &self.options.profile.account.user_id,
                 vec![event],
                 stop.clone(),
@@ -369,7 +360,7 @@ impl<
                 }
                 if self
                     .maintenance
-                    .publish(self.resources.matrix.as_ref(), self.hooks.stop.clone())
+                    .publish(self.resources.messaging.as_ref(), self.hooks.stop.clone())
                     .await?
                 {
                     self.state

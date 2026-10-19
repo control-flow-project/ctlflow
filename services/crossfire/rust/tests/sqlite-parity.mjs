@@ -27,7 +27,7 @@ function native(binary, ...arguments_) {
   return JSON.parse(execFileSync(resolve(binary), arguments_, {encoding:'utf8', timeout:30_000, maxBuffer:1_048_576}).trim());
 }
 function schema(database) {
-  assert.deepEqual(databaseIdentity(database), {application:1129465426, version:18});
+  assert.deepEqual(databaseIdentity(database), {application:1129465426, version:1});
   assert.deepEqual(foreignKeyViolations(database), []);
   assert.deepEqual(integrityResults(database), [{integrity_check:'ok'}]);
   return migrationRows(database, migrationQuery('sqlite_schema').select('type', 'name', 'tbl_name', 'sql')
@@ -40,7 +40,7 @@ try {
   const before = schema(database);
   database.close(); database = null;
   const ownerId = randomUUID(); const rustIdentity = native(identityBinary, 'write', path, ownerId);
-  assert.equal(rustIdentity.id, ownerId); assert.equal(rustIdentity.version, 18);
+  assert.equal(rustIdentity.id, ownerId); assert.equal(rustIdentity.version, 1);
   database = new Database(path, {fileMustExist:true}); database.pragma('foreign_keys=ON');
   const repositories = createRepositories(database), directoryReader = createDirectoryRepository(database), runtime = createRuntimeRepository(database), statistics = createStatisticsRepository(database);
   const member = value(directoryReader.member(ownerId)); assert(member);
@@ -48,7 +48,7 @@ try {
   value(repositories.member.update({...member.member, displayName:'Node renamed this member'}));
   const now = 1_792_000_000_000, agentId = randomUUID(), fleetId = randomUUID(), runId = randomUUID(), decisionId = randomUUID();
   database.transaction(() => {
-    value(repositories.principal.insert({id:agentId, matrixUserId:'@agent:example.test', kind:'agent', status:'active', revision:0, createdAt:now}));
+    value(repositories.principal.insert({id:agentId, backendUserId:'@agent:example.test', kind:'agent', status:'active', revision:0, createdAt:now}));
     value(repositories.agent.insert({principalId:agentId, principalKind:'agent', ownerId, wakeMode:'humans'}));
     value(repositories.principalRole.insert({principalId:agentId, principalKind:'agent', roleCode:'agent', assignedByMemberId:ownerId, assignedAt:now}));
     value(repositories.principalApplication.insert({principalId:agentId, appliedRevision:null, appliedIntentHash:null, appliedStatus:null, nativeDisplayName:null,
@@ -68,7 +68,7 @@ try {
       lastActivityAt:now, historyAvailable:true, historyMode:'shared', maxInputBytes:65536, errorMessage:null,
       settings:[{name:'model',configured:'fixture-model',effective:'fixture-model'}]}));
     value(statistics.record(agentId, runId, {sequence:1, startedAt:now, endedAt:now, dropped:0,
-      flows:[{roomId:'!room:example.test',senderMatrixId:'@owner:example.test',messageType:'m.text',observed:2,delivered:1,contentBytes:120,deliveredBytes:60,attachmentBytes:200,largestBytes:80}],
+      flows:[{roomId:'!room:example.test',senderBackendUserId:'@owner:example.test',messageType:'m.text',observed:2,delivered:1,contentBytes:120,deliveredBytes:60,attachmentBytes:200,largestBytes:80}],
       usage:[{runtime:'codex',sessionId:'native-session',tokens:{input:100,cachedInput:40,cacheWriteInput:null,output:20,reasoningOutput:10,total:120}}]}, now));
   })();
   database.close(); database = null;

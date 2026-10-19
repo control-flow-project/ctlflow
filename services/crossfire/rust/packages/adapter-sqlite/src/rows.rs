@@ -10,7 +10,7 @@ use diesel::prelude::*;
 #[diesel(table_name = tables::principal)]
 pub(crate) struct PrincipalRow {
     pub id: String,
-    pub matrix_user_id: String,
+    pub backend_user_id: String,
     pub kind: String,
     pub status: String,
     pub revision: i64,
@@ -120,7 +120,7 @@ impl TryFrom<PrincipalRow> for Principal {
     fn try_from(row: PrincipalRow) -> Result<Self> {
         Ok(Self {
             id: row.id,
-            matrix_user_id: row.matrix_user_id,
+            backend_user_id: row.backend_user_id,
             kind: kind(&row.kind)?,
             status: status(&row.status)?,
             revision: row.revision,
@@ -133,7 +133,7 @@ impl From<&Principal> for PrincipalRow {
     fn from(value: &Principal) -> Self {
         Self {
             id: value.id.clone(),
-            matrix_user_id: value.matrix_user_id.clone(),
+            backend_user_id: value.backend_user_id.clone(),
             kind: kind_text(value.kind).to_owned(),
             status: status_text(value.status).to_owned(),
             revision: value.revision,

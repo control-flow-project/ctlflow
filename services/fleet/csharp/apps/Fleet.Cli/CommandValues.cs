@@ -66,6 +66,8 @@ fleet daemon status|stop|restart --root DIRECTORY
 fleet remote add NAME --ssh USER@HOST --root DIRECTORY
 fleet [--root DIRECTORY | --remote NAME] add DIRECTORY
 fleet [--root DIRECTORY | --remote NAME] list|show|test|enroll|start|stop|remove [FLEET]
+fleet [--root DIRECTORY | --remote NAME] diagnose [FLEET]
+fleet [--root DIRECTORY | --remote NAME] agent diagnose FLEET INSTANCE
 fleet [--root DIRECTORY | --remote NAME] start FLEET [--fresh-history] [--operation-id UUID]
 fleet [--root DIRECTORY | --remote NAME] stop FLEET [--operation-id UUID]
 fleet [--root DIRECTORY | --remote NAME] update FLEET [--operation-id UUID] [--release-directory DIRECTORY]

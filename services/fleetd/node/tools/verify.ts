@@ -1,3 +1,4 @@
+import { MAX_HISTORY_CONTEXT } from '@ctlflow/crossfire-kernel/history-context';
 import { lstatSync, realpathSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -5,7 +6,10 @@ import { createDaemonClient, operations } from '@ctlflow/fleet-daemon-client/cli
 import { loadConfiguration } from '@ctlflow/fleetd-storage/configuration';
 import { loadBinding } from '@ctlflow/fleetd-storage/binding';
 import { nativeOptions } from '@ctlflow/fleetd-domain/model';
-import { nativeJson } from '@ctlflow/crossfire-adapter-matrix/http';
+import type { MessagingConnector } from '@ctlflow/crossfire-domain/port/messaging-client';
+import type { BackendConfiguration } from '@ctlflow/crossfire-domain/port/messaging';
+import { createClient } from '@ctlflow/crossfire-client/client';
+import { operations as serverOperations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { command } from '@ctlflow/crossfire-operator-support/process';
 import { collectPages } from '@ctlflow/crossfire-operator-support/collections';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
@@ -14,7 +18,7 @@ import { inspectNative, preserveNative } from './runtime/inspect.js';
 import type { NativeInspector } from './runtime/types.js';
 
 export const preservation = check.object({ identities: check.list(check.object({ instanceKey: check.name, agentId: check.identifier,
-  contexts: check.list(check.object({ context: check.text(255), sessionId: check.text(200) }), 2002) }), 100),
+  contexts: check.list(check.object({ context: check.text(MAX_HISTORY_CONTEXT), sessionId: check.text(200) }), 2002) }), 100),
   files: check.list(check.object({ path: check.text(4096), bytes: check.integer(), sha256: check.text(64, 64) }), 1000) });
 export type Preservation = check.Parsed<typeof preservation>;
 
@@ -42,7 +46,7 @@ async function projectBoundary(workspace: string, signal: AbortSignal): Promise<
 }
 
 export async function verifyFleet(input: { root: string; directory: string; running: boolean; fresh: boolean; noRooms: boolean;
-  skills: string[]; previous?: Preservation }, signal: AbortSignal, native: NativeInspector = inspectNative): Promise<Result<unknown>> {
+  skills: string[]; previous?: Preservation }, signal: AbortSignal, connect: MessagingConnector, native: NativeInspector = inspectNative): Promise<Result<unknown>> {
   if (input.fresh && !input.running) return failure('invalid', 'Fresh native history verification requires --running');
   try {
     const root = lstatSync(input.root), socket = lstatSync(join(input.root, 'fleetd.sock'));
@@ -51,6 +55,12 @@ export async function verifyFleet(input: { root: string; directory: string; runn
     const loaded = loadConfiguration(input.directory); if (!loaded.ok) return loaded;
     const configuration = loaded.value, saved = loadBinding(configuration); if (!saved.ok) return saved;
     const binding = saved.value;
+    let backend: BackendConfiguration | undefined;
+    if (input.noRooms) {
+      const selected = await createClient({ origin: binding.server, signal }).call(serverOperations.messagingBackend, {}, {});
+      if (!selected.ok) return selected;
+      backend = selected.value.data.configuration;
+    }
     if (binding.server !== configuration.roster.coordination.server || binding.owner !== configuration.roster.coordination.owner
       || binding.fleetKey !== configuration.roster.fleet) return failure('conflict', 'Fleet binding differs from its configured identity');
     const client = createDaemonClient(join(input.root, 'fleetd.sock'), signal);
@@ -104,11 +114,9 @@ export async function verifyFleet(input: { root: string; directory: string; runn
         inspected.push({ context: history.context, ...result.value });
       }
       if (input.running && !inspected.length) return failure('conflict', 'Running instance has no inspectable native history');
-      if (input.noRooms) {
-        const joined = await nativeJson({ base: binding.server, token: identity.account.access_token, signal }, 'GET', '/_matrix/client/v3/joined_rooms');
-        if (!joined.ok) return joined;
-        const body = joined.value.body;
-        if (joined.value.status !== 200 || !body || typeof body !== 'object' || Array.isArray(body) || !Array.isArray(body.joined_rooms) || body.joined_rooms.length) return failure('conflict', 'Native agent has unexpected joined rooms');
+      if (backend) {
+        const joined = await connect(backend, identity.account).transport(signal, 45000).joinedRooms();
+        if (joined.length) return failure('conflict', 'Native agent has unexpected joined rooms');
       }
       const preserved = preserveNative(role.runtime, join(input.directory, configured.workarea));
       if (!preserved.ok) return preserved;

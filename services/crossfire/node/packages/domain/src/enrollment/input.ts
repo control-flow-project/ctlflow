@@ -1,9 +1,10 @@
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
+import { opaqueIdentifier } from '@ctlflow/crossfire-kernel/identifier';
 import { validateCoordinationPolicy, type CoordinationPolicy } from '../fleet/coordination-policy.js';
 export type EnrollmentIdentityProof = { agentId: string; accessToken: string };
 export type EnrollmentEntry = { instanceKey: string; name: string; identity?: EnrollmentIdentityProof; coordinationPolicy: CoordinationPolicy };
 export type ControllerDescriptor = { name: string; metadata?: Record<string, string> };
-export type EnrollmentRoster = { controller: ControllerDescriptor; controllerCredential?: string; ownerMatrixId: string; fleetKey: string; instances: EnrollmentEntry[] };
+export type EnrollmentRoster = { controller: ControllerDescriptor; controllerCredential?: string; ownerBackendUserId: string; fleetKey: string; instances: EnrollmentEntry[] };
 export type EnrollmentIntroduction = EnrollmentRoster & { enrollmentId: string; claimSecret: string };
 export function validName(value: string): boolean { return /^[a-z][a-z0-9-]{0,39}$/u.test(value); }
 export function validateController(controller: ControllerDescriptor) {
@@ -12,7 +13,7 @@ export function validateController(controller: ControllerDescriptor) {
   return success(controller);
 }
 export function validateRoster(roster: EnrollmentRoster) {
-  if (!/^@[^:\s]+:[^\s]+$/u.test(roster.ownerMatrixId) || typeof roster.fleetKey !== 'string' || !validName(roster.fleetKey)
+  if (!opaqueIdentifier(roster.ownerBackendUserId) || typeof roster.fleetKey !== 'string' || !validName(roster.fleetKey)
     || !Array.isArray(roster.instances) || roster.instances.length < 1 || roster.instances.length > 100
     || roster.instances.some(item => !validName(item.instanceKey) || !validName(item.name))
     || new Set(roster.instances.map(item => item.instanceKey)).size !== roster.instances.length

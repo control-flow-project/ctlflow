@@ -11,6 +11,7 @@ await ProtocolAcceptance.Verify();
 await SignalAcceptance.Verify();
 ConfigurationAcceptance.Verify();
 NativeValuesAcceptance.Verify();
+ProviderDiagnosticsAcceptance.Verify();
 await ProcessAcceptance.Verify();
 await ModelAcceptance.Verify();
 HistoryAcceptance.Verify();
@@ -20,6 +21,7 @@ await PiProtocolAcceptance.Verify();
 await OwnedPiAcceptance.Verify();
 await DeliveryAcceptance.Verify();
 await ListenerReportingAcceptance.Verify();
+await FleetConnectionAcceptance.Verify();
 await ChatPublicationAcceptance.Verify();
 Console.WriteLine("{\"status\":\"passed\",\"scope\":\"implemented runtime transport\",\"assertions\":" + Checks.Passed
     + ",\"dynamicCode\":" + (RuntimeFeature.IsDynamicCodeSupported ? "true" : "false") + "}");

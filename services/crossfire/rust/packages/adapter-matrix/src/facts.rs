@@ -1,9 +1,8 @@
 use crate::account::Authority;
-use crossfire_contracts::{
-    matrix_room::{self, StateEvent},
-    validation,
-};
-use crossfire_domain::matrix::{NativePermission, RoomFacts, RoomPower};
+use crate::native_values::{MatrixRoomFacts, NativePermission, RoomPower};
+use crate::room_state::{self, StateEvent};
+use crossfire_contracts::validation;
+use crossfire_domain::messaging::RoomFacts;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use serde_json::{Map, Value};
 
@@ -14,7 +13,7 @@ fn content<'a>(events: &'a [StateEvent], event_type: &str) -> Option<&'a Map<Str
         .map(|event| &event.content)
 }
 
-pub(crate) fn facts(events: &[StateEvent], user: &str, room: &str) -> Result<RoomFacts> {
+pub(crate) fn facts(events: &[StateEvent], user: &str, room: &str) -> Result<MatrixRoomFacts> {
     if !events.iter().any(|event| {
         event.event_type == "m.room.member"
             && event.state_key == user
@@ -27,8 +26,8 @@ pub(crate) fn facts(events: &[StateEvent], user: &str, room: &str) -> Result<Roo
     }
     let powers = content(events, "m.room.power_levels")
         .ok_or_else(|| Failure::new(ErrorCode::Native, "Native room power levels are missing"))?;
-    let levels = matrix_room::powers(powers, user)?;
-    let creators = matrix_room::creators(events)?;
+    let levels = room_state::powers(powers, user)?;
+    let creators = room_state::creators(events)?;
     let creator = creators.iter().any(|id| id == user);
     let read_level = levels
         .ceiling
@@ -69,10 +68,7 @@ pub(crate) fn facts(events: &[StateEvent], user: &str, room: &str) -> Result<Roo
     ] {
         permissions.push(NativePermission {
             action: action.to_owned(),
-            level: matrix_room::level(
-                powers.get(action).filter(|value| !value.is_null()),
-                default,
-            )?,
+            level: room_state::level(powers.get(action).filter(|value| !value.is_null()), default)?,
         });
     }
     let empty = Map::new();
@@ -87,17 +83,16 @@ pub(crate) fn facts(events: &[StateEvent], user: &str, room: &str) -> Result<Roo
     {
         permissions.push(NativePermission {
             action: action.clone(),
-            level: matrix_room::level(Some(value), 0)?,
+            level: room_state::level(Some(value), 0)?,
         });
     }
-    let invite_level =
-        matrix_room::level(powers.get("invite").filter(|value| !value.is_null()), 0)?;
-    let kick_level = matrix_room::level(powers.get("kick").filter(|value| !value.is_null()), 50)?;
-    let change_power_level = matrix_room::level(
+    let invite_level = room_state::level(powers.get("invite").filter(|value| !value.is_null()), 0)?;
+    let kick_level = room_state::level(powers.get("kick").filter(|value| !value.is_null()), 50)?;
+    let change_power_level = room_state::level(
         event_levels
             .get("m.room.power_levels")
             .filter(|value| !value.is_null()),
-        matrix_room::level(
+        room_state::level(
             powers.get("state_default").filter(|value| !value.is_null()),
             50,
         )?,
@@ -114,12 +109,12 @@ pub(crate) fn facts(events: &[StateEvent], user: &str, room: &str) -> Result<Roo
     let alias = content(events, "m.room.canonical_alias")
         .and_then(|content| content.get("alias"))
         .and_then(Value::as_str);
-    Ok(RoomFacts {
+    Ok(MatrixRoomFacts {
         room_id: room.to_owned(),
         name: crossfire_kernel::text::truncate_utf16(name, 255).to_owned(),
         topic: crossfire_kernel::text::truncate_utf16(topic, 4096).to_owned(),
         alias: alias.map(|alias| crossfire_kernel::text::truncate_utf16(alias, 255).to_owned()),
-        matrix_user_id: user.to_owned(),
+        backend_user_id: user.to_owned(),
         power: if creator {
             RoomPower::Creator
         } else {
@@ -136,8 +131,20 @@ pub(crate) fn facts(events: &[StateEvent], user: &str, room: &str) -> Result<Roo
 }
 
 impl Authority {
-    pub async fn room(&self, user: &str, room: &str) -> Result<RoomFacts> {
+    pub async fn room(&self, user: &str, room: &str, subject: Option<&str>) -> Result<RoomFacts> {
         let events = self.state(user, room).await?;
-        facts(&events, user, room)
+        crate::access::room_view(facts(&events, user, room)?, subject)
+    }
+    pub async fn authorize_room_access(
+        &self,
+        user: &str,
+        target: &str,
+        room: &str,
+        intent: &crossfire_domain::room_access::values::Intent,
+    ) -> Result<RoomFacts> {
+        let events = self.state(user, room).await?;
+        let facts = facts(&events, user, room)?;
+        crate::access::requested_power(&facts, target, intent, false)?;
+        crate::access::room_view(facts, Some(target))
     }
 }

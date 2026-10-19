@@ -1,15 +1,14 @@
 import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authority';
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage } from 'node:http';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { HTTP_LIMITS } from '@ctlflow/crossfire-contracts/rest/limits';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
-import { matrixUserId } from '@ctlflow/crossfire-contracts/schema/validation';
+import { backendUserId } from '@ctlflow/crossfire-contracts/schema/validation';
 import { onboardingGuide, setupDescriptor } from '@ctlflow/crossfire-contracts/onboarding';
 import { authenticateMember, authenticateAgent } from '@ctlflow/crossfire-domain/session/authenticate';
 import type { Application } from '../composition.js';
 import type { createWorker } from '../worker.js';
 import type { Release } from '@ctlflow/crossfire-adapter-filesystem/release';
-import type { ElementPresentation } from '../element-configuration.js';
 import { serveArtifact } from '../artifacts.js';
 import { type Context, type Endpoint, type Reply } from './bind.js';
 import { readBody, send, cookie, setCookie } from './transport.js';
@@ -25,26 +24,15 @@ import { instanceRoutes } from './routes/instance.js';
 import { runtimeRoutes } from './routes/runtime.js';
 import { publicationRoutes } from './routes/publication.js';
 import { readBinary } from './binary.js';
-import { registrationTransport, invitationCookie, setInvitationCookie, registrationStage } from './registration.js';
-import { verifyInvitation } from '@ctlflow/crossfire-domain/member/registration';
-import { searchMatrixDirectory } from './matrix-directory.js';
-import { changeMatrixProfile } from './matrix-profile.js';
+import { setInvitationCookie } from './invitation-cookie.js';
 import { publicRequestBudget } from './public-request-budget.js';
-export function createHttpServer(application: Application, worker: ReturnType<typeof createWorker>, release: Release, presentation: ElementPresentation = {}) {
+export function createHttpServer(application: Application, worker: ReturnType<typeof createWorker>, release: Release, presentation: Record<string, unknown> = {}) {
   const { services, config } = application;
-  const register = registrationTransport(services);
   const fleetChanges = createFleetChanges();
   const endpoints = [...sessionRoutes(), ...enrollmentRoutes(), ...fleetRoutes(), ...agentRoutes(), ...wakeUpRoutes(), ...roomRoutes(), ...memberRoutes(),
     ...runtimeRoutes(), ...publicationRoutes(), ...instanceRoutes(config.instance, services.clock.now(), application.diagnostics.error)];
   const rate = publicRequestBudget(services.clock.now, config.trustedProxyAddresses);
-  function admitNative(request: IncomingMessage, response: ServerResponse, requestId: string): boolean {
-    const admitted = rate(request);
-    if (admitted.ok) return true;
-    response.writeHead(admitted.error.code === 'rate_limit' ? 429 : 403, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store',
-      'X-Content-Type-Options': 'nosniff', 'X-Request-ID': requestId, ...(admitted.error.code === 'rate_limit' ? { 'Retry-After': '60' } : {}) });
-    response.end(JSON.stringify({ errcode: admitted.error.code === 'rate_limit' ? 'M_LIMIT_EXCEEDED' : 'M_FORBIDDEN', error: admitted.error.message }));
-    return false;
-  }
+  const native = application.messagingHttp(presentation, request => { const result = rate(request); return result.ok ? success(undefined) : result; });
   async function authenticate(request: IncomingMessage, endpoint: Endpoint, requestId: string, signal: AbortSignal): Promise<Result<Context>> {
     const authorization = request.headers.authorization, credential = cookie(request);
     const mutation = request.method !== 'GET';
@@ -78,40 +66,15 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
       if (url.origin !== config.publicOrigin || request.headers.host !== new URL(config.publicOrigin).host) { send(response, requestId, failure('forbidden', 'Invalid request host')); return; }
       if (request.headers.origin !== undefined && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Invalid request origin')); return; }
       const method = request.method ?? 'GET';
-      if (method === 'PUT' && /^\/_matrix\/client\/v3\/profile\/[^/]+\/displayname$/u.test(url.pathname)) {
-        await changeMatrixProfile(services, request, response, url, requestId); worker.wake(); return;
-      }
-      if (url.pathname === '/_matrix/client/v3/user_directory/search') {
-        await searchMatrixDirectory(services, request, response, url, requestId); return;
-      }
-      if (url.pathname === '/_matrix/client/v3/register') {
-        if (!admitNative(request, response, requestId)) return;
-        await register.register(request, response, requestId); if (response.statusCode === 200) worker.wake(); return;
-      }
-      if (url.pathname === '/_matrix/client/v3/auth/' + registrationStage + '/fallback/web') {
-        if (method === 'POST' && !admitNative(request, response, requestId)) return;
-        await register.fallback(request, response, url); return;
-      }
-      if (url.pathname === '/config.json' || url.pathname === '/config.' + new URL(config.publicOrigin).hostname + '.json') {
-        if (method !== 'GET' && method !== 'HEAD') { response.writeHead(405, { Allow: 'GET, HEAD' }); response.end(); return; }
-        const policy = services.repositories.instancePolicy.find({ id: 'instance' });
-        const claim = invitationCookie(request);
-        const invited = claim && verifyInvitation(services, claim.id, claim.secret).ok;
-        response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-        response.end(method === 'HEAD' ? undefined : JSON.stringify({ brand: 'crossfire', default_theme: 'light', ...presentation,
-          custom_translations_url: '/manage/assets/element-translations.json',
-          default_server_config: { 'm.homeserver': { base_url: config.publicOrigin, server_name: config.serverName } },
-          disable_custom_urls: true, disable_guests: true, disable_login_language_selector: true, disable_3pid_login: true,
-          disable_registration: !invited && !(policy.ok && policy.value?.signupMode === 'open'), room_directory: { servers: [] } })); return;
-      }
+      if (await native(request, response, url, requestId)) { if (method !== 'GET' && response.statusCode === 200) worker.wake(); return; }
       if (serveArtifact(release, method, url.pathname, response)) return;
       if (url.pathname === '/onboarding/setup' || url.pathname === '/onboarding/setup.json') {
         if (method !== 'GET' && method !== 'HEAD') {
           response.setHeader('Allow', 'GET, HEAD'); send(response, requestId, failure('method_not_allowed', 'Method not allowed')); return;
         }
-        const owner = matrixUserId(url.searchParams.get('ownerMatrixId'));
-        if (!owner.ok || url.searchParams.size !== 1) { send(response, requestId, failure('invalid', 'Exactly one ownerMatrixId is required')); return; }
-        const principal = services.directory.principalByMatrixId(owner.value);
+        const owner = backendUserId(url.searchParams.get('ownerBackendUserId'));
+        if (!owner.ok || url.searchParams.size !== 1) { send(response, requestId, failure('invalid', 'Exactly one ownerBackendUserId is required')); return; }
+        const principal = services.directory.principalByBackendUserId(owner.value);
         if (!principal.ok) { send(response, requestId, principal); return; }
         if (!principal.value || principal.value.kind !== 'human' || principal.value.status !== 'active') { send(response, requestId, failure('forbidden', 'An active registered human owner is required')); return; }
         const policy = services.repositories.instancePolicy.find({ id: 'instance' });
@@ -143,7 +106,7 @@ export function createHttpServer(application: Application, worker: ReturnType<ty
         const admitted = rate(request);
         if (!admitted.ok) { if (admitted.error.code === 'rate_limit') response.setHeader('Retry-After', '60'); send(response, requestId, admitted); return; }
       }
-      if (endpoint.path === '/api/sessions' && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin human login required')); return; }
+      if ((endpoint.path === '/api/sessions' || endpoint.path === operations.authenticateBackend.path) && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin human login required')); return; }
       if (endpoint.path === operations.claimInvitation.path && request.headers.origin !== config.publicOrigin) { send(response, requestId, failure('forbidden', 'Same-origin invitation claim required')); return; }
       const authenticated = await authenticate(request, endpoint, requestId, stop.signal);
       if (!authenticated.ok) { send(response, requestId, authenticated); return; }

@@ -1,3 +1,4 @@
+using Crossfire.Domain;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AgentCore;
@@ -7,7 +8,7 @@ using Fleetd.Domain;
 
 namespace Fleetd.Storage;
 
-public sealed record BoundIdentity(string InstanceKey, string Name, string AgentId, AgentAccount Account);
+public sealed record BoundIdentity(string InstanceKey, string Name, string AgentId, BackendAccount Account);
 public sealed record EnrollmentClaim(string EnrollmentId, string ClaimSecret, string Digest);
 public sealed record FleetBinding(string Server, string Owner, string FleetKey, string? FleetId, string? ControllerCredential, EnrollmentClaim? Request, IReadOnlyList<BoundIdentity> Identities);
 public static class BindingFiles
@@ -25,9 +26,9 @@ public static class BindingFiles
     });
     public static Result<BoundIdentity> Identity(JsonElement value)
     {
-        if (!Validation.Fields(value, ["instanceKey", "name", "agentId", "account"]).IsSuccess || !Validation.Fields(value.GetProperty("account"), ["user_id", "access_token", "device_id"]).IsSuccess) return Results.Fail<BoundIdentity>("invalid", "Invalid enrolled identity");
-        var key = WireJson.Text(value, "instanceKey"); var name = WireJson.Text(value, "name"); var agent = WireJson.Text(value, "agentId"); var account = value.GetProperty("account"); var user = WireJson.Text(account, "user_id"); var token = Validation.Text(account.GetProperty("access_token"), 8192); var device = Validation.Text(account.GetProperty("device_id"), 255);
-        return key is not null && IdentitySyntax.Name(key) && name is not null && IdentitySyntax.Name(name) && agent is not null && Validation.Identifier(agent) && user is not null && Validation.UserId(user) && token.IsSuccess && device.IsSuccess ? Result<BoundIdentity>.Success(new(key, name, agent, new(user, token.Value, device.Value))) : Results.Fail<BoundIdentity>("invalid", "Invalid immutable enrolled identity or account");
+        if (!Validation.Fields(value, ["instanceKey", "name", "agentId", "account"]).IsSuccess) return Results.Fail<BoundIdentity>("invalid", "Invalid enrolled identity");
+        var key = WireJson.Text(value, "instanceKey"); var name = WireJson.Text(value, "name"); var agent = WireJson.Text(value, "agentId"); var account = MessagingContract.Account(value.GetProperty("account"));
+        return key is not null && IdentitySyntax.Name(key) && name is not null && IdentitySyntax.Name(name) && agent is not null && Validation.Identifier(agent) && account.IsSuccess ? Result<BoundIdentity>.Success(new(key, name, agent, account.Value)) : Results.Fail<BoundIdentity>("invalid", "Invalid immutable enrolled identity or account");
     }
     public static Result<Unit> Save(string directory, FleetBinding value) => ConfigurationFiles.Boundary(() =>
     {
@@ -35,7 +36,7 @@ public static class BindingFiles
         {
             writer.WriteString("server", value.Server); writer.WriteString("owner", value.Owner); writer.WriteString("fleetKey", value.FleetKey); writer.WriteString("fleetId", value.FleetId); writer.WriteString("controllerCredential", value.ControllerCredential); writer.WritePropertyName("request");
             if (value.Request is null) writer.WriteNullValue(); else { writer.WriteStartObject(); writer.WriteString("enrollmentId", value.Request.EnrollmentId); writer.WriteString("claimSecret", value.Request.ClaimSecret); writer.WriteString("digest", value.Request.Digest); writer.WriteEndObject(); }
-            writer.WriteStartArray("identities"); foreach (var identity in value.Identities) { writer.WriteStartObject(); writer.WriteString("instanceKey", identity.InstanceKey); writer.WriteString("name", identity.Name); writer.WriteString("agentId", identity.AgentId); writer.WriteStartObject("account"); writer.WriteString("user_id", identity.Account.UserId); writer.WriteString("access_token", identity.Account.AccessToken); writer.WriteString("device_id", identity.Account.DeviceId); writer.WriteEndObject(); writer.WriteEndObject(); } writer.WriteEndArray();
+            writer.WriteStartArray("identities"); foreach (var identity in value.Identities) { writer.WriteStartObject(); writer.WriteString("instanceKey", identity.InstanceKey); writer.WriteString("name", identity.Name); writer.WriteString("agentId", identity.AgentId); writer.WritePropertyName("account"); MessagingContract.Account(identity.Account).WriteTo(writer); writer.WriteEndObject(); } writer.WriteEndArray();
         }), true), 1048576); return Results.Done();
     });
     public static void InitializeHistory(string directory, string agent, string? reset)

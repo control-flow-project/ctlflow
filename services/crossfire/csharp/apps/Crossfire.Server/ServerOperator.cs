@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
+using Crossfire.AdapterMatrix;
 using Crossfire.AdapterSqlite;
 using Crossfire.Contracts;
 using Crossfire.Kernel;
@@ -35,8 +36,14 @@ public static class ServerOperator
     private static void Initialize(string directory, IReadOnlyDictionary<string, string> options)
     {
         if (Directory.Exists(directory) && Directory.EnumerateFileSystemEntries(directory).Any()) throw new IOException("Initialization requires an empty directory; existing data is never overwritten"); var username = options.GetValueOrDefault("administrator") ?? "";
-        if (username.Length is < 1 or > 80 || username.Any(character => character is not (>= 'a' and <= 'z' or >= '0' and <= '9' or '.' or '_' or '=' or '-')) || username == "conduit" || username.StartsWith("crossfire-", StringComparison.Ordinal) || username.StartsWith("agent-", StringComparison.Ordinal)) throw new ArgumentException("Supply a regular human --administrator username");
-        var configuration = WireJson.Object(writer => { foreach (var pair in new[] { ("instance", "instance"), ("serverName", "server-name"), ("publicOrigin", "origin"), ("contentOrigin", "content-origin") }) writer.WriteString(pair.Item1, options.GetValueOrDefault(pair.Item2)); writer.WriteString("matrixOrigin", "http://127.0.0.1:6167"); writer.WriteString("administrator", "@" + username + ":" + options.GetValueOrDefault("server-name")); writer.WriteString("jwtSecret", Identity.Secret()); writer.WriteString("registrationSecret", Identity.Secret()); }); var parsed = Parse(Configurations.Parse(configuration)); PrivateFiles.Directory(directory);
+        var administrator = Parse(MatrixSettings.AdministratorUser(username, options.GetValueOrDefault("server-name")));
+        var configuration = WireJson.Object(writer =>
+        {
+            foreach (var pair in new[] { ("instance", "instance"), ("publicOrigin", "origin"), ("contentOrigin", "content-origin") }) writer.WriteString(pair.Item1, options.GetValueOrDefault(pair.Item2));
+            writer.WriteString("administrator", administrator); writer.WriteStartObject("messaging"); writer.WriteString("type", "matrix");
+            writer.WriteStartObject("parameters"); writer.WriteString("serverName", options.GetValueOrDefault("server-name")); writer.WriteString("origin", "http://127.0.0.1:6167");
+            writer.WriteString("jwtSecret", Identity.Secret()); writer.WriteString("registrationSecret", Identity.Secret()); writer.WriteEndObject(); writer.WriteEndObject();
+        }); var parsed = Parse(Configurations.Parse(configuration)); Parse(MatrixSettings.Read(parsed.Messaging, parsed.Instance, parsed.Administrator)); PrivateFiles.Directory(directory);
         PrivateFiles.Write(Path.Combine(directory, "config.json"), WireJson.Bytes(configuration, true), 65536); PrivateFiles.Write(Path.Combine(directory, "bootstrap.json"), WireJson.Bytes(WireJson.Object(writer => { writer.WriteString("servicePassword", Identity.Secret()); writer.WriteString("administratorPassword", Identity.Secret()); }), true), 16384); Console.WriteLine("Initialized " + directory + "\nAdministrator: " + parsed.Administrator + "\nInitial password: administratorPassword in " + Path.Combine(directory, "bootstrap.json"));
     }
 }

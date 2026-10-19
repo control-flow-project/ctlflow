@@ -28,7 +28,7 @@ public static class DaemonApi
             var selected = matches.FirstOrDefault(value => value.Operation.Method == http.Request.Method); operation = selected.Operation; if (operation is null) throw new RequestFailure(new(matches.Length == 0 ? "missing" : "method_not_allowed", "No such daemon operation"));
             foreach (var parameter in selected.Parameters!) if (parameter.Key is "fleetId" or "operationId" ? !Validation.Identifier(parameter.Value) : !IdentitySyntax.Name(parameter.Value)) throw new RequestFailure(new("invalid", "Invalid daemon path identity"));
             var query = new Dictionary<string, string>(StringComparer.Ordinal); foreach (var entry in http.Request.Query) { if (entry.Value.Count != 1) throw new RequestFailure(new("invalid", "Duplicated daemon query parameter")); query.Add(entry.Key, entry.Value[0]!); }
-            var allowed = operation.Collection ? new[] { "page", "pageSize" } : operation.Name == "attachment" ? ["context"] : Array.Empty<string>(); if (query.Keys.Any(key => !allowed.Contains(key, StringComparer.Ordinal))) throw new RequestFailure(new("invalid", "Unknown daemon query parameter"));
+            var allowed = operation.Collection ? new[] { "page", "pageSize" } : operation.Name == "attachment" ? ["context"] : operation.Name == "diagnostics" ? ["fleetId", "instanceKey"] : Array.Empty<string>(); if (query.Keys.Any(key => !allowed.Contains(key, StringComparer.Ordinal))) throw new RequestFailure(new("invalid", "Unknown daemon query parameter"));
             var body = Value(await NativeHttp.Collect(http.Request.Body, 1048576, http.RequestAborted)); if (body.Length != 0 && http.Request.ContentType?.Split(';')[0] != "application/json") throw new RequestFailure(new("invalid", "Use application/json"));
             var input = body.Length == 0 ? WireJson.Object(_ => { }) : WireJson.Parse(body); var data = await Invoke(controller, operation.Name, selected.Parameters!, query, input, logging, id, http.RequestAborted); result = Result<DaemonReply>.Success(data);
         }
@@ -55,6 +55,10 @@ public static class DaemonApi
         var fleet = parameters.GetValueOrDefault("fleetId") ?? ""; var instance = parameters.GetValueOrDefault("instanceKey") ?? "";
         switch (operation)
         {
+            case "diagnostics":
+                Fields(input); var report = Value(await controller.Diagnostics(Value(DiagnosticContract.Query(query)), cancellation)); var diagnosticLog = logging();
+                return new(DiagnosticContract.Encode(report with { Checks = [.. report.Checks, new("controller.logging", new(null, null), diagnosticLog.Error is null ? "pass" : "fail", report.CheckedAt,
+                    diagnosticLog.Error is null ? "Controller logging is available" : "Controller logging has failed", diagnosticLog.Error is null ? null : "Check disk space and controller log permissions")] }));
             case "status": Fields(input); var log = logging(); return new(WireJson.Object(writer => { writer.WritePropertyName("controller"); FleetWire.Controller(controller.Identity).WriteTo(writer); writer.WriteNumber("startedAt", controller.StartedAt); writer.WriteBoolean("stopping", controller.Stopping); writer.WriteNumber("loggingRetentionDays", log.Days); writer.WriteString("loggingError", log.Error); }));
             case "setup":
                 Value(Validation.Fields(input, ["descriptor", "workspace"], ["configuration"])); var descriptor = Value(Onboarding.ParseDescriptor(input.GetProperty("descriptor"))); var configuration = input.TryGetProperty("configuration", out var configured) ? Value(Validation.Text(configured, 4096)) : null; var setup = Value(await controller.Setup(new(descriptor, Text(input, "workspace"), configuration), cancellation));

@@ -16,6 +16,7 @@ import { terminalPointer } from './attachment.js';
 import { setup } from './setup.js';
 import { listFleets, observeOperation } from './operation.js';
 import { readAuthentication } from '@ctlflow/fleetd-storage/authentication';
+import { diagnose } from './diagnostics.js';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) throw new Error(result.error.code + ': ' + result.error.message); return result.value; }
 function output(value: unknown): void { process.stdout.write(JSON.stringify(value, null, 2) + '\n'); }
@@ -25,6 +26,8 @@ fleet daemon status|stop|restart --root DIRECTORY
 fleet remote add NAME --ssh USER@HOST --root DIRECTORY
 fleet [--root DIRECTORY | --remote NAME] add DIRECTORY
 fleet [--root DIRECTORY | --remote NAME] list|show|test|enroll|start|stop|remove [FLEET]
+fleet [--root DIRECTORY | --remote NAME] diagnose [FLEET]
+fleet [--root DIRECTORY | --remote NAME] agent diagnose FLEET INSTANCE
 fleet [--root DIRECTORY | --remote NAME] start FLEET [--fresh-history] [--operation-id UUID]
 fleet [--root DIRECTORY | --remote NAME] stop FLEET [--operation-id UUID]
 fleet [--root DIRECTORY | --remote NAME] update FLEET [--operation-id UUID] [--release-directory DIRECTORY]
@@ -91,6 +94,15 @@ export async function run(argv: string[], signal: AbortSignal): Promise<void> {
   if (values.remote && !remote) throw new Error('Remote connection not found');
   if (remote) root = remote.root;
   if (!root) throw new Error('Select --root DIRECTORY or --remote NAME');
+  if (positionals[0] === 'diagnose' || positionals[0] === 'agent' && positionals[1] === 'diagnose') {
+    const agent = positionals[0] === 'agent';
+    if (agent ? positionals.length !== 4 : positionals.length > 2) throw new Error(usage);
+    const fleetKey = positionals[agent ? 2 : 1], instanceKey = agent ? value(nameParser(positionals[3])) : undefined;
+    if (fleetKey !== undefined && !nameParser(fleetKey).ok && !identifier(fleetKey).ok) throw new Error('Use a configured fleet key or UUID');
+    const report = await diagnose(root, remote, fleetKey, instanceKey, signal); output(report);
+    if (report.checks.some(check => check.status === 'fail')) throw new Error('Diagnostics found failed checks');
+    return;
+  }
   if (positionals[0] === 'daemon' && positionals[1] === 'start') {
     if (remote || positionals.length !== 2) throw new Error('Start the daemon locally on its computer');
     const status = await launchDaemon(root, values.name, signal);

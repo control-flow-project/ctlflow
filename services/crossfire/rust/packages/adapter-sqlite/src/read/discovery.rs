@@ -25,7 +25,7 @@ pub(super) fn page(
                 .and(principal::id.ne(excluded)),
         )
         .filter(
-            principal::matrix_user_id
+            principal::backend_user_id
                 .like(&search)
                 .or(member::display_name.like(&search)),
         );
@@ -50,7 +50,7 @@ pub(super) fn page(
                 .and(fleet::archived_at.is_null()),
         )
         .filter(
-            principal::matrix_user_id
+            principal::backend_user_id
                 .like(&search)
                 .or(agent_name::name.like(&search)),
         );
@@ -81,11 +81,11 @@ pub(super) fn page(
             .limit(human_limit)
             .select((
                 principal::id,
-                principal::matrix_user_id,
+                principal::backend_user_id,
                 principal::kind,
                 member::display_name,
                 principal::id,
-                principal::matrix_user_id,
+                principal::backend_user_id,
             ))
             .load::<SummaryRow>(store.database.connection())
             .map_err(failure)?
@@ -105,11 +105,11 @@ pub(super) fn page(
             .select((
                 (
                     principal::id,
-                    principal::matrix_user_id,
+                    principal::backend_user_id,
                     principal::kind,
                     agent_name::name,
                     agent::owner_id,
-                    owner.field(principal::matrix_user_id),
+                    owner.field(principal::backend_user_id),
                 ),
                 member::display_name,
             ))
@@ -131,17 +131,17 @@ pub(super) fn identities(store: &mut Store, ids: &[String]) -> Result<Vec<Princi
         .filter(
             principal::kind
                 .eq("human")
-                .and(principal::matrix_user_id.eq_any(ids)),
+                .and(principal::backend_user_id.eq_any(ids)),
         )
-        .select((principal::matrix_user_id, member::display_name))
+        .select((principal::backend_user_id, member::display_name))
         .load::<(String, String)>(store.database.connection())
         .map_err(failure)?
         .into_iter()
-        .map(|(matrix_user_id, name)| PrincipalIdentity {
-            matrix_user_id,
+        .map(|(backend_user_id, name)| PrincipalIdentity {
+            backend_user_id,
             kind: Some(PrincipalKind::Human),
             display_name: Some(name),
-            owner_matrix_id: None,
+            owner_backend_user_id: None,
             owner_display_name: None,
         })
         .collect::<Vec<_>>();
@@ -151,22 +151,22 @@ pub(super) fn identities(store: &mut Store, ids: &[String]) -> Result<Vec<Princi
         .inner_join(agent_name::table.on(agent_name::agent_id.eq(agent::principal_id.nullable())))
         .inner_join(owner.on(owner.field(principal::id).eq(agent::owner_id)))
         .inner_join(member::table.on(member::principal_id.eq(agent::owner_id)))
-        .filter(principal::matrix_user_id.eq_any(ids))
+        .filter(principal::backend_user_id.eq_any(ids))
         .select((
-            principal::matrix_user_id,
+            principal::backend_user_id,
             agent_name::name,
-            owner.field(principal::matrix_user_id),
+            owner.field(principal::backend_user_id),
             member::display_name,
         ))
         .load::<(String, String, String, String)>(store.database.connection())
         .map_err(failure)?;
     result.extend(
         agents.into_iter().map(
-            |(matrix_user_id, name, owner_id, owner_name)| PrincipalIdentity {
-                matrix_user_id,
+            |(backend_user_id, name, owner_id, owner_name)| PrincipalIdentity {
+                backend_user_id,
                 kind: Some(PrincipalKind::Agent),
                 display_name: Some(agent_display_name(&name, &owner_name)),
-                owner_matrix_id: Some(owner_id),
+                owner_backend_user_id: Some(owner_id),
                 owner_display_name: Some(owner_name),
             },
         ),

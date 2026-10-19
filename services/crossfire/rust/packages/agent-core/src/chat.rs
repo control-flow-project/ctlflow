@@ -42,7 +42,7 @@ pub fn envelope(
         }
         let principal = identities
             .get(sender)
-            .filter(|identity| &identity.matrix_user_id == sender)
+            .filter(|identity| &identity.backend_user_id == sender)
             .ok_or_else(|| invalid("Missing verified sender identity"))?;
         let kind = match principal.kind {
             Some(PrincipalKind::Agent) => "agent",
@@ -55,7 +55,7 @@ pub fn envelope(
             match principal.kind {
                 Some(PrincipalKind::Human) => "other-human",
                 Some(PrincipalKind::Agent)
-                    if principal.owner_matrix_id.as_ref() == Some(&settings.owner) =>
+                    if principal.owner_backend_user_id.as_ref() == Some(&settings.owner) =>
                 {
                     "owners-agent"
                 }
@@ -66,7 +66,7 @@ pub fn envelope(
         let mut details =
             json!({"kind":kind,"display_name":principal.display_name,"relationship":relationship});
         if principal.kind == Some(PrincipalKind::Agent) {
-            details["owner"] = json!(principal.owner_matrix_id);
+            details["owner"] = json!(principal.owner_backend_user_id);
             details["owner_display_name"] = json!(principal.owner_display_name);
         }
         senders.insert(sender.clone(), details);
@@ -148,7 +148,9 @@ pub fn prepare(
             room: (mode == HistoryMode::PerRoom).then(|| group[0].room_id.clone()),
             messages: group
                 .iter()
-                .filter(|event| event.kind == "m.room.message")
+                .filter(|event| {
+                    event.kind == crossfire_domain::messaging_client::EventType::Message
+                })
                 .count(),
             events: group,
             text,

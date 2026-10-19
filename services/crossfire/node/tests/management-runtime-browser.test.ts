@@ -19,9 +19,9 @@ import { browserController } from './support/browser-controller.js';
 
 test('Management distinguishes native sleep and wake from listener readiness without per-agent runtime requests', { timeout: 120000 }, async scope => {
   const release = await releaseFixture(), fixture = await nativeServer(scope, release), { services, admin, origin } = fixture;
-  const { fleet, instances, ready, controller } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId, 3);
+  const { fleet, instances, ready, controller } = await mapFleet(services, admin.actor, admin.member.principal.backendUserId, 3);
   const unreported = await fixture.agent(admin.actor, 'unreported');
-  const liveController = await browserController(scope, { origin, controller, owner: admin.member.principal.matrixUserId,
+  const liveController = await browserController(scope, { origin, controller, owner: admin.member.principal.backendUserId,
     execute: async () => failure('unavailable', 'This observation fixture has no native lifecycle executor') });
   const tokens = instances.map(instance => {
     const token = ready.instances.find(item => item.instanceKey === instance.instanceKey)?.account?.accessToken; assert(token);

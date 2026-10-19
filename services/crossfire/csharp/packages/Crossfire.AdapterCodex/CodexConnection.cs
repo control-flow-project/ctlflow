@@ -26,6 +26,16 @@ public sealed class CodexConnection : RuntimeConnection, TurnControl
     public TurnControl TurnControl => this;
     public RuntimeLifecycle? Lifecycle => null;
     public bool Unsettled => delivery!.Unsettled;
+    public async ValueTask<Result<ProviderState>> Provider(CancellationToken cancellation)
+    {
+        try
+        {
+            var reply = CodexJson.ObjectReply(await session.Protocol.Request("account/read", CodexJson.Object(writer => writer.WriteBoolean("refreshToken", false)), cancellation));
+            return reply.IsSuccess ? CodexProvider.Parse(reply.Value) : Results.Fail<ProviderState>("unavailable", "Native provider metadata could not be read without refresh");
+        }
+        catch (Exception error) when (error is OperationCanceledException or IOException or InvalidOperationException)
+        { return Results.Fail<ProviderState>("unavailable", "Native provider metadata could not be read without refresh"); }
+    }
     private CodexConnection(CodexSession session, string file, int poll, int timeout, TimeProvider time, Action<RuntimeObservationEvent>? observe)
     { this.session = session; receiptFile = file; this.poll = poll; this.timeout = timeout; this.time = time; this.observe = observe; }
     public static Result<CodexConnection> Open(CodexSession session, string file, int pollMs, int timeoutMs = 30000, TimeProvider? time = null, Action<RuntimeObservationEvent>? observe = null)

@@ -25,9 +25,9 @@ impl AuthorizationRepository for Store {
             .transpose()
     }
 
-    fn principal_by_matrix_id(&mut self, id: &str) -> Result<Option<Principal>> {
+    fn principal_by_backend_user_id(&mut self, id: &str) -> Result<Option<Principal>> {
         principal::table
-            .filter(principal::matrix_user_id.eq(id))
+            .filter(principal::backend_user_id.eq(id))
             .select(rows::PrincipalRow::as_select())
             .first(self.database.connection())
             .optional()

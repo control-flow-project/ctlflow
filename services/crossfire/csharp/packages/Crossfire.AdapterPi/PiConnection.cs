@@ -30,6 +30,13 @@ public sealed class PiConnection : RuntimeConnection, TurnControl
     public TurnControl TurnControl => this;
     public RuntimeLifecycle? Lifecycle => null;
     public bool Unsettled => delivery!.Unsettled;
+    public async ValueTask<Result<ProviderState>> Provider(CancellationToken cancellation)
+    {
+        var state = await native.Request("get_state", PiValues.Empty(), cancellation);
+        if (!state.IsSuccess) return Results.Fail<ProviderState>("unavailable", "Native provider metadata could not be read without refresh");
+        var available = await native.Request("get_available_models", PiValues.Empty(), cancellation);
+        return available.IsSuccess ? PiProvider.Parse(state.Value, available.Value) : Results.Fail<ProviderState>("unavailable", "Native provider metadata could not be read without refresh");
+    }
     private PiConnection(PiProtocol native, string home, string history, string workspace, string receipt, string session, RuntimeHooks hooks, Func<ValueTask> close, TimeProvider time)
     { this.native = native; this.home = home; this.history = history; this.workspace = workspace; this.receipt = receipt; SessionId = session; this.hooks = hooks; this.time = time; }
     public static Result<PiConnection> Open(PiProtocol native, string home, string history, string workspace, string receipt, string session, RuntimeHooks hooks,

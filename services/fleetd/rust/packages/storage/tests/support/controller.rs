@@ -29,6 +29,22 @@ pub struct Agent {
     calls: Arc<Calls>,
 }
 impl RunningAgent for Agent {
+    fn diagnostics(
+        &self,
+        _cancellation: CancellationToken,
+    ) -> Response<'_, crossfire_agent_core::owned_runtime::NativeDiagnostic> {
+        Box::pin(async {
+            Ok(crossfire_agent_core::owned_runtime::NativeDiagnostic {
+                checked_at: 1,
+                state: "idle".to_owned(),
+                observed_at: Some(1),
+                provider: crossfire_agent_core::owned_runtime::ProviderState::Unknown,
+                provider_observed_at: None,
+                pending_input: false,
+                pending_decision: false,
+            })
+        })
+    }
     fn session_id(&self) -> &str {
         &self.session
     }

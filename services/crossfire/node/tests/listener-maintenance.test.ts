@@ -1,3 +1,5 @@
+import { createMessagingClient } from '@ctlflow/crossfire-adapter-matrix/messaging-client';
+import { messageEvent } from '@ctlflow/crossfire-adapter-matrix/events';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { listenerMaintenance } from '@ctlflow/crossfire-agent-core/listener-maintenance';
@@ -26,7 +28,7 @@ test('ordinary blocked-mention notices retain their exact identity across cancel
       });
       return fixture.coordination.notice(...parameters);
     } } };
-  const maintenance = listenerMaintenance(options), event = eventView(message('$blocked-notice'), ROOM);
+  const maintenance = listenerMaintenance(options), event = eventView(messageEvent(message('$blocked-notice'), ROOM), ROOM);
   maintenance.notice(event); maintenance.notice(event);
   assert.equal(storage.read<unknown[]>('maintenance').length, 1);
   const publishing = maintenance.publish(preemption.signal), rejected = assert.rejects(publishing, /Steering preemption/u);
@@ -34,7 +36,7 @@ test('ordinary blocked-mention notices retain their exact identity across cancel
   const restarted = listenerMaintenance({ ...options, coordination: fixture.coordination });
   assert(restarted.pending()); await restarted.publish(new AbortController().signal);
   assert(!storage.exists('maintenance')); assert(!restarted.pending());
-  const notices = fixture.requests.filter(request => request.path.endsWith('/wake-notices/' + event.event_id));
+  const notices = fixture.requests.filter(request => request.path.endsWith('/wake-notices/' + event.eventId));
   assert.equal(notices.length, 1); assert.deepEqual(notices[0]!.body, { roomId: ROOM });
 });
 
@@ -45,7 +47,7 @@ test('a hung invitation lookup cannot hold the Matrix watch or accepted steering
     inspect: async () => ({ busy: false }), close: () => {}, acknowledge: () => {}, recover: async () => false, settle: async () => false,
     turnControl: { activeTurn: async () => null, interrupt: async () => 'inactive' }, deliver: async text => { delivered.push(text); } });
   const receiving = listen({ ...matrix, clock, storage: localState,
-    transport: signal => nativeMatrix({ base: matrix.settings.homeserver, token: matrix.account.access_token, signal }),
+    transport: signal => createMessagingClient(nativeMatrix({ base: matrix.settings.server, token: matrix.account.accessToken, signal }), matrix.account.userId),
     invitationRooms: async signal => {
       maintenanceStarted = true;
       return new Promise<readonly string[]>((_resolve, reject) => {

@@ -21,7 +21,7 @@ public static class StatisticsViews
 
     public static JsonElement Fleet(FleetStatisticsView value) => JsonValues.Object(writer =>
     {
-        var summary = value.Summary; var agents = value.Agents.ToDictionary(agent => agent.PrincipalId, StringComparer.Ordinal); var senders = value.Senders.ToDictionary(sender => sender.MatrixUserId, StringComparer.Ordinal);
+        var summary = value.Summary; var agents = value.Agents.ToDictionary(agent => agent.PrincipalId, StringComparer.Ordinal); var senders = value.Senders.ToDictionary(sender => sender.BackendUserId, StringComparer.Ordinal);
         writer.WriteNumber("capturedAt", value.CapturedAt); writer.WriteNumber("since", value.Since); writer.WriteNumber("retentionDays", value.RetentionDays);
         writer.WriteNumber("intervals", summary.Intervals); writer.WriteNumber("dropped", summary.Dropped); JsonValues.Number(writer, "firstReportAt", summary.FirstReportAt); JsonValues.Number(writer, "lastReportAt", summary.LastReportAt);
         writer.WritePropertyName("totals"); Totals(writer, summary.Totals); writer.WritePropertyName("tokens"); Tokens(writer, summary.Tokens); writer.WriteNull("spend");
@@ -29,12 +29,12 @@ public static class StatisticsViews
         writer.WriteNumber("totalPages", Math.Max(1, summary.TotalFlows / value.PageSize + (summary.TotalFlows % value.PageSize == 0 ? 0 : 1))); writer.WriteEndObject();
         writer.WritePropertyName("agents"); JsonValues.Array(summary.Agents, (output, agent) =>
         {
-            output.WriteStartObject(); output.WriteString("agentId", agent.AgentId); output.WriteString("displayName", agents[agent.AgentId].DisplayName); output.WriteString("matrixUserId", agents[agent.AgentId].MatrixUserId);
+            output.WriteStartObject(); output.WriteString("agentId", agent.AgentId); output.WriteString("displayName", agents[agent.AgentId].DisplayName); output.WriteString("backendUserId", agents[agent.AgentId].BackendUserId);
             output.WritePropertyName("totals"); Totals(output, agent.Totals); output.WritePropertyName("tokens"); Tokens(output, agent.Tokens); output.WriteEndObject();
         }).WriteTo(writer);
         writer.WritePropertyName("flows"); JsonValues.Array(summary.Flows, (output, flow) =>
         {
-            output.WriteStartObject(); output.WriteString("agentId", flow.AgentId); output.WriteString("senderMatrixId", flow.SenderMatrixId); output.WriteString("senderName", senders.GetValueOrDefault(flow.SenderMatrixId)?.DisplayName);
+            output.WriteStartObject(); output.WriteString("agentId", flow.AgentId); output.WriteString("senderBackendUserId", flow.SenderBackendUserId); output.WriteString("senderName", senders.GetValueOrDefault(flow.SenderBackendUserId)?.DisplayName);
             output.WriteString("roomId", flow.RoomId); output.WriteString("messageType", flow.MessageType); output.WritePropertyName("totals"); Totals(output, flow.Totals); output.WriteEndObject();
         }).WriteTo(writer);
     });

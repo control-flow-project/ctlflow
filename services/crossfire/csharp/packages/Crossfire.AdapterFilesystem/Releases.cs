@@ -10,7 +10,7 @@ public sealed record Release(JsonElement Manifest, string Version, string Identi
 
 public static class Releases
 {
-    public static readonly IReadOnlyList<string> ArtifactNames = ["README.md", "SKILL.md", "crossfire-client.mjs", "matrix-spec-LICENSE.txt"];
+    public static readonly IReadOnlyList<string> ArtifactNames = ["README.md", "SKILL.md", "crossfire-client.mjs", "messaging-LICENSE.txt"];
 
     public static Release Load(string directory)
     {

@@ -1,9 +1,7 @@
+use crossfire_adapter_http::public_request_budget::{self as budget, RequestBudget};
 use crossfire_adapter_http::server::{HeaderMap, Peer};
 use crossfire_kernel::failure::ErrorCode;
-use crossfire_server::{
-    configuration,
-    http::public_request_budget::{self as budget, RequestBudget},
-};
+use crossfire_server::configuration;
 use serde_json::json;
 use std::net::{IpAddr, SocketAddr};
 
@@ -49,9 +47,9 @@ fn configuration_accepts_only_distinct_literal_immediate_peers()
     ] {
         assert!(budget::proxies(&value).is_err());
     }
-    let value = json!({"instance":"test", "serverName":"example.localhost", "publicOrigin":"http://127.0.0.1:8080",
-        "contentOrigin":"http://localhost:8082", "matrixOrigin":"http://127.0.0.1:6167", "administrator":"@admin:example.localhost",
-        "jwtSecret":"a".repeat(43), "registrationSecret":"b".repeat(43), "trustedProxyAddresses":["::ffff:127.0.0.1"]});
+    let value = json!({"instance":"test", "publicOrigin":"http://127.0.0.1:8080",
+        "contentOrigin":"http://localhost:8082", "administrator":"@admin:architecture.localhost",
+        "messaging":{"type":"matrix","parameters":{"serverName":"architecture.localhost","origin":"http://127.0.0.1:8003","jwtSecret":"a".repeat(43),"registrationSecret":"b".repeat(43)}}, "trustedProxyAddresses":["::ffff:127.0.0.1"]});
     assert_eq!(
         configuration::parse(&value)?.trusted_proxy_addresses,
         vec!["127.0.0.1".parse::<IpAddr>()?]

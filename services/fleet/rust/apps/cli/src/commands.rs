@@ -78,6 +78,11 @@ pub async fn run(values: Vec<String>, stop: CancellationToken) -> Result<()> {
             .or(settings.local_root.clone())
             .ok_or_else(|| invalid("Select --root DIRECTORY or --remote NAME"))?,
     };
+    if words[0] == "diagnose"
+        || words[0] == "agent" && words.get(1).map(String::as_str) == Some("diagnose")
+    {
+        return crate::diagnostics::run(&root, remote.as_ref(), words, stop).await;
+    }
     if words[0] == "daemon" && words.get(1).map(String::as_str) == Some("start") {
         if words.len() != 2 || remote.is_some() {
             return Err(invalid("Start the controller locally on its computer"));

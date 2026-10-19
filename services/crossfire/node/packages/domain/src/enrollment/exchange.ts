@@ -2,18 +2,19 @@ import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result'
 import { controllerToken } from '../fleet/authority.js';
 import { agentDisplayName } from '../identity/display-name.js';
 import type { Services } from '../port/services.js';
+import type { BackendAccount } from '../port/messaging.js';
 export type ExchangedInstance = { instanceKey: string; name: string; agentId: string | null; status: 'ready' | 'provisioning'; errorCode: string | null;
-  account: { matrixUserId: string; accessToken: string; deviceId: string } | null };
-export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock'>,
-  enrollmentId: string, claimSecret: string): Result<{ status: string; ownerMatrixId: string; fleet: { fleetId: string; controllerCredential: string | null } | null; instances: ExchangedInstance[] }> {
+  account: BackendAccount | null };
+export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'messaging'>,
+  enrollmentId: string, claimSecret: string): Result<{ status: string; ownerBackendUserId: string; fleet: { fleetId: string; controllerCredential: string | null } | null; instances: ExchangedInstance[] }> {
   const request = services.repositories.enrollmentRequest.find({ id: enrollmentId });
   if (!request.ok) return request;
   if (!request.value || !services.identity.matches(claimSecret, request.value.claimHash)) return failure('unauthorized', 'Invalid enrollment claim');
   const owner = services.repositories.principal.find({ id: request.value.ownerId });
   if (!owner.ok) return owner;
   if (!owner.value || owner.value.status !== 'active') return failure('forbidden', 'Owner access is no longer active');
-  if (request.value.expiresAt <= services.clock.now()) return success({ status: 'expired', ownerMatrixId: owner.value.matrixUserId, fleet: null, instances: [] });
-  if (request.value.status !== 'approved') return success({ status: request.value.status, ownerMatrixId: owner.value.matrixUserId, fleet: null, instances: [] });
+  if (request.value.expiresAt <= services.clock.now()) return success({ status: 'expired', ownerBackendUserId: owner.value.backendUserId, fleet: null, instances: [] });
+  if (request.value.status !== 'approved') return success({ status: request.value.status, ownerBackendUserId: owner.value.backendUserId, fleet: null, instances: [] });
   const currentFleet = services.repositories.fleet.find({ ownerId: request.value.ownerId, fleetKey: request.value.fleetKey });
   if (!currentFleet.ok) return currentFleet;
   if (!currentFleet.value || currentFleet.value.archivedAt !== null) return failure('forbidden', 'Fleet enrollment is no longer current');
@@ -37,7 +38,7 @@ export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'di
       && agent.value.application.nativeDisplayName === agentDisplayName(agent.value.name, agent.value.ownerMember.displayName)
       && agent.value.application.errorCode === null;
     instances.push({ ...base, status: ready ? 'ready' : 'provisioning', errorCode: agent.value.application.errorCode,
-      account: ready ? { matrixUserId: agent.value.principal.matrixUserId, accessToken: credentials.value.accessToken!, deviceId: 'CROSSFIRE_AGENT' } : null });
+      account: ready ? services.messaging.agentAccount(agent.value.principal.backendUserId, credentials.value.accessToken!) : null });
   }
   let fleet: { fleetId: string; controllerCredential: string | null } | null = null;
   {
@@ -48,5 +49,5 @@ export function exchangeEnrollment(services: Pick<Services, 'repositories' | 'di
     if (!credential.ok) return credential;
     fleet = { fleetId: found.value.id, controllerCredential: credential.value?.revokedAt === null ? controllerToken(services, enrollmentId, claimSecret) : null };
   }
-  return success({ status: instances.some(item => item.status === 'provisioning') ? 'provisioning' : 'ready', ownerMatrixId: owner.value.matrixUserId, fleet, instances });
+  return success({ status: instances.some(item => item.status === 'provisioning') ? 'provisioning' : 'ready', ownerBackendUserId: owner.value.backendUserId, fleet, instances });
 }

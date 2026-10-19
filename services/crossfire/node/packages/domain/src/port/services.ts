@@ -2,7 +2,7 @@ import type { Repositories } from './repositories.js';
 import type { DirectoryRepository } from './directory.js';
 import type { CollectionRepository } from './collection.js';
 import type { UnitOfWork } from './unit-of-work.js';
-import type { MatrixAuthority } from './matrix-authority.js';
+import type { MessagingAuthority } from './messaging.js';
 import type { ListenerReadRepository } from './listener-read.js';
 import type { DiscoveryRepository } from './discovery.js';
 import type { RoomGrantReadRepository } from './room-grant-read.js';
@@ -26,10 +26,10 @@ export type Services = {
   roomOperations: RoomOperations;
   schedule: ScheduleCalculator;
   unitOfWork: UnitOfWork;
-  matrix: MatrixAuthority;
+  messaging: MessagingAuthority;
   clock: { now(): number };
   identity: { id(): string; secret(): string; verificationCode(): string; hash(value: string): string; matches(value: string, digest: string): boolean };
-  instance: { serverName: string; publicOrigin: string; serviceMatrixId: string };
+  instance: { publicOrigin: string };
 };
 export type Actor = { principalId: string; kind: 'human' | 'agent'; authentication?:
-  { kind: 'management'; sessionHash: string } | { kind: 'native'; matrixUserId: string } };
+  { kind: 'management'; sessionHash: string } | { kind: 'native'; backendUserId: string } };

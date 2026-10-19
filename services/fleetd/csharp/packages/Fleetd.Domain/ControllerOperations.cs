@@ -44,18 +44,31 @@ public sealed partial class FleetController
         _ = Run(); return Result<FleetOperation>.Success(accepted);
         async Task Run()
         {
-            try { if (predecessor is not null) await predecessor.Done; await Execute(accepted, configuration, selected, work.Stop.Token); }
-            catch (Exception error) when (error is IOException or InvalidDataException or InvalidOperationException or OperationCanceledException or AggregateException)
-            { var failed = accepted with { Status = "failed", CompletedAt = Now, Approval = null, Errors = [new(null, "unavailable", error.Message)] }; registry.SaveOperation(failed); foreach (var instance in selected) { try { await StopInstance(request.Target.FleetId!, instance); } catch (Exception cleanup) when (cleanup is IOException or InvalidOperationException or OperationCanceledException or AggregateException) { await lifetime.CancelAsync(); } } }
-            finally { lock (gate) if (active.GetValueOrDefault(request.Target.FleetId!) == work) active.Remove(request.Target.FleetId!); completed.TrySetResult(); work.Stop.Dispose(); }
+            FleetOperation outcome;
+            try { if (predecessor is not null) await predecessor.Done; outcome = await Execute(accepted, configuration, selected, work.Stop.Token); }
+            catch (Exception error)
+            {
+                foreach (var instance in selected) { try { await StopInstance(request.Target.FleetId!, instance); } catch (Exception) { await lifetime.CancelAsync(); } }
+                outcome = accepted with { Status = "failed", CompletedAt = Now, Approval = null, Errors = [new(null, "unavailable", error.Message)] };
+            }
+            try
+            {
+                lock (gate)
+                {
+                    if (active.GetValueOrDefault(request.Target.FleetId!) == work) active.Remove(request.Target.FleetId!);
+                    Save(outcome);
+                }
+            }
+            catch (IOException) { lock (gate) stopping = true; await lifetime.CancelAsync(); }
+            finally { completed.TrySetResult(); work.Stop.Dispose(); }
         }
     }
-    private async Task Execute(FleetOperation initial, FleetConfiguration? configuration, IReadOnlyList<FleetInstance> selected, CancellationToken cancellation)
+    private async Task<FleetOperation> Execute(FleetOperation initial, FleetConfiguration? configuration, IReadOnlyList<FleetInstance> selected, CancellationToken cancellation)
     {
         var operation = initial with { Status = "running" }; Save(operation); var errors = new List<OperationError>(); var fleet = operation.Request.Target.FleetId!; var action = operation.Request.Action;
         void Error(FleetInstance? instance, Failure failure) { errors.Add(new(instance?.Key, failure.Code, failure.Message)); if (instance is not null) State(fleet, instance, "failed", failure.Message); }
         async ValueTask Stop(IReadOnlyList<FleetInstance> instances) { foreach (var instance in instances) { try { await StopInstance(fleet, instance); } catch (Exception error) when (error is IOException or InvalidOperationException or OperationCanceledException or AggregateException) { Error(instance, new("unavailable", "Native cleanup failed: " + error.Message)); } } }
-        try
+        async Task Apply()
         {
             if (action == "stop")
             {
@@ -90,6 +103,7 @@ public sealed partial class FleetController
                 if (!started.IsSuccess) Error(instance, started.Error); else if (!Launched(fleet, configuration, instance, started.Value, cancellation)) await started.Value.DisposeAsync();
             }
         }
+        try { await Apply(); }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { Error(null, new("unavailable", "Native operation was cancelled by controller shutdown or explicit stop")); }
         catch (Exception error) when (error is IOException or InvalidDataException or InvalidOperationException) { Error(null, new("unavailable", error.Message)); }
         finally
@@ -97,8 +111,8 @@ public sealed partial class FleetController
             if (cancellation.IsCancellationRequested && action != "stop") await Stop(selected);
             lock (gate) foreach (var instance in selected) if (states.GetValueOrDefault((fleet, instance.Key))?.Phase is "starting" or "awaiting-approval") State(fleet, instance, "failed", errors.FirstOrDefault()?.Message ?? "Operation did not complete");
             if (errors.Count == 0 && action == "start") { var marked = registry.CompleteSetup(operation.Request.OperationId); if (!marked.IsSuccess) Error(null, marked.Error); }
-            Save(operation with { Status = errors.Count == 0 ? "succeeded" : "failed", CompletedAt = Now, Approval = null, Errors = errors });
         }
+        return operation with { Status = errors.Count == 0 ? "succeeded" : "failed", CompletedAt = Now, Approval = null, Errors = errors };
     }
     private void Save(FleetOperation operation) { var result = registry.SaveOperation(operation); if (!result.IsSuccess) throw new IOException("Operation persistence failed: " + result.Error.Message); }
 }

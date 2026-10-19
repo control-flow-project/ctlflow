@@ -13,7 +13,7 @@ public static class FleetMapRoutes
         async ValueTask<Result<RoomDetails>> Room(string room, string agent, CancellationToken cancellation)
         {
             using var database = context.State.Storage.Open();
-            return await RoomReads.Read(RoomGrantCommands.Ports(database, context.State.Now, context.State.Matrix.Room), context.State.Matrix.Ports(), context.Actor, room, agent, cancellation);
+            return await RoomReads.Read(RoomGrantCommands.Ports(database, context.State.Now, context.State.Messaging), context.State.Messaging, context.Actor, room, agent, cancellation);
         }
         var ports = new FleetMapPorts(FleetReadQueries.Ports(context.Database, context.State.Now), () => AgentRoutingQueries.Identities(context.Database), ids => FleetMapQueries.Relations(context.Database, ids), Room);
         return Replies.Of((await FleetMaps.Read(ports, context.Actor, parameters["fleetId"], context.Http.RequestAborted)).Map(View));
@@ -35,8 +35,8 @@ public static class FleetMapRoutes
         foreach (var entry in value.Agents)
         {
             var record = entry.Agent.Record;
-            writer.WriteStartObject(); writer.WriteString("agentId", record.Principal.Id); writer.WriteString("matrixUserId", record.Principal.MatrixUserId); writer.WriteString("instanceKey", entry.Agent.Deployment.InstanceKey); writer.WriteString("displayName", record.Name + " (" + record.OwnerMember.DisplayName + ")"); writer.WriteString("status", record.Principal.Status);
-            writer.WriteStartObject("owner"); writer.WriteString("memberId", record.Owner.Id); writer.WriteString("matrixUserId", record.Owner.MatrixUserId); writer.WriteString("displayName", record.OwnerMember.DisplayName); writer.WriteString("status", record.Owner.Status); writer.WriteEndObject();
+            writer.WriteStartObject(); writer.WriteString("agentId", record.Principal.Id); writer.WriteString("backendUserId", record.Principal.BackendUserId); writer.WriteString("instanceKey", entry.Agent.Deployment.InstanceKey); writer.WriteString("displayName", record.Name + " (" + record.OwnerMember.DisplayName + ")"); writer.WriteString("status", record.Principal.Status);
+            writer.WriteStartObject("owner"); writer.WriteString("memberId", record.Owner.Id); writer.WriteString("backendUserId", record.Owner.BackendUserId); writer.WriteString("displayName", record.OwnerMember.DisplayName); writer.WriteString("status", record.Owner.Status); writer.WriteEndObject();
             writer.WriteString("sourceId", entry.SourceId); writer.WriteString("listener", entry.Agent.Activity.Status); JsonValues.Number(writer, "lastSeenAt", entry.Agent.Activity.LastSeenAt); writer.WriteEndObject();
         }
         writer.WriteEndArray(); writer.WriteStartArray("connections");

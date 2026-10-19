@@ -11,11 +11,11 @@ const MAXIMUM_REQUEST: usize = 64 * 1024 * 1024;
 fn failed() -> Failure {
     Failure::new(
         ErrorCode::Native,
-        "Native Matrix forwarding failed or exceeded its deadline",
+        "HTTP forwarding failed or exceeded its deadline",
     )
 }
 fn exclusions(headers: &HeaderMap) -> BTreeSet<String> {
-    let mut excluded: [&str; 9] = [
+    let mut excluded: [&str; 10] = [
         "connection",
         "keep-alive",
         "proxy-authenticate",
@@ -25,6 +25,7 @@ fn exclusions(headers: &HeaderMap) -> BTreeSet<String> {
         "transfer-encoding",
         "upgrade",
         "cookie",
+        "set-cookie",
     ];
     excluded.sort_unstable();
     let mut result = excluded
@@ -44,6 +45,7 @@ fn exclusions(headers: &HeaderMap) -> BTreeSet<String> {
     }
     result
 }
+
 impl NativeHttp {
     pub async fn forward(
         &self,
@@ -64,7 +66,7 @@ impl NativeHttp {
         {
             return Err(Failure::new(
                 ErrorCode::MethodNotAllowed,
-                "Unsupported Matrix method",
+                "Unsupported HTTP method",
             ));
         }
         let path = input
@@ -72,14 +74,15 @@ impl NativeHttp {
             .path_and_query()
             .map(|value| value.as_str())
             .ok_or_else(failed)?;
-        if !path.starts_with("/_matrix/")
+        if !path.starts_with('/')
+            || path.starts_with("//")
             || path
                 .chars()
                 .any(|value| value <= '\u{20}' || value == '\u{7f}' || matches!(value, '\\' | '#'))
         {
             return Err(Failure::new(
                 ErrorCode::Invalid,
-                "Invalid Matrix forwarding target",
+                "Invalid HTTP forwarding target",
             ));
         }
         let destination = reqwest::Url::parse(&format!(
@@ -94,7 +97,7 @@ impl NativeHttp {
         {
             return Err(Failure::new(
                 ErrorCode::Forbidden,
-                "Matrix forwarding must remain on its configured origin",
+                "HTTP forwarding must remain on its configured origin",
             ));
         }
         if input
@@ -137,7 +140,9 @@ impl NativeHttp {
             request = request.body(reqwest::Body::wrap_stream(body));
         }
         let response = tokio::select! {biased;_=self.cancellation.cancelled()=>return Err(failed()),response=request.send()=>response.map_err(|_|failed())?};
-        if response.status().is_redirection() {
+        if response.status().is_redirection()
+            && response.status() != hyper::StatusCode::NOT_MODIFIED
+        {
             return Err(failed());
         }
         let status = response.status();
@@ -164,5 +169,28 @@ impl NativeHttp {
         builder
             .body(StreamBody::new(body).boxed_unsync())
             .map_err(|_| failed())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn native_forwarding_excludes_cookies_and_connection_named_headers() {
+        let mut headers = hyper::HeaderMap::new();
+        headers.insert(
+            hyper::header::CONNECTION,
+            hyper::header::HeaderValue::from_static("x-private"),
+        );
+        let excluded = super::exclusions(&headers);
+        for name in [
+            "cookie",
+            "set-cookie",
+            "x-private",
+            "connection",
+            "transfer-encoding",
+        ] {
+            assert!(excluded.contains(name), "{name}");
+        }
+        assert!(!excluded.contains("authorization"));
     }
 }

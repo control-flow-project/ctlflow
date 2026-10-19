@@ -5,7 +5,7 @@ import { Socket } from 'node:net';
 import { chromium } from '@playwright/test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { setCookie } from '../apps/server/src/http/transport.js';
-import { setInvitationCookie } from '../apps/server/src/http/registration.js';
+import { setInvitationCookie } from '../apps/server/src/http/invitation-cookie.js';
 
 test('real Chromium accepts host-only secure credentials and rejects sibling Domain-cookie injection', async scope => {
   const browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true }); cleanup(scope, () => browser.close());

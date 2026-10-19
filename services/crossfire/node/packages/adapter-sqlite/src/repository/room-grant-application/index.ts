@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3';
 import { schema } from '../../schema/tables.js';
 import { mapRoomGrantApplication } from './map.js';
 import { stored } from '../stored.js';
+import { writeNativeAccess } from '../native-access.js';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { RoomGrantApplicationRepository } from '@ctlflow/crossfire-domain/port/repositories';
 
@@ -24,14 +25,13 @@ export function createRoomGrantApplicationRepository(database: Database.Database
       applied_revision: params.appliedRevision,
       applied_access_revision: params.appliedAccessRevision,
       membership: params.membership,
-      creator: params.creator,
-      power_level: params.powerLevel,
+      native_access: params.nativeAccess,
       last_attempt_at: params.lastAttemptAt,
       last_success_at: params.lastSuccessAt,
       next_check_at: params.nextCheckAt,
       error_code: params.errorCode,
       error_message: params.errorMessage,
-        }), { ...value, creator: value.creator ? 1 : 0 });
+        }), { ...value, nativeAccess: writeNativeAccess(value.nativeAccess) });
         return success(undefined);
       });
     },
@@ -42,14 +42,13 @@ export function createRoomGrantApplicationRepository(database: Database.Database
       applied_revision: params.appliedRevision,
       applied_access_revision: params.appliedAccessRevision,
       membership: params.membership,
-      creator: params.creator,
-      power_level: params.powerLevel,
+      native_access: params.nativeAccess,
       last_attempt_at: params.lastAttemptAt,
       last_success_at: params.lastSuccessAt,
       next_check_at: params.nextCheckAt,
       error_code: params.errorCode,
       error_message: params.errorMessage,
-        }).where(row => row.agent_id === params.agentId && row.room_id === params.roomId), { ...value, creator: value.creator ? 1 : 0 });
+        }).where(row => row.agent_id === params.agentId && row.room_id === params.roomId), { ...value, nativeAccess: writeNativeAccess(value.nativeAccess) });
         return changed === 1 ? success(undefined) : failure('missing', 'RoomGrantApplication not found');
       });
     },

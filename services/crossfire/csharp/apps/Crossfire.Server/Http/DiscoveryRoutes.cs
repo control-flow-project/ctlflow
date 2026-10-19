@@ -36,13 +36,13 @@ public static class DiscoveryRoutes
 
     private static ValueTask<Result<ApiReply>> Resolve(ApiContext context, IReadOnlyDictionary<string, string> parameters, JsonElement input)
     {
-        var fields = Validation.Fields(input, ["matrixUserIds"]);
+        var fields = Validation.Fields(input, ["backendUserIds"]);
         if (!fields.IsSuccess) return Replies.Ready(Result<ApiReply>.Fail(fields.Error));
-        var ids = Validation.List(input.GetProperty("matrixUserIds"), value => Validation.Text(value), 100, 1);
+        var ids = Validation.List(input.GetProperty("backendUserIds"), value => Validation.Text(value), 100, 1);
         if (!ids.IsSuccess) return Replies.Ready(Result<ApiReply>.Fail(ids.Error));
         return Replies.Ready(Replies.Of(Discovery.Resolve(DiscoveryQueries.Ports(context.Database, context.State.Now), context.Actor, ids.Value).Map(values => JsonValues.Array(values, (writer, value) =>
         {
-            writer.WriteStartObject(); writer.WriteString("matrixUserId", value.MatrixUserId); writer.WriteString("kind", value.Kind); writer.WriteString("ownerMatrixId", value.OwnerMatrixId);
+            writer.WriteStartObject(); writer.WriteString("backendUserId", value.BackendUserId); writer.WriteString("kind", value.Kind); writer.WriteString("ownerBackendUserId", value.OwnerBackendUserId);
             writer.WriteString("displayName", value.DisplayName); writer.WriteString("ownerDisplayName", value.OwnerDisplayName); writer.WriteEndObject();
         }))));
     }

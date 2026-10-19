@@ -1,34 +1,34 @@
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { activeActor } from '../authorization/authorize.js';
-export async function authenticateMember(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'clock'>,
+export async function authenticateMember(services: Pick<Services, 'repositories' | 'directory' | 'messaging' | 'identity' | 'clock'>,
   secret: string, csrfSecret?: string) {
   const session = services.repositories.memberSession.find({ secretHash: services.identity.hash(secret) });
   if (!session.ok) return session;
   if (!session.value || session.value.expiresAt <= services.clock.now()) return failure('unauthorized', 'Management session expired or ended');
   if (csrfSecret !== undefined && csrfSecret !== session.value.csrfSecret) return failure('forbidden', 'CSRF verification failed');
-  const identity = await services.matrix.identify(session.value.nativeAccessToken);
+  const identity = await services.messaging.identify(session.value.nativeAccessToken);
   if (!identity.ok) return identity;
   const member = services.directory.member(session.value.memberId);
   if (!member.ok) return member;
-  if (!member.value || member.value.principal.matrixUserId !== identity.value) return failure('unauthorized', 'Native session identity changed');
+  if (!member.value || member.value.principal.backendUserId !== identity.value) return failure('unauthorized', 'Native session identity changed');
   const actor: Actor = { principalId: session.value.memberId, kind: 'human', authentication: { kind: 'management', sessionHash: session.value.secretHash } };
   const checked = activeActor(services, actor);
   if (!checked.ok) return checked;
   const permissions = services.directory.permissions(actor.principalId);
   return permissions.ok ? success({ actor, member: member.value, csrfSecret: session.value.csrfSecret, permissions: permissions.value }) : permissions;
 }
-export async function authenticateNativePrincipal(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'clock'>, token: string) {
-  const identity = await services.matrix.identify(token);
+export async function authenticateNativePrincipal(services: Pick<Services, 'repositories' | 'directory' | 'messaging' | 'clock'>, token: string) {
+  const identity = await services.messaging.identify(token);
   if (!identity.ok) return identity;
-  const principal = services.directory.principalByMatrixId(identity.value);
+  const principal = services.directory.principalByBackendUserId(identity.value);
   if (!principal.ok) return principal;
   if (!principal.value) return failure('forbidden', 'Registered identity authentication is required');
-  const actor: Actor = { principalId: principal.value.id, kind: principal.value.kind, authentication: { kind: 'native', matrixUserId: identity.value } };
+  const actor: Actor = { principalId: principal.value.id, kind: principal.value.kind, authentication: { kind: 'native', backendUserId: identity.value } };
   const checked = activeActor(services, actor);
   return checked.ok ? success(actor) : checked;
 }
-export async function authenticateAgent(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'clock'>, token: string) {
+export async function authenticateAgent(services: Pick<Services, 'repositories' | 'directory' | 'messaging' | 'clock'>, token: string) {
   const result = await authenticateNativePrincipal(services, token);
   return !result.ok || result.value.kind === 'agent' ? result : failure('forbidden', 'Registered agent authentication is required');
 }

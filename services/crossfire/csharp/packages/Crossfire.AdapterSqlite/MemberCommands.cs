@@ -17,7 +17,7 @@ public static class MemberCommands
 
     public static Result<Unit> RegisterIdentity(CrossfireDbContext context, Principal principal, PrincipalRole role, PrincipalApplication application)
     {
-        context.Principal.Add(new() { Id = principal.Id, MatrixUserId = principal.MatrixUserId, Kind = principal.Kind, Status = principal.Status, Revision = principal.Revision, CreatedAt = principal.CreatedAt });
+        context.Principal.Add(new() { Id = principal.Id, BackendUserId = principal.BackendUserId, Kind = principal.Kind, Status = principal.Status, Revision = principal.Revision, CreatedAt = principal.CreatedAt });
         context.PrincipalRole.Add(new() { PrincipalId = role.PrincipalId, PrincipalKind = role.PrincipalKind, RoleCode = role.RoleCode, AssignedByMemberId = role.AssignedByMemberId, AssignedAt = role.AssignedAt });
         context.PrincipalApplication.Add(new() { PrincipalId = application.PrincipalId, AppliedRevision = application.AppliedRevision, AppliedIntentHash = application.AppliedIntentHash,
             AppliedStatus = application.AppliedStatus, NativeDisplayName = application.NativeDisplayName, LastAttemptAt = application.LastAttemptAt,

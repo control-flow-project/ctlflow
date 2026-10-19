@@ -1,24 +1,29 @@
 use crate::{
     coordination::{self, Coordination},
-    events::{Event, Kind},
-    matrix::{self, API, Matrix, Request},
+    events::Event,
     profile::Profile,
 };
-use crossfire_contracts::{matrix_event, operations::Method, origin::segment, validation as check};
+use crossfire_contracts::notices;
+use crossfire_domain::messaging_client::MessagingClient;
 use crossfire_kernel::Result;
-use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use tokio_util::sync::CancellationToken;
 
-pub fn source(event: &Event) -> Result<crossfire_domain::matrix::MatrixEvent> {
-    matrix_event::event(
-        &json!({"event_id":event.event_id,"sender":event.sender,"type":event.kind,"content":event.content}),
-        &event.room_id,
-        &event.event_id,
-    )
+pub fn source(event: &Event) -> Result<crossfire_domain::messaging::BackendEvent> {
+    Ok(crossfire_domain::messaging::BackendEvent {
+        event_id: event.event_id.clone(),
+        room_id: event.room_id.clone(),
+        sender_backend_user_id: event.sender.clone(),
+        event_type: event.kind.code().to_owned(),
+        message_type: Some(event.content.kind.code().to_owned()),
+        body: event.content.body.clone(),
+        mentions: event.content.mentions.clone(),
+        edited: event.content.edited,
+        control: event.content.control,
+    })
 }
 pub async fn authorized(
-    matrix: &impl Matrix,
+    messaging: &impl MessagingClient,
     coordination: &impl Coordination,
     profile: &Profile,
     event: &Event,
@@ -26,22 +31,22 @@ pub async fn authorized(
     stop: CancellationToken,
 ) -> Result<bool> {
     let source = source(event)?;
-    if source.event_type != "m.room.message"
-        || source.message_type.as_deref() != Some("m.text")
+    if source.event_type != "message"
+        || source.message_type.as_deref() != Some("text")
         || source.body.is_none()
         || source.edited
         || source.control
-        || source.sender_matrix_id == profile.account.user_id
+        || source.sender_backend_user_id == profile.account.user_id
     {
         return Ok(false);
     }
-    let mention = matrix_event::mentions_agent(&source, &profile.account.user_id);
-    let pause = source.sender_matrix_id == profile.settings.owner
+    let mention = notices::mentions_agent(&source, &profile.account.user_id);
+    let pause = source.sender_backend_user_id == profile.settings.owner
         && source
             .body
             .as_deref()
             .is_some_and(|body| body.trim() == "!!");
-    let direct = event.origin.kind == Kind::Dm;
+    let direct = event.origin.kind == crossfire_domain::messaging_client::OriginKind::Dm;
     if !pause && (!senders.contains(&event.sender) || !mention && !direct) {
         return Ok(false);
     }
@@ -53,23 +58,8 @@ pub async fn authorized(
     {
         return Ok(false);
     }
-    let joined = matrix::request(
-        matrix,
-        &Request::new(
-            Method::Get,
-            format!("{API}/rooms/{}/joined_members", segment(&event.room_id)),
-        ),
-        stop,
-    )
-    .await?;
-    let joined = joined
-        .get("joined")
-        .and_then(Value::as_object)
-        .ok_or_else(|| crate::events::invalid("Invalid native joined-member response"))?;
-    for member in joined.keys() {
-        check::matrix_user_id(&json!(member))?;
-    }
-    Ok(joined.contains_key(&event.sender)
-        && joined.contains_key(&profile.account.user_id)
+    let joined = messaging.joined_members(&event.room_id, stop).await?;
+    Ok(joined.contains(&event.sender)
+        && joined.contains(&profile.account.user_id)
         && (mention || (pause || direct) && joined.len() == 2))
 }

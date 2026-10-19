@@ -1,24 +1,23 @@
 import { createHash } from 'node:crypto';
-import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
-import { ownerNotice, ownerNoticeChunks, ownerNoticeFits } from './owner-notices.js';
 import type { RuntimeObservationEvent } from './runtime.js';
 import type { NativeSessionState } from './runtime.js';
 import { observation, type RuntimeObservation } from '@ctlflow/crossfire-contracts/runtime';
-import type { Clock, LocalState, Transport } from './port.js';
+import type { Clock, LocalState, MessagingTransport } from './port.js';
 import type { Coordination } from './coordination.js';
 import { failureError } from '@ctlflow/crossfire-kernel/result';
 
 type Output = { id: string; text: string; sources: string[]; streamId: string | null; sealed: boolean };
 type Journal = { output: Output[]; observations: RuntimeObservation[] };
 export function ownerObservation(options: { agentId: string; userId: string; file: string; storage: LocalState; clock: Clock;
-  transport: Transport; coordination: Coordination; historyMode: 'shared' | 'per-room'; maximum: number;
+  transport: MessagingTransport; coordination: Coordination; historyMode: 'shared' | 'per-room'; maximum: number;
   native?: () => NativeSessionState | undefined }, stop: AbortSignal) {
   const journalBytes = 64 * 1024 * 1024;
+  const codec = options.transport(stop, 15000);
   let journal: Journal;
   try {
     journal = options.storage.exists(options.file) ? options.storage.read<Journal>(options.file, journalBytes) : { output: [], observations: [] };
     if (!journal || !Array.isArray(journal.output) || journal.output.some(item => !item || typeof item !== 'object'
-      || typeof item.id !== 'string' || typeof item.text !== 'string' || !ownerNoticeFits(item.text) || typeof item.sealed !== 'boolean'
+      || typeof item.id !== 'string' || typeof item.text !== 'string' || !codec.noticeFits(item.text) || typeof item.sealed !== 'boolean'
       || item.streamId !== null && typeof item.streamId !== 'string' || !Array.isArray(item.sources) || !item.sources.length
       || item.sources.some(source => typeof source !== 'string')) || !Array.isArray(journal.observations)
       || journal.observations.some(item => !observation(item).ok)) throw new Error('Invalid owner observation journal');
@@ -39,7 +38,7 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
   function save(): void { options.storage.write(options.file, journal, journalBytes); }
   function notice(identity: string, text: string): void {
     let position = 0;
-    for (const part of ownerNoticeChunks(text)) {
+    for (const part of codec.noticeChunks(text)) {
       const id = createHash('sha256').update(JSON.stringify(['listener-notice', identity, position++])).digest('hex');
       if (pendingSources.has(id)) continue;
       journal.output.push({ id, text: part, sources: [id], streamId: null, sealed: true });
@@ -49,7 +48,7 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
     wakeFlusher?.();
   }
   async function typing(room: string, enabled: boolean): Promise<void> {
-    await options.transport(AbortSignal.timeout(10000), 10000).put(API + '/rooms/' + segment(room) + '/typing/' + segment(options.userId), { typing: enabled, ...(enabled ? { timeout: 30000 } : {}) });
+    await options.transport(AbortSignal.timeout(10000), 10000).thinking(room, options.userId, enabled, 30000);
   }
   async function clearTyping(): Promise<void> {
     typingGeneration++;
@@ -90,11 +89,11 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
       lastActivityAt = options.clock.now();
       let position = 0;
       const streamId = event.streamId === null ? null : JSON.stringify([event.sessionId, event.streamId]);
-      for (const part of ownerNoticeChunks(event.text)) {
+      for (const part of codec.noticeChunks(event.text)) {
         const id = createHash('sha256').update(JSON.stringify([event.sessionId, event.id, position++])).digest('hex');
         if (pendingSources.has(id)) continue;
         const previous = journal.output.at(-1);
-        if (streamId !== null && previous?.streamId === streamId && !previous.sealed && ownerNoticeFits(previous.text + part)) {
+        if (streamId !== null && previous?.streamId === streamId && !previous.sealed && codec.noticeFits(previous.text + part)) {
           previous.text += part; previous.sources.push(id);
         } else journal.output.push({ id, text: part, sources: [id], streamId, sealed: false });
         pendingSources.add(id);
@@ -122,8 +121,7 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
       const conversation = await options.coordination.ownerConversation(options.agentId, scope);
       if (!conversation.ok) return false;
       const client = options.transport(scope, 15000);
-      await client.put(API + '/rooms/' + segment(conversation.value.roomId) + '/send/m.room.message/observation-' + output.id,
-        ownerNotice(output.text));
+      await client.sendNotice(conversation.value.roomId, 'observation-' + output.id, output.text);
       journal.output.shift();
       for (const source of output.sources) pendingSources.delete(source);
       save();

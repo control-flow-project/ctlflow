@@ -26,9 +26,9 @@ pub fn policy(value: &Value) -> Result<Policy> {
     let senders = check::list(&fields["senders"], 0, 2000)?
         .iter()
         .map(|value| {
-            let value = check::object(value, &["matrixUserId", "includeAgents"], &[])?;
-            Ok(crossfire_domain::coordination::MatrixSender {
-                matrix_user_id: check::matrix_user_id(&value["matrixUserId"])?.to_owned(),
+            let value = check::object(value, &["backendUserId", "includeAgents"], &[])?;
+            Ok(crossfire_domain::coordination::BackendSender {
+                backend_user_id: check::backend_user_id(&value["backendUserId"])?.to_owned(),
                 include_agents: check::boolean(&value["includeAgents"])?,
             })
         })
@@ -40,7 +40,7 @@ pub fn policy(value: &Value) -> Result<Policy> {
     if mode == WakeMode::Everyone && !senders.is_empty()
         || senders
             .iter()
-            .map(|sender| &sender.matrix_user_id)
+            .map(|sender| &sender.backend_user_id)
             .collect::<std::collections::BTreeSet<_>>()
             .len()
             != senders.len()
@@ -108,7 +108,7 @@ fn decode_roster(value: &serde_json::Map<String, Value>) -> Result<Roster> {
         .collect::<Result<Vec<_>>>()?;
     Ok(Roster {
         controller: controller(&value["controller"])?,
-        owner_matrix_id: check::matrix_user_id(&value["ownerMatrixId"])?.to_owned(),
+        owner_backend_user_id: check::backend_user_id(&value["ownerBackendUserId"])?.to_owned(),
         fleet_key: check::name(&value["fleetKey"])?.to_owned(),
         instances,
         controller_credential: value
@@ -123,7 +123,7 @@ fn decode_roster(value: &serde_json::Map<String, Value>) -> Result<Roster> {
 pub fn roster(value: &Value) -> Result<Roster> {
     decode_roster(check::object(
         value,
-        &["controller", "ownerMatrixId", "fleetKey", "instances"],
+        &["controller", "ownerBackendUserId", "fleetKey", "instances"],
         &["controllerCredential"],
     )?)
 }
@@ -132,7 +132,7 @@ pub fn introduction(value: &Value) -> Result<Introduction> {
         value,
         &[
             "controller",
-            "ownerMatrixId",
+            "ownerBackendUserId",
             "fleetKey",
             "instances",
             "enrollmentId",
@@ -183,9 +183,9 @@ pub fn decided(value: &DecisionResult) -> Value {
     json!({"enrollmentId":value.enrollment_id,"status":value.state.as_str(),"revision":value.revision})
 }
 pub fn exchanged(value: &Exchange) -> Value {
-    json!({"status":value.status,"ownerMatrixId":value.owner_matrix_id,"fleet":value.fleet.as_ref().map(|(id,credential)| json!({"fleetId":id,"controllerCredential":credential.as_ref().map(|credential| credential.expose())})),
+    json!({"status":value.status,"ownerBackendUserId":value.owner_backend_user_id,"fleet":value.fleet.as_ref().map(|(id,credential)| json!({"fleetId":id,"controllerCredential":credential.as_ref().map(|credential| credential.expose())})),
         "instances":value.instances.iter().map(|value| json!({"instanceKey":value.instance_key,"name":value.name,"agentId":value.agent_id,"status":if value.account.is_some(){"ready"}else{"provisioning"},"errorCode":value.error_code,
-            "account":value.account.as_ref().map(|value| json!({"matrixUserId":value.matrix_user_id,"accessToken":value.access_token.expose(),"deviceId":value.device_id}))})).collect::<Vec<_>>()})
+            "account":value.account.as_ref().map(crate::messaging::account_value)})).collect::<Vec<_>>()})
 }
 
 pub struct Digest(CollatorBorrowed<'static>);
@@ -229,7 +229,7 @@ impl Digest {
             .collect::<Vec<_>>();
         items.sort_by(|left, right| self.compare(left.0, right.0));
         serde_json::to_string(&Canonical {
-            owner: &roster.owner_matrix_id,
+            owner: &roster.owner_backend_user_id,
             fleet: &roster.fleet_key,
             controller,
             items,
@@ -241,11 +241,11 @@ impl Digest {
             .senders
             .iter()
             .map(|sender| Sender {
-                matrix_user_id: &sender.matrix_user_id,
+                backend_user_id: &sender.backend_user_id,
                 include_agents: sender.include_agents,
             })
             .collect::<Vec<_>>();
-        senders.sort_by(|left, right| self.compare(left.matrix_user_id, right.matrix_user_id));
+        senders.sort_by(|left, right| self.compare(left.backend_user_id, right.backend_user_id));
         PolicyWire {
             wake_mode: match value.mode {
                 WakeMode::Humans => "humans",
@@ -288,6 +288,6 @@ struct PolicyWire<'a> {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Sender<'a> {
-    matrix_user_id: &'a str,
+    backend_user_id: &'a str,
     include_agents: bool,
 }

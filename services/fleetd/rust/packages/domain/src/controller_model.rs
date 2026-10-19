@@ -197,6 +197,10 @@ pub struct SetupOutcome {
 }
 
 pub trait RunningAgent: Send + Sync {
+    fn diagnostics(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Response<'_, crossfire_agent_core::owned_runtime::NativeDiagnostic>;
     fn session_id(&self) -> &str;
     fn lifetime(&self) -> CancellationToken;
     fn deliberately_stopped(&self) -> bool;

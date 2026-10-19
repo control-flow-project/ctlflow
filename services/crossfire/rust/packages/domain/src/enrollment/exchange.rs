@@ -10,6 +10,7 @@ pub fn exchange(
     id: &str,
     claim: &Secret,
     now: i64,
+    messaging: &impl crate::messaging::MessagingAuthority,
 ) -> Result<Exchange> {
     let request = repo
         .enrollment_request(id)?
@@ -21,7 +22,7 @@ pub fn exchange(
         .ok_or_else(|| Failure::new(ErrorCode::Forbidden, "Owner access is no longer active"))?;
     let mut result = Exchange {
         status: request.state.as_str(),
-        owner_matrix_id: owner.matrix_user_id,
+        owner_backend_user_id: owner.backend_user_id,
         fleet: None,
         instances: Vec::new(),
     };
@@ -99,13 +100,12 @@ pub fn exchange(
             agent_id: agent,
             error_code: current.application.error_code,
             account: if ready {
-                Some(Account {
-                    matrix_user_id: current.principal.matrix_user_id,
-                    access_token: credentials.access_token.ok_or_else(|| {
+                Some(messaging.agent_account(
+                    &current.principal.backend_user_id,
+                    credentials.access_token.ok_or_else(|| {
                         Failure::new(ErrorCode::Unavailable, "Ready agent credential is missing")
                     })?,
-                    device_id: "CROSSFIRE_AGENT".to_owned(),
-                })
+                ))
             } else {
                 None
             },

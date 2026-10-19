@@ -1,3 +1,6 @@
+import { connectMatrix } from '@ctlflow/crossfire-adapter-matrix/connection';
+import { matrixSettings } from './support/matrix-config.js';
+import { matrixPublicRoutes } from '@ctlflow/crossfire-adapter-matrix/web/router';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { connectOwnerConversation } from '@ctlflow/crossfire-domain/owner-conversation/connect';
 import assert from 'node:assert/strict';
@@ -9,7 +12,7 @@ import test from 'node:test';
 import { chromium, expect, type Page } from '@playwright/test';
 import { decideConfirmation } from './support/confirmation.js';
 import { conduitFixture } from '../scripts/architecture-proof/conduit-fixture.js';
-import { bootstrap } from '../apps/server/src/bootstrap.js';
+import { bootstrap } from '@ctlflow/crossfire-adapter-matrix/bootstrap';
 import { secret, value } from './support/application.js';
 import { createApplication } from '../apps/server/src/composition.js';
 import { applicationDatabase } from './support/storage.js';
@@ -33,7 +36,7 @@ import { createClient } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
-import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { API, segment } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { nativeProvider } from '@ctlflow/crossfire-test-support/native-provider';
 import { nativeEngine, materialize } from '../scripts/test-support/native-engine.js';
@@ -104,10 +107,10 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const directory = mkdtempSync(join(process.cwd(), '.temp/browser-'));
   const jwtSecret = secret();
   const matrix = await conduitFixture(scope, { jwtSecret });
-  const config = { instance: 'browser', serverName: 'architecture.localhost', publicOrigin: 'http://127.0.0.1',
-    contentOrigin: 'http://localhost', matrixOrigin: matrix.base, administrator: '@admin:architecture.localhost', registrationSecret: matrix.registrationToken, jwtSecret };
+  const config = { instance: 'browser', publicOrigin: 'http://127.0.0.1', contentOrigin: 'http://localhost',
+    messaging: { type: 'matrix', parameters: { serverName: 'architecture.localhost', origin: matrix.base, registrationSecret: matrix.registrationToken, jwtSecret } }, administrator: '@admin:architecture.localhost' };
   const password = secret();
-  const initialized = await bootstrap(config, { servicePassword: secret(), administratorPassword: password });
+  const initialized = await bootstrap({ ...matrixSettings(config), instance: config.instance, administrator: config.administrator }, { servicePassword: secret(), administratorPassword: password });
   assert(initialized.ok, JSON.stringify(initialized));
   const application = createApplication(applicationDatabase(scope, join(directory, 'management.sqlite')), config), { services } = application;
   const worker = createWorker(services, application.diagnostics);
@@ -119,7 +122,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
     web: join(process.cwd(), 'dist/web'), element };
   cleanup(scope, async () => { await worker.stop(); service.closeAllConnections();
     await new Promise<void>(resolve => service.close(() => resolve())); application.close(); });
-  const { origin } = await secureRouter(scope, publicRouter(routes));
+  const { origin } = await secureRouter(scope, publicRouter({ get publicOrigin() { return routes.publicOrigin; }, service: routes.service, web: routes.web, backend: matrixPublicRoutes(routes) }));
   routes.publicOrigin = origin; config.publicOrigin = origin; services.instance.publicOrigin = origin;
   const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
@@ -136,13 +139,13 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await page.setViewportSize({ width: 390, height: 844 });
   assert(await page.evaluate<boolean>('document.documentElement.scrollWidth <= innerWidth'));
   await checkPaperLayout(page);
-  await page.getByLabel('Matrix username').focus();
-  await expect(page.getByLabel('Matrix username')).toHaveCSS('outline-style', 'solid');
+  await page.getByLabel('Username').focus();
+  await expect(page.getByLabel('Username')).toHaveCSS('outline-style', 'solid');
   await page.keyboard.press('Tab');
   await expect(page.getByLabel('Password', { exact: true })).toBeFocused();
   await page.screenshot({ path: join(directory, 'login-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByLabel('Matrix username').fill(config.administrator);
+  await page.getByLabel('Username').fill(config.administrator);
   await page.getByLabel('Password', { exact: true }).fill('incorrect-fixture-password');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page.getByRole('alert')).toBeVisible();
@@ -173,7 +176,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   assert((await nativeOk(human, 'PUT', API + '/rooms/' + segment(room) + '/state/m.room.canonical_alias', { alias: roomAlias })).ok);
   const workspace = join(directory, 'project'); mkdirSync(workspace);
   const stateDirectory = join(directory, 'controller-state'); mkdirSync(stateDirectory);
-  const enrollment = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: config.administrator, fleetKey: 'project',
+  const enrollment = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: config.administrator, fleetKey: 'project',
     controller: { name: 'Browser workstation', metadata: {} }, instances: [{ instanceKey: 'holmes', name: 'holmes',
       coordinationPolicy: { ...defaultCoordinationPolicy(config.administrator), wakeMode: 'selected' as const } }] };
   const introduced = value(await introduceEnrollment(services, enrollment));
@@ -185,12 +188,11 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await worker.drain();
   const enrolled = value(exchangeEnrollment(services, enrollment.enrollmentId, enrollment.claimSecret)), enrolledAgent = enrolled.instances[0];
   assert(enrolledAgent?.agentId && enrolledAgent.account && enrolled.fleet?.controllerCredential);
-  const profile = { id: enrolledAgent.agentId, workspace, account: { user_id: enrolledAgent.account.matrixUserId,
-    access_token: enrolledAgent.account.accessToken, device_id: enrolledAgent.account.deviceId },
-    settings: { instance: config.instance, homeserver: origin, server_name: config.serverName, owner: config.administrator, max_upload_bytes: 16 * 1024 * 1024 } };
+  const profile = { id: enrolledAgent.agentId, workspace, account: enrolledAgent.account,
+    settings: { instance: config.instance, server: origin, backend: { type: 'matrix', parameters: { origin: origin, serverName: matrixSettings(config).serverName } }, owner: config.administrator, maxUploadBytes: 16 * 1024 * 1024 } };
   const fleetId = enrolled.fleet.fleetId;
   const rename = { ...enrollment, enrollmentId: randomUUID(), claimSecret: secret(), controllerCredential: enrolled.fleet.controllerCredential,
-    instances: [{ ...enrollment.instances[0]!, name: 'holmes-max', identity: { agentId: profile.id, accessToken: profile.account.access_token } }] };
+    instances: [{ ...enrollment.instances[0]!, name: 'holmes-max', identity: { agentId: profile.id, accessToken: profile.account.accessToken } }] };
   const review = value(await introduceEnrollment(services, rename));
   await page.goto(origin + '/manage/enrollments/' + rename.enrollmentId);
   await expect(page.getByText('Rename from holmes', { exact: true })).toBeVisible();
@@ -235,7 +237,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await submit(page, 'Save access');
   await expect(page.getByRole('button', { name: 'Save access' })).toBeEnabled();
   await worker.drain();
-  const agent = { base: origin, token: profile.account.access_token };
+  const agent = { base: origin, token: profile.account.accessToken };
   assert(!(await nativeOk(agent, 'PUT', API + '/rooms/' + segment(room) + '/send/m.room.message/denied', { msgtype: 'm.text', body: 'Denied' })).ok);
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Registered name', exact: true, level: 2 })).toBeVisible();
@@ -243,26 +245,26 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await expect(page.getByRole('button', { name: 'Save name', exact: true })).toHaveCount(0);
   await page.getByRole('navigation', { name: 'Agent sections' }).getByRole('link', { name: 'Rooms', exact: true }).click();
   await page.getByRole('link', { name: 'Engineering', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Native Matrix permissions', exact: true })).toBeVisible();
-  const nativePermissions = page.getByRole('table', { name: 'Native permission thresholds', exact: true });
+  await expect(page.getByRole('heading', { name: 'Backend permissions', exact: true })).toBeVisible();
+  const nativePermissions = page.getByRole('table', { name: 'Backend permissions', exact: true });
   await expect(nativePermissions).toBeHidden();
-  await page.getByText('View native permission thresholds', { exact: true }).click();
+  await page.getByText('View backend permissions', { exact: true }).click();
   await expect(nativePermissions).toBeVisible();
   const roomResponse = await page.request.get(origin + '/api/rooms/' + encodeURIComponent(room) + '?agentId=' + profile.id);
   assert.equal(roomResponse.status(), 200);
-  const thresholds = (await roomResponse.json() as { data: { authority: { nativePermissions: { action: string; level: number }[] } } }).data.authority.nativePermissions;
+  const thresholds = (await roomResponse.json() as { data: { authority: { permissions: { action: string; label: string; allowed: boolean }[] } } }).data.authority.permissions;
   for (const permission of thresholds) {
-    const row = nativePermissions.getByRole('row').filter({ has: page.getByRole('cell', { name: permission.action, exact: true }) });
-    await expect(row.getByRole('cell').nth(1)).toHaveText(String(permission.level));
+    const row = nativePermissions.getByRole('row').filter({ has: page.getByRole('cell', { name: permission.label, exact: true }) });
+    await expect(row.getByRole('cell').nth(1)).toHaveText(permission.allowed ? 'Allowed' : 'Not allowed');
   }
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Engineering', exact: true })).toBeVisible();
   await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('custom');
-  await page.getByLabel('Power level', { exact: true }).fill('50');
+  await page.getByLabel('Matrix power level', { exact: true }).fill('50');
   await submit(page, 'Save access');
-  await expect(page.locator('.subject-status .status')).toHaveText('Custom power level', { timeout: 15_000 });
+  await expect(page.locator('.subject-status .status')).toHaveText('Custom access', { timeout: 15_000 });
   await worker.drain();
-  assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: profile.id, roomId: room }))!.powerLevel, 50);
+  assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: profile.id, roomId: room }))!.nativeAccess?.powerLevel, 50);
   await page.getByRole('link', { name: '← Agent details' }).click();
   await page.getByRole('combobox', { name: 'Access for Engineering' }).selectOption('reply');
   await submit(page, 'Save access');
@@ -298,7 +300,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const binding = control.listener(profile.id);
   await until(() => control.status().connected);
   const cursorFile = join(stateDirectory, 'cursors.json');
-  const receiving = listen({ log: (_message: string) => {}, binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: profile.account.access_token }), release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile,
+  const receiving = listen({ ...connectMatrix(profile.settings.backend, profile.account), log: (_message: string) => {}, binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: profile.account.accessToken }), release: release.manifest, settings: profile.settings, account: profile.account, id: profile.id, cursorFile,
     limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 1000, ready: () => { listenerReady = true; },
     runtime: (signal, pollMs, hooks) => resumeFixture({ ...engine, pollMs, hooks }, signal),
   }, stop.signal).catch(error => { if (!stop.signal.aborted) listenerFailure = error; });
@@ -320,7 +322,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await until(() => engine.notifications.some(notice => notice.method === 'turn/completed'));
   provider.hold();
   await page.getByRole('link', { name: 'Choose who can wake' }).click();
-  await page.getByLabel('Search people or Matrix IDs').fill(config.administrator);
+  await page.getByLabel('Search people or messaging identities').fill(config.administrator);
   await page.getByLabel('Allow ' + config.administrator, { exact: true }).check();
   await page.getByRole('button', { name: 'Save wake-up policy', exact: true }).click();
   await expect(page).toHaveURL(origin + '/manage/agents/' + profile.id);
@@ -351,7 +353,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await page.screenshot({ path: join(directory, 'agent-runtime-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
   const run = value(services.collection.listenerRuns({ agentId: profile.id })).find(run => run.stoppedAt === null); assert(run);
-  const coordination = createCoordination({ origin, token: profile.account.access_token });
+  const coordination = createCoordination({ origin, token: profile.account.accessToken });
   const decision = value(await coordination.createDecision(profile.id, { id: randomUUID(), runId: run.id, sessionId: engine.session,
     runtime: 'codex', requestId: 'browser-question', turnId: 'original-turn', itemId: 'original-question', kind: 'question',
     action: 'Select a destination', review: 'Complete original native scope', blocking: true, expiresAt: null,
@@ -443,7 +445,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const incompletePage = await memberContext.newPage(); incompletePage.on('pageerror', error => errors.push(error.message));
   await incompletePage.goto(incompleteInvitation.href);
   await expect(incompletePage.getByRole('alert')).toHaveText('Open the complete private invitation link you received.');
-  await expect(incompletePage.getByRole('button', { name: 'Continue to Element →', exact: true })).toBeDisabled();
+  await expect(incompletePage.getByRole('button', { name: 'Continue to Matrix →', exact: true })).toBeDisabled();
   await checkPaperLayout(incompletePage);
   await incompletePage.screenshot({ path: join(directory, 'invitation-incomplete.png'), fullPage: true });
   await incompletePage.close();
@@ -456,7 +458,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   assert(await memberPage.evaluate<boolean>('document.documentElement.scrollWidth <= innerWidth'));
   await checkPaperLayout(memberPage);
   await memberPage.screenshot({ path: join(directory, 'invitation-join-mobile.png'), fullPage: true });
-  await memberPage.getByRole('button', { name: 'Continue to Element →', exact: true }).click();
+  await memberPage.getByRole('button', { name: 'Continue to Matrix →', exact: true }).click();
   await memberPage.waitForURL(origin + '/#/register');
   await expect(memberPage.getByLabel('Username', { exact: true })).toBeVisible();
   await memberPage.getByLabel('Username', { exact: true }).fill('alice');
@@ -480,7 +482,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await confirmation.close();
   await memberPage.screenshot({ path: join(directory, 'element-registration.png'), fullPage: true });
   await memberPage.goto(origin + '/manage/');
-  await memberPage.getByLabel('Matrix username').fill('@alice:architecture.localhost');
+  await memberPage.getByLabel('Username').fill('@alice:architecture.localhost');
   await memberPage.getByLabel('Password', { exact: true }).fill('browser-fixture-only-password');
   await memberPage.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(memberPage.getByRole('heading', { name: 'Agents', exact: true })).toBeVisible();
@@ -529,7 +531,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await worker.drain();
   await page.reload();
   await expect(page.locator('.status').filter({ hasText: /^No access$/u })).toBeVisible();
-  assert.equal(value(await services.matrix.membership(config.administrator, profile.account.user_id, room)).membership, 'leave');
+  assert.equal(value(await services.messaging.membership(config.administrator, profile.account.userId, room)).membership, 'leave');
   const ownerConversation = value(services.repositories.ownerConversation.find({ agentId: profile.id }))!;
   assert.deepEqual(value(services.collection.roomGrants({ agentId: profile.id })).filter(grant => grant.accessMode !== 'none').map(grant => grant.roomId), [ownerConversation.roomId]);
   await page.goto(origin + '/manage/audit');
@@ -540,9 +542,9 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   const adminSession = value(await createSession(services, human.token)), adminActor = value(await authenticateMember(services, adminSession.secret)).actor;
   const aliceAccount = value(await nativeOk({ base: origin }, 'POST', API + '/login', { type: 'm.login.password', identifier: { type: 'm.id.user', user: '@alice:architecture.localhost' }, password: 'browser-fixture-only-password' }));
   const aliceSession = value(await createSession(services, String(aliceAccount.access_token))), aliceActor = value(await authenticateMember(services, aliceSession.secret)).actor;
-  for (const [name, actor, ownerMatrixId] of [['archived', adminActor, config.administrator], ['alice-agent', aliceActor, '@alice:architecture.localhost']] as const) {
-    const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId, fleetKey: name, controller: { name: name + ' workstation', metadata: {} },
-      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy(ownerMatrixId) }] };
+  for (const [name, actor, ownerBackendUserId] of [['archived', adminActor, config.administrator], ['alice-agent', aliceActor, '@alice:architecture.localhost']] as const) {
+    const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId, fleetKey: name, controller: { name: name + ' workstation', metadata: {} },
+      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy(ownerBackendUserId) }] };
     const introduced = value(await introduceEnrollment(services, input));
     value(decideEnrollment(services, actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
     const id = value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))[0]!.agentId!;
@@ -602,7 +604,7 @@ test('real browser member/admin flows and a fleet-managed listener span native C
   await expect(page.getByRole('heading', { name: 'No agents', exact: true })).toBeVisible();
   const retired = value(services.repositories.fleetInstance.find({ ownerId: adminActor.principalId, fleetKey: 'project', instanceKey: 'holmes' }))!;
   assert(retired.retiredAt !== null);
-  assert.equal(value(services.repositories.principal.find({ id: profile.id }))!.matrixUserId, profile.account.user_id);
+  assert.equal(value(services.repositories.principal.find({ id: profile.id }))!.backendUserId, profile.account.userId);
   assert.equal(value(services.repositories.ownerConversation.find({ agentId: profile.id }))!.roomId, ownerConversation.roomId);
   assert(engine.child.exitCode !== null || engine.child.signalCode !== null, 'Retirement follows an actual stopped native process');
   await page.getByRole('navigation', { name: 'Fleet views' }).getByRole('link', { name: 'Settings', exact: true }).click();

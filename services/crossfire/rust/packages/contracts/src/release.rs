@@ -8,7 +8,7 @@ pub const ARTIFACTS: [&str; 4] = [
     "README.md",
     "SKILL.md",
     "crossfire-client.mjs",
-    "matrix-spec-LICENSE.txt",
+    "messaging-LICENSE.txt",
 ];
 pub const MAX_ARTIFACT_BYTES: usize = 8 * 1024 * 1024;
 #[derive(Clone, Debug, Deserialize, Serialize)]

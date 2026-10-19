@@ -25,9 +25,9 @@ The owner reaffirmed on 2026-10-17: preserving existing data, deployment state,
 old clients or prior implementation choices never justifies a second path.
 Do not retain or introduce any compatibility reader/writer, old/new handler,
 alias, bridge or fallback to save existing state. Any such exception requires
-the owner's explicit approval of that specific path; none is approved. Necessary
-one-time forward migrations end at the single current schema and do not leave
-old runtime support. Explicitly selected Node/C#/Rust build targets remain
+the owner's explicit approval of that specific path; none is approved. No historical
+preservation or conversion is required before an explicit production declaration.
+Explicitly selected Node/C#/Rust build targets remain
 separate implementations of that same current contract, not compatibility modes.
 
 On 2026-10-13 the owner explicitly authorized independently selected Node and
@@ -61,8 +61,17 @@ only that transitive lock entry. The persistent seven-day policy and existing
 named exemptions remain unchanged. This does not authorize future exemptions,
 compatibility paths or broader dependency updates.
 
-Necessary forward data migrations convert a verified deployed schema into the
-single current schema; they do not authorize concurrent old/new runtime paths.
+Until the owner explicitly declares production, existing application databases
+and data are resettable and impose no preservation requirement. Do not implement
+historical schema admission, conversion, compatibility readers, special obsolete
+database handling or historical-format tests. Create the current schema directly
+from one initial Knex migration. Keep existing domain entities and behavior;
+nullable fields require genuine domain absence, never old-data accommodation.
+There are no historical compatibility exceptions. If production is explicitly
+declared later, ask the owner before proposing or writing any compatibility or
+historical-preservation code. Do not build speculative future migration machinery.
+This does not authorize deleting credentials, source work or unrequested running
+resources. Database resets are explicit operations, not automatic startup behavior.
 Knex is the sole owner of database creation and migrations across every language
 implementation. Database assets use the Lesser/Snapped structure under their
 service: database/<database>/<backend>/migrations and seeds, with a per-database
@@ -72,10 +81,12 @@ after success. Node, C# and Rust validate existing databases; none creates schem
 runs ORM migrations or silently migrates at startup. New databases follow the
 same nesting and owner. File state and Conduit's externally owned RocksDB are
 not SQL databases and are not converted into artificial Knex stores.
-Preserve production data, credentials and native histories. Inventory actual
-stores before removing obsolete migration inputs; never reset production to avoid
-designing the correct migration. Required native protocol behavior is not an
-excuse for speculative support of older contracts.
+Preserve credentials and native histories unless the owner explicitly requests
+their removal. Required native protocol behavior is not an excuse for speculative
+support of older contracts. Generic code uses only neutral fields; native wire
+names belong exclusively to the selected messaging adapter. This also excludes
+historical native-context/observation converters and bespoke obsolete-file checks.
+Read only each current format; do not inspect past formats before using it.
 
 On 2026-10-16 the owner selected C# NativeAOT as the GAAP and Bad Bets server
 deployment default. Node and managed C# remain explicit package choices, never
@@ -94,6 +105,16 @@ Keep host, owner, fleet and release expectations explicit; site-specific brandin
 TLS and deployment configuration remain site-owned.
 
 ## Engineering
+Messaging backends are adapters, not platform policy. Generic domain, listener,
+fleet/controller, contracts and shared UI must not encode Matrix identifiers,
+HTTP routes, event bodies, power-level calculations, membership/invitation
+protocols, registration stages or native-client URLs. Use normalized messaging
+ports and opaque identifiers. Backend adapters own native validation, authority,
+capabilities, encoding, authentication integration and protocol translations.
+Matrix is the implemented backend; do not add placeholder Slack/Zulip adapters.
+Apply every applicable change in Node, C# managed/NativeAOT and Rust. Verify the
+generic core with a non-Matrix-shaped fixture as well as actual Matrix integration.
+
 Use functional modules, strict types without any, named exports, explicit .js
 relative imports, Result for expected failures and boundary validation. Split
 modules by responsibility near 600 lines. Domain code imports neither transport
@@ -170,8 +191,9 @@ or whenever the impact is uncertain. Never weaken a gate or claim verification
 that was not performed.
 On 2026-10-18 the owner approved one performance exception: managed .NET's
 saved-runtime-observation median and p95 may each be at most 1.30 times Node's
-corresponding measured latency. Throughput, request success and every other
-target/workload retain strict Node comparisons. JSON/HTML reports expose both limits
+corresponding measured latency; that workload's throughput may be at least 0.95
+times Node's. Request success and every other target/workload retain strict Node
+comparisons. JSON/HTML reports expose both limits
 and label its use; no implicit tolerance or unreported failed attempt.
 Keep the unified spec and .analysis/20260929-164420-fleet-handover/necessity-ledger.md
 aligned with decisions and evidence. .analysis/MEMORY.md is the local work memory.

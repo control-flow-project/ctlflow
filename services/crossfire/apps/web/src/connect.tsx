@@ -9,7 +9,7 @@ function SetupPicture({ step }: { step: number }) {
   </svg>;
 }
 export function Connect() {
-  const { member } = useSession(), guide = onboardingUrl(location.origin, member.matrixUserId);
+  const { member } = useSession(), guide = onboardingUrl(location.origin, member.backendUserId);
   return <Page title="Set up an agent" description="Create a fleet-managed agent in your project using your existing coding harness and login.">
     <section className="setup-step" aria-labelledby="setup-instruction"><SetupPicture step={1}/><div><span className="step-label">STEP 1</span><h2 id="setup-instruction">Paste this into your coding assistant</h2>
       <p>Open the project you want the new agent to work in. Your assistant reads the guide and runs setup with saved defaults—no configuration questions.</p>
@@ -21,7 +21,7 @@ export function Connect() {
       <p>Repeated setup reuses the fleet, identities and saved histories. New agents or expanded permissions need another review. Approval alone creates no chats or room access.</p><a href="/manage/enrollments">Review enrollment requests →</a></div></section>
     <section className="setup-step" aria-labelledby="setup-ready"><SetupPicture step={3}/><div><span className="step-label">STEP 3</span><h2 id="setup-ready">Choose where your agent works</h2>
       <p>Setup checks controller, listener and native-session readiness without calling the model. Your agent appears in Agents and its fleet.</p>
-      <p>Open a DM in Element when you need it, or invite it to an existing room. Room access controls what it can read or send; wake eligibility controls whose messages trigger work.</p>
+      <p>Open a DM in your messaging client when you need it, or invite it to an existing room. Room access controls what it can read or send; wake eligibility controls whose messages trigger work.</p>
       <p>Agents sleep after the configured idle period and resume their saved histories for eligible messages. Stopped sessions stay stopped until you explicitly resume them.</p>
       <div className="actions"><a className="button" href="/manage/agents">View agents →</a><a className="button" href="/manage/fleets">View fleets →</a><a className="button" href="/">Open Element →</a></div></div></section>
     <details className="setup-details"><summary>Requirements &amp; advanced configuration</summary>

@@ -1,3 +1,4 @@
+import { connectMatrix } from '@ctlflow/crossfire-adapter-matrix/connection';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createServer } from 'node:http';
@@ -61,7 +62,7 @@ test('fleet verification uses only daemon GETs, exact native identities and the 
   mkdirSync(join(directory, '.agents', 'skills', 'search'), { recursive: true, mode: 0o700 }); writeFileSync(skill, 'fixture');
   const agentId = randomUUID(), fleetId = randomUUID(), sessionId = randomUUID();
   saveBinding(fleetDirectory, { server: 'https://example.test', owner: '@owner:test', fleetKey: 'research', fleetId, controllerCredential: 'private-controller', request: null,
-    identities: [{ instanceKey: 'helper', name: 'helper', agentId, account: { user_id: '@helper:test', access_token: 'private-agent', device_id: 'fixture' } }] });
+    identities: [{ instanceKey: 'helper', name: 'helper', agentId, account: { userId: '@helper:test', accessToken: 'private-agent', native: { deviceId: 'fixture' } } }] });
   const instance = { key: 'helper', name: 'helper', definition: 'analyst', workarea: 'agents/analyst/workarea/helper' };
   const view: FleetView = { fleetId, fleetKey: 'research', label: 'Research', directory: fleetDirectory, revision: 0, controller: { name: 'laptop' }, phase: 'running', error: null, resumeInstanceKeys: null,
     connection: { connected: true, deliveryEnabled: true, revision: 0, error: null },
@@ -82,20 +83,20 @@ test('fleet verification uses only daemon GETs, exact native identities and the 
   const called: Attachment[] = [];
   const inspect: NativeInspector = async input => { called.push(input.attachment); return success({ sessionId, status: 'idle', authenticated: true, configuredModel: 'gpt-5.2', configuredReasoning: null, projectSkills: [{ name: 'search', path: skill }], turns: 0 }); };
   const input = { root, directory: fleetDirectory, running: true, fresh: true, noRooms: false, skills: ['search'] };
-  const first = value(await verifyFleet(input, new AbortController().signal, inspect));
+  const first = value(await verifyFleet(input, new AbortController().signal, connectMatrix, inspect));
   assert(first && typeof first === 'object' && 'preservation' in first);
   const previous = value(preservation(first.preservation));
-  value(await verifyFleet({ ...input, previous }, new AbortController().signal, inspect));
+  value(await verifyFleet({ ...input, previous }, new AbortController().signal, connectMatrix, inspect));
   assert(requests.every(request => request.startsWith('GET ')));
   assert(called.every(current => current.sessionId === sessionId && current.workspace === workspace));
   assert(!JSON.stringify(first).includes('private-agent') && !JSON.stringify(first).includes('private-controller'));
-  assert.equal((await verifyFleet({ ...input, previous: { ...previous, identities: [{ instanceKey: 'helper', agentId: randomUUID(), contexts: [] }] } }, new AbortController().signal, inspect)).ok, false);
-  assert.equal((await verifyFleet(input, new AbortController().signal, async input => success({ sessionId: input.attachment.sessionId, status: 'idle', authenticated: true, configuredModel: null, configuredReasoning: null, projectSkills: [], turns: 0 }))).ok, false);
+  assert.equal((await verifyFleet({ ...input, previous: { ...previous, identities: [{ instanceKey: 'helper', agentId: randomUUID(), contexts: [] }] } }, new AbortController().signal, connectMatrix, inspect)).ok, false);
+  assert.equal((await verifyFleet(input, new AbortController().signal, connectMatrix, async input => success({ sessionId: input.attachment.sessionId, status: 'idle', authenticated: true, configuredModel: null, configuredReasoning: null, projectSkills: [], turns: 0 }))).ok, false);
   view.instances[0]!.listenerActive = false;
-  assert.equal((await verifyFleet(input, new AbortController().signal, inspect)).ok, false);
+  assert.equal((await verifyFleet(input, new AbortController().signal, connectMatrix, inspect)).ok, false);
   view.instances[0]!.listenerActive = true; attachment.workspace = directory;
-  assert.equal((await verifyFleet(input, new AbortController().signal, inspect)).ok, false);
-  assert.equal((await verifyFleet({ ...input, running: false }, new AbortController().signal, inspect)).ok, false);
+  assert.equal((await verifyFleet(input, new AbortController().signal, connectMatrix, inspect)).ok, false);
+  assert.equal((await verifyFleet({ ...input, running: false }, new AbortController().signal, connectMatrix, inspect)).ok, false);
   assert.equal((await inspectNative({ attachment: { ...attachment, runtime: 'unsupported' }, options: {}, fresh: false, requiredSkills: [] }, new AbortController().signal)).ok, false);
 });
 

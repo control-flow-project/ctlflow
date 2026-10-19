@@ -64,11 +64,11 @@ public sealed partial class CrossfireDbContext
         model.Entity<ListenerStatFlowRow>(entity =>
         {
             entity.ToTable("listener_stat_flow");
-            entity.HasKey(value => new { value.RunId, value.BucketAt, value.RoomId, value.SenderMatrixId, value.MessageType });
+            entity.HasKey(value => new { value.RunId, value.BucketAt, value.RoomId, value.SenderBackendUserId, value.MessageType });
             entity.Property(value => value.RunId).HasColumnName("run_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.BucketAt).HasColumnName("bucket_at").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.RoomId).HasColumnName("room_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
-            entity.Property(value => value.SenderMatrixId).HasColumnName("sender_matrix_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
+            entity.Property(value => value.SenderBackendUserId).HasColumnName("sender_backend_user_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.MessageType).HasColumnName("message_type").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.Observed).HasColumnName("observed").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.Delivered).HasColumnName("delivered").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();

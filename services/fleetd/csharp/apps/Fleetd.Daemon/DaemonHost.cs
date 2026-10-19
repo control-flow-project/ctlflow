@@ -4,6 +4,8 @@ using System.Text.Json;
 using Crossfire.AdapterCodex;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AdapterPi;
+using Crossfire.AdapterHttp;
+using Crossfire.AdapterMatrix;
 using Crossfire.AgentCore;
 using Crossfire.Contracts;
 using Crossfire.Kernel;
@@ -19,16 +21,16 @@ public static class DaemonHost
     public static async Task Run(string[] arguments)
     {
         if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("The owned fleet controller requires Linux");
-        var options = new Dictionary<string, string>(StringComparer.Ordinal); var background = false; var migrate = false; for (var index = 0; index < arguments.Length; index++) { var key = arguments[index]; if (key == "--background" && !background) { background = true; continue; } if (key == "--migrate-contexts" && !migrate) { migrate = true; continue; } if (key is not ("--root" or "--name" or "--artifacts") || index + 1 >= arguments.Length || !options.TryAdd(key, arguments[++index])) throw new ArgumentException("fleetd --root ABSOLUTE_DIRECTORY [--name NAME] [--artifacts RELEASE_DIRECTORY] [--migrate-contexts]"); }
+        var options = new Dictionary<string, string>(StringComparer.Ordinal); var background = false; for (var index = 0; index < arguments.Length; index++) { var key = arguments[index]; if (key == "--background" && !background) { background = true; continue; } if (key is not ("--root" or "--name" or "--artifacts") || index + 1 >= arguments.Length || !options.TryAdd(key, arguments[++index])) throw new ArgumentException("fleetd --root ABSOLUTE_DIRECTORY [--name NAME] [--artifacts RELEASE_DIRECTORY]"); }
         if (background) Crossfire.AdapterProcess.BackgroundStdio.RedirectToNull();
         if (!options.TryGetValue("--root", out var root) || !Path.IsPathFullyQualified(root) || root != Path.GetFullPath(root) || Encoding.UTF8.GetByteCount(Path.Combine(root, "fleetd.sock")) > 100) throw new ArgumentException("Use an exact absolute controller root short enough for its private Unix socket");
-        if (migrate) { if (background || options.ContainsKey("--name") || options.ContainsKey("--artifacts")) throw new ArgumentException("Context migration retains identity and software; supply only --root and --migrate-contexts"); ControllerContextMigration.Run(root); return; }
         if (PrivateFiles.Exists(root)) PrivateFiles.ExistingDirectory(root, true); else PrivateFiles.Directory(root); var authenticationKey = await Authentication.Initialize(); using var ownership = new StateLock(Path.Combine(root, "daemon")); var selected = options.GetValueOrDefault("--name"); var identityFile = Path.Combine(root, "controller.json"); ControllerIdentity identity;
         if (PrivateFiles.Exists(identityFile)) { identity = ParseController(AgentIO.Read(Crossfire.AdapterCrossfire.AgentState.Port, identityFile)); if (selected is not null && identity.Name != selected) throw new InvalidDataException("Controller root is already named differently"); }
         else { identity = ParseController(WireJson.Object(writer => writer.WriteString("name", selected ?? "local"))); AgentIO.Write(Crossfire.AdapterCrossfire.AgentState.Port, identityFile, Fleetd.Contracts.FleetWire.Controller(identity)); }
         var retention = RegistryFiles.LoggingDays(root); if (!retention.IsSuccess) throw new InvalidDataException(retention.Error.Message); var clock = TimeProvider.System; using var diagnostics = new DiagnosticStore(Path.Combine(root, "logs"), retention.Value, () => clock.GetUtcNow().ToUnixTimeMilliseconds());
         var socket = Path.Combine(root, "fleetd.sock"); await PrivateSockets.RemoveStale(socket, CancellationToken.None); var release = Path.GetFullPath(options.GetValueOrDefault("--artifacts") ?? Path.Combine(AppContext.BaseDirectory, "artifacts"));
-        await using var execution = new ExecutionHost(new Dictionary<string, OwnedRuntimeAdapter>(StringComparer.Ordinal) { ["codex"] = CodexRuntime.Create(), ["pi"] = PiRuntime.Create() }, release, diagnostics.Write, clock);
+        using var messagingHttp = NativeHttp.Client();
+        await using var execution = new ExecutionHost(new Dictionary<string, OwnedRuntimeAdapter>(StringComparer.Ordinal) { ["codex"] = CodexRuntime.Create(), ["pi"] = PiRuntime.Create() }, (configuration, account) => ClientConnection.Connect(messagingHttp, configuration, account), release, diagnostics.Write, clock);
         var registry = new RegistryFiles(root); var created = FleetController.Create(registry.Port, execution.Port, identity, clock); if (!created.IsSuccess) throw new InvalidDataException(created.Error.Message); await using var controller = created.Value;
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = [], ApplicationName = typeof(DaemonHost).Assembly.GetName().Name }); builder.Logging.ClearProviders(); builder.WebHost.ConfigureKestrel(server => { server.ListenUnixSocket(socket); server.Limits.MaxRequestBodySize = 1048576; server.Limits.MaxRequestHeadersTotalSize = 8192; server.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(10); server.Limits.MaxConcurrentConnections = 128; });
         await using var app = builder.Build(); app.Run(http => DaemonApi.Handle(controller, authenticationKey, () => (retention.Value, diagnostics.Error), app.Lifetime.StopApplication, http)); using var cleanup = new CancellationTokenSource();

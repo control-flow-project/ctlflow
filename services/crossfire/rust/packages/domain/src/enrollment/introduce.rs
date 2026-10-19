@@ -10,14 +10,14 @@ use crate::{
     fleet::coordination,
     identity::Status,
     port::{
-        AuthorizationRepository, FleetRepository, MatrixIdentity, RepositoryAccess, UnitOfWork,
+        AuthorizationRepository, BackendUserIdentity, FleetRepository, RepositoryAccess, UnitOfWork,
     },
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
 
-pub async fn introduce<A: RepositoryAccess, M: MatrixIdentity>(
+pub async fn introduce<A: RepositoryAccess, M: BackendUserIdentity>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     digest: &impl RosterDigest,
     input: &Introduction,
     now: i64,
@@ -56,7 +56,7 @@ where
         }
         return repository.with(|repo| receipt(repo, prior));
     }
-    let verified = preflight::verify(repository, matrix, &input.roster).await?;
+    let verified = preflight::verify(repository, messaging, &input.roster).await?;
     repository.with(|repo| {
         repo.transaction(|repo| {
             expire(repo, now)?;

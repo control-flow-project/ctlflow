@@ -2,7 +2,9 @@ use crate::{
     authorization::active_actor,
     identity::{Actor, Authentication, MemberSession, MemberView, PrincipalKind, Status},
     permission::Permission,
-    port::{AuthorizationRepository, CoreRepository, MatrixIdentity, RepositoryAccess, UnitOfWork},
+    port::{
+        AuthorizationRepository, BackendUserIdentity, CoreRepository, RepositoryAccess, UnitOfWork,
+    },
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, secret::Secret};
 
@@ -15,19 +17,19 @@ pub struct Opened {
 
 pub async fn create<A: RepositoryAccess>(
     repository: &A,
-    matrix: &impl MatrixIdentity,
+    messaging: &impl BackendUserIdentity,
     token: &Secret,
     clock: impl Fn() -> Result<i64>,
 ) -> Result<Opened>
 where
     A::Repository: CoreRepository,
 {
-    let matrix_id = matrix.identify(token).await?;
+    let backend_user_id = messaging.identify(token).await?;
     repository.with(|repo| {
         repo.transaction(|repo| {
             let now = clock()?;
             let principal = repo
-                .principal_by_matrix_id(&matrix_id)?
+                .principal_by_backend_user_id(&backend_user_id)?
                 .filter(|value| {
                     value.kind == PrincipalKind::Human && value.status == Status::Active
                 })
@@ -84,7 +86,7 @@ pub struct Authenticated {
 
 pub async fn native<A: RepositoryAccess>(
     repository: &A,
-    matrix: &impl MatrixIdentity,
+    messaging: &impl BackendUserIdentity,
     token: &Secret,
     kind: Option<PrincipalKind>,
     clock: impl Fn() -> Result<i64>,
@@ -92,10 +94,10 @@ pub async fn native<A: RepositoryAccess>(
 where
     A::Repository: AuthorizationRepository,
 {
-    let matrix_user_id = matrix.identify(token).await?;
+    let backend_user_id = messaging.identify(token).await?;
     repository.with(|repo| {
         let principal = repo
-            .principal_by_matrix_id(&matrix_user_id)?
+            .principal_by_backend_user_id(&backend_user_id)?
             .filter(|value| kind.is_none_or(|kind| value.kind == kind))
             .ok_or_else(|| {
                 Failure::new(
@@ -106,7 +108,7 @@ where
         let actor = Actor {
             principal_id: principal.id,
             kind: principal.kind,
-            authentication: Some(Authentication::Native { matrix_user_id }),
+            authentication: Some(Authentication::Native { backend_user_id }),
         };
         active_actor(repo, &actor, clock()?)?;
         Ok(actor)

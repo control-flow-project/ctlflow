@@ -10,7 +10,7 @@ pub fn descriptor(value: &Value) -> Result<SetupDescriptor> {
         &[
             "schemaVersion",
             "server",
-            "ownerMatrixId",
+            "ownerBackendUserId",
             "package",
             "instructions",
         ],
@@ -35,7 +35,7 @@ pub fn descriptor(value: &Value) -> Result<SetupDescriptor> {
     }
     Ok(SetupDescriptor {
         server: server.to_owned(),
-        owner: check::matrix_user_id(&value["ownerMatrixId"])?.to_owned(),
+        owner: check::backend_user_id(&value["ownerBackendUserId"])?.to_owned(),
         package_version: version.to_owned(),
         instructions: check::plain_text(&value["instructions"], 131072)?.to_owned(),
     })

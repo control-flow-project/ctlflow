@@ -10,6 +10,7 @@ native agents or write controller state directly.
 - [Stop, resume and reset](docs/sessions.md)
 - [Remote controllers](docs/remote.md)
 - [Software updates and diagnosis](docs/operations.md)
+- [Read-only diagnostic reports](docs/diagnostics.md)
 - [Pi runtime](docs/pi.md)
 - [Node package installation](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/node.md)
 - [C# managed installation](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/csharp-managed.md)

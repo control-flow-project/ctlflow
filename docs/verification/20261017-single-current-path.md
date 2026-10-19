@@ -1,5 +1,9 @@
 # Single current-path review — 2026-10-17
 
+Historical verification of the 2026-10-17 source, not the current architecture.
+The current architecture removes the context/observation converters and historical
+state admission described here. See `../architecture/messaging-backends.md`.
+
 ## Scope
 
 Reviewed crossfire, fleetd and fleet across Node, C# and Rust: transport routing,

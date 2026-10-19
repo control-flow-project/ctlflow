@@ -14,7 +14,7 @@ import { validateWakeSenders } from '../wake/replace-policy.js';
 import { enrollmentItemViews, type EnrollmentItemView } from './item-view.js';
 import { enrollmentRosterValue } from './roster-digest.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'matrix' | 'unitOfWork' | 'identity' | 'clock'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'messaging' | 'unitOfWork' | 'identity' | 'clock'>;
 export type EnrollmentReceipt = EnrollmentOverview & { instances: EnrollmentItemView[] };
 function receipt(services: Dependencies, request: EnrollmentRequest, instances: EnrollmentItem[]): Result<EnrollmentReceipt> {
   const overview = enrollmentOverviews(services, [request]);

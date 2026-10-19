@@ -33,11 +33,11 @@ public static class RoomPlanDigest
             if (index++ != 0) output.Append(','); var proof = change.Proof; var input = proof.Input;
             output.Append("{\"input\":{");
             if (input.AccessMode != "none") output.Append("\"roomId\":").Append(ProtocolJson.Quote(input.RoomId)).Append(',');
-            output.Append("\"accessMode\":").Append(ProtocolJson.Quote(input.AccessMode)).Append(",\"powerLevel\":").Append(Number(input.PowerLevel)).Append(",\"muted\":").Append(Boolean(input.Muted)).Append(",\"agentId\":").Append(ProtocolJson.Quote(input.AgentId));
+            output.Append("\"accessMode\":").Append(ProtocolJson.Quote(input.AccessMode)).Append(",\"nativeAccess\":").Append(input.NativeAccess is { } parameters ? WireJson.Compact(parameters) : "null").Append(",\"muted\":").Append(Boolean(input.Muted)).Append(",\"agentId\":").Append(ProtocolJson.Quote(input.AgentId));
             if (input.AccessMode == "none") output.Append(",\"roomId\":").Append(ProtocolJson.Quote(input.RoomId));
             output.Append(",\"expectedRevision\":").Append(Number(input.ExpectedRevision)).Append(",\"expectedGeneration\":").Append(input.ExpectedGeneration is null ? "null" : ProtocolJson.Quote(input.ExpectedGeneration)).Append("},\"authorizerId\":").Append(ProtocolJson.Quote(proof.AuthorizerId)).Append(",\"native\":");
             if (proof.Native is not { } native) output.Append("null");
-            else output.Append("{\"powerLevel\":").Append(Number(native.PowerLevel)).Append(",\"creator\":").Append(Boolean(native.Creator)).Append(",\"readLevel\":").Append(Number(native.ReadLevel)).Append(",\"replyLevel\":").Append(Number(native.ReplyLevel)).Append('}');
+            else output.Append(WireJson.Compact(MessagingJson.Facts(native)));
             output.Append('}');
         }
         return Identity.Hash(output.Append("]}").ToString());

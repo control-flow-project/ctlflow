@@ -21,13 +21,13 @@ test('wake modes resolve active verified identities and never modify room author
   const senders = () => value(deliveryPolicy(services, agent.actor, agent.id)).wake.senders.toSorted();
   const change = (mode: 'humans' | 'everyone' | 'selected', senders: { principalId: string; includeAgents: boolean }[] = []) =>
     value(changeWakePolicy(services, alice.actor, agent.id, { expectedRevision: current().principal.revision, mode, senders }, randomUUID()));
-  assert.deepEqual(senders(), [alice.member.principal.matrixUserId]);
+  assert.deepEqual(senders(), [alice.member.principal.backendUserId]);
   assert.equal(changeWakePolicy(services, bob.actor, agent.id, { expectedRevision: 0, mode: 'everyone', senders: [] }, randomUUID()).ok, false);
-  change('selected', [{ principalId: alice.actor.principalId, includeAgents: true }]); assert.deepEqual(senders(), [alice.member.principal.matrixUserId, peer.matrixUserId].sort());
-  change('humans'); assert.deepEqual(senders(), [alice.member.principal.matrixUserId, bob.member.principal.matrixUserId, admin.member.principal.matrixUserId].sort());
-  change('humans', [{ principalId: alice.actor.principalId, includeAgents: true }]); assert(senders().includes(peer.matrixUserId));
-  change('everyone'); assert(senders().includes(foreign.matrixUserId));
-  change('selected', [{ principalId: bob.actor.principalId, includeAgents: false }, { principalId: peer.id, includeAgents: false }]); assert.deepEqual(senders(), [bob.member.principal.matrixUserId, peer.matrixUserId].sort());
+  change('selected', [{ principalId: alice.actor.principalId, includeAgents: true }]); assert.deepEqual(senders(), [alice.member.principal.backendUserId, peer.backendUserId].sort());
+  change('humans'); assert.deepEqual(senders(), [alice.member.principal.backendUserId, bob.member.principal.backendUserId, admin.member.principal.backendUserId].sort());
+  change('humans', [{ principalId: alice.actor.principalId, includeAgents: true }]); assert(senders().includes(peer.backendUserId));
+  change('everyone'); assert(senders().includes(foreign.backendUserId));
+  change('selected', [{ principalId: bob.actor.principalId, includeAgents: false }, { principalId: peer.id, includeAgents: false }]); assert.deepEqual(senders(), [bob.member.principal.backendUserId, peer.backendUserId].sort());
   value(changeMember(services, admin.actor, bob.actor.principalId, { expectedRevision: 0, status: 'suspended' }, randomUUID()));
   value(changeAgent(services, alice.actor, peer.id, { expectedRevision: value(services.repositories.principal.find({ id: peer.id }))!.revision, status: 'suspended' }, randomUUID()));
   assert.deepEqual(senders(), []); change('selected'); assert.deepEqual(senders(), []);
@@ -53,21 +53,21 @@ test('administrator policy is revisioned, resettable and authority is checked af
 test('grant mutations recheck current authority, logout, target lifecycle and exact revisions after native calls', async scope => {
   const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
   const owner = await fixture.member('owner'), agent = await fixture.agent(owner.actor, 'races');
-  const roomId = value(await native.createRoom(owner.member.principal.matrixUserId, 'Race')).roomId;
+  const roomId = value(await native.createRoom(owner.member.principal.backendUserId, 'Race')).roomId;
   const input = { agentId: agent.id, roomId, expectedRevision: value(services.repositories.principal.find({ id: agent.id }))!.revision,
-    expectedGeneration: null, accessMode: 'reply' as const, powerLevel: null, muted: false };
-  const original = services.matrix.room; let calls = 0, release: (() => void) | undefined, entered!: () => void;
+    expectedGeneration: null, accessMode: 'reply' as const, nativeAccess: null, muted: false };
+  const original = services.messaging.authorizeRoomAccess; let calls = 0, release: (() => void) | undefined, entered!: () => void;
   const started = new Promise<void>(resolve => { entered = resolve; });
-  services.matrix.room = async (...args) => { calls++; const result = await original(...args); entered(); await new Promise<void>(resolve => { release = resolve; }); return result; };
+  services.messaging.authorizeRoomAccess = async (...args) => { calls++; const result = await original(...args); entered(); await new Promise<void>(resolve => { release = resolve; }); return result; };
   assert.equal((await changeRoomGrant(services, owner.actor, { ...input, expectedRevision: input.expectedRevision + 1 }, randomUUID())).ok, false); assert.equal(calls, 0);
   const pending = changeRoomGrant(services, owner.actor, input, randomUUID());
-  cleanup(scope, async () => { release?.(); await pending; services.matrix.room = original; });
+  cleanup(scope, async () => { release?.(); await pending; services.messaging.authorizeRoomAccess = original; });
   await Promise.race([started, pending.then(result => assert.fail(result.ok ? 'Grant completed before the native race hook' : result.error.message))]);
   value(changeAgent(services, owner.actor, agent.id, { expectedRevision: input.expectedRevision, status: 'revoked' }, randomUUID())); release?.();
   assert.equal((await pending).ok, false); assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId })), null);
-  services.matrix.room = original;
+  services.messaging.authorizeRoomAccess = original;
   const second = await fixture.agent(owner.actor, 'logout-race');
-  services.matrix.room = async (...args) => { const result = await original(...args); value(services.repositories.memberSession.remove({ secretHash: services.identity.hash(owner.secret) })); return result; };
+  services.messaging.authorizeRoomAccess = async (...args) => { const result = await original(...args); value(services.repositories.memberSession.remove({ secretHash: services.identity.hash(owner.secret) })); return result; };
   assert.equal((await changeRoomGrant(services, owner.actor, { ...input, agentId: second.id,
     expectedRevision: value(services.repositories.principal.find({ id: second.id }))!.revision }, randomUUID())).ok, false);
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: second.id, roomId })), null);
@@ -77,10 +77,10 @@ test('grant mutations recheck current authority, logout, target lifecycle and ex
 test('account revision and mute edits retain the native grant revision and membership generation', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture, agent = await fixture.agent(admin.actor, 'rename');
   const revision = () => value(services.repositories.principal.find({ id: agent.id }))!.revision;
-  const roomId = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Room')).roomId;
-  const granted = value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: revision(), expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID())).grant!;
+  const roomId = value(await fixture.native.createRoom(admin.member.principal.backendUserId, 'Room')).roomId;
+  const granted = value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: revision(), expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false }, randomUUID())).grant!;
   value(changeAgent(services, admin.actor, agent.id, { expectedRevision: revision(), status: 'active' }, randomUUID()));
-  value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: revision(), expectedGeneration: granted.generation, accessMode: 'reply', powerLevel: null, muted: true }, randomUUID()));
+  value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId, expectedRevision: revision(), expectedGeneration: granted.generation, accessMode: 'reply', nativeAccess: null, muted: true }, randomUUID()));
   const updated = value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId }))!;
   assert.equal(updated.accessRevision, granted.accessRevision); assert.equal(updated.generation, granted.generation);
   const before = value(services.repositories.principal.find({ id: agent.id }));

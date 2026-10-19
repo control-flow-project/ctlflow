@@ -5,7 +5,7 @@ namespace Crossfire.Domain;
 public sealed record FleetMessage(string Id, string FleetId, string? AuthorPrincipalId, string? AuthorCredentialId, string Body, long CreatedAt, long ExpiresAt);
 public sealed record FleetMessageDelivery(string MessageId, string AgentId, string Status, long? CompletedAt, string? ErrorMessage);
 public sealed record FleetMessageSummary(string MessageId, string Body, long CreatedAt, long ExpiresAt, int Total, int Delivered, int Failed, int Skipped, int Pending, int Expired);
-public sealed record FleetMessageSender(string Kind, string? MatrixUserId);
+public sealed record FleetMessageSender(string Kind, string? BackendUserId);
 public sealed record FleetMessageCommand(string MessageId, string FleetId, string Body, long CreatedAt, long ExpiresAt, FleetMessageSender Sender, IReadOnlyList<string> AgentIds);
 public sealed record FleetControlSnapshot(FleetControlView Control, IReadOnlyList<string> AgentIds, IReadOnlyList<FleetMessageCommand> Messages, IReadOnlyList<FleetOperationView> RuntimeOperations);
 public sealed record FleetRecipient(string AgentId, string Status, string OwnerStatus);

@@ -82,9 +82,9 @@ public static partial class Validation
 
     public static bool Identifier(string value) => IdentitySyntax.Identifier(value);
     public static bool Name(string value) => IdentitySyntax.Name(value);
-    public static bool UserId(string value) => TextRules.WellFormed(value) && IdentitySyntax.MatrixUser(value);
-    public static bool RoomId(string value) => value.Length <= 255 && TextRules.WellFormed(value) && RoomPattern().IsMatch(value);
-    public static bool EventId(string value) => value.Length <= 255 && TextRules.WellFormed(value) && EventPattern().IsMatch(value);
+    public static bool UserId(string value) => IdentitySyntax.BackendIdentifier(value);
+    public static bool RoomId(string value) => IdentitySyntax.BackendIdentifier(value);
+    public static bool EventId(string value) => IdentitySyntax.BackendIdentifier(value);
     public static bool Secret(string value) => SecretPattern().IsMatch(value);
 
     public static bool Json(JsonElement value, int depth = 0)
@@ -117,10 +117,6 @@ public static partial class Validation
     private static partial Regex Controls();
     [GeneratedRegex("[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f]", RegexOptions.CultureInvariant)]
     private static partial Regex PlainControls();
-    [GeneratedRegex("\\A![^\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+\\z", RegexOptions.CultureInvariant)]
-    private static partial Regex RoomPattern();
-    [GeneratedRegex("\\A\\$[^\\x09-\\x0d\\x20\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff]+\\z", RegexOptions.CultureInvariant)]
-    private static partial Regex EventPattern();
     [GeneratedRegex("\\A[A-Za-z0-9_-]{43}\\z", RegexOptions.CultureInvariant)]
     private static partial Regex SecretPattern();
 }

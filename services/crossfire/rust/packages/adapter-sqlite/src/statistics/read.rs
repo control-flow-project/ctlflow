@@ -59,7 +59,7 @@ impl TrafficAggregate {
 struct FlowAggregate {
     agent_id: String,
     room_id: String,
-    sender_matrix_id: String,
+    sender_backend_user_id: String,
     message_type: String,
     observed: Option<i64>,
     delivered: Option<i64>,
@@ -122,7 +122,7 @@ pub(super) fn read(
     let keys = (
         interval::agent_id,
         flow::room_id,
-        flow::sender_matrix_id,
+        flow::sender_backend_user_id,
         flow::message_type,
     );
     let flows = flow_source
@@ -131,7 +131,7 @@ pub(super) fn read(
         .select((
             interval::agent_id,
             flow::room_id,
-            flow::sender_matrix_id,
+            flow::sender_backend_user_id,
             flow::message_type,
             sum_integer(flow::observed.nullable()),
             sum_integer(flow::delivered.nullable()),
@@ -142,7 +142,7 @@ pub(super) fn read(
         ))
         .order((
             sum_integer(flow::observed.nullable()).desc(),
-            flow::sender_matrix_id.asc(),
+            flow::sender_backend_user_id.asc(),
             interval::agent_id.asc(),
             flow::room_id.asc(),
             flow::message_type.asc(),
@@ -256,7 +256,7 @@ pub(super) fn read(
                 agent_id: aggregate.agent_id,
                 flow: Flow {
                     room_id: aggregate.room_id,
-                    sender_matrix_id: aggregate.sender_matrix_id,
+                    sender_backend_user_id: aggregate.sender_backend_user_id,
                     message_type: aggregate.message_type,
                     totals: Totals {
                         observed: add(0, aggregate.observed.unwrap_or(0))?,

@@ -1,15 +1,15 @@
 use crate::account::{API, Authority};
 use crossfire_contracts::origin::segment;
-use crossfire_contracts::{matrix_event, validation};
-use crossfire_domain::matrix::MatrixEvent;
+use crossfire_contracts::validation;
+use crossfire_domain::messaging::BackendEvent;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use reqwest::Method;
 use serde_json::{Value, json};
 
 impl Authority {
-    pub async fn event(&self, user: &str, room: &str, event_id: &str) -> Result<MatrixEvent> {
-        validation::room_id(&json!(room))?;
-        validation::event_id(&json!(event_id))?;
+    pub async fn event(&self, user: &str, room: &str, event_id: &str) -> Result<BackendEvent> {
+        crate::syntax::room_id(&json!(room))?;
+        crate::syntax::event_id(&json!(event_id))?;
         let token = self.as_user(user).await?;
         let value = self
             .http
@@ -20,7 +20,24 @@ impl Authority {
                 None,
             )
             .await?;
-        matrix_event::event(&value, room, event_id)
+        let event = crate::message_events::parse(&value, room)?;
+        if event.event_id != event_id {
+            return Err(Failure::new(
+                ErrorCode::Native,
+                "Matrix event identity changed",
+            ));
+        }
+        Ok(BackendEvent {
+            event_id: event.event_id,
+            room_id: event.room_id,
+            sender_backend_user_id: event.sender,
+            event_type: event.event_type.code().to_owned(),
+            message_type: Some(event.content.kind.code().to_owned()),
+            body: event.content.body,
+            mentions: event.content.mentions,
+            edited: event.content.edited,
+            control: event.content.control,
+        })
     }
 
     pub async fn send_notice(
@@ -31,13 +48,13 @@ impl Authority {
         body: &str,
         sender: &str,
     ) -> Result<String> {
-        validation::room_id(&json!(room))?;
+        crate::syntax::room_id(&json!(room))?;
         validation::text(&json!(transaction_id), 1, 255)?;
-        validation::matrix_user_id(&json!(sender))?;
+        crate::syntax::user_id(&json!(sender))?;
         let token = self.as_user(user).await?;
         let response = self.http.request(Some(&token), Method::PUT,
             &format!("{API}/rooms/{}/send/m.room.message/{}", segment(room), segment(transaction_id)),
-            Some(&json!({"msgtype":"m.notice","body":body,"m.mentions":{"user_ids":[sender]},matrix_event::LISTENER_NOTICE:true}))).await?;
+            Some(&json!({"msgtype":"m.notice","body":body,"m.mentions":{"user_ids":[sender]},crate::message_events::NOTICE_MARKER:true}))).await?;
         if response.status == 403 {
             return Err(Failure::new(
                 ErrorCode::Forbidden,
@@ -50,7 +67,7 @@ impl Authority {
                 "Notice publication remains unconfirmed",
             ));
         }
-        validation::event_id(response.body.get("event_id").unwrap_or(&Value::Null))
+        crate::syntax::event_id(response.body.get("event_id").unwrap_or(&Value::Null))
             .map_err(|_| Failure::new(ErrorCode::Native, "Notice publication remains unconfirmed"))
     }
 }

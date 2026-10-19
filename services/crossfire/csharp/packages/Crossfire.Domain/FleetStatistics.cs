@@ -18,7 +18,7 @@ public static class FleetStatistics
         var agents = discovery.Selected(ids); if (!agents.IsSuccess) return Result<FleetStatisticsView>.Fail(agents.Error);
         if (agents.Value.Count != ids.Length) return Results.Fail<FleetStatisticsView>("unavailable", "Fleet agent records are missing");
         var measured = statistics.Read(ids, since, page, size); if (!measured.IsSuccess) return Result<FleetStatisticsView>.Fail(measured.Error);
-        var senders = discovery.Identities(measured.Value.Flows.Select(flow => flow.SenderMatrixId).Distinct(StringComparer.Ordinal).ToArray());
+        var senders = discovery.Identities(measured.Value.Flows.Select(flow => flow.SenderBackendUserId).Distinct(StringComparer.Ordinal).ToArray());
         return senders.Map(values => new FleetStatisticsView(now, since, retentionDays, measured.Value, agents.Value, values, page, size));
     }
 }

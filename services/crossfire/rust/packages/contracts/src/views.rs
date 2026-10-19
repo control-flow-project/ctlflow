@@ -31,7 +31,7 @@ pub fn application(value: &Application) -> Value {
     "lastAttemptAt":value.last_attempt_at,"lastSuccessAt":value.last_success_at,"errorCode":value.error_code,"errorMessage":value.error_message})
 }
 pub fn member(value: &MemberView) -> Value {
-    json!({"memberId":value.principal.id,"matrixUserId":value.principal.matrix_user_id,"displayName":value.member.display_name,
+    json!({"memberId":value.principal.id,"backendUserId":value.principal.backend_user_id,"displayName":value.member.display_name,
     "roleCode":match value.role.role {crossfire_domain::identity::Role::Member=>"member",crossfire_domain::identity::Role::Administrator=>"administrator",crossfire_domain::identity::Role::Agent=>"agent"},
     "status":status(value.principal.status),"revision":value.principal.revision,"createdAt":value.principal.created_at,"application":application(&value.application)})
 }
@@ -52,8 +52,8 @@ pub fn agent(value: &AgentDetails) -> Value {
     let principal = &record.view.principal;
     let owner = &record.view.owner;
     let deployment = &value.deployment;
-    json!({"agentId":principal.id,"matrixUserId":principal.matrix_user_id,"name":record.name,"displayName":crossfire_domain::identity::agent_display_name(&record.name,&record.view.owner_member.display_name),
-        "owner":{"memberId":owner.id,"matrixUserId":owner.matrix_user_id,"displayName":record.view.owner_member.display_name,"status":status(owner.status)},"status":status(principal.status),"revision":principal.revision,"createdAt":principal.created_at,
+    json!({"agentId":principal.id,"backendUserId":principal.backend_user_id,"name":record.name,"displayName":crossfire_domain::identity::agent_display_name(&record.name,&record.view.owner_member.display_name),
+        "owner":{"memberId":owner.id,"backendUserId":owner.backend_user_id,"displayName":record.view.owner_member.display_name,"status":status(owner.status)},"status":status(principal.status),"revision":principal.revision,"createdAt":principal.created_at,
         "application":application(&record.view.application),"activity":activity(&value.activity),"nativeRuntime":value.native_runtime.as_ref().map(native_summary),
         "deployment":{"fleetId":deployment.fleet_id,"fleetKey":deployment.fleet_key,"label":deployment.label,"controllerName":deployment.controller_name,"reportedAt":deployment.reported_at,"instanceKey":deployment.instance_key},
         "canRetire":value.can_retire,"allowedActions":value.allowed_actions})
@@ -75,7 +75,7 @@ pub fn policy(value: &InstancePolicy) -> Value {
     "maxMessageBytes":value.max_message_bytes,"fleetIdleTimeoutSeconds":value.fleet_idle_timeout_seconds,"agentInstructions":value.agent_instructions,"signupMode":value.signup_mode,"invitationIssuers":value.invitation_issuers})
 }
 pub fn identity(value: &PrincipalIdentity) -> Value {
-    json!({"matrixUserId":value.matrix_user_id,"kind":value.kind.map_or("unknown",kind),"ownerMatrixId":value.owner_matrix_id,"displayName":value.display_name,"ownerDisplayName":value.owner_display_name})
+    json!({"backendUserId":value.backend_user_id,"kind":value.kind.map_or("unknown",kind),"ownerBackendUserId":value.owner_backend_user_id,"displayName":value.display_name,"ownerDisplayName":value.owner_display_name})
 }
 pub fn role(value: &CatalogRole) -> Value {
     json!({"code":value.code,"principalKind":kind(value.principal_kind),"label":value.label})

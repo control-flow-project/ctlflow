@@ -26,10 +26,12 @@ public static class LoggingAcceptance
             foreach (var id in new[] { oldOperation, lastStop }) context.FleetRuntimeOperation.Add(new() { Id = id, FleetId = fixture.FleetId, AuthorPrincipalId = owner.PrincipalId,
                 Action = "stop", Status = "succeeded", CreatedAt = start, CompletedAt = id == lastStop ? start + 1 : start });
             foreach (var id in new[] { oldInvitation, claimedInvitation }) context.MemberInvitation.Add(new() { Id = id, CreatedByMemberId = owner.PrincipalId, ClaimHash = Identity.Hash(Identity.Secret()), RoleCode = "member", PrincipalKind = "human", CreatedAt = start - 1000, ExpiresAt = start,
-                ClaimMatrixUserId = id == claimedInvitation ? "@native-created-" + id + ":example.test" : null, ClaimDisplayName = id == claimedInvitation ? "Created" : null, ClaimFingerprint = id == claimedInvitation ? Identity.Hash("claim") : null });
+                ClaimBackendUserId = id == claimedInvitation ? "@native-created-" + id + ":example.test" : null, ClaimDisplayName = id == claimedInvitation ? "Created" : null, ClaimFingerprint = id == claimedInvitation ? Identity.Hash("claim") : null });
             context.ListenerStatInterval.Add(new() { RunId = terminal, AgentId = fixture.AgentId, BucketAt = start, StartedAt = start, EndedAt = start + 1, CapturedAt = start });
             context.ListenerStatCheckpoint.Add(new() { RunId = terminal, Sequence = 1, CapturedAt = start, Digest = Identity.Hash("sample") });
             context.RuntimeUsageCheckpoint.Add(new() { AgentId = fixture.AgentId, Runtime = "codex", SessionId = "old", CapturedAt = start });
+            context.WakeNotice.Add(new() { ReceiverAgentId = fixture.AgentId, RoomId = "retention/keep", EventId = "same-event", SenderBackendUserId = "person", ReservedAt = start, MessageBody = "Pending notice", Status = "pending", NextAttemptAt = start });
+            context.WakeNotice.Add(new() { ReceiverAgentId = fixture.AgentId, RoomId = "retention/expire", EventId = "same-event", SenderBackendUserId = "person", ReservedAt = start, MessageBody = "Expired notice", Status = "denied" });
             context.AuditEvent.Add(new() { Id = boundary, RequestId = Identity.Identifier(), ActorKind = "human", ActorPrincipalId = owner.PrincipalId, OwnerId = owner.PrincipalId,
                 TargetKind = "agent", TargetId = fixture.AgentId, Action = "listener.report", Outcome = "accepted", Message = "boundary", CreatedAt = cutoff });
             return Results.Done();
@@ -43,6 +45,8 @@ public static class LoggingAcceptance
             scan = batch.Value.Scan; removed += batch.Value.Removed; if (!batch.Value.More) { drained = true; break; }
         }
         Equal(drained, true, "protected old records cannot starve bounded cleanup");
+        Equal(WakeNoticeQueries.Find(context, fixture.AgentId, "retention/keep", "same-event").Value?.Status, "pending", "retention preserves a pending notice with the same event ID in another room");
+        Equal(WakeNoticeQueries.Find(context, fixture.AgentId, "retention/expire", "same-event").Value is null, true, "retention removes only the expired room-scoped notice");
         Equal(removed > 0, true, "logging cleanup reclaims obsolete rows");
         Equal(context.ListenerRun.AsNoTracking().Any(row => row.Id == terminal), false, "obsolete listener and dependent observations are reclaimed");
         Equal(context.RuntimeSetting.AsNoTracking().Any(row => row.RunId == terminal), false, "old runtime settings are reclaimed with their observation");

@@ -1,4 +1,6 @@
+import { roomContext, contextRoom, validHistoryContext } from '@ctlflow/crossfire-kernel/history-context';
 import { existsSync } from 'node:fs';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { deliveryJournalExists, readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal';
 import type { RuntimeHooks, InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
@@ -44,6 +46,7 @@ export function codexHistories(options: { home: string; workspace: string; name:
   }
   async function open(context: string, admission?: InputAdmission): Promise<CodexConnection> {
     admission?.signal.throwIfAborted();
+    if (!validHistoryContext(context)) throw new Error('Invalid native history context');
     if (opened.has(context)) return opened.get(context)!;
     if (initializing.has(context)) {
       if (admission) throw Object.assign(new Error('Exact room history is opening; immediate input has not been accepted'), { code: 'unavailable' });
@@ -60,7 +63,7 @@ export function codexHistories(options: { home: string; workspace: string; name:
         ? { kind: 'resume', id: previous, config: options.config }
         : { kind: 'create', name: options.name + (context === 'shared' ? '' : ' · ' + context), config: options.config }, AbortSignal.any([lifetime, starting.signal]),
         { ...options.hooks, observe: event => options.hooks.observe?.(event.kind === 'state'
-          ? { ...event, observation: { ...event.observation, roomId: context === 'shared' || context === 'control' ? null : context } } : event) },
+          ? { ...event, observation: { ...event.observation, roomId: contextRoom(context) } } : event) },
         event => connection?.event(event));
       try {
         if (!previous && [...state.bindings.map(binding => binding.sessionId), ...[...opened.values()].map(connection => connection.sessionId)]
@@ -80,6 +83,11 @@ export function codexHistories(options: { home: string; workspace: string; name:
     try { return await pending; } finally { initializing.delete(context); admission?.signal.removeEventListener('abort', cancelled); }
   }
   return { open, signal: lifetime,
+    async provider(signal: AbortSignal) {
+      const connection = opened.values().next().value;
+      if (!connection) return failure('unavailable', 'No existing native connection is available for provider inspection');
+      return connection.provider(signal);
+    },
     async activity(): Promise<NativeActivity> {
       lifetime.throwIfAborted();
       if (initializing.size) return { busy: true, contexts: [] };
@@ -121,7 +129,7 @@ export function codexHistories(options: { home: string; workspace: string; name:
       return sessionId ? [{ context, attachment: { ...options.attachment, sessionId } }] : [];
     }); },
     async activeTurn(room?: string, admission?: InputAdmission) {
-      const context = options.mode === 'shared' ? 'shared' : room ?? 'control';
+      const context = options.mode === 'shared' ? 'shared' : room === undefined ? 'control' : roomContext(room);
       const connection = admission ? await open(context, admission) : opened.get(context);
       admission?.signal.throwIfAborted();
       const turn = connection ? await connection.turnControl.activeTurn(undefined, admission) : null;

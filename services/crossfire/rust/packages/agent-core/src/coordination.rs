@@ -24,9 +24,9 @@ pub fn identity(value: &Value) -> Result<crossfire_domain::read::values::Princip
     let value = check::object(
         value,
         &[
-            "matrixUserId",
+            "backendUserId",
             "kind",
-            "ownerMatrixId",
+            "ownerBackendUserId",
             "displayName",
             "ownerDisplayName",
         ],
@@ -44,9 +44,9 @@ pub fn identity(value: &Value) -> Result<crossfire_domain::read::values::Princip
         "agent" => Some(PrincipalKind::Agent),
         _ => None,
     };
-    let owner = optional("ownerMatrixId")?;
+    let owner = optional("ownerBackendUserId")?;
     if let Some(owner) = &owner {
-        check::matrix_user_id(&json!(owner))?;
+        check::backend_user_id(&json!(owner))?;
     }
     if (kind == Some(PrincipalKind::Agent)) != owner.is_some() {
         return Err(Failure::new(
@@ -55,9 +55,9 @@ pub fn identity(value: &Value) -> Result<crossfire_domain::read::values::Princip
         ));
     }
     Ok(crossfire_domain::read::values::PrincipalIdentity {
-        matrix_user_id: check::matrix_user_id(&value["matrixUserId"])?.to_owned(),
+        backend_user_id: check::backend_user_id(&value["backendUserId"])?.to_owned(),
         kind,
-        owner_matrix_id: owner,
+        owner_backend_user_id: owner,
         display_name: optional("displayName")?,
         owner_display_name: optional("ownerDisplayName")?,
     })
@@ -76,7 +76,7 @@ pub async fn senders(
     let mut result = BTreeMap::new();
     for requested in ids.chunks(100) {
         let mut call = Call::new(OperationId::ResolvePrincipals);
-        call.body = Some(json!({"matrixUserIds":requested}));
+        call.body = Some(json!({"backendUserIds":requested}));
         let response = coordination.call(&call, stop.clone()).await?;
         let parsed = crossfire_contracts::validation::list(&response, 1, 100)?
             .iter()
@@ -85,7 +85,7 @@ pub async fn senders(
         if parsed.len() != requested.len()
             || parsed
                 .iter()
-                .any(|value| !requested.contains(&value.matrix_user_id.as_str()))
+                .any(|value| !requested.contains(&value.backend_user_id.as_str()))
         {
             return Err(Failure::new(
                 ErrorCode::Invalid,
@@ -93,7 +93,10 @@ pub async fn senders(
             ));
         }
         for value in parsed {
-            if result.insert(value.matrix_user_id.clone(), value).is_some() {
+            if result
+                .insert(value.backend_user_id.clone(), value)
+                .is_some()
+            {
                 return Err(Failure::new(
                     ErrorCode::Invalid,
                     "Duplicate resolved sender identity",
@@ -113,8 +116,8 @@ pub async fn policy(
         .await?;
     let result = delivery_policy::parse(&result)?;
     if result.agent_id != profile.id
-        || result.matrix_user_id != profile.account.user_id
-        || result.owner_matrix_id != profile.settings.owner
+        || result.backend_user_id != profile.account.user_id
+        || result.owner_backend_user_id != profile.settings.owner
     {
         return Err(Failure::new(
             ErrorCode::Forbidden,
@@ -133,12 +136,12 @@ pub async fn policy(
                     Room {
                         muted: grant.muted,
                         access: grant.access,
-                        power: grant.power,
+                        native_access: grant.native_access,
                     },
                 )
             })
             .collect::<BTreeMap<_, _>>(),
-        senders: result.sender_matrix_ids.into_iter().collect(),
+        senders: result.sender_backend_user_ids.into_iter().collect(),
         max_message_bytes: result.max_message_bytes,
         idle_timeout_seconds: result.idle_timeout_seconds,
         owner_conversation: result.owner_conversation,

@@ -28,8 +28,9 @@ import { canInitializeHistory, initializedHistory } from '@ctlflow/fleetd-storag
 import { createNativeStopReceipts, type NativeStopActivity } from './native-stops.js';
 import { createResumeWork } from '@ctlflow/fleetd-storage/resume-work';
 import { nativeOptions } from '@ctlflow/fleetd-domain/model';
+import type { MessagingConnector } from '@ctlflow/crossfire-domain/port/messaging-client';
 
-export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, artifacts: string, log: (message: string) => void): Execution {
+export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, messaging: MessagingConnector, artifacts: string, log: (message: string) => void): Execution {
   const connections = new Map<string, FleetControlConnection>();
   const reporters = new Map<string, ReturnType<typeof failureReporter>>();
   const stops = new Map<string, ReturnType<typeof createNativeStopReceipts>>();
@@ -145,7 +146,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
       if (!adapter) return failure('invalid', 'Unsupported runtime: ' + definition.runtime);
       const stateDirectory = privateDir(join(configuration.directory, instance.workarea));
       const admitted = await adapter.inspect({ workspace: instance.workspace ?? stateDirectory, stateDirectory, options: nativeOptions(configuration, instance) }, signal);
-      return admitted.ok ? resetInstance(configuration, instance, identity.agentId, resetId, adapter, signal) : admitted;
+      return admitted.ok ? resetInstance(configuration, instance, identity.agentId, resetId, adapter, messaging, signal) : admitted;
     },
     async contexts(configuration, instance) {
       try {
@@ -193,10 +194,13 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
         const listenerHost = await (host ??= createListenerHost());
         release = await acquireProcessLock(join(local.state, 'listener'));
         const software = reason === 'recovery' || existsSync(join(local.root, 'client.mjs')) ? installedSoftware(local.root) : await installSoftware(local.root, artifacts);
-        const client = createClient({ origin: binding.server, token: identity.account.access_token, signal: lifetime });
+        const client = createClient({ origin: binding.server, token: identity.account.accessToken, signal: lifetime });
         const health = await client.call(operations.health, {}, {});
         if (!health.ok) { report(new Error('Instance startup failed: ' + health.error.message)); await release(); return health; }
-        const settings = { instance: health.value.data.instance, homeserver: binding.server, server_name: binding.owner.slice(binding.owner.indexOf(':') + 1), owner: binding.owner, max_upload_bytes: MAX_UPLOAD_BYTES };
+        const backend = await client.call(operations.messagingBackend, {}, {});
+        if (!backend.ok) { report(new Error('Messaging backend is unavailable: ' + backend.error.message)); await release(); return backend; }
+        const settings = { instance: health.value.data.instance, server: binding.server, backend: backend.value.data.configuration, owner: binding.owner, maxUploadBytes: MAX_UPLOAD_BYTES };
+        const messagingConnection = messaging(settings.backend, identity.account);
         writeJson(local.profile, { id: identity.agentId, workspace: stateDirectory, account: identity.account, settings });
         software.activate();
         const instructions = [definition.instructions, 'Crossfire identity: ' + instance.name + '. This instance is already enrolled and its listener is managed by the fleet controller. Do not reconnect, enroll or start another listener.',
@@ -205,7 +209,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
         let ready!: () => void, rejectReady!: (error: unknown) => void;
         bindingControl = connection.listener(identity.agentId);
         const readiness = new Promise<void>((resolve, reject) => { ready = resolve; rejectReady = reject; });
-        done = listen({ log, settings, account: identity.account, id: identity.agentId, coordination: createCoordination({ origin: binding.server, token: identity.account.access_token }),
+        done = listen({ log, settings, ...messagingConnection, account: identity.account, id: identity.agentId, coordination: createCoordination({ origin: binding.server, token: identity.account.accessToken }),
           binding: 'fleet-' + identity.agentId, host: listenerHost,
           control: bindingControl.control,
           release: software.manifest, cursorFile: local.cursors, limit: 100, pollMs: 10000, debounceMs: 1000, reconcileMs: 30000,
@@ -266,7 +270,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, a
           if (activity) stops.get(configuration.directory)?.closed(activity);
           bindingControl?.close(); await unlock(); })();
         return success({ sessionId: destination.runtime.sessionId, signal: stop.signal, attachment: destination.attachment,
-          attachments: destination.attachments, contexts: destination.contexts, nativeState: destination.nativeState, resume: destination.resume,
+          attachments: destination.attachments, contexts: destination.contexts, nativeState: destination.nativeState, diagnostics: destination.diagnostics, resume: destination.resume,
           control: bindingControl.control, close });
       } catch (error) {
         report(error); stop.abort(error); await done; await destination?.close();

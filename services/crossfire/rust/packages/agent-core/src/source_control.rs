@@ -2,13 +2,13 @@ use crate::{
     coordination::Coordination,
     events::{Event, invalid},
     local_state::{self, LocalState},
-    matrix::Matrix,
     origins,
     profile::Profile,
     runtime::{Admission, InputPriority, InterruptResult, TurnControl},
     steering,
 };
 use crossfire_contracts::validation as check;
+use crossfire_domain::messaging_client::MessagingClient;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -247,11 +247,17 @@ impl<S: LocalState> Controls<S> {
     }
     pub async fn interrupt(
         &self,
-        input: Interrupt<'_, impl Matrix, impl Coordination, impl TurnControl, impl Notices>,
+        input: Interrupt<
+            '_,
+            impl MessagingClient,
+            impl Coordination,
+            impl TurnControl,
+            impl Notices,
+        >,
         stop: CancellationToken,
     ) -> Result<bool> {
         let event = origins::enrich(
-            input.matrix,
+            input.messaging,
             &input.profile.account.user_id,
             vec![input.event],
             stop.clone(),
@@ -270,7 +276,7 @@ impl<S: LocalState> Controls<S> {
             .await?;
         if !input.allowed.contains(&event.room_id)
             || !steering::authorized(
-                input.matrix,
+                input.messaging,
                 input.coordination,
                 input.profile,
                 &event,
@@ -290,8 +296,10 @@ impl<S: LocalState> Controls<S> {
             room: event.room_id.clone(),
             event: event.event_id.clone(),
             stop: event.sender == input.profile.settings.owner
-                && event.content["body"]
-                    .as_str()
+                && event
+                    .content
+                    .body
+                    .as_deref()
                     .is_some_and(|body| body.trim() == "!!"),
             turn,
             status: Stage::Interrupting,
@@ -346,7 +354,7 @@ impl<S: LocalState> Controls<S> {
     }
 }
 pub struct Interrupt<'a, M, C, N, R> {
-    pub matrix: &'a M,
+    pub messaging: &'a M,
     pub coordination: &'a C,
     pub native: &'a N,
     pub notices: &'a R,

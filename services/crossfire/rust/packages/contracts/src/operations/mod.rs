@@ -27,6 +27,8 @@ pub enum Authentication {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperationId {
+    MessagingBackend,
+    AuthenticateBackend,
     RecordFleetNativeStop,
     CreatePublication,
     Publications,

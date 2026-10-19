@@ -1,4 +1,6 @@
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
+import { json, type JsonObject } from '@ctlflow/crossfire-kernel/json';
+import { opaqueIdentifier } from '@ctlflow/crossfire-kernel/identifier';
 export type Parser<T> = (input: unknown) => Result<T>;
 export type Parsed<Check> = Check extends Parser<infer Value> ? Value : never;
 export function refine<Value>(parse: Parser<Value>, accepts: (value: Value) => boolean, message: string): Parser<Value> {
@@ -46,9 +48,13 @@ export function object<const Fields extends Shape>(fields: Fields): Parser<Objec
 export const identifier: Parser<string> = input => typeof input === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u.test(input)
   ? success(input) : failure('invalid', 'Expected an opaque UUID');
 export const name: Parser<string> = input => typeof input === 'string' && /^[a-z][a-z0-9-]{0,39}$/u.test(input) ? success(input) : failure('invalid', 'Expected a lowercase name of 1–40 characters');
-export const matrixUserId: Parser<string> = input => typeof input === 'string' && input.length <= 255 && input.isWellFormed() && /^@[^:\s]+:[^\s]+$/u.test(input) ? success(input) : failure('invalid', 'Expected a Matrix user ID');
-export const roomId: Parser<string> = input => typeof input === 'string' && input.length <= 255 && input.isWellFormed() && /^!\S+$/u.test(input) ? success(input) : failure('invalid', 'Expected an immutable Matrix room ID');
-export const eventId: Parser<string> = input => typeof input === 'string' && input.length <= 255 && input.isWellFormed() && /^\$\S+$/u.test(input) ? success(input) : failure('invalid', 'Expected a Matrix event ID');
+const opaque: Parser<string> = input => opaqueIdentifier(input) ? success(input) : failure('invalid', 'Expected an opaque backend identifier');
+export const backendUserId = opaque;
+export const roomId = opaque;
+export const eventId = opaque;
+export const backendParameters: Parser<JsonObject> = input => input !== null && typeof input === 'object' && !Array.isArray(input)
+  && json(input) && Object.keys(input).length <= 64 && new TextEncoder().encode(JSON.stringify(input)).length <= 8192
+  ? success(input as JsonObject) : failure('invalid', 'Expected a backend parameter object up to 8192 UTF-8 bytes');
 export const secret: Parser<string> = input => typeof input === 'string' && /^[A-Za-z0-9_-]{43}$/u.test(input) ? success(input) : failure('invalid', 'Expected a private 32-byte claim');
 export const empty = object({});
 export const status = choice('active', 'suspended', 'revoked');

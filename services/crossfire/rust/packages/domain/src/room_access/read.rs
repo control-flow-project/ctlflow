@@ -5,7 +5,7 @@ use super::{
 use crate::{
     authorization::{AgentAction, active_actor, authorize_agent},
     identity::{Actor, Page, PrincipalKind},
-    matrix::{MatrixAuthority, RoomFacts, RoomPower},
+    messaging::{MessagingAuthority, RoomFacts},
     port::{AgentRepository, AuthorizationRepository, RepositoryAccess},
     read::values::Pagination,
 };
@@ -94,9 +94,9 @@ pub fn grants(
         total_pages: page.total_pages,
     })
 }
-pub async fn grant<A: RepositoryAccess, M: MatrixAuthority, C: Clock>(
+pub async fn grant<A: RepositoryAccess, M: MessagingAuthority, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     clock: &C,
     actor: &Actor,
     agent: &str,
@@ -126,9 +126,8 @@ where
         Ok((acting, target, can_read, delegated))
     })?;
     let delegated = if delegation.is_some() {
-        let facts = matrix.room(&acting.matrix_user_id, room).await?;
-        matches!(facts.power, RoomPower::Creator)
-            || matches!(facts.power,RoomPower::Level(level) if level>=facts.invite_level)
+        let facts = messaging.room(&acting.backend_user_id, room, None).await?;
+        facts.can_invite
     } else {
         false
     };
@@ -211,9 +210,9 @@ fn private_for(repo: &mut impl RoomRepository, room: &str, agent: &str) -> Resul
             .owner_conversation_by_room(room)?
             .is_some_and(|private| private.agent_id != agent))
 }
-pub async fn room<A: RepositoryAccess, M: MatrixAuthority, C: Clock>(
+pub async fn room<A: RepositoryAccess, M: MessagingAuthority, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     clock: &C,
     actor: &Actor,
     id: &str,
@@ -235,7 +234,16 @@ where
         }
         Ok(acting)
     })?;
-    match matrix.room(&acting.matrix_user_id, id).await {
+    let subject = repository.with(|repo| {
+        agent
+            .map(|agent| repo.principal(agent))
+            .transpose()
+            .map(|value| value.flatten().map(|value| value.backend_user_id))
+    })?;
+    match messaging
+        .room(&acting.backend_user_id, id, subject.as_deref())
+        .await
+    {
         Ok(facts) => Ok(RoomDetails {
             room_id: id.to_owned(),
             name: facts.name.clone(),
@@ -255,7 +263,7 @@ where
                 repo.principal(agent)?
                     .ok_or_else(|| Failure::new(ErrorCode::Missing, "Agent not found"))
             })?;
-            let observed = matrix.room(&target.matrix_user_id, id).await.ok();
+            let observed = messaging.room(&target.backend_user_id, id, None).await.ok();
             Ok(RoomDetails {
                 room_id: id.to_owned(),
                 name: observed
@@ -276,9 +284,9 @@ pub struct RoomQuery<'a> {
     pub search: &'a str,
     pub pagination: Pagination,
 }
-pub async fn rooms<A: RepositoryAccess, M: MatrixAuthority, C: Clock>(
+pub async fn rooms<A: RepositoryAccess, M: MessagingAuthority, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     clock: &C,
     input: RoomQuery<'_>,
     compare: impl Fn(&str, &str) -> std::cmp::Ordering,
@@ -294,8 +302,8 @@ where
     } = input;
     pagination.validate()?;
     let acting = repository.with(|repo| active_actor(repo, actor, clock.now()?))?;
-    let mut ids: std::collections::BTreeSet<_> = matrix
-        .joined(&acting.matrix_user_id)
+    let mut ids: std::collections::BTreeSet<_> = messaging
+        .joined(&acting.backend_user_id)
         .await?
         .into_iter()
         .collect();
@@ -316,7 +324,7 @@ where
         {
             continue;
         }
-        let value = room(repository, matrix, clock, actor, &id, agent).await?;
+        let value = room(repository, messaging, clock, actor, &id, agent).await?;
         if [&value.name, value.alias.as_deref().unwrap_or(""), &id]
             .iter()
             .any(|text| text.to_lowercase().contains(&search))

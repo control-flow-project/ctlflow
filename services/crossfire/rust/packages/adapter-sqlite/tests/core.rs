@@ -9,6 +9,39 @@ use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 
 const NOW: i64 = 1_792_000_000_000;
 
+#[test]
+fn management_authentication_uses_opaque_backend_identities()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let mut fixture = fixture()?;
+    registration::initialize(
+        &mut fixture.store,
+        "person/東京",
+        "Independent administrator",
+        NOW,
+    )?;
+    let principal = fixture
+        .store
+        .principal_by_backend_user_id("person/東京")?
+        .ok_or("Missing principal")?;
+    let actor = Actor {
+        principal_id: principal.id,
+        kind: PrincipalKind::Human,
+        authentication: Some(Authentication::Native {
+            backend_user_id: "person/東京".to_owned(),
+        }),
+    };
+    assert_eq!(
+        policy::read(&mut fixture.store, &actor, NOW)?.max_message_bytes,
+        65536
+    );
+    let mut foreign = actor.clone();
+    foreign.authentication = Some(Authentication::Native {
+        backend_user_id: "person/other".to_owned(),
+    });
+    assert!(policy::read(&mut fixture.store, &foreign, NOW).is_err());
+    Ok(())
+}
+
 struct Fixture {
     store: Store,
     _directory: tempfile::TempDir,
@@ -31,15 +64,15 @@ fn fixture() -> std::result::Result<Fixture, Box<dyn std::error::Error>> {
 }
 
 fn administrator(store: &mut Store) -> Result<Actor> {
-    registration::initialize(store, "@admin:example.test", NOW)?;
+    registration::initialize(store, "@admin:example.test", "admin", NOW)?;
     let principal = store
-        .principal_by_matrix_id("@admin:example.test")?
+        .principal_by_backend_user_id("@admin:example.test")?
         .ok_or_else(|| Failure::new(ErrorCode::Missing, "Administrator fixture missing"))?;
     Ok(Actor {
         principal_id: principal.id,
         kind: PrincipalKind::Human,
         authentication: Some(Authentication::Native {
-            matrix_user_id: "@admin:example.test".to_owned(),
+            backend_user_id: "@admin:example.test".to_owned(),
         }),
     })
 }
@@ -57,7 +90,7 @@ fn canonical_identity_authority_and_policy_are_transactional()
         )
     );
     let actor = administrator(store)?;
-    registration::initialize(store, "@admin:example.test", NOW)?;
+    registration::initialize(store, "@admin:example.test", "admin", NOW)?;
     assert_eq!(store.active_administrator_count()?, 1);
     let default = policy::read(store, &actor, NOW)?;
     assert_eq!(default.max_message_bytes, 65536);
@@ -89,7 +122,7 @@ fn canonical_identity_authority_and_policy_are_transactional()
     assert_eq!(store.active_administrator_count()?, 1);
     let mut impostor = actor.clone();
     impostor.authentication = Some(Authentication::Native {
-        matrix_user_id: "@impostor:example.test".to_owned(),
+        backend_user_id: "@impostor:example.test".to_owned(),
     });
     assert!(policy::read(store, &impostor, NOW).is_err());
     Ok(())
@@ -169,7 +202,7 @@ fn native_int64_and_normalized_roles_survive_reopen()
                 store,
                 &Principal {
                     id: id.to_owned(),
-                    matrix_user_id: "@native:example.test".to_owned(),
+                    backend_user_id: "@native:example.test".to_owned(),
                     kind: PrincipalKind::Human,
                     status: Status::Active,
                     revision: 0,

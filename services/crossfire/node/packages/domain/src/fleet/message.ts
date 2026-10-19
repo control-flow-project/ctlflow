@@ -81,7 +81,7 @@ export function readFleetControl(services: MessageServices, actor: FleetActor, f
   if (!sender.ok) return sender;
   if (message.value.authorPrincipalId && !sender.value) return failure('unavailable', 'Fleet message sender is missing');
   const command: FleetMessageCommand = { messageId: message.value.id, fleetId, body: message.value.body, createdAt: message.value.createdAt,
-    expiresAt: message.value.expiresAt, sender: { kind: message.value.authorPrincipalId ? 'human' : 'controller', matrixUserId: sender.value?.matrixUserId ?? null },
+    expiresAt: message.value.expiresAt, sender: { kind: message.value.authorPrincipalId ? 'human' : 'controller', backendUserId: sender.value?.backendUserId ?? null },
     agentIds: deliveries.value.filter(delivery => delivery.status === 'pending').map(delivery => delivery.agentId) };
   return success({ ...view, agentIds, messages: [command] });
 }

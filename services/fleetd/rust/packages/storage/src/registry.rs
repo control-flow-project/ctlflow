@@ -14,19 +14,6 @@ pub struct Registry {
 impl Registry {
     pub fn open(path: &Path) -> Result<Self> {
         let directory = PrivateDirectory::open(path, true)?;
-        for name in ["operations.json", "daemon.log"] {
-            match std::fs::symlink_metadata(path.join(name)) {
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                _ => {
-                    return Err(Failure::new(
-                        ErrorCode::Invalid,
-                        format!(
-                            "Unsupported controller state: {name}; normal startup does not import obsolete files"
-                        ),
-                    ));
-                }
-            }
-        }
         let operations = directory.child("operations", true)?;
         Ok(Self {
             directory,

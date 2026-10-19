@@ -125,7 +125,7 @@ public static class OwnedPiAcceptance
         var current = await Start(adapter, isolated, cancellation); IReadOnlyList<SavedRuntimeContext> saved;
         try
         {
-            using var admission = new CancellationTokenSource(); var first = (await current.Conversation("!first:fixture", new(InputPriority.Steering, admission.Token))).Value;
+            using var admission = new CancellationTokenSource(); var first = (await current.Conversation("control", new(InputPriority.Steering, admission.Token))).Value;
             await admission.CancelAsync(); Equal(first.Lifetime.IsCancellationRequested || current.Lifetime.IsCancellationRequested, false, "completed Pi room admission is detached from the native engine lifetime");
             var second = (await current.Conversation("!second:fixture")).Value; Equal(first.SessionId != second.SessionId && first.SessionId != current.SessionId && second.SessionId != current.SessionId, true, "Pi per-room histories and private control use distinct native identities");
             Equal((await first.Deliver("Private first-room fact violet 51.", "pi-first", cancellation)).IsSuccess, true, "Pi publishes to the first room history"); first.Acknowledge(["pi-first"]); await Idle(first, cancellation); await provider.Calls.ReadAsync(cancellation);
@@ -139,7 +139,7 @@ public static class OwnedPiAcceptance
         try
         {
             Equal(adapter.SavedContexts(isolated.Workspace, isolated.StateDirectory).Value.SequenceEqual(saved), true, "Pi primary restart preserves the complete saved context order and identities");
-            foreach (var binding in saved.Where(value => value.Context != "control")) Equal((await current.Conversation(binding.Context)).Value.SessionId, binding.SessionId, "Pi restart resumes every exact retained room identity");
+            foreach (var binding in saved.Where(value => value.Context != "control")) Equal((await current.Conversation(HistoryContext.Room(binding.Context)!)).Value.SessionId, binding.SessionId, "Pi restart resumes every exact retained room identity");
         }
         finally { await current.DisposeAsync(); }
         var reset = Identity.Identifier(); Equal(adapter.Reset(new(isolated.Workspace, isolated.StateDirectory, reset)).IsSuccess, true, "Pi explicit reset archives native histories"); Equal(adapter.Reset(new(isolated.Workspace, isolated.StateDirectory, reset)).IsSuccess, true, "Pi reset is idempotent by reset identity");

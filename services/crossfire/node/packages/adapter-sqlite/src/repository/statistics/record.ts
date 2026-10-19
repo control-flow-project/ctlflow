@@ -44,16 +44,16 @@ export function statisticsRecorder(database: Database.Database) {
       const identity = { ...key, ...flow };
       const previous = executeSelect(database, schema, (query, params) => query.from('listener_stat_flow')
         .where(row => row.run_id === params.runId && row.bucket_at === params.bucketAt && row.room_id === params.roomId
-          && row.sender_matrix_id === params.senderMatrixId && row.message_type === params.messageType).firstOrDefault(), identity);
+          && row.sender_backend_user_id === params.senderBackendUserId && row.message_type === params.messageType).firstOrDefault(), identity);
       if (previous) executeUpdate(database, schema, (query, params) => query.update('listener_stat_flow').set({ observed: params.observed,
         delivered: params.delivered, content_bytes: params.contentBytes, delivered_bytes: params.deliveredBytes,
         attachment_bytes: params.attachmentBytes, largest_bytes: params.largestBytes }).where(row => row.run_id === params.runId
-          && row.bucket_at === params.bucketAt && row.room_id === params.roomId && row.sender_matrix_id === params.senderMatrixId && row.message_type === params.messageType),
+          && row.bucket_at === params.bucketAt && row.room_id === params.roomId && row.sender_backend_user_id === params.senderBackendUserId && row.message_type === params.messageType),
       { ...identity, observed: add(previous.observed, flow.observed), delivered: add(previous.delivered, flow.delivered),
         contentBytes: add(previous.content_bytes, flow.contentBytes), deliveredBytes: add(previous.delivered_bytes, flow.deliveredBytes),
         attachmentBytes: add(previous.attachment_bytes, flow.attachmentBytes), largestBytes: Math.max(previous.largest_bytes, flow.largestBytes) });
       else executeInsert(database, schema, (query, params) => query.insertInto('listener_stat_flow').values({ run_id: params.runId,
-        bucket_at: params.bucketAt, room_id: params.roomId, sender_matrix_id: params.senderMatrixId, message_type: params.messageType,
+        bucket_at: params.bucketAt, room_id: params.roomId, sender_backend_user_id: params.senderBackendUserId, message_type: params.messageType,
         observed: params.observed, delivered: params.delivered, content_bytes: params.contentBytes, delivered_bytes: params.deliveredBytes,
         attachment_bytes: params.attachmentBytes, largest_bytes: params.largestBytes }), identity);
     }

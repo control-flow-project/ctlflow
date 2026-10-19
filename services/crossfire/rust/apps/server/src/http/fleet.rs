@@ -12,7 +12,9 @@ use crossfire_domain::{
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use serde_json::{Value, json};
 use std::time::Duration;
-pub fn list(context: &Context<'_>) -> Result<Reply> {
+pub fn list(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let page = context.query.page()?;
     let owner = context.query.identifier("ownerId")?;
     let search = context.query.search()?;
@@ -20,13 +22,17 @@ pub fn list(context: &Context<'_>) -> Result<Reply> {
         .with(|repo, now| read::fleet::list(repo, context.actor()?, owner, search, page, now))?;
     reply::page(values, |value| Ok(views::fleet(value)))
 }
-pub fn read(context: &Context<'_>) -> Result<Reply> {
+pub fn read(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let actor = context.auth.fleet()?;
     let value = context
         .with(|repo, now| read::fleet::read(repo, &actor, context.parameter("fleetId")?, now))?;
     reply::of(views::fleet(&value))
 }
-pub fn agents(context: &Context<'_>) -> Result<Reply> {
+pub fn agents(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let page = context.query.page()?;
     let actor = context.auth.fleet()?;
     let values = context.with(|repo, now| {
@@ -36,7 +42,9 @@ pub fn agents(context: &Context<'_>) -> Result<Reply> {
         Ok(json!({"instanceKey":key,"agent":views::agent(agent)}))
     })
 }
-pub fn change(context: &Context<'_>) -> Result<Reply> {
+pub fn change(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(
         &context.input,
         &["expectedRevision", "label", "controller"],
@@ -62,7 +70,9 @@ pub fn change(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(views::fleet(&value))
 }
-pub fn delivery(context: &Context<'_>) -> Result<Reply> {
+pub fn delivery(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["expectedRevision", "enabled"], &[])?;
     let revision = check::integer(&value["expectedRevision"], 0, check::SAFE_INTEGER)?;
     let enabled = check::boolean(&value["enabled"])?;
@@ -80,7 +90,9 @@ pub fn delivery(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(views::control(&value))
 }
-pub fn connection(context: &Context<'_>) -> Result<Reply> {
+pub fn connection(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["stopped"], &[])?;
     let stopped = check::boolean(&value["stopped"])?;
     let actor = context.auth.fleet()?;
@@ -110,7 +122,9 @@ pub fn integer(value: Option<&str>, minimum: i64, maximum: i64) -> Result<i64> {
         .filter(|value| *value >= minimum && *value <= maximum)
         .ok_or_else(|| Failure::new(ErrorCode::Invalid, "Use a canonical integer query value"))
 }
-pub async fn control(context: &Context<'_>) -> Result<Reply> {
+pub async fn control(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let connection = context.query.identifier("connectionId")?.ok_or_else(|| {
         Failure::new(
             ErrorCode::Invalid,
@@ -144,7 +158,9 @@ pub async fn control(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(wire::snapshot(&current))
 }
-pub fn messages(context: &Context<'_>) -> Result<Reply> {
+pub fn messages(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let page = integer(Some(context.query.get("page").unwrap_or("1")), 1, 100000)?;
     let size = integer(Some(context.query.get("pageSize").unwrap_or("10")), 1, 10)?;
     let actor = context.auth.fleet()?;
@@ -153,7 +169,9 @@ pub fn messages(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::page(values, |value| Ok(wire::summary(value)))
 }
-pub fn create_message(context: &Context<'_>) -> Result<Reply> {
+pub fn create_message(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["messageId", "body"], &[])?;
     let id = check::identifier(&value["messageId"])?;
     let body = check::plain_text(&value["body"], message::MAX_BYTES)?;
@@ -170,7 +188,9 @@ pub fn create_message(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(wire::summary(&value))
 }
-pub fn acknowledge(context: &Context<'_>) -> Result<Reply> {
+pub fn acknowledge(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["status", "errorMessage"], &[])?;
     let state = match check::choice(&value["status"], &["delivered", "failed", "skipped"])? {
         "delivered" => message::DeliveryState::Delivered,
@@ -199,7 +219,9 @@ pub fn acknowledge(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(json!({"recorded":recorded}))
 }
-pub fn operations(context: &Context<'_>) -> Result<Reply> {
+pub fn operations(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let page = context.query.page()?;
     let actor = context.auth.fleet()?;
     let values = context.with(|repo, now| {
@@ -218,7 +240,9 @@ fn encoded<T: serde::Serialize>(value: T) -> Result<Value> {
     serde_json::to_value(value)
         .map_err(|_| Failure::new(ErrorCode::Unavailable, "Fleet response cannot be encoded"))
 }
-pub fn request(context: &Context<'_>) -> Result<Reply> {
+pub fn request(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let input = fleet_runtime::request(&context.input)?;
     let actor = context.auth.fleet()?;
     let value = context.with(|repo, now| {
@@ -233,7 +257,9 @@ pub fn request(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(fleet_runtime::OperationWire(&value))
 }
-pub fn claim(context: &Context<'_>) -> Result<Reply> {
+pub fn claim(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["connectionId"], &[])?;
     let connection = check::identifier(&value["connectionId"])?;
     let actor = context.auth.fleet()?;
@@ -249,7 +275,9 @@ pub fn claim(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(fleet_runtime::OperationWire(&value))
 }
-pub fn receipt(context: &Context<'_>) -> Result<Reply> {
+pub fn receipt(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let input = fleet_runtime::receipt(&context.input)?;
     let actor = context.auth.fleet()?;
     let recorded = context.with(|repo, now| {
@@ -264,7 +292,9 @@ pub fn receipt(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(json!({"recorded":recorded}))
 }
-pub fn native_stop(context: &Context<'_>) -> Result<Reply> {
+pub fn native_stop(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["connectionId", "runId", "receiptId"], &[])?;
     let input = native_stop::StopInput {
         fleet: context.parameter("fleetId")?,
@@ -277,7 +307,9 @@ pub fn native_stop(context: &Context<'_>) -> Result<Reply> {
     context.with(|repo, now| native_stop::record(repo, &actor, input, now))?;
     reply::of(json!({"recorded":true}))
 }
-pub fn remove(context: &Context<'_>) -> Result<Reply> {
+pub fn remove(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["expectedRevision", "instanceKey"], &[])?;
     let actor = context.auth.fleet()?;
     let input = retire::Remove {
@@ -290,7 +322,9 @@ pub fn remove(context: &Context<'_>) -> Result<Reply> {
     context.with(|repo, now| retire::remove(repo, &actor, input, now))?;
     reply::of(json!({"accepted":true}))
 }
-pub fn archive(context: &Context<'_>) -> Result<Reply> {
+pub fn archive(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["expectedRevision"], &[])?;
     let revision = check::integer(&value["expectedRevision"], 0, check::SAFE_INTEGER)?;
     let actor = context.auth.fleet()?;

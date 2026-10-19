@@ -1,20 +1,22 @@
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import type { Page, PageRequest } from '../port/directory.js';
-import type { RoomFacts } from '../port/matrix-authority.js';
+import type { RoomFacts } from '../port/messaging.js';
 import { activeActor, authorizeAgent } from '../authorization/authorize.js';
 import { privateConversation } from '../owner-conversation/protect.js';
 export type RoomDetails = { roomId: string; name: string; topic: string; alias: string | null; authority: RoomFacts | null };
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'matrix' | 'clock' | 'runtime'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'messaging' | 'clock' | 'runtime'>;
 export async function readRoom(services: Dependencies, actor: Actor, roomId: string, agentId?: string): Promise<Result<RoomDetails>> {
   const current = activeActor(services, actor);
   if (!current.ok) return current;
+  let subjectUserId: string | undefined;
   if (agentId) {
     const permitted = authorizeAgent(services, actor, agentId, 'read'), conversation = privateConversation(services, roomId);
     if (!permitted.ok) return permitted; if (!conversation.ok) return conversation;
+    subjectUserId = permitted.value.principal.backendUserId;
     if (conversation.value && (conversation.value.kind === 'management' || conversation.value.agentId !== agentId)) return failure('forbidden', 'This private owner DM is not an agent assignment');
   }
-  const native = await services.matrix.room(current.value.matrixUserId, roomId);
+  const native = await services.messaging.room(current.value.backendUserId, roomId, subjectUserId);
   if (native.ok) return success({ roomId, name: native.value.name, topic: native.value.topic, alias: native.value.alias, authority: native.value });
   if (!agentId) return native;
   const agent = authorizeAgent(services, actor, agentId, 'read');
@@ -22,14 +24,14 @@ export async function readRoom(services: Dependencies, actor: Actor, roomId: str
   const grant = services.repositories.agentRoomGrant.find({ agentId, roomId });
   if (!grant.ok) return grant;
   if (!grant.value) return failure('missing', 'Assigned room not found');
-  const observed = await services.matrix.room(agent.value.principal.matrixUserId, roomId);
+  const observed = await services.messaging.room(agent.value.principal.backendUserId, roomId);
   if (!observed.ok) return success({ roomId, name: roomId, topic: '', alias: null, authority: null });
   return success({ roomId, name: observed.value.name, topic: observed.value.topic, alias: observed.value.alias, authority: null });
 }
 export async function listRooms(services: Dependencies, actor: Actor, input: PageRequest & { agentId?: string; search: string }): Promise<Result<Page<RoomDetails>>> {
   const current = activeActor(services, actor);
   if (!current.ok) return current;
-  const joined = await services.matrix.joined(current.value.matrixUserId);
+  const joined = await services.messaging.joined(current.value.backendUserId);
   if (!joined.ok) return joined;
   const identifiers = new Set(joined.value);
   if (input.agentId !== undefined) {

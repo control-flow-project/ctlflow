@@ -1,9 +1,9 @@
+use crate::history_resources::HISTORY_BYTES;
 use crate::{
     chat::{self, Artifacts},
     coordination::{self, Coordination},
     events::{Event, invalid},
     local_state::{self, LocalState},
-    matrix::{HISTORY_BYTES, Matrix},
     origins,
     profile::Profile,
     receive_pages,
@@ -12,6 +12,8 @@ use crate::{
     unread,
 };
 use crossfire_contracts::validation as check;
+use crossfire_domain::messaging_client::MessagingClient;
+use crossfire_domain::messaging_client::{Direction, MessagePageRequest};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, time::Clock};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -82,7 +84,7 @@ struct Pending {
 }
 pub struct Queries<S, M, C, A, T> {
     pub storage: Arc<S>,
-    pub matrix: Arc<M>,
+    pub messaging: Arc<M>,
     pub coordination: Arc<C>,
     pub artifacts: Arc<A>,
     pub clock: T,
@@ -96,7 +98,7 @@ fn conflict() -> Failure {
         "Delivery positions changed; the unread query was not acknowledged",
     )
 }
-impl<S: LocalState, M: Matrix, C: Coordination, A: Artifacts, T: Clock + Send + Sync>
+impl<S: LocalState, M: MessagingClient, C: Coordination, A: Artifacts, T: Clock + Send + Sync>
     Queries<S, M, C, A, T>
 {
     fn pending(&self) -> Result<Option<Pending>> {
@@ -162,7 +164,7 @@ impl<S: LocalState, M: Matrix, C: Coordination, A: Artifacts, T: Clock + Send + 
                 "Agent and owner must both be active",
             ));
         }
-        let joined = receive_pages::joined(self.matrix.as_ref(), stop).await?;
+        let joined = receive_pages::joined(self.messaging.as_ref(), stop).await?;
         let rooms = policy
             .rooms
             .keys()
@@ -202,7 +204,7 @@ impl<S: LocalState, M: Matrix, C: Coordination, A: Artifacts, T: Clock + Send + 
             }
             unread::read(
                 self.storage.as_ref(),
-                self.matrix.as_ref(),
+                self.messaging.as_ref(),
                 &self.profile.settings,
                 self.artifacts.as_ref(),
                 unread::Options {
@@ -225,20 +227,22 @@ impl<S: LocalState, M: Matrix, C: Coordination, A: Artifacts, T: Clock + Send + 
             let mut batch = Batch::default();
             let mut file_mode = false;
             for (position, room) in rooms.iter().enumerate() {
-                let mut query = BTreeMap::from([("dir".to_owned(), input.direction.clone())]);
-                if let Some(cursor) = input.cursors.get(room) {
-                    query.insert("from".to_owned(), cursor.clone());
-                }
-                let page = receive_pages::history(
-                    self.matrix.as_ref(),
-                    room,
-                    &query,
-                    receive_pages::room_quota(input.limit, rooms.len(), position),
-                    stop.clone(),
-                )
-                .await?;
-                let count = page.chunk.len();
-                for event in page.chunk {
+                let query = MessagePageRequest {
+                    direction: if input.direction == "f" {
+                        Direction::Forward
+                    } else {
+                        Direction::Backward
+                    },
+                    from: input.cursors.get(room).cloned(),
+                    to: None,
+                    filter: None,
+                    limit: receive_pages::room_quota(input.limit, rooms.len(), position),
+                };
+                let page =
+                    receive_pages::history(self.messaging.as_ref(), room, &query, stop.clone())
+                        .await?;
+                let count = page.events.len();
+                for event in page.events {
                     batch.events.push(crate::events::take(event, room)?);
                 }
                 if file_mode
@@ -258,7 +262,7 @@ impl<S: LocalState, M: Matrix, C: Coordination, A: Artifacts, T: Clock + Send + 
             batch
         };
         batch.events = origins::enrich(
-            self.matrix.as_ref(),
+            self.messaging.as_ref(),
             &self.profile.account.user_id,
             batch.events,
             stop.clone(),
@@ -340,7 +344,7 @@ impl<S: LocalState, M: Matrix, C: Coordination, A: Artifacts, T: Clock + Send + 
         self.save(&pending)?;
         receive_state::acknowledge(
             self.storage.as_ref(),
-            self.matrix.as_ref(),
+            self.messaging.as_ref(),
             &self.file,
             &pending.batch,
             lease.cancellation(),

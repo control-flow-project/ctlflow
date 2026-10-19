@@ -3,7 +3,7 @@ import type { Tables } from '../../schema/tables.js';
 export function mapPrincipal(row: Tables['principal']): Principal {
   return {
     id: row.id,
-    matrixUserId: row.matrix_user_id,
+    backendUserId: row.backend_user_id,
     kind: row.kind,
     status: row.status,
     revision: row.revision,

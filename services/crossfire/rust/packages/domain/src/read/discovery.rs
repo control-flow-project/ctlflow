@@ -26,21 +26,21 @@ pub fn resolve(
     if ids.is_empty() || ids.len() > 100 || ids.iter().collect::<BTreeSet<_>>().len() != ids.len() {
         return Err(Failure::new(
             ErrorCode::Invalid,
-            "Resolve 1–100 unique Matrix identities",
+            "Resolve 1–100 unique backend identities",
         ));
     }
     let mut identities: BTreeMap<_, _> = repo
         .identities(ids)?
         .into_iter()
-        .map(|value| (value.matrix_user_id.clone(), value))
+        .map(|value| (value.backend_user_id.clone(), value))
         .collect();
     Ok(ids
         .iter()
         .map(|id| {
             identities.remove(id).unwrap_or_else(|| PrincipalIdentity {
-                matrix_user_id: id.clone(),
+                backend_user_id: id.clone(),
                 kind: None,
-                owner_matrix_id: None,
+                owner_backend_user_id: None,
                 display_name: None,
                 owner_display_name: None,
             })

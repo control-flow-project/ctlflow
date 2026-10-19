@@ -12,9 +12,8 @@ function Connections({ map, connections, agent }: { map: FleetMapView; connectio
         {agent ? room.name ?? 'Name unavailable' : receiver.displayName}</a></strong><span className="subline">{agent ? room.alias ?? room.roomId : receiver.instanceKey}</span></td>
         <td>{accessLabel(connection)}<span className="subline"><Status value={state.status}/>{state.removing && ' · removal'}</span>
           {connection.application?.errorMessage && <span className="subline map-error">{connection.application.errorMessage}</span>}</td>
-        <td>{connection.application?.membership ?? 'Not observed'}{connection.application?.creator ? <span className="subline">Native room creator</span>
-          : connection.application?.powerLevel !== null && connection.application?.powerLevel !== undefined
-          && <span className="subline">Native level {connection.application.powerLevel}</span>}<span className="subline">{timestamp(connection.application?.lastSuccessAt ?? null)}</span></td>
+        <td>{connection.application?.membership ?? 'Not observed'}{connection.application?.nativeAccess
+          && <span className="subline mono">{JSON.stringify(connection.application.nativeAccess)}</span>}<span className="subline">{timestamp(connection.application?.lastSuccessAt ?? null)}</span></td>
         <td>{receiver.status !== 'active' || receiver.owner.status !== 'active' ? 'Account inactive' : state.removing ? 'No assigned delivery'
           : state.muted ? 'Muted' : state.notJoined ? 'Not joined' : 'Unmuted'}<span className="subline">{receiver.listener} listener</span></td></tr>;
     })}</tbody></table></div> : <Empty title="No rooms">This agent has no assigned or unresolved room connections.</Empty>}</PageItems>;
@@ -25,12 +24,12 @@ function Identities({ map, source, agent }: { map: FleetMapView; source: MapSour
   const eligible = new Set(enabled ? source.eligiblePrincipalIds.filter(id => id !== agent?.agentId) : []);
   const configured = new Map(source.senders.map(sender => [sender.principalId, sender.includeAgents]));
   const identities = map.principals.filter(identity => eligible.has(identity.principalId) || configured.has(identity.principalId))
-    .sort((left, right) => left.displayName.localeCompare(right.displayName) || left.matrixUserId.localeCompare(right.matrixUserId));
+    .sort((left, right) => left.displayName.localeCompare(right.displayName) || left.backendUserId.localeCompare(right.backendUserId));
   return <><p className="support">{eligible.size} active identities allowed by this rule.{!agent && ' Each agent excludes itself.'} Room access and unmuted delivery are still required.</p>
     {!enabled && <p className="support">Chat delivery is disabled while the agent or owner account is inactive.</p>}
     <PageItems items={identities} parameter="authorsPage">{items => items.length ? <div className="table-wrap"><table aria-label="Wake-up identities">
       <thead><tr><th>Identity</th><th>Type</th><th>Wake eligibility</th></tr></thead><tbody>{items.map(identity => <tr key={identity.principalId}>
-        <td><strong>{identity.displayName}</strong><span className="subline mono">{identity.matrixUserId}</span></td><td>{identity.kind}</td>
+        <td><strong>{identity.displayName}</strong><span className="subline mono">{identity.backendUserId}</span></td><td>{identity.kind}</td>
         <td>{eligible.has(identity.principalId) ? 'Allowed' : 'Selected, not eligible'}{configured.get(identity.principalId) && <span className="subline">Includes their agents</span>}</td></tr>)}</tbody></table></div>
       : <p className="support">Nobody can trigger chat input under this rule{!enabled ? ' while the account is inactive' : ''}. Scheduled Wake-ups and terminal input remain separate.</p>}</PageItems></>;
 }
@@ -44,7 +43,7 @@ export function FleetMapDetails({ map, selection, onClear }: { map: FleetMapView
     const agent = map.agents.find(entry => entry.agentId === selection.id), source = map.sources.find(entry => entry.sourceId === agent?.sourceId);
     if (!agent || !source) return <section className="map-inspector" aria-label="Connection details">{heading('Agent no longer in this fleet')}<p>Choose another node to inspect the current map.</p></section>;
     return <section className="map-inspector" aria-label="Connection details">{heading(agent.displayName, { href: '/manage/agents/' + agent.agentId, label: 'Agent details' })}
-      <dl className="map-facts"><dt>Owner</dt><dd>{agent.owner.displayName} · {agent.owner.matrixUserId}</dd><dt>Account</dt><dd><Status value={agent.status}/></dd>
+      <dl className="map-facts"><dt>Owner</dt><dd>{agent.owner.displayName} · {agent.owner.backendUserId}</dd><dt>Account</dt><dd><Status value={agent.status}/></dd>
         <dt>Listener</dt><dd><Status value={agent.listener}/> · Last heartbeat {agent.lastSeenAt === null ? 'Not reported' : timestamp(agent.lastSeenAt)}</dd><dt>Wake-up rule</dt><dd>{sourceLabel(source)}</dd></dl>
       <h3>Room connections</h3><Connections map={map} agent={agent} connections={map.connections.filter(connection => connection.agentId === agent.agentId)}/>
       <h3>Who can wake this agent</h3><Identities map={map} source={source} agent={agent}/></section>;
@@ -53,7 +52,7 @@ export function FleetMapDetails({ map, selection, onClear }: { map: FleetMapView
     const room = map.rooms.find(entry => entry.roomId === selection.id);
     if (!room) return <section className="map-inspector" aria-label="Connection details">{heading('Room no longer connected')}<p>Choose another node to inspect the current map.</p></section>;
     return <section className="map-inspector" aria-label="Connection details">{heading(room.name ?? 'Name unavailable')}
-      <p className="mono">{room.alias ?? room.roomId}</p>{!room.name && <p className="support">The room name could not be read from Matrix. Access state remains visible.</p>}
+      <p className="mono">{room.alias ?? room.roomId}</p>{!room.name && <p className="support">The room name could not be read from the messaging backend. Access state remains visible.</p>}
       <Connections map={map} connections={map.connections.filter(connection => connection.roomId === room.roomId)}/></section>;
   }
   const source = map.sources.find(entry => entry.sourceId === selection.id);

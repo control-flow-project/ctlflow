@@ -1,10 +1,11 @@
+import { matrixSettings } from './support/matrix-config.js';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { createClient } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
-import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { API } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { nativeServer } from './support/native-server.js';
 import { secret, value } from './support/application.js';
@@ -18,10 +19,10 @@ test('public guide and owner approval enroll a controller-bound roster without c
   assert.equal(publicReadme.status, 200);
   const documentation = await publicReadme.text();
   assert(!documentation.includes(native.registrationToken));
-  assert(!documentation.includes(fixture.application.config.jwtSecret));
+  assert(!documentation.includes(matrixSettings(fixture.application.config).jwtSecret));
   const publicClient = createClient({ origin });
-  const roster = { ownerMatrixId: admin.member.principal.matrixUserId, fleetKey: 'holmes', controller: { name: 'Holmes controller' },
-    instances: [{ instanceKey: 'holmes', name: 'holmes', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }] };
+  const roster = { ownerBackendUserId: admin.member.principal.backendUserId, fleetKey: 'holmes', controller: { name: 'Holmes controller' },
+    instances: [{ instanceKey: 'holmes', name: 'holmes', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.backendUserId) }] };
   assert.equal(value(await publicClient.call(operations.preflight, {}, roster)).data.available, true);
   const introduction = { ...roster, enrollmentId: randomUUID(), claimSecret: secret() };
   const requested = value(await publicClient.call(operations.introduceEnrollment, {}, introduction)).data;

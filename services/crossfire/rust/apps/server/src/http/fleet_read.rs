@@ -8,7 +8,9 @@ use crossfire_domain::{fleet::values::FleetActor, read, room_access};
 use crossfire_kernel::{Result, identity};
 use futures_util::{StreamExt, stream};
 use serde_json::json;
-pub fn statistics(context: &Context<'_>) -> Result<Reply> {
+pub fn statistics(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let hours = fleet::integer(Some(context.query.get("hours").unwrap_or("24")), 1, 720)?;
     let page = fleet::integer(Some(context.query.get("page").unwrap_or("1")), 1, 100000)?;
     let size = fleet::integer(Some(context.query.get("pageSize").unwrap_or("20")), 1, 100)?;
@@ -25,7 +27,9 @@ pub fn statistics(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(statistics::report(&value)?)
 }
-pub async fn map(context: &Context<'_>) -> Result<Reply> {
+pub async fn map(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let mut captured = context.with(|repo, now| {
         read::map::capture(
             repo,
@@ -43,7 +47,7 @@ pub async fn map(context: &Context<'_>) -> Result<Reply> {
             .map(|(index, value)| async move {
                 let observed = room_access::read::room(
                     &context.state.repository,
-                    &context.state.matrix,
+                    context.state.messaging.as_ref(),
                     &identity::now,
                     actor,
                     &value.id,

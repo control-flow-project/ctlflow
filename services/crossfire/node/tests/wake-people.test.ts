@@ -19,15 +19,15 @@ test('person and ownership group entries combine dynamically across owners witho
     { expectedRevision: current().principal.revision, mode: 'selected', senders }, randomUUID()));
   const authors = () => value(deliveryPolicy(services, receiver.actor, receiver.id)).wake.senders;
   change([{ principalId: first.actor.principalId, includeAgents: true }, { principalId: second.actor.principalId, includeAgents: false }]);
-  assert.deepEqual(authors(), [first.member.principal.matrixUserId, firstAgent.matrixUserId, second.member.principal.matrixUserId].sort());
+  assert.deepEqual(authors(), [first.member.principal.backendUserId, firstAgent.backendUserId, second.member.principal.backendUserId].sort());
   const newFirstAgent = await fixture.agent(first.actor, 'new-first-agent');
-  assert(authors().includes(newFirstAgent.matrixUserId));
-  assert(!authors().includes(admin.member.principal.matrixUserId)); assert(!authors().includes(peer.matrixUserId)); assert(!authors().includes(secondAgent.matrixUserId));
+  assert(authors().includes(newFirstAgent.backendUserId));
+  assert(!authors().includes(admin.member.principal.backendUserId)); assert(!authors().includes(peer.backendUserId)); assert(!authors().includes(secondAgent.backendUserId));
   change([{ principalId: admin.actor.principalId, includeAgents: true }, { principalId: second.actor.principalId, includeAgents: true }]);
-  assert.deepEqual(authors(), [admin.member.principal.matrixUserId, peer.matrixUserId, second.member.principal.matrixUserId, secondAgent.matrixUserId].sort());
-  assert(!authors().includes(receiver.matrixUserId));
+  assert.deepEqual(authors(), [admin.member.principal.backendUserId, peer.backendUserId, second.member.principal.backendUserId, secondAgent.backendUserId].sort());
+  assert(!authors().includes(receiver.backendUserId));
   value(changeMember(services, admin.actor, second.actor.principalId, { expectedRevision: 0, status: 'suspended' }, randomUUID()));
-  assert.deepEqual(authors(), [admin.member.principal.matrixUserId, peer.matrixUserId].sort());
+  assert.deepEqual(authors(), [admin.member.principal.backendUserId, peer.backendUserId].sort());
   change([]); assert.deepEqual(authors(), []);
 });
 

@@ -16,7 +16,7 @@ export function registerPrincipal(services: Pick<Services, 'repositories' | 'clo
   return services.repositories.principalRole.insert({ principalId: principal.id, principalKind: principal.kind,
     roleCode, assignedByMemberId, assignedAt: services.clock.now() });
 }
-export function initializeInstance(services: Pick<Services, 'repositories' | 'directory' | 'identity' | 'clock' | 'unitOfWork'>, administratorMatrixId: string): Result<void> {
+export function initializeInstance(services: Pick<Services, 'repositories' | 'directory' | 'identity' | 'clock' | 'unitOfWork' | 'messaging'>, administratorBackendUserId: string): Result<void> {
   return services.unitOfWork.run(() => {
     const policy = services.repositories.instancePolicy.find({ id: 'instance' });
     if (!policy.ok) return policy;
@@ -25,13 +25,13 @@ export function initializeInstance(services: Pick<Services, 'repositories' | 'di
         maxPending: 100, enrollmentSeconds: 600, reconcileSeconds: 300, maxMessageBytes: 65536, fleetIdleTimeoutSeconds: 1800, agentInstructions: '', signupMode: 'invitation', invitationIssuers: 'administrators' });
       if (!added.ok) return added;
     }
-    const existing = services.directory.principalByMatrixId(administratorMatrixId);
+    const existing = services.directory.principalByBackendUserId(administratorBackendUserId);
     if (!existing.ok) return existing;
     if (existing.value) return success(undefined);
     const id = services.identity.id();
-    const registered = registerPrincipal(services, { id, matrixUserId: administratorMatrixId, kind: 'human', status: 'active', revision: 0, createdAt: services.clock.now() }, 'administrator', null);
+    const registered = registerPrincipal(services, { id, backendUserId: administratorBackendUserId, kind: 'human', status: 'active', revision: 0, createdAt: services.clock.now() }, 'administrator', null);
     if (!registered.ok) return registered;
     return services.repositories.member.insert({ principalId: id, principalKind: 'human',
-      displayName: administratorMatrixId.slice(1, administratorMatrixId.indexOf(':')) });
+      displayName: services.messaging.localLabel(administratorBackendUserId) });
   });
 }

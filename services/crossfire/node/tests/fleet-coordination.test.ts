@@ -31,9 +31,9 @@ async function coordinationFixture(scope: Parameters<typeof applicationFixture>[
   async function agent(owner: Parameters<Fixture['agent']>[0], name: string): Promise<Agent> {
     if (owner.principalId !== fixture.admin.actor.principalId) return fixture.agent(owner, name);
     const input: EnrollmentIntroduction = { enrollmentId: randomUUID(), claimSecret: secret(),
-      ownerMatrixId: fixture.admin.member.principal.matrixUserId, fleetKey: 'agreements',
+      ownerBackendUserId: fixture.admin.member.principal.backendUserId, fleetKey: 'agreements',
       controller: { name: 'test-controller' }, ...(controller ? { controllerCredential: controller.credential } : {}),
-      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy(fixture.admin.member.principal.matrixUserId) }] };
+      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy(fixture.admin.member.principal.backendUserId) }] };
     const ready = await approve(fixture, input), item = ready.instances[0]!;
     assert(item.agentId && item.account);
     if (!controller) {
@@ -41,12 +41,12 @@ async function coordinationFixture(scope: Parameters<typeof applicationFixture>[
       controller = { fleetId: ready.fleet.fleetId, credential: ready.fleet.controllerCredential, connectionId: randomUUID() };
       fixture.renewController(controller);
     }
-    return { id: item.agentId, matrixUserId: item.account.matrixUserId, token: item.account.accessToken, controller,
+    return { id: item.agentId, backendUserId: item.account.userId, token: item.account.accessToken, controller,
       actor: { principalId: item.agentId, kind: 'agent' } };
   }
   return { ...fixture, agent };
 }
-const settings: CoordinationPolicy = { wakeMode: 'selected', senders: [{ matrixUserId: '@admin:test.localhost', includeAgents: true }], permissions: ['room.agent.invite'] };
+const settings: CoordinationPolicy = { wakeMode: 'selected', senders: [{ backendUserId: '@admin:test.localhost', includeAgents: true }], permissions: ['room.agent.invite'] };
 test('expired private enrollment claims reveal only terminal status, never ready credentials or controller authority', async scope => {
   const fixture = await coordinationFixture(scope), ada = await fixture.agent(fixture.admin.actor, 'ada');
   const input = request(fixture, [ada]);
@@ -54,13 +54,13 @@ test('expired private enrollment claims reveal only terminal status, never ready
   assert.equal(value(exchangeEnrollment(fixture.services, input.enrollmentId, input.claimSecret)).status, 'ready');
   fixture.advance(3_600_001);
   assert.deepEqual(value(exchangeEnrollment(fixture.services, input.enrollmentId, input.claimSecret)), {
-    status: 'expired', ownerMatrixId: fixture.admin.member.principal.matrixUserId, fleet: null, instances: [],
+    status: 'expired', ownerBackendUserId: fixture.admin.member.principal.backendUserId, fleet: null, instances: [],
   });
   const invalid = exchangeEnrollment(fixture.services, input.enrollmentId, secret());
   assert(!invalid.ok); assert.equal(invalid.error.code, 'unauthorized');
 });
 function request(fixture: Fixture, agents: Agent[], policies: CoordinationPolicy[] = agents.map(() => settings), controllerCredential?: string): EnrollmentIntroduction {
-  return { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: fixture.admin.member.principal.matrixUserId,
+  return { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: fixture.admin.member.principal.backendUserId,
     fleetKey: 'agreements', controller: { name: 'test-controller' }, ...((controllerCredential ?? agents[0]?.controller.credential) ? { controllerCredential: controllerCredential ?? agents[0]!.controller.credential } : {}),
     instances: agents.map((agent, index) => ({ instanceKey: value(fixture.services.directory.agent(agent.id))!.name,
       name: value(fixture.services.directory.agent(agent.id))!.name, identity: { agentId: agent.id, accessToken: agent.token }, coordinationPolicy: policies[index]! })) };
@@ -77,7 +77,7 @@ async function approve(fixture: Fixture, input: EnrollmentIntroduction) {
 function intent(fixture: Fixture, agentId: string, roomId: string) {
   const previous = value(fixture.services.repositories.agentRoomGrant.find({ agentId, roomId }));
   return { agentId, roomId, expectedRevision: value(fixture.services.directory.agent(agentId))!.principal.revision,
-    expectedGeneration: previous?.generation ?? null, accessMode: 'reply' as const, powerLevel: null, muted: false };
+    expectedGeneration: previous?.generation ?? null, accessMode: 'reply' as const, nativeAccess: null, muted: false };
 }
 async function assigned(fixture: Fixture, agent: Agent, roomId: string, actor = fixture.admin.actor) {
   value(await changeRoomGrant(fixture.services, actor, intent(fixture, agent.id, roomId), randomUUID()));
@@ -94,14 +94,14 @@ test('fleet coordination contracts are strict, complete and reject missing deplo
   assert(enrollment(input).ok);
   const missing = { ...input, instances: input.instances.map(({ coordinationPolicy: _policy, ...item }) => item) };
   assert.equal(enrollment(missing).ok, false);
-  assert.equal(preflight({ ownerMatrixId: input.ownerMatrixId, fleetKey: input.fleetKey, controller: input.controller, instances: missing.instances }).ok, false);
+  assert.equal(preflight({ ownerBackendUserId: input.ownerBackendUserId, fleetKey: input.fleetKey, controller: input.controller, instances: missing.instances }).ok, false);
   assert.equal(enrollment({ ...input, fleetKey: null, controller: undefined }).ok, false);
   for (const invalid of [{ ...settings, permissions: ['policy.manage'] }, { ...settings, extra: true },
-    { ...settings, senderMatrixIds: ['@someone:test'] }, { ...settings, wakeMode: 'agents' },
-    { ...settings, wakeMode: 'selected', senders: Array.from({ length: 2 }, () => ({ matrixUserId: '@someone:test', includeAgents: false })) }]) assert.equal(coordinationPolicy(invalid).ok, false);
-  const unknown = request(fixture, [agent], [{ ...settings, wakeMode: 'selected', senders: [{ matrixUserId: '@missing:test', includeAgents: false }] }]);
+    { ...settings, senderBackendUserIds: ['@someone:test'] }, { ...settings, wakeMode: 'agents' },
+    { ...settings, wakeMode: 'selected', senders: Array.from({ length: 2 }, () => ({ backendUserId: '@someone:test', includeAgents: false })) }]) assert.equal(coordinationPolicy(invalid).ok, false);
+  const unknown = request(fixture, [agent], [{ ...settings, wakeMode: 'selected', senders: [{ backendUserId: '@missing:test', includeAgents: false }] }]);
   assert.equal((await preflightEnrollment(fixture.services, unknown)).ok, false);
-  const self = request(fixture, [agent], [{ ...settings, wakeMode: 'selected', senders: [{ matrixUserId: agent.matrixUserId, includeAgents: false }] }]);
+  const self = request(fixture, [agent], [{ ...settings, wakeMode: 'selected', senders: [{ backendUserId: agent.backendUserId, includeAgents: false }] }]);
   assert.equal((await preflightEnrollment(fixture.services, self)).ok, false);
   assert.equal(value(fixture.services.collection.pendingEnrollmentCount()), 0);
 });
@@ -109,16 +109,16 @@ test('fleet coordination contracts are strict, complete and reject missing deplo
 test('owner approval configures existing grants, selected senders and future defaults without creating or joining rooms', async scope => {
   const fixture = await coordinationFixture(scope), { services, admin, native } = fixture;
   const ada = await fixture.agent(admin.actor, 'ada'), kit = await fixture.agent(admin.actor, 'kit'), human = await fixture.member('alice');
-  const roomId = value(await native.createRoom(admin.member.principal.matrixUserId, 'Matter')).roomId;
+  const roomId = value(await native.createRoom(admin.member.principal.backendUserId, 'Matter')).roomId;
   await assigned(fixture, ada, roomId);
   const before = value(services.repositories.agentRoomGrant.find({ agentId: ada.id, roomId }))!;
   value(await connectOwnerConversation(services, ada.actor, ada.id));
   const ownerDm = value(services.repositories.ownerConversation.find({ agentId: ada.id }))!.roomId;
-  const selected: CoordinationPolicy = { ...settings, wakeMode: 'selected', senders: [human.member.principal.matrixUserId, ada.matrixUserId].map(matrixUserId => ({ matrixUserId, includeAgents: false })) };
+  const selected: CoordinationPolicy = { ...settings, wakeMode: 'selected', senders: [human.member.principal.backendUserId, ada.backendUserId].map(backendUserId => ({ backendUserId, includeAgents: false })) };
   const input = request(fixture, [ada, kit], [settings, selected]);
   const receipt = value(await introduceEnrollment(services, input));
   assert.equal(receipt.request.status, 'pending');
-  assert.deepEqual(receipt.instances.map(item => item.coordinationPolicy), [settings, { ...selected, senders: [...selected.senders].sort((left, right) => left.matrixUserId.localeCompare(right.matrixUserId)) }]);
+  assert.deepEqual(receipt.instances.map(item => item.coordinationPolicy), [settings, { ...selected, senders: [...selected.senders].sort((left, right) => left.backendUserId.localeCompare(right.backendUserId)) }]);
   assert.deepEqual(value(readEnrollment(services, admin.actor, input.enrollmentId)).instances, receipt.instances);
   assert.equal(value(services.repositories.fleet.find({ ownerId: admin.actor.principalId, fleetKey: input.fleetKey }))!.id, ada.controller.fleetId);
   assert.deepEqual(permissions(fixture, ada, roomId), []);
@@ -135,7 +135,7 @@ test('owner approval configures existing grants, selected senders and future def
   assert.equal(after.generation, before.generation); assert.equal(after.accessRevision, before.accessRevision);
   assert.equal(after.revision, before.revision + 1);
   assert.equal(value(deliveryPolicy(services, ada.actor, ada.id)).wake.mode, 'selected');
-  assert.deepEqual(value(deliveryPolicy(services, kit.actor, kit.id)).wake.senders, selected.senders.map(sender => sender.matrixUserId).sort());
+  assert.deepEqual(value(deliveryPolicy(services, kit.actor, kit.id)).wake.senders, selected.senders.map(sender => sender.backendUserId).sort());
   const approved = value(services.repositories.fleetPolicy.approved(ada.id))!;
   assert.equal(approved.approvedByMemberId, admin.actor.principalId);
   assert.equal(services.repositories.fleetPolicy.approve({ ...approved, approvedByMemberId: human.actor.principalId }).ok, false, 'Storage rejects a different approving owner');
@@ -146,9 +146,9 @@ test('fresh Element admission inherits independently approved defaults; inviter 
   const ada = await fixture.agent(admin.actor, 'ada'), kit = await fixture.agent(admin.actor, 'kit'), owner = await fixture.member('other');
   const guest = await fixture.agent(owner.actor, 'visitor');
   await approve(fixture, request(fixture, [ada, kit]));
-  const roomId = value(await native.createRoom(admin.member.principal.matrixUserId, 'Samosas')).roomId;
-  native.rooms.get(roomId)!.members.set(ada.matrixUserId, { matrixUserId: ada.matrixUserId, displayName: 'Ada', membership: 'invite', creator: false, powerLevel: 0 });
-  native.invitations.set(roomId + ':' + ada.matrixUserId, { roomId, senderMatrixId: admin.member.principal.matrixUserId, eventId: '$ada-invite', direct: false });
+  const roomId = value(await native.createRoom(admin.member.principal.backendUserId, 'Samosas')).roomId;
+  native.rooms.get(roomId)!.members.set(ada.backendUserId, { backendUserId: ada.backendUserId, displayName: 'Ada', membership: 'invite', creator: false, powerLevel: 0 });
+  native.invitations.set(roomId + ':' + ada.backendUserId, { roomId, senderBackendUserId: admin.member.principal.backendUserId, eventId: '$ada-invite', direct: false });
   assert.equal(value(await acceptRoomInvitation(services, ada.actor, ada.id, roomId, randomUUID())).accepted, true);
   assert.deepEqual(permissions(fixture, ada, roomId), ['room.agent.invite']);
   await assigned(fixture, kit, roomId, ada.actor);
@@ -160,15 +160,15 @@ test('fresh Element admission inherits independently approved defaults; inviter 
   for (const agent of [kit, guest]) {
     value(await changeRoomGrant(services, ada.actor, { ...intent(fixture, agent.id, roomId), accessMode: 'none' }, randomUUID()));
     value(await reconcileRoomGrant(services, agent.id, roomId));
-    assert.equal(native.rooms.get(roomId)!.members.get(agent.matrixUserId)!.membership, 'leave');
+    assert.equal(native.rooms.get(roomId)!.members.get(agent.backendUserId)!.membership, 'leave');
     assert.deepEqual(permissions(fixture, agent, roomId), []);
   }
   await assigned(fixture, kit, roomId);
   assert.equal((await changeRoomGrant(services, ada.actor, { ...intent(fixture, kit.id, roomId), accessMode: 'none' }, randomUUID())).ok, false, 'A new owner addition has different provenance');
-  const room = services.matrix.room;
-  services.matrix.room = async (...args) => {
+  const room = services.messaging.authorizeRoomAccess;
+  services.messaging.authorizeRoomAccess = async (...args) => {
     const facts = await room(...args);
-    return facts.ok && args[0] === ada.matrixUserId ? success({ ...facts.value, inviteLevel: 50 }) : facts;
+    return facts.ok && args[0] === ada.backendUserId ? success({ ...facts.value, canInvite: false }) : facts;
   };
   assert.equal((await changeRoomGrant(services, ada.actor, intent(fixture, guest.id, roomId), randomUUID())).ok, false, 'Configured permission cannot bypass the native invite threshold');
 });
@@ -177,7 +177,7 @@ test('unchanged restarts preserve per-room edits while changed coordination requ
   const fixture = await coordinationFixture(scope), { services, admin, native } = fixture;
   const ada = await fixture.agent(admin.actor, 'ada'), first = await approve(fixture, request(fixture, [ada]));
   const credential = ada.controller.credential; assert.equal(first.fleet!.fleetId, ada.controller.fleetId);
-  const roomId = value(await native.createRoom(admin.member.principal.matrixUserId, 'Matter')).roomId;
+  const roomId = value(await native.createRoom(admin.member.principal.backendUserId, 'Matter')).roomId;
   await assigned(fixture, ada, roomId);
   const grant = value(services.repositories.agentRoomGrant.find({ agentId: ada.id, roomId }))!;
   value(setRoomPermission(services, admin.actor, { agentId: ada.id, roomId,
@@ -192,7 +192,7 @@ test('unchanged restarts preserve per-room edits while changed coordination requ
   value(decideEnrollment(services, admin.actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: pending.request.verificationCode }, randomUUID()));
   assert.equal(value(services.repositories.agent.find({ principalId: ada.id }))!.wakeMode, 'everyone');
   assert.deepEqual(value(services.repositories.fleetPolicy.approved(ada.id))!.permissions, []);
-  const nextRoom = value(await native.createRoom(admin.member.principal.matrixUserId, 'Next matter')).roomId;
+  const nextRoom = value(await native.createRoom(admin.member.principal.backendUserId, 'Next matter')).roomId;
   await assigned(fixture, ada, nextRoom); assert.deepEqual(permissions(fixture, ada, nextRoom), []);
   await approve(fixture, request(fixture, [ada], [settings], credential));
   assert.deepEqual(permissions(fixture, ada, roomId), ['room.agent.invite']);
@@ -212,7 +212,7 @@ test('stale, rejected and deactivated-sender reviews roll back complete rosters 
   assert.equal(value(services.repositories.fleet.find({ ownerId: admin.actor.principalId, fleetKey: 'agreements' }))!.id, ada.controller.fleetId);
   value(decideEnrollment(services, admin.actor, input.enrollmentId, { ...decision, decision: 'reject' }, randomUUID()));
   assert.equal(value(exchangeEnrollment(services, input.enrollmentId, input.claimSecret)).status, 'rejected');
-  const selected = request(fixture, [ada], [{ ...settings, wakeMode: 'selected', senders: [{ matrixUserId: kit.matrixUserId, includeAgents: false }] }]);
+  const selected = request(fixture, [ada], [{ ...settings, wakeMode: 'selected', senders: [{ backendUserId: kit.backendUserId, includeAgents: false }] }]);
   const review = value(await introduceEnrollment(services, selected));
   const principal = value(services.repositories.principal.find({ id: kit.id }))!;
   value(services.repositories.principal.update({ ...principal, status: 'suspended', revision: principal.revision + 1 }));
@@ -224,7 +224,7 @@ test('stale, rejected and deactivated-sender reviews roll back complete rosters 
 test('wake edits require review on next start and archival preserves history without independent deployment', async scope => {
   const fixture = await coordinationFixture(scope), { services, admin, native } = fixture;
   const ada = await fixture.agent(admin.actor, 'ada'), enrolled = await approve(fixture, request(fixture, [ada]));
-  const roomId = value(await native.createRoom(admin.member.principal.matrixUserId, 'Matter')).roomId;
+  const roomId = value(await native.createRoom(admin.member.principal.backendUserId, 'Matter')).roomId;
   await assigned(fixture, ada, roomId);
   value(changeWakePolicy(services, admin.actor, ada.id, { expectedRevision: value(services.directory.agent(ada.id))!.principal.revision,
     mode: 'selected', senders: [] }, randomUUID()));
@@ -237,10 +237,10 @@ test('wake edits require review on next start and archival preserves history wit
   assert.deepEqual(permissions(fixture, ada, roomId), ['room.agent.invite']);
   assert.equal(value(services.repositories.agent.find({ principalId: ada.id }))!.wakeMode, 'selected');
   assert.deepEqual(value(services.collection.wakeSenders({ agentId: ada.id })), []);
-  const nextRoom = value(await native.createRoom(admin.member.principal.matrixUserId, 'Next matter')).roomId;
+  const nextRoom = value(await native.createRoom(admin.member.principal.backendUserId, 'Next matter')).roomId;
   assert.equal((await changeRoomGrant(services, admin.actor, { agentId: ada.id, roomId: nextRoom,
     expectedRevision: value(services.repositories.principal.find({ id: ada.id }))!.revision,
-    expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID())).ok, false);
+    expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false }, randomUUID())).ok, false);
   assert.deepEqual(permissions(fixture, ada, nextRoom), []);
   assert.equal(value(services.repositories.fleetInstance.findByAgent(ada.id))!.retiredAt, fixture.now());
 });
@@ -249,9 +249,9 @@ test('private owner DM claims never receive fleet delegation, including before n
   const fixture = await coordinationFixture(scope), { services, admin } = fixture;
   const ada = await fixture.agent(admin.actor, 'ada');
   await approve(fixture, request(fixture, [ada]));
-  const original = services.matrix.setRoomAccess;
+  const original = services.messaging.setRoomAccess;
   let checked = false;
-  services.matrix.setRoomAccess = async (...args) => {
+  services.messaging.setRoomAccess = async (...args) => {
     const conversation = value(services.repositories.ownerConversation.find({ agentId: ada.id }));
     assert.equal(conversation?.roomId, args[2], 'Privacy is bound before asynchronous native application');
     assert.deepEqual(permissions(fixture, ada, args[2]), []);
@@ -272,7 +272,7 @@ test('private owner DM claims never receive fleet delegation, including before n
 
 test('new fleet identities receive approved coordination but no room grants or preemptive owner conversations', async scope => {
   const fixture = await coordinationFixture(scope), { services, admin, native } = fixture;
-  const input: EnrollmentIntroduction = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId,
+  const input: EnrollmentIntroduction = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: admin.member.principal.backendUserId,
     fleetKey: 'agreements', controller: { name: 'test-controller' }, instances: ['ada', 'kit'].map(name => ({ instanceKey: name, name, coordinationPolicy: settings })) };
   const ready = await approve(fixture, input);
   assert.equal(ready.status, 'ready'); assert.equal(native.rooms.size, 0);
@@ -283,5 +283,5 @@ test('new fleet identities receive approved coordination but no room grants or p
     assert.deepEqual(value(services.collection.roomGrants({ agentId: item.agentId! })), []);
     assert.equal(value(services.repositories.ownerConversation.find({ agentId: item.agentId! })), null);
   }
-  assert.deepEqual(defaultCoordinationPolicy('@admin:test.localhost'), { wakeMode: 'selected', senders: [{ matrixUserId: '@admin:test.localhost', includeAgents: false }], permissions: [] });
+  assert.deepEqual(defaultCoordinationPolicy('@admin:test.localhost'), { wakeMode: 'selected', senders: [{ backendUserId: '@admin:test.localhost', includeAgents: false }], permissions: [] });
 });

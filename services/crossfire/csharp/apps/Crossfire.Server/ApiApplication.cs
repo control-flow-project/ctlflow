@@ -1,4 +1,3 @@
-using Crossfire.AdapterMatrix;
 using Crossfire.AdapterSqlite;
 using Crossfire.Domain;
 using Crossfire.Kernel;
@@ -17,12 +16,12 @@ public static class ApiApplication
         {
             var schema = Schema.Validate(database);
             if (!schema.IsSuccess) throw new IOException(schema.Error.Message);
-            var initialized = PrincipalValues.Initialize(PolicyQueries.Ports(database, state.Now), state.Configuration.Administrator);
+            var initialized = PrincipalValues.Initialize(PolicyQueries.Ports(database, state.Now), state.Configuration.Administrator, state.Messaging.LocalLabel(state.Configuration.Administrator));
             if (!initialized.IsSuccess) throw new IOException(initialized.Error.Message);
         }
     }
 
-    public static WebApplication Build(ApiState state, string listen, Action wake)
+    public static WebApplication Build(ApiState state, string listen, Action wake, MessagingHttpFactory backend)
     {
         Initialize(state);
         var builder = WebApplication.CreateSlimBuilder(); builder.Logging.ClearProviders(); builder.WebHost.UseUrls(listen);
@@ -30,7 +29,7 @@ public static class ApiApplication
         {
             options.AddServerHeader = false; options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(10); options.Limits.MaxRequestBodySize = 16 * 1024 * 1024;
         });
-        var application = builder.Build(); application.Run(ApiPipeline.Create(state, Endpoints(), wake));
+        var application = builder.Build(); application.Run(ApiPipeline.Create(state, Endpoints(), wake, backend));
         return application;
     }
 }

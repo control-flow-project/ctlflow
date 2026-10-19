@@ -24,32 +24,32 @@ public sealed partial class AccountAuthority
         var result = await MatrixJson.Ok(client, account.Value, "GET", MatrixJson.Api + "/joined_rooms", cancellation: cancellation);
         if (!result.IsSuccess) return Result<IReadOnlyList<string>>.Fail(result.Error);
         if (!result.Value.TryGetProperty("joined_rooms", out var rooms)) return Results.Fail<IReadOnlyList<string>>("native", "Invalid native joined rooms");
-        var parsed = Validation.List(rooms, value => value.ValueKind == System.Text.Json.JsonValueKind.String && Validation.RoomId(value.GetString()!)
+        var parsed = Validation.List(rooms, value => value.ValueKind == System.Text.Json.JsonValueKind.String && MatrixSyntax.RoomId(value.GetString()!)
             ? Result<string>.Success(value.GetString()!) : Results.Fail<string>("native", "Invalid native joined rooms"), 1000);
         return parsed.IsSuccess ? parsed : Results.Fail<IReadOnlyList<string>>("native", "Invalid native joined rooms");
     }
 
-    public async ValueTask<Result<RoomFacts>> Room(string matrixId, string roomId, CancellationToken cancellation = default)
+    public async ValueTask<Result<MatrixRoomFacts>> NativeRoom(string matrixId, string roomId, CancellationToken cancellation = default)
     {
         var state = await State(matrixId, roomId, cancellation);
-        if (!state.IsSuccess) return Result<RoomFacts>.Fail(state.Error);
+        if (!state.IsSuccess) return Result<MatrixRoomFacts>.Fail(state.Error);
         var membership = RoomState.Content(state.Value, "m.room.member", matrixId);
-        if (membership is null || RoomState.String(membership.Value, "membership") != "join") return Results.Fail<RoomFacts>("forbidden", "Owner is not a current room member");
+        if (membership is null || RoomState.String(membership.Value, "membership") != "join") return Results.Fail<MatrixRoomFacts>("forbidden", "Owner is not a current room member");
         var powers = RoomState.Content(state.Value, "m.room.power_levels");
-        if (powers is null) return Results.Fail<RoomFacts>("native", "Native room power levels are missing");
+        if (powers is null) return Results.Fail<MatrixRoomFacts>("native", "Native room power levels are missing");
         var levels = RoomState.Powers(powers.Value, matrixId);
-        if (!levels.IsSuccess) return Result<RoomFacts>.Fail(levels.Error);
+        if (!levels.IsSuccess) return Result<MatrixRoomFacts>.Fail(levels.Error);
         var creators = RoomState.Creators(state.Value);
-        if (!creators.IsSuccess) return Result<RoomFacts>.Fail(creators.Error);
+        if (!creators.IsSuccess) return Result<MatrixRoomFacts>.Fail(creators.Error);
         var creator = creators.Value.Contains(matrixId, StringComparer.Ordinal);
         var read = Math.Min(Math.Min(creator ? Validation.MaxWireInteger : levels.Value.OwnerLevel, levels.Value.Ceiling),
             Math.Min(levels.Value.Ordinary - 1, Math.Min(levels.Value.Message - 1, levels.Value.Reaction - 1)));
-        if (read < -Validation.MaxWireInteger) return Results.Fail<RoomFacts>("native", "Invalid native permission levels");
+        if (read < -Validation.MaxWireInteger) return Results.Fail<MatrixRoomFacts>("native", "Invalid native permission levels");
         var permissions = new List<NativePermission> { new("m.room.message", levels.Value.Message), new("m.reaction", levels.Value.Reaction), new("events_default", levels.Value.Ordinary) };
         foreach (var threshold in new[] { ("invite", 0L), ("kick", 50L), ("ban", 50L), ("redact", 50L), ("state_default", 50L) })
         {
             var value = RoomState.Level(powers.Value, threshold.Item1, threshold.Item2, true);
-            if (!value.IsSuccess) return Result<RoomFacts>.Fail(value.Error);
+            if (!value.IsSuccess) return Result<MatrixRoomFacts>.Fail(value.Error);
             permissions.Add(new(threshold.Item1, value.Value));
         }
         var events = powers.Value.TryGetProperty("events", out var eventValues) && eventValues.ValueKind == System.Text.Json.JsonValueKind.Object ? eventValues : default;
@@ -57,19 +57,19 @@ public sealed partial class AccountAuthority
         {
             if (permission.Name is "m.room.message" or "m.reaction") continue;
             var value = RoomState.Level(events, permission.Name, 0);
-            if (!value.IsSuccess) return Result<RoomFacts>.Fail(value.Error);
+            if (!value.IsSuccess) return Result<MatrixRoomFacts>.Fail(value.Error);
             permissions.Add(new(permission.Name, value.Value));
         }
         var name = Text(state.Value, "m.room.name", "name", 255); var topic = Text(state.Value, "m.room.topic", "topic", 4096); var alias = Text(state.Value, "m.room.canonical_alias", "alias", 255);
         var invite = RoomState.Level(powers.Value, "invite", 0, true); var kick = RoomState.Level(powers.Value, "kick", 50, true); var change = RoomState.Level(events, "m.room.power_levels", RoomState.Level(powers.Value, "state_default", 50, true).Value, true);
-        return Result<RoomFacts>.Success(new(roomId, string.IsNullOrEmpty(name) ? "Unnamed room" : name, topic ?? "", alias, matrixId,
+        return Result<MatrixRoomFacts>.Success(new(roomId, string.IsNullOrEmpty(name) ? "Unnamed room" : name, topic ?? "", alias, matrixId,
             creator, creator ? null : levels.Value.OwnerLevel, creators.Value, read, Math.Max(levels.Value.Message, levels.Value.Reaction), invite.Value, kick.Value, change.Value, permissions));
     }
 
-    public async ValueTask<Result<RoomMembership>> Membership(string matrixId, string target, string roomId, CancellationToken cancellation = default)
+    public async ValueTask<Result<MatrixMembership>> NativeMembership(string matrixId, string target, string roomId, CancellationToken cancellation = default)
         => (await MembershipState(matrixId, target, roomId, cancellation)).Map(state => state.Member);
 
-    private sealed record ObservedMembership(RoomMembership Member, long ReadLevel, long ReplyLevel);
+    private sealed record ObservedMembership(MatrixMembership Member, long ReadLevel, long ReplyLevel);
 
     private async ValueTask<Result<ObservedMembership>> MembershipState(string matrixId, string target, string roomId, CancellationToken cancellation)
     {
@@ -85,7 +85,7 @@ public sealed partial class AccountAuthority
         if (!creators.IsSuccess) return Result<ObservedMembership>.Fail(creators.Error);
         var creator = creators.Value.Contains(target, StringComparer.Ordinal);
         var name = content is null ? null : MatrixJson.Text(content.Value, "displayname");
-        var member = new RoomMembership(target, name ?? target, membership, creator, creator ? null : levels.Value.OwnerLevel);
+        var member = new MatrixMembership(target, name ?? target, membership, creator, creator ? null : levels.Value.OwnerLevel);
         var read = Math.Min(levels.Value.Ceiling, Math.Min(levels.Value.Ordinary - 1, Math.Min(levels.Value.Message - 1, levels.Value.Reaction - 1)));
         return Result<ObservedMembership>.Success(new(member, read, Math.Max(levels.Value.Message, levels.Value.Reaction)));
     }

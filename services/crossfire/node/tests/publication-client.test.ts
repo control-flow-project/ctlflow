@@ -1,3 +1,4 @@
+import { matrixSettings } from './support/matrix-config.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync, symlinkSync } from 'node:fs';
@@ -18,8 +19,8 @@ test('the report command streams a local static directory through the canonical 
   mkdirSync(join(directory, 'assets')); writeFileSync(join(directory, 'index.html'), '<p>Published by the command</p>');
   writeFileSync(join(directory, 'assets', 'main.mjs'), 'export const value = 42;');
   const profile: Profile = { workspace: directory, id: agent.id,
-    settings: { instance: 'tests', server_name: fixture.application.config.serverName, homeserver: api.origin, owner: '@admin:test.localhost', max_upload_bytes: 16 * 1024 * 1024 },
-    account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'fixture-device' } };
+    settings: { instance: 'tests', server: api.origin, backend: { type: "matrix", parameters: { origin: api.origin, serverName: matrixSettings(fixture.application.config).serverName } }, owner: '@admin:test.localhost', maxUploadBytes: 16 * 1024 * 1024 },
+    account: { userId: agent.backendUserId, accessToken: agent.token, native: { deviceId: 'fixture-device' } } };
   const published = value(await publishReport(profile, directory, 'Credit report'));
   assert.equal(published.public, true); assert.equal(published.fileCount, 2);
   assert.equal(await (await fetch(published.url)).text(), '<p>Published by the command</p>');
@@ -27,7 +28,7 @@ test('the report command streams a local static directory through the canonical 
   assert.equal((await publishReport(profile, join(directory, 'missing'), 'Report')).ok, false);
   symlinkSync(join(directory, 'index.html'), join(directory, 'link.html'));
   assert.equal((await publishReport(profile, directory, 'Report')).ok, false); rmSync(join(directory, 'link.html'));
-  const invalid = await publishReport({ ...profile, settings: { ...profile.settings, homeserver: 'http://untrusted.example' } }, directory, 'Report');
+  const invalid = await publishReport({ ...profile, settings: { ...profile.settings, server: 'http://untrusted.example' } }, directory, 'Report');
   assert.equal(invalid.ok, false); if (!invalid.ok) assert.equal(invalid.error.code, 'invalid');
   assert.equal(value(readPublications(fixture.services, fixture.admin.actor, { page: 1, pageSize: 10, search: '' })).totalItems, 1);
 });

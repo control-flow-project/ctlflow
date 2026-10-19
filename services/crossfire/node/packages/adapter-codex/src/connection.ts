@@ -7,8 +7,11 @@ import type { NativeEvent } from './protocol.js';
 import { codexInput, type HistoryBoundary, type CodexInput } from './input.js';
 import { nativeDelivery } from '@ctlflow/crossfire-adapter-runtime/delivery';
 import { resumptionText, retainResumptionInput } from '@ctlflow/crossfire-adapter-runtime/resumption';
+import { failure as diagnosticFailure } from '@ctlflow/crossfire-kernel/result';
+import { providerState } from './provider.js';
 
 export type CodexConnection = RuntimeConnection & { turnControl: TurnControl; verify: () => Promise<void>;
+  provider: import('@ctlflow/crossfire-agent-core/owned-runtime').OwnedRuntimeConnection['provider'];
   inspectSession: (sessionId: string) => Promise<{ busy: boolean }>; unsettled: () => boolean; event: (event: NativeEvent) => void };
 
 function pollInterval(milliseconds: number): number {
@@ -307,6 +310,10 @@ export function codexDelivery(session: CodexSession, options: { pollMs: number; 
     close: () => session.close(),
   }, codexInput, { journal: options.receiptFile, pollMs, timeoutMs });
   return { ...delivery, verify, inspectSession: async threadId => ({ busy: await nativeState(threadId) === 'active' }), turnControl: { activeTurn, interrupt },
+    async provider(signal) {
+      try { return providerState(await request('account/read', { refreshToken: false }, signal)); }
+      catch { return diagnosticFailure('unavailable', 'Native provider metadata could not be read without refresh'); }
+    },
     event: message => {
       if (message.params.threadId !== sessionId) return;
       if (message.method === 'thread/closed') throw new Error('The selected Codex thread closed; listener delivery stopped');

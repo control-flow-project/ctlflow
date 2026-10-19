@@ -1,6 +1,6 @@
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
-import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { API, segment } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { chromium, expect } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { mkdirSync } from 'node:fs';

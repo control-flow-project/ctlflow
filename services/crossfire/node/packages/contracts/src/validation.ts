@@ -13,9 +13,9 @@ export function fields(value: unknown, required: readonly string[], optional: re
   return parsed;
 }
 export function text(value: unknown, maximum = 200): value is string { return check.text(maximum)(value).ok; }
-export function userId(value: unknown): value is string { return check.matrixUserId(value).ok; }
+export function userId(value: unknown): value is string { return check.backendUserId(value).ok; }
 export function roomId(value: unknown): value is string { return check.roomId(value).ok; }
 export function selectRoom(selector: string): string {
-  if (!roomId(selector)) throw new Error('Use an exact native room ID from matrix get-joined-rooms');
+  if (!roomId(selector)) throw new Error('Use an exact room identifier returned by the messaging backend');
   return selector;
 }

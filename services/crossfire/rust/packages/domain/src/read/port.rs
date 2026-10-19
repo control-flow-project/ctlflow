@@ -18,7 +18,7 @@ pub trait ReadRepository:
         &mut self,
         filter: &DiscoveryFilter<'_>,
     ) -> Result<Page<crate::identity::PrincipalSummary>>;
-    fn identities(&mut self, matrix_ids: &[String]) -> Result<Vec<PrincipalIdentity>>;
+    fn identities(&mut self, backend_user_ids: &[String]) -> Result<Vec<PrincipalIdentity>>;
     fn wake_senders_many(
         &mut self,
         agent_ids: &[String],

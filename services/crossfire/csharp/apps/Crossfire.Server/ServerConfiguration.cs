@@ -7,35 +7,24 @@ using Crossfire.Server.Http;
 
 namespace Crossfire.Server;
 
-public sealed record ServerConfiguration(string Instance, string ServerName, string PublicOrigin, string ContentOrigin, string MatrixOrigin,
-    string Administrator, string JwtSecret, string RegistrationSecret, PublicationBudget PublicationBudget, long LoggingRetentionDays, IReadOnlyList<string>? TrustedProxyAddresses = null)
-{
-    public string ServiceMatrixId => "@crossfire-" + Instance + ":" + ServerName;
-}
+public sealed record ServerConfiguration(string Instance, string PublicOrigin, string ContentOrigin, BackendConfiguration Messaging,
+    string Administrator, PublicationBudget PublicationBudget, long LoggingRetentionDays, IReadOnlyList<string>? TrustedProxyAddresses = null);
 
 public static partial class Configurations
 {
     public static Result<ServerConfiguration> Parse(JsonElement input)
     {
-        var fields = Validation.Fields(input, ["instance", "serverName", "publicOrigin", "contentOrigin", "matrixOrigin", "administrator", "jwtSecret", "registrationSecret"],
+        var fields = Validation.Fields(input, ["instance", "publicOrigin", "contentOrigin", "messaging", "administrator"],
             ["publicationBudget", "loggingRetentionDays", "trustedProxyAddresses"]);
         if (!fields.IsSuccess) return Result<ServerConfiguration>.Fail(fields.Error);
         var instance = Validation.Text(input.GetProperty("instance"), 40);
-        var server = Validation.Text(input.GetProperty("serverName"), 200);
-        var administrator = Validation.Text(input.GetProperty("administrator"));
-        var jwt = Validation.Text(input.GetProperty("jwtSecret"), 200, 32);
-        var registration = Validation.Text(input.GetProperty("registrationSecret"), 200, 32);
-        if (!instance.IsSuccess || !server.IsSuccess || !administrator.IsSuccess || !jwt.IsSuccess || !registration.IsSuccess
-            || !InstanceName().IsMatch(instance.Value) || !ServerName().IsMatch(server.Value)
-            || !Validation.UserId(administrator.Value) || !administrator.Value.EndsWith(":" + server.Value, StringComparison.Ordinal))
+        var administrator = Validation.Text(input.GetProperty("administrator")); var messaging = MessagingContract.Configuration(input.GetProperty("messaging"));
+        if (!instance.IsSuccess || !InstanceName().IsMatch(instance.Value) || !administrator.IsSuccess || !Validation.UserId(administrator.Value) || !messaging.IsSuccess)
             return Results.Fail<ServerConfiguration>("invalid", "Invalid server configuration");
-        var publicOrigin = ReadOrigin(input, "publicOrigin"); var contentOrigin = ReadOrigin(input, "contentOrigin"); var matrixOrigin = ReadOrigin(input, "matrixOrigin");
+        var publicOrigin = ReadOrigin(input, "publicOrigin"); var contentOrigin = ReadOrigin(input, "contentOrigin");
         if (!publicOrigin.IsSuccess) return Result<ServerConfiguration>.Fail(publicOrigin.Error);
         if (!contentOrigin.IsSuccess) return Result<ServerConfiguration>.Fail(contentOrigin.Error);
-        if (!matrixOrigin.IsSuccess) return Result<ServerConfiguration>.Fail(matrixOrigin.Error);
-        var content = new Uri(contentOrigin.Value);
-        if (contentOrigin.Value == publicOrigin.Value || contentOrigin.Value == matrixOrigin.Value
-            || content.Scheme == "https" && (content.Host == new Uri(publicOrigin.Value).Host || content.Host == new Uri(matrixOrigin.Value).Host))
+        if (new Uri(contentOrigin.Value).Host == new Uri(publicOrigin.Value).Host)
             return Results.Fail<ServerConfiguration>("invalid", "Publications require a separate content hostname and origin");
         var budget = input.TryGetProperty("publicationBudget", out var limits) ? Budget(limits) : Result<PublicationBudget>.Success(new(1073741824, 134217728, 4096, 128, 8));
         if (!budget.IsSuccess) return Result<ServerConfiguration>.Fail(budget.Error);
@@ -43,8 +32,7 @@ public static partial class Configurations
         if (!retention.IsSuccess) return Result<ServerConfiguration>.Fail(retention.Error);
         var proxies = input.TryGetProperty("trustedProxyAddresses", out var addresses) ? PublicRequestBudget.Proxies(addresses) : Result<IReadOnlyList<string>>.Success([]);
         if (!proxies.IsSuccess) return Result<ServerConfiguration>.Fail(proxies.Error);
-        return Result<ServerConfiguration>.Success(new(instance.Value, server.Value, publicOrigin.Value, contentOrigin.Value, matrixOrigin.Value,
-            administrator.Value, jwt.Value, registration.Value, budget.Value, retention.Value, proxies.Value));
+        return Result<ServerConfiguration>.Success(new(instance.Value, publicOrigin.Value, contentOrigin.Value, messaging.Value, administrator.Value, budget.Value, retention.Value, proxies.Value));
     }
 
     private static Result<string> ReadOrigin(JsonElement input, string name)
@@ -65,6 +53,4 @@ public static partial class Configurations
 
     [GeneratedRegex("\\A[a-z][a-z0-9-]*\\z", RegexOptions.CultureInvariant)]
     private static partial Regex InstanceName();
-    [GeneratedRegex("\\A[a-z0-9.-]+(?::[0-9]+)?\\z", RegexOptions.CultureInvariant)]
-    private static partial Regex ServerName();
 }

@@ -6,9 +6,10 @@ import { connect } from 'node:http2';
 import { Readable } from 'node:stream';
 import { getCACertificates, setDefaultCACertificates } from 'node:tls';
 import test, { type TestContext } from "node:test";
-import { json } from '@ctlflow/crossfire-contracts/matrix';
+import { json } from '@ctlflow/crossfire-kernel/json';
 import { endpoint } from '@ctlflow/crossfire-contracts/origin';
-import { collect, nativeJson, nativeOpen } from '@ctlflow/crossfire-adapter-matrix/http';
+import { nativeJson, nativeOpen } from '@ctlflow/crossfire-adapter-matrix/http';
+import { collect } from '@ctlflow/crossfire-kernel/collect';
 import { MAX_JSON_BYTES } from "@ctlflow/crossfire-contracts/limits";
 import { secureHttp2Router } from '@ctlflow/crossfire-test-support/tls';
 

@@ -10,7 +10,7 @@ public static class LatestListenerAcceptance
     public static void Verify(CrossfireDbContext context, string ownerId)
     {
         var owner = AuthorizationQueries.Principal(context, ownerId).Value!;
-        var fixture = FleetFixture.Create(context, new(ownerId, "human", new NativeAuthentication(owner.MatrixUserId)), 1700000000000);
+        var fixture = FleetFixture.Create(context, new(ownerId, "human", new NativeAuthentication(owner.BackendUserId)), 1700000000000);
         var original = ListenerQueries.Find(context, fixture.RunId).Value!;
         for (var index = 1; index <= 20; index++)
         {

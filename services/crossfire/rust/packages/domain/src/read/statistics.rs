@@ -60,14 +60,14 @@ pub fn read(
     let senders: Vec<_> = measured
         .flows
         .iter()
-        .map(|value| value.flow.sender_matrix_id.clone())
+        .map(|value| value.flow.sender_backend_user_id.clone())
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
     let senders = repo
         .identities(&senders)?
         .into_iter()
-        .map(|value| (value.matrix_user_id, value.display_name))
+        .map(|value| (value.backend_user_id, value.display_name))
         .collect();
     Ok(Report {
         captured_at: now,

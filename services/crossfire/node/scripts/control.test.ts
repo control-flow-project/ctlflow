@@ -1,3 +1,5 @@
+import { createMessagingClient } from '@ctlflow/crossfire-adapter-matrix/messaging-client';
+import { messageEvent, NOTICE_MARKER } from '@ctlflow/crossfire-adapter-matrix/events';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { testClock, withClock } from './test-support/clock.js';
 import { localState as storage } from '@ctlflow/crossfire-adapter-filesystem/state';
@@ -6,15 +8,15 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { matrix as nativeMatrix } from '@ctlflow/crossfire-adapter-matrix/http';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
-import type { Event } from '@ctlflow/crossfire-contracts/client';
+import type { MatrixEvent as Event } from '@ctlflow/crossfire-adapter-matrix/values';
 import type { RuntimeAdapter } from '@ctlflow/crossfire-agent-core/runtime';
 import { listen } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { resumeFixture } from './test-support/codex-runtime.js';
 import { isControl, loadControl, type ControlState } from '@ctlflow/crossfire-agent-core/control';
 import { eventView } from '@ctlflow/crossfire-agent-core/receive';
-import { isListenerNotice, LISTENER_NOTICE } from '@ctlflow/crossfire-contracts/notices';
+import { isListenerNotice } from '@ctlflow/crossfire-contracts/notices';
 import { createHash } from 'node:crypto';
-import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { API } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { fakeCodex, inputReceipt, matrixFixture, message, mention, OBSERVER, ROOM, SELF, THREAD, temporary } from './test-support/listener.js';
 
 async function fixture(context: TestContext, clock: ReturnType<typeof testClock>) {
@@ -30,13 +32,13 @@ async function fixture(context: TestContext, clock: ReturnType<typeof testClock>
   await clock.until(() => existsSync(matrix.cursorFile) && matrix.waiting() === 1);
   const starts = () => native.requests().filter(request => request.method === 'turn/start');
   const controls = () => readJson<ControlState>(matrix.cursorFile + '.control');
-  return { matrix, native, stop, result, options, starts, controls };
+  return { messaging: matrix, native, stop, result, options, starts, controls };
 }
 
 test('a human stop interrupts a pending receipt without replay, remains paused, and survives restart', withClock(async (context, clock) => {
 
   const value = await fixture(context, clock);
-  const { native, matrix, starts, controls } = value;
+  const { native, messaging: matrix, starts, controls } = value;
   matrix.add(ROOM, message('$pending'));
   await clock.until(() => starts().length === 1);
   matrix.add(ROOM, message('$stop', OBSERVER, '!!'));
@@ -82,7 +84,7 @@ test('a runtime without native interruption pauses delivery and reports the limi
   await clock.until(() => controls().paused && limitation() !== undefined);
   const notice = limitation()!.body as { msgtype: string; body: string };
   assert.equal(notice.msgtype, 'm.notice');
-  assert(isListenerNotice({ type: 'm.room.message', content: notice }));
+  assert(isListenerNotice(messageEvent({ ...message('$notice'), content: notice }, ROOM)));
   assert.match(notice.body, /cannot interrupt the current turn/);
   assert.equal(native.requests().filter(request => request.method === 'turn/start' || request.method === 'turn/interrupt').length, 0);
   matrix.add(ROOM, message('$buffered'));
@@ -138,12 +140,12 @@ for (const kind of ['read-only', 'native-denial'] as const) {
 
 test('automatic peer notices neither wake the model nor contaminate subsequent authorized context', withClock(async (context, clock) => {
 
-  const { matrix, native, starts } = await fixture(context, clock);
+  const { messaging: matrix, native, starts } = await fixture(context, clock);
   matrix.waking.policy = 'selected'; matrix.waking.senders = [OBSERVER];
   matrix.add(ROOM, message('$pending-context', '@other:test.localhost', 'Keep this context.'));
-  const automatic = { ...message('$peer-notice'), content: { msgtype: 'm.notice', [LISTENER_NOTICE]: true,
+  const automatic = { ...message('$peer-notice'), content: { msgtype: 'm.notice', [NOTICE_MARKER]: true,
     body: 'Listener delivery is paused. This runtime connection cannot interrupt the current turn; stop it in the coding session.' } };
-  assert(isListenerNotice(automatic));
+  assert(isListenerNotice(messageEvent(automatic, ROOM)));
   matrix.add(ROOM, automatic);
   await clock.advance(200);
   assert.equal(starts().length, 0);
@@ -153,7 +155,7 @@ test('automatic peer notices neither wake the model nor contaminate subsequent a
   await clock.advance(150);
   assert.equal(starts().length, 0, 'An allowed peer automatic notice is not a wake authority');
   const legitimate = { ...message('$legitimate-notice', '@other:test.localhost'), content: { msgtype: 'm.notice', body: 'A real status update.' } };
-  assert.equal(isListenerNotice(legitimate), false);
+  assert.equal(isListenerNotice(messageEvent(legitimate, ROOM)), false);
   native.update({ mode: 'normal' });
   matrix.add(ROOM, legitimate, message('$owner-wake', OBSERVER, 'Please continue.'));
   await clock.until(() => starts().length === 1);
@@ -166,7 +168,7 @@ test('automatic peer notices neither wake the model nor contaminate subsequent a
 
 test('urgent redirect precedes unread ordinary input and cannot advance its contiguous read marker', withClock(async (context, clock) => {
 
-  const { native, matrix, starts } = await fixture(context, clock);
+  const { native, messaging: matrix, starts } = await fixture(context, clock);
   matrix.add(ROOM, message('$ordinary'));
   await clock.until(() => starts().length === 1);
   matrix.add(ROOM, mention('$redirect'));
@@ -185,7 +187,7 @@ test('urgent redirect precedes unread ordinary input and cannot advance its cont
 
 test('a receipt published during human interruption is acknowledged without replaying the original input', withClock(async (context, clock) => {
 
-  const { native, matrix, starts } = await fixture(context, clock);
+  const { native, messaging: matrix, starts } = await fixture(context, clock);
   native.update({ delayInterrupt: true });
   matrix.add(ROOM, message('$ordinary'));
   await clock.until(() => starts().length === 1);
@@ -203,8 +205,8 @@ test('a receipt published during human interruption is acknowledged without repl
 
 test('human control authority uses exact identity and shared-room native mentions, never display names', async context => {
   const matrix = await matrixFixture(context, temporary(context));
-  const client = nativeMatrix({base: matrix.settings.homeserver, token: matrix.account.access_token});
-  const check = (event: Event) => isControl(client, matrix.settings, matrix.account, eventView(event, ROOM),
+  const client = nativeMatrix({base: matrix.settings.server, token: matrix.account.accessToken});
+  const check = (event: Event) => isControl(createMessagingClient(client, matrix.account.userId), matrix.settings, matrix.account, eventView(messageEvent(event, ROOM), ROOM),
     matrix.coordination, new Set(matrix.waking.senders), new AbortController().signal);
   assert(await check(message('$human', OBSERVER, '!!')));
   for (const sender of [SELF, '@human:elsewhere', '@agent-human:test.localhost']) assert.equal(await check(message('$spoof', sender, '!! stop')), false);
@@ -223,12 +225,12 @@ test('human control authority uses exact identity and shared-room native mention
 
 test('native human and agent mentions use identical verified wake identity and membership, including replies but never edits or text names', async context => {
   const matrix = await matrixFixture(context, temporary(context));
-  const client = nativeMatrix({ base: matrix.settings.homeserver, token: matrix.account.access_token });
+  const client = nativeMatrix({ base: matrix.settings.server, token: matrix.account.accessToken });
   const human = '@permitted:test.localhost', peer = '@agent-holmes:test.localhost';
-  matrix.identities.set(human, { matrixUserId: human, kind: 'human', ownerMatrixId: null, displayName: 'Same name', ownerDisplayName: null });
+  matrix.identities.set(human, { backendUserId: human, kind: 'human', ownerBackendUserId: null, displayName: 'Same name', ownerDisplayName: null });
   matrix.extraMembers.add(human);
   const senders = new Set([OBSERVER, human, peer, SELF, '@unknown:test.localhost']);
-  const check = (event: Event) => isControl(client, matrix.settings, matrix.account, eventView(event, ROOM),
+  const check = (event: Event) => isControl(createMessagingClient(client, matrix.account.userId), matrix.settings, matrix.account, eventView(messageEvent(event, ROOM), ROOM),
     matrix.coordination, senders, new AbortController().signal);
   assert(await check(mention('$owner')));
   assert(await check(mention('$human', human)));
@@ -254,9 +256,9 @@ test('native human and agent mentions use identical verified wake identity and m
 });
 
 test('a permitted non-owner human mention interrupts and delivers exact attribution before the blocked backlog', withClock(async (context, clock) => {
-  const { native, matrix, starts, controls } = await fixture(context, clock);
+  const { native, messaging: matrix, starts, controls } = await fixture(context, clock);
   const human = '@permitted:test.localhost';
-  matrix.identities.set(human, { matrixUserId: human, kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null });
+  matrix.identities.set(human, { backendUserId: human, kind: 'human', ownerBackendUserId: null, displayName: null, ownerDisplayName: null });
   matrix.extraMembers.add(human); matrix.waking.policy = 'selected'; matrix.waking.senders = [human];
   await clock.until(() => matrix.requests.filter(request => request.path.endsWith('/delivery-policy')).length >= 2);
   matrix.add(ROOM, message('$ordinary', human));
@@ -273,7 +275,7 @@ test('a permitted non-owner human mention interrupts and delivers exact attribut
 }));
 
 test('an accepted agent mention interrupts a native turn and gets the same attributed priority input as a human', withClock(async (context, clock) => {
-  const { native, matrix, starts, controls } = await fixture(context, clock);
+  const { native, messaging: matrix, starts, controls } = await fixture(context, clock);
   matrix.extraMembers.add('@agent-holmes:test.localhost');
   matrix.add(ROOM, message('$ordinary'));
   await clock.until(() => starts().length === 1);
@@ -289,11 +291,11 @@ test('an accepted agent mention interrupts a native turn and gets the same attri
 }));
 
 test('a newly permitted human mention in limited sync uses current policy rather than cached sender filtering', withClock(async (context, clock) => {
-  const { native, matrix, starts } = await fixture(context, clock);
+  const { native, messaging: matrix, starts } = await fixture(context, clock);
   matrix.add(ROOM, message('$ordinary'));
   await clock.until(() => starts().length === 1);
   const human = '@newly-permitted:test.localhost';
-  matrix.identities.set(human, { matrixUserId: human, kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null });
+  matrix.identities.set(human, { backendUserId: human, kind: 'human', ownerBackendUserId: null, displayName: null, ownerDisplayName: null });
   matrix.extraMembers.add(human); matrix.waking.senders.push(human); matrix.waking.policy = 'humans';
   matrix.add(ROOM, mention('$new-authority', human), ...Array.from({ length: 25 }, (_, index) => message('$peer-' + index)));
   await clock.until(() => starts().length === 2);
@@ -304,7 +306,7 @@ test('a newly permitted human mention in limited sync uses current policy rather
 }));
 
 test('a newer mention supersedes fetched urgent input before publication without losing unread evidence', withClock(async (context, clock) => {
-  const { native, matrix, starts, controls } = await fixture(context, clock);
+  const { native, messaging: matrix, starts, controls } = await fixture(context, clock);
   matrix.add(ROOM, message('$ordinary'));
   await clock.until(() => starts().length === 1);
   const fetched = matrix.hold(`${API}/rooms/${ROOM}/event/$first-steer`);
@@ -322,7 +324,7 @@ test('a newer mention supersedes fetched urgent input before publication without
 }));
 
 test('oversized steering uses the same private-file budget and preserves complete source attribution', withClock(async (context, clock) => {
-  const { native, matrix, starts } = await fixture(context, clock);
+  const { native, messaging: matrix, starts } = await fixture(context, clock);
   matrix.add(ROOM, message('$ordinary'));
   await clock.until(() => starts().length === 1);
   const body = 'Review this evidence instead. ' + 'Ω'.repeat(50_000);
@@ -334,8 +336,8 @@ test('oversized steering uses the same private-file budget and preserves complet
   assert.equal(pointer.kind, 'crossfire-message-files');
   const manifest = readJson<{ messages: { file: string }[] }>(pointer.manifest);
   assert.equal(manifest.messages.length, 1);
-  const event = readJson<{ event_id: string; room_id: string; sender: string; timestamp: string; content: { body: string } }>(manifest.messages[0]!.file);
-  assert.equal(event.event_id, '$large-steer'); assert.equal(event.room_id, ROOM); assert.equal(event.sender, OBSERVER);
+  const event = readJson<{ eventId: string; roomId: string; sender: string; timestamp: string; content: { body: string } }>(manifest.messages[0]!.file);
+  assert.equal(event.eventId, '$large-steer'); assert.equal(event.roomId, ROOM); assert.equal(event.sender, OBSERVER);
   assert.equal(event.timestamp, new Date(1).toISOString()); assert.equal(event.content.body, body);
   assert.equal(starts()[1]!.params!.threadId, THREAD);
   assert.equal(native.requests().filter(request => request.method === 'turn/interrupt').length, 1);
@@ -367,7 +369,7 @@ test('revoked human authority during turn capture cannot interrupt or publish re
 }));
 
 test('a muted room cannot steer, while an idle human mention enters the same history exactly once', withClock(async (context, clock) => {
-  const { native, matrix, starts } = await fixture(context, clock);
+  const { native, messaging: matrix, starts } = await fixture(context, clock);
   matrix.muted.add(ROOM); matrix.add(ROOM, mention('$muted'));
   await clock.until(() => readJson<string>(matrix.cursorFile + '.sync') === 'sync-1');
   assert.equal(starts().length, 0);
@@ -382,7 +384,7 @@ test('a muted room cannot steer, while an idle human mention enters the same his
 
 test('an interrupted listener resumes captured mention evidence without cancelling a replacement turn or replaying input', withClock(async (context, clock) => {
   const current = await fixture(context, clock);
-  const { native, matrix, starts, controls } = current;
+  const { native, messaging: matrix, starts, controls } = current;
   native.update({ delayInterrupt: true });
   matrix.add(ROOM, message('$original'));
   await clock.until(() => starts().length === 1);
@@ -402,7 +404,7 @@ test('an interrupted listener resumes captured mention evidence without cancelli
 
 test('limited sync recovers an earlier control instead of losing it behind peer traffic', withClock(async (context, clock) => {
 
-  const { matrix, starts, controls } = await fixture(context, clock);
+  const { messaging: matrix, starts, controls } = await fixture(context, clock);
   matrix.add(ROOM, message('$pending'));
   await clock.until(() => starts().length === 1);
   matrix.add(ROOM, message('$stop', OBSERVER, '!!'), ...Array.from({ length: 25 }, (_, index) => message('$peer-' + index)));
@@ -413,7 +415,7 @@ test('limited sync recovers an earlier control instead of losing it behind peer 
 
 test('limited history recovery retains a control at the native sync upper boundary', withClock(async (context, clock) => {
 
-  const { matrix, starts, controls } = await fixture(context, clock);
+  const { messaging: matrix, starts, controls } = await fixture(context, clock);
   matrix.add(ROOM, message('$pending'));
   await clock.until(() => starts().length === 1);
   matrix.overridePage({ chunk: [] });
@@ -425,10 +427,10 @@ test('limited history recovery retains a control at the native sync upper bounda
 
 test('leaving during a human pause discards the old cursor without resuming delivery', withClock(async (context, clock) => {
 
-  const { matrix, starts, controls } = await fixture(context, clock);
+  const { messaging: matrix, starts, controls } = await fixture(context, clock);
   matrix.add(ROOM, message('$stop', OBSERVER, '!!'));
   await clock.until(() => controls().paused);
-  const client = nativeMatrix({base: matrix.settings.homeserver, token: matrix.account.access_token});
+  const client = nativeMatrix({base: matrix.settings.server, token: matrix.account.accessToken});
   await client.post('/_matrix/client/v3/rooms/' + encodeURIComponent(ROOM) + '/leave', {});
   await clock.until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === undefined);
   assert(controls().paused);
@@ -442,7 +444,7 @@ test('leaving during a human pause discards the old cursor without resuming deli
 
 test('leaving one room while a mixed-room delivery settles does not replay the other room', withClock(async (context, clock) => {
 
-  const { matrix, native, starts } = await fixture(context, clock);
+  const { messaging: matrix, native, starts } = await fixture(context, clock);
   const other = '!other:test.localhost';
   matrix.subscribe(other);
   matrix.add(ROOM, message('$leaving'), message('$also-leaving'));
@@ -450,7 +452,7 @@ test('leaving one room while a mixed-room delivery settles does not replay the o
   await clock.until(() => starts().length === 1);
   assert(JSON.stringify(starts()[0]!.params!.input).includes('$retained'));
   const original = starts()[0]!.params!;
-  const client = nativeMatrix({base: matrix.settings.homeserver, token: matrix.account.access_token});
+  const client = nativeMatrix({base: matrix.settings.server, token: matrix.account.accessToken});
   await client.post('/_matrix/client/v3/rooms/' + encodeURIComponent(ROOM) + '/leave', {});
   await clock.until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === undefined);
   native.notify('item/completed', { threadId: THREAD, item: inputReceipt(String(original.clientUserMessageId), original.input) });

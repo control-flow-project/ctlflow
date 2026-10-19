@@ -5,7 +5,7 @@ use super::{
 use crate::{
     authorization::{AgentAction, authorize_agent},
     identity::{Actor, AgentView},
-    matrix::Membership,
+    messaging::Membership,
     port::DiscoveryRepository,
     wake,
 };

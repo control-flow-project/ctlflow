@@ -1,3 +1,4 @@
+import { messageEvent } from '@ctlflow/crossfire-adapter-matrix/events';
 import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { openTestStore } from './support/storage.js';
 import assert from 'node:assert/strict';
@@ -34,28 +35,28 @@ test('persisted listener time uses integer UTC milliseconds rather than process-
   const before = Date.now(), now = nativeClock.now(), after = Date.now();
   assert(Number.isSafeInteger(now)); assert(now >= before && now <= after);
   const statistics = listenerStatistics('@self:test.localhost', nativeClock.now);
-  statistics.observed([eventView(message('$utc', OBSERVER), ROOM)]);
+  statistics.observed([eventView(messageEvent(message('$utc', OBSERVER), ROOM), ROOM)]);
   const batch = statistics.batch(true)!; assert(statisticsBatch(batch).ok); assert(batch.startedAt >= before);
 });
 
 test('bounded traffic collection deduplicates observations, excludes self and notices, and retains exact batches until acknowledgment', () => {
   let now = 1000;
   const statistics = listenerStatistics('@self:test.localhost', () => now);
-  const events = [eventView(message('$one', OBSERVER, '😀'), ROOM), eventView(message('$self', '@self:test.localhost'), ROOM)];
+  const events = [eventView(messageEvent(message('$one', OBSERVER, '😀'), ROOM), ROOM), eventView(messageEvent(message('$self', '@self:test.localhost'), ROOM), ROOM)];
   statistics.observed(events); statistics.observed(events); statistics.delivered(events); statistics.delivered(events);
   assert.equal(statistics.batch(), null);
   now += 300000;
   const batch = statistics.batch()!; assert(statisticsBatch(batch).ok);
   assert.equal(batch.flows.length, 1); assert.equal(batch.flows[0]!.observed, 1); assert.equal(batch.flows[0]!.delivered, 1);
   assert.equal(batch.flows[0]!.contentBytes, Buffer.byteLength(JSON.stringify(events[0]!.content)));
-  statistics.observed([eventView(message('$next', OBSERVER), ROOM)]);
+  statistics.observed([eventView(messageEvent(message('$next', OBSERVER), ROOM), ROOM)]);
   assert.equal(statistics.batch(), batch); statistics.acknowledge({ ...batch }); assert.equal(statistics.batch(), batch);
   statistics.acknowledge(batch); assert.equal(statistics.batch(true)!.flows[0]!.observed, 1);
 });
 
 test('collection overflow is observable and native token hooks reject corrupt, foreign and incomplete counters', () => {
   const statistics = listenerStatistics('@self:test.localhost', () => 1000);
-  statistics.observed(Array.from({ length: STATISTICS_LIMITS.flows + 4 }, (_, index) => eventView(message('$' + index), '!room-' + index + ':test.localhost')));
+  statistics.observed(Array.from({ length: STATISTICS_LIMITS.flows + 4 }, (_, index) => eventView(messageEvent(message('$' + index), '!room-' + index + ':test.localhost'), '!room-' + index + ':test.localhost')));
   const batch = statistics.batch(true)!; assert.equal(batch.flows.length, 256); assert.equal(batch.dropped, 4);
   const total = { inputTokens: 100, cachedInputTokens: 50, outputTokens: 20, reasoningOutputTokens: 10, totalTokens: 120 };
   const event = { method: 'thread/tokenUsage/updated', params: { threadId: 'session', tokenUsage: { total } } };
@@ -70,20 +71,20 @@ test('summary labels stay bounded Unicode and usage stays adapter-neutral withou
   const statistics = listenerStatistics('@self:test.localhost', () => 1000);
   const labels = ['a'.repeat(99) + '😀suffix', '😀'.repeat(51), '', '\n'];
   statistics.delivered(labels.map((label, index) => {
-    const event = message('$bounded-' + index, OBSERVER); event.content.msgtype = label; return eventView(event, ROOM);
+    const event = message('$bounded-' + index, OBSERVER); event.content.msgtype = label; return eventView(messageEvent(event, ROOM), ROOM);
   }));
   const usage = { ...sample('😀'.repeat(127) + 'a'), runtime: 'custom-adapter' };
   statistics.usage(usage); statistics.usage({ ...usage, sessionId: '😀'.repeat(128) }); statistics.usage({ ...usage, runtime: 'invalid\n' });
   const batch = statistics.batch(true)!;
   assert(statisticsBatch(batch).ok); assert.equal(batch.dropped, 2); assert.equal(batch.usage.length, 1);
   assert.equal(batch.usage[0]!.runtime, 'custom-adapter');
-  assert.deepEqual(batch.flows.map(flow => [flow.messageType, flow.delivered]), [['a'.repeat(99), 1], ['😀'.repeat(50), 1], ['unknown', 2]]);
+  assert.deepEqual(batch.flows.map(flow => [flow.messageType, flow.delivered]), [['other', 4]]);
 });
 
 test('counter overflow drops only that sample and preserves the last valid summary', () => {
   const statistics = listenerStatistics('@self:test.localhost', () => 1000);
   const events = [Number.MAX_SAFE_INTEGER, 1].map((size, index) => {
-    const event = message('$count-' + index, OBSERVER); event.content.info = { size }; return eventView(event, ROOM);
+    const event = message('$count-' + index, OBSERVER); event.content.msgtype = 'm.file'; event.content.url = 'mxc://test/attachment'; event.content.info = { size }; return eventView(messageEvent(event, ROOM), ROOM);
   });
   statistics.delivered(events);
   const batch = statistics.batch(true)!;
@@ -92,17 +93,28 @@ test('counter overflow drops only that sample and preserves the last valid summa
   assert.equal(batch.flows[0]!.attachmentBytes, Number.MAX_SAFE_INTEGER);
 });
 
+test('event identities are scoped to their room rather than assumed globally unique', () => {
+  const statistics = listenerStatistics('agent/self', () => 1000);
+  const first = eventView(messageEvent(message('$same', OBSERVER), ROOM), ROOM);
+  const second = { ...first, roomId: 'room/another' };
+  statistics.observed([first, second, first]);
+  statistics.delivered([first, second, second]);
+  const batch = statistics.batch(true)!;
+  assert(statisticsBatch(batch).ok);
+  assert.deepEqual(batch.flows.map(flow => [flow.roomId, flow.observed, flow.delivered]), [[ROOM, 1, 1], ['room/another', 1, 1]]);
+});
+
 test('hourly normalized summaries are idempotent, paginated in SQL, token-baselined across restarts and cleaned by shared retention', async scope => {
   const fixture = await fixtureStore(scope), agent = await fixture.agent(fixture.admin.actor, 'stats'), other = await fixture.agent(fixture.admin.actor, 'other');
-  const run = randomUUID(), session = randomUUID(), collected = listenerStatistics(agent.matrixUserId, fixture.now);
+  const run = randomUUID(), session = randomUUID(), collected = listenerStatistics(agent.backendUserId, fixture.now);
   const heartbeat = (statistics: ReturnType<typeof collected.batch>, runId = run) => value(reportListener(fixture.services, agent.actor, agent.id, runId,
     { release: 'fixture', messagesDelivered: 2, stopped: false, controller: agent.controller, statistics }, 'fixture'));
-  collected.observed([eventView(message('$first', OBSERVER), ROOM)]); collected.usage(sample(session));
+  collected.observed([eventView(messageEvent(message('$first', OBSERVER), ROOM), ROOM)]); collected.usage(sample(session));
   fixture.advanceConnected(300000, agent.controller); const first = collected.batch()!; assert(heartbeat(first).statisticsAccepted); assert(heartbeat(first).statisticsAccepted);
   const read = () => value(fixture.services.statistics.read([agent.id], fixture.now() - 3600000, 1, 1));
   assert.equal(read().totals.observed, 1); assert.equal(read().tokens!.input, 0);
   collected.acknowledge(first);
-  collected.observed([eventView(message('$second', OBSERVER), '!second:test.localhost')]); collected.usage(sample(session, 160, 40));
+  collected.observed([eventView(messageEvent(message('$second', OBSERVER), '!second:test.localhost'), '!second:test.localhost')]); collected.usage(sample(session, 160, 40));
   fixture.advanceConnected(300000, agent.controller); const second = collected.batch()!; assert(heartbeat(second).statisticsAccepted);
   assert.equal(read().totals.observed, 2); assert.equal(read().totalFlows, 2); assert.equal(read().flows.length, 1);
   assert.equal(read().tokens!.input, 60); assert.equal(read().tokens!.cachedInput, 30); assert.equal(read().tokens!.output, 20); assert.equal(read().tokens!.cacheWriteInput, null);

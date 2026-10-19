@@ -15,7 +15,7 @@ import { releaseFixture } from './release-fixture.js';
 test('real published HTML runs modules, CSS, images and data with an opaque origin and no application credentials', { timeout: 180_000 }, async scope => {
   const release = await releaseFixture(), fixture = await nativeApplication(scope), agent = await fixture.agent(fixture.admin.actor, 'public-reporter');
   const api = await httpFixture(scope, fixture.application, release), content = await contentFixture(scope, fixture.application);
-  await browserPublisher(scope, { origin: api.origin, agent, owner: fixture.admin.member.principal.matrixUserId,
+  await browserPublisher(scope, { origin: api.origin, agent, owner: fixture.admin.member.principal.backendUserId,
     release: release.manifest.release });
   const report = await publishFixture(api.origin, agent.token, {
     'index.html': '<!doctype html><html><head><link rel="stylesheet" href="assets/style.css"></head><body><h1>Report</h1><img id="illustration" src="assets/pixel.png"><pre id="proof">waiting</pre><script type="module" src="assets/main.mjs"></script></body></html>',

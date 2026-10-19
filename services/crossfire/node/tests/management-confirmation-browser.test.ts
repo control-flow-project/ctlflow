@@ -59,7 +59,7 @@ test('themed confirmations isolate focus, cancel without writes, retain failed r
 
 test('fleet session controls track the current operation even while viewing older history pages', { timeout: 120000 }, async scope => {
   const { services, admin, origin } = await nativeServer(scope, await releaseFixture());
-  const { fleet, controller } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId, 1);
+  const { fleet, controller } = await mapFleet(services, admin.actor, admin.member.principal.backendUserId, 1);
   const now = services.clock.now();
   for (let index = 0; index < 11; index++) value(services.repositories.fleetRuntimeOperation.insert({ operationId: randomUUID(), fleetId: fleet.id,
     authorPrincipalId: admin.actor.principalId, action: 'start', agentId: null, expectedRevision: 0, status: 'succeeded',
@@ -67,7 +67,7 @@ test('fleet session controls track the current operation even while viewing olde
     credentialId: value(services.repositories.fleetConnection.find(fleet.id))!.credentialId }));
   let release!: () => void, executions = 0;
   const pending = new Promise<void>(resolve => { release = resolve; });
-  await browserController(scope, { origin, controller, owner: admin.member.principal.matrixUserId,
+  await browserController(scope, { origin, controller, owner: admin.member.principal.backendUserId,
     execute: async () => { executions++; await pending; return success({ status: 'succeeded', errorMessage: null }); } });
   cleanup(scope, () => release());
   const browser = await chromium.launch(browserOptions); cleanup(scope, () => browser.close());

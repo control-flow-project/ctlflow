@@ -23,6 +23,6 @@ public static class PolicyQueries
     }
 
     public static PrincipalPorts Ports(CrossfireDbContext context, Func<long> now)
-        => new(new SqliteUnitOfWork(context), id => MemberQueries.ByMatrixId(context, id), () => Find(context), value => Add(context, value),
+        => new(new SqliteUnitOfWork(context), id => MemberQueries.ByBackendUserId(context, id), () => Find(context), value => Add(context, value),
             (principal, role, application, member) => MemberCommands.Register(context, principal, role, application, member), now, Identity.Identifier);
 }

@@ -10,32 +10,8 @@ namespace Crossfire.Server.Http;
 
 public static class PlatformRoutes
 {
-    public static async Task<bool> Handle(ApiState state, HttpContext http, string path, string requestId, JsonElement? presentation)
+    public static async Task<bool> Handle(ApiState state, HttpContext http, string path, string requestId)
     {
-        if (path == "/config.json" || path == "/config." + new Uri(state.Configuration.PublicOrigin).Host + ".json")
-        {
-            if (!ReadMethod(http)) return true;
-            using var context = state.Storage.Open();
-            var claim = InvitationCookies.Read(http.Request);
-            var invited = claim is not null && Invitations.Verify(InvitationCommands.Ports(context, state.Now), claim.Id, claim.Secret).IsSuccess;
-            var policy = PolicyQueries.Find(context);
-            await Json(http, JsonValues.Object(writer =>
-            {
-                var shown = presentation ?? JsonValues.Object(_ => { });
-                foreach (var name in new[] { "brand", "default_theme" })
-                {
-                    writer.WritePropertyName(name);
-                    if (shown.TryGetProperty(name, out var value)) value.WriteTo(writer); else writer.WriteStringValue(name == "brand" ? "crossfire" : "light");
-                }
-                foreach (var name in new[] { "branding", "embedded_pages", "setting_defaults" })
-                    if (shown.TryGetProperty(name, out var value)) { writer.WritePropertyName(name); value.WriteTo(writer); }
-                writer.WriteString("custom_translations_url", "/manage/assets/element-translations.json");
-                writer.WriteStartObject("default_server_config"); writer.WriteStartObject("m.homeserver"); writer.WriteString("base_url", state.Configuration.PublicOrigin); writer.WriteString("server_name", state.Configuration.ServerName); writer.WriteEndObject(); writer.WriteEndObject();
-                foreach (var name in new[] { "disable_custom_urls", "disable_guests", "disable_login_language_selector", "disable_3pid_login" }) writer.WriteBoolean(name, true);
-                writer.WriteBoolean("disable_registration", !invited && !(policy.IsSuccess && policy.Value?.SignupMode == "open"));
-                writer.WriteStartObject("room_directory"); JsonValues.Strings(writer, "servers", []); writer.WriteEndObject();
-            })); return true;
-        }
         var prefix = "/onboarding/" + state.Release.Identity + "/";
         if (http.Request.Method is "GET" or "HEAD" && path.StartsWith(prefix, StringComparison.Ordinal))
         {
@@ -45,13 +21,13 @@ public static class PlatformRoutes
         }
         if (path is not ("/onboarding/setup" or "/onboarding/setup.json")) return false;
         if (!ReadMethod(http)) return true;
-        var query = Transport.Query(http.Request, ["ownerMatrixId"]);
-        if (!query.IsSuccess || query.Value.Count != 1 || !Validation.UserId(query.Value.GetValueOrDefault("ownerMatrixId", "")))
-        { await Transport.Send(http, requestId, Results.Fail<ApiReply>("invalid", "Exactly one ownerMatrixId is required"), 200); return true; }
-        var ownerId = query.Value["ownerMatrixId"];
+        var query = Transport.Query(http.Request, ["ownerBackendUserId"]);
+        if (!query.IsSuccess || query.Value.Count != 1 || !Validation.UserId(query.Value.GetValueOrDefault("ownerBackendUserId", "")))
+        { await Transport.Send(http, requestId, Results.Fail<ApiReply>("invalid", "Exactly one ownerBackendUserId is required"), 200); return true; }
+        var ownerId = query.Value["ownerBackendUserId"];
         using (var context = state.Storage.Open())
         {
-            var principal = MemberQueries.ByMatrixId(context, ownerId);
+            var principal = MemberQueries.ByBackendUserId(context, ownerId);
             if (!principal.IsSuccess) { await Transport.Send(http, requestId, Result<ApiReply>.Fail(principal.Error), 200); return true; }
             if (principal.Value is null || principal.Value.Kind != "human" || principal.Value.Status != "active")
             { await Transport.Send(http, requestId, Results.Fail<ApiReply>("forbidden", "An active registered human owner is required"), 200); return true; }

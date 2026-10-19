@@ -8,19 +8,21 @@ namespace Crossfire.Server.Http;
 
 public static class ApiPipeline
 {
-    public static RequestDelegate Create(ApiState state, IReadOnlyList<ApiEndpoint> endpoints, Action wake, JsonElement? presentation = null)
+    public static RequestDelegate Create(ApiState state, IReadOnlyList<ApiEndpoint> endpoints, Action wake, MessagingHttpFactory backend)
     {
         if (endpoints.Select(endpoint => endpoint.OperationName).Distinct(StringComparer.Ordinal).Count() != endpoints.Count)
             throw new InvalidOperationException("REST operations must have exactly one C# implementation");
         var rate = PublicRequestBudget.Create(state.Now, state.Configuration.TrustedProxyAddresses);
-        var registration = new RegistrationTransport(state);
+        var messaging = backend(rate, wake);
         var changes = new FleetChanges();
+        var authority = new Uri(state.Configuration.PublicOrigin).Authority;
+        var routes = endpoints.Select(endpoint => new { Endpoint = endpoint, Pattern = endpoint.Operation.Path.Split('/') }).ToArray();
         return async http =>
         {
             var requestId = Identity.Identifier();
             try
             {
-                if (http.Request.Host.Value != new Uri(state.Configuration.PublicOrigin).Authority)
+                if (http.Request.Host.Value != authority)
                 {
                     await Transport.Send(http, requestId, Results.Fail<ApiReply>("forbidden", "Invalid request host"), 200); return;
                 }
@@ -34,23 +36,16 @@ public static class ApiPipeline
                     await Transport.Send(http, requestId, Result<ApiReply>.Fail(target.Error), 200); return;
                 }
                 var path = target.Value.Path;
-                if (await PlatformRoutes.Handle(state, http, path, requestId, presentation)) return;
-                if (registration.Handles(path))
-                {
-                    if (path == RegistrationTransport.RegisterPath || http.Request.Method == "POST")
-                    {
-                        var admitted = rate(http);
-                        if (!admitted.IsSuccess) { if (admitted.Error.Code == "rate_limit") http.Response.Headers.RetryAfter = "60"; await NativeResponses.Error(http, requestId, admitted.Error.Code == "rate_limit" ? 429 : 403, admitted.Error.Code == "rate_limit" ? "M_LIMIT_EXCEEDED" : "M_FORBIDDEN", admitted.Error.Message); return; }
-                    }
-                    await registration.Handle(http, path, requestId); if (http.Request.Method == "POST" && http.Response.StatusCode == 200) wake(); return;
-                }
-                if (MatrixRoutes.Handles(path, http.Request.Method)) { await MatrixRoutes.Handle(state, http, path, requestId); return; }
+                if (await PlatformRoutes.Handle(state, http, path, requestId)) return;
+                if (await messaging(http, path, requestId)) return;
                 ApiEndpoint? selected = null; IReadOnlyDictionary<string, string>? parameters = null; string? matchedPath = null;
                 var allowed = new List<string>();
-                foreach (var endpoint in endpoints)
+                var segments = path.Split('/');
+                foreach (var route in routes)
                 {
+                    var endpoint = route.Endpoint;
                     if (matchedPath is not null && matchedPath != endpoint.Operation.Path) continue;
-                    var matched = Match(endpoint.Operation.Path, path);
+                    var matched = Match(route.Pattern, segments);
                     if (matched is null) continue;
                     matchedPath = endpoint.Operation.Path; allowed.Add(endpoint.Operation.Method);
                     if (endpoint.Operation.Method != http.Request.Method) continue;
@@ -92,21 +87,27 @@ public static class ApiPipeline
         };
     }
 
-    public static IReadOnlyDictionary<string, string>? Match(string template, string path)
+    private static IReadOnlyDictionary<string, string>? Match(string[] pattern, string[] segments)
     {
-        var pattern = template.Split('/'); var segments = path.Split('/');
         if (pattern.Length != segments.Length) return null;
-        var values = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var index = 0; index < pattern.Length; index++)
         {
             var part = pattern[index];
             if (part.StartsWith('{') && part.EndsWith('}'))
             {
                 if (segments[index].Length == 0) return null;
+            }
+            else if (part != segments[index]) return null;
+        }
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var index = 0; index < pattern.Length; index++)
+        {
+            var part = pattern[index];
+            if (part.StartsWith('{') && part.EndsWith('}'))
+            {
                 try { values.Add(part[1..^1], Uri.UnescapeDataString(segments[index])); }
                 catch (UriFormatException) { return null; }
             }
-            else if (part != segments[index]) return null;
         }
         return values;
     }

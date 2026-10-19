@@ -16,7 +16,7 @@ public static class FleetFixture
         var matrixId = "@agent-" + agentId + ":example.test";
         var saved = Transactions.Run(context, () =>
         {
-            context.Principal.Add(new() { Id = agentId, MatrixUserId = matrixId, Kind = "agent", Status = "active", CreatedAt = now });
+            context.Principal.Add(new() { Id = agentId, BackendUserId = matrixId, Kind = "agent", Status = "active", CreatedAt = now });
             context.Agent.Add(new() { PrincipalId = agentId, PrincipalKind = "agent", OwnerId = owner.PrincipalId, WakeMode = "selected" });
             context.AgentName.Add(new() { Name = "test-" + agentId[..8], AgentId = agentId });
             context.PrincipalRole.Add(new() { PrincipalId = agentId, PrincipalKind = "agent", RoleCode = "agent", AssignedAt = now });

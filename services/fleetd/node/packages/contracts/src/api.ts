@@ -1,3 +1,4 @@
+import { MAX_HISTORY_CONTEXT } from '@ctlflow/crossfire-kernel/history-context';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { controller } from '@ctlflow/crossfire-contracts/schema/controller';
 import { operation } from '@ctlflow/crossfire-contracts/rest/operation';
@@ -7,6 +8,7 @@ import { attachment } from './attachment.js';
 import { fleetControl, fleetMessageSummary, deliveryChange, messageCreation } from '@ctlflow/crossfire-contracts/fleet-control';
 import { setupInput } from './setup.js';
 import { runtimeOptions } from './configuration.js';
+import { diagnosticQuery, diagnosticReport } from './diagnostics.js';
 const releaseDirectory = check.refine(check.text(4096), value => value.startsWith('/') && !value.includes('\\')
   && value.split('/').slice(1).every(segment => segment && segment !== '.' && segment !== '..'), 'Release directory must be an absolute normalized path');
 const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
@@ -41,6 +43,8 @@ const params = check.object({ fleetId: check.identifier });
 const agentParams = check.object({ fleetId: check.identifier, instanceKey: check.name });
 export const setupResult = check.object({ fleet: fleetView, operation: check.nullable(operationView), status: check.choice('starting', 'ready', 'stopped') });
 export const operations = {
+  diagnostics: operation({ ...common, method: 'GET', path: '/api/diagnostics', params: check.empty, query: diagnosticQuery, input: check.empty,
+    output: diagnosticReport, description: 'Read bounded diagnostics without starting sessions, refreshing credentials or repairing state' }),
   setup: operation({ ...common, method: 'POST', path: '/api/setup', params: check.empty, query: none, input: setupInput,
     output: setupResult, description: 'Set up an ordinary fleet without configuration questions; preserve prior stop intent' }),
   status: operation({ ...common, method: 'GET', path: '/api/status', params: check.empty, query: none, input: check.empty,
@@ -59,9 +63,9 @@ export const operations = {
   addAgent: operation({ ...common, method: 'POST', path: '/api/fleets/{fleetId}/agents', params, query: none, input: check.object({ expectedRevision: check.integer(), instance }), output: fleetView, status: 201, description: 'Add defined instance' }),
   agent: operation({ ...common, method: 'GET', path: '/api/fleets/{fleetId}/agents/{instanceKey}', params: agentParams, query: none, input: check.empty, output: instanceView, description: 'Instance details' }),
   contexts: operation({ ...common, method: 'GET', path: '/api/fleets/{fleetId}/agents/{instanceKey}/contexts', params: agentParams, query: none, input: check.empty,
-    output: check.list(check.object({ context: check.text(255), runtime: check.name, sessionId: check.text(200) }), 2002), description: 'Read retained native history identities without starting a session' }),
+    output: check.list(check.object({ context: check.text(MAX_HISTORY_CONTEXT), runtime: check.name, sessionId: check.text(200) }), 2002), description: 'Read retained native history identities without starting a session' }),
   attachment: operation({ ...common, method: 'GET', path: '/api/fleets/{fleetId}/agents/{instanceKey}/attachment', params: agentParams,
-    query: input => { if (!(input instanceof URLSearchParams) || [...input.keys()].some(key => key !== 'context') || input.getAll('context').length > 1) return failure('invalid', 'Use one exact context'); return check.object({ context: check.optional(check.text(255)) })(input.has('context') ? { context: input.get('context') } : {}); },
+    query: input => { if (!(input instanceof URLSearchParams) || [...input.keys()].some(key => key !== 'context') || input.getAll('context').length > 1) return failure('invalid', 'Use one exact context'); return check.object({ context: check.optional(check.text(MAX_HISTORY_CONTEXT)) })(input.has('context') ? { context: input.get('context') } : {}); },
     input: check.empty, output: attachment, description: 'Read a private live terminal pointer; sleeping and stopped sessions require explicit resume' }),
   changeAgent: operation({ ...common, method: 'PATCH', path: '/api/fleets/{fleetId}/agents/{instanceKey}', params: agentParams, query: none, input: check.object({ expectedRevision: check.integer(), definition: check.name }), output: fleetView, description: 'Change a stopped instance definition' }),
   removeAgent: operation({ ...common, method: 'DELETE', path: '/api/fleets/{fleetId}/agents/{instanceKey}', params: agentParams, query: none, input: check.object({ expectedRevision: check.integer() }), output: fleetView, description: 'Retire a stopped instance registration while preserving private history' }),

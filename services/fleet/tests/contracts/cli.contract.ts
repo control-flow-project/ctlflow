@@ -26,6 +26,17 @@ export async function cliContracts(scope: TestContext, platform: ContractPlatfor
   const cli = (...args: string[]) => execute(selected.cli, args);
   async function json(...args: string[]) { const result = await cli(...args); assert.equal(result.code, 0, result.error); return JSON.parse(result.output) as unknown; }
   cleanup(scope, async () => { await cli('daemon', 'stop', '--root', root); });
+  await scope.test('diagnose never initializes authentication, starts a controller, or guesses offline agent state', async () => {
+    const file = join(home, '.config/ctlflow/fleetd.json');
+    assert.equal(existsSync(file), false); assert.equal(existsSync(root), false);
+    const missing = await cli('diagnose', '--root', root);
+    assert.notEqual(missing.code, 0);
+    const report = record(JSON.parse(missing.output) as unknown), checks = list(report.checks).map(record);
+    assert.equal(checks.find(check => check.id === 'controller.authentication')?.status, 'fail');
+    assert.equal(checks.find(check => check.id === 'fleet.state')?.status, 'unknown');
+    assert.equal(existsSync(file), false); assert.equal(existsSync(root), false);
+    assert.equal(provider.requests.length, 0);
+  });
   await scope.test('invalid start syntax cannot create a controller or native session', async () => {
     for (const words of [['start'], ['start', 'one', 'extra'], ['agent', 'start', 'one'], ['agent', 'start', 'one', 'two', 'extra'],
       ['start', 'INVALID'], ['start', 'one', '--operation-id', 'not-a-uuid'], ['agent', 'start', 'one', 'INVALID'],
@@ -39,8 +50,20 @@ export async function cliContracts(scope: TestContext, platform: ContractPlatfor
   await scope.test('CLI starts one named controller and persists the default connection', async () => {
     const first = record(await json('daemon', 'start', '--root', root, '--name', 'cli-contract')); const second = record(await json('daemon', 'start', '--root', root, '--name', 'cli-contract')); assert.equal(first.startedAt, second.startedAt); assert.equal(record(first.controller).name, 'cli-contract'); assert.equal(statSync(join(root, 'fleetd.sock')).mode & 0o777, 0o600); assert.notEqual((await cli('daemon', 'start', '--root', root, '--name', 'different')).code, 0);
   });
+  await scope.test('diagnose uses the authenticated controller on every installed CLI target', async () => {
+    const file = join(home, '.config/ctlflow/fleetd.json'), original = readFileSync(file), secret = readAuthentication(file);
+    for (const target of platform.targets) {
+      const result = await execute(target.cli, ['diagnose', '--root', root]);
+      assert.equal(result.code, 0, target.name + ': ' + result.error);
+      const report = record(JSON.parse(result.output) as unknown), checks = list(report.checks).map(record);
+      assert(checks.every(check => check.status === 'pass'));
+      assert(!(result.output + result.error).includes(secret));
+      assert.deepEqual(readFileSync(file), original);
+    }
+    assert.equal(provider.requests.length, 0);
+  });
   await scope.test('all lifecycle orchestration goes through the same daemon API', async () => {
-    mkdirSync(join(fleet, 'agents/analyst'), { recursive: true, mode: 0o700 }); writeFileSync(join(fleet, 'runtime.toml'), 'fleet = "cli-research-' + runtime + '"\ninstances = []\n[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(platform.origin) + '\nowner = ' + JSON.stringify(platform.owner.matrixUserId) + '\n', { mode: 0o600 }); writeFileSync(join(fleet, 'agents/analyst/agent.toml'), 'name = "Analyst"\nruntime = ' + JSON.stringify(runtime) + '\n[runtime_options]\n' + nativeOptions, { mode: 0o600 }); writeFileSync(join(fleet, 'agents/analyst/AGENTS.md'), 'Retain this authored role.\n', { mode: 0o600 });
+    mkdirSync(join(fleet, 'agents/analyst'), { recursive: true, mode: 0o700 }); writeFileSync(join(fleet, 'runtime.toml'), 'fleet = "cli-research-' + runtime + '"\ninstances = []\n[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(platform.origin) + '\nowner = ' + JSON.stringify(platform.owner.backendUserId) + '\n', { mode: 0o600 }); writeFileSync(join(fleet, 'agents/analyst/agent.toml'), 'name = "Analyst"\nruntime = ' + JSON.stringify(runtime) + '\n[runtime_options]\n' + nativeOptions, { mode: 0o600 }); writeFileSync(join(fleet, 'agents/analyst/AGENTS.md'), 'Retain this authored role.\n', { mode: 0o600 });
     const added = record(await json('add', fleet)); const id = text(added.fleetId); assert.equal(list(await json('list')).length, 1); const expanded = record(await json('agent', 'add', 'cli-research-' + runtime, 'analyst', '--definition', 'analyst')); assert(integer(expanded.revision) > integer(added.revision)); assert.equal(list(await json('agent', 'list', id)).length, 1); assert.deepEqual(await json('agent', 'contexts', id, 'analyst'), []); assert.notEqual((await cli('agent', 'attach', id, 'analyst')).code, 0);
     await json('agent', 'remove', id, 'analyst'); await json('remove', id); assert.equal(list(await json('list')).length, 0); assert.notEqual((await cli('list', '--fresh-history')).code, 0); assert.notEqual((await cli('list', '--root', root, '--remote', 'other')).code, 0);
   });
@@ -101,7 +124,7 @@ export async function cliContracts(scope: TestContext, platform: ContractPlatfor
   await scope.test('noninteractive setup completes real enrollment and preserves history and explicit stop on repetition', async () => {
     const configured = join(directory, 'configured'), role = join(configured, 'agents/analyst'); mkdirSync(role, { recursive: true, mode: 0o700 });
     writeFileSync(join(role, 'agent.toml'), 'name = "Setup analyst"\nruntime = ' + JSON.stringify(runtime) + '\n[runtime_options]\n' + nativeOptions + effort + ' = "high"\n', { mode: 0o600 }); writeFileSync(join(role, 'AGENTS.md'), 'Setup makes no model prompt. Preserve identity and existing history.\n', { mode: 0o600 });
-    const configuration = join(configured, 'runtime.toml'); writeFileSync(configuration, 'fleet = "setup-contract-' + runtime + '"\n[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(platform.origin) + '\nowner = ' + JSON.stringify(platform.owner.matrixUserId) + '\n[[instances]]\nkey = "setup-analyst"\nname = "setup-analyst-' + runtime + '"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/setup-analyst"\n', { mode: 0o600 });
+    const configuration = join(configured, 'runtime.toml'); writeFileSync(configuration, 'fleet = "setup-contract-' + runtime + '"\n[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(platform.origin) + '\nowner = ' + JSON.stringify(platform.owner.backendUserId) + '\n[[instances]]\nkey = "setup-analyst"\nname = "setup-analyst-' + runtime + '"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/setup-analyst"\n', { mode: 0o600 });
     const starting = contractProcess(scope, selected.cli, ['setup', '--config', configuration], directory, environment); const approved = new Set<string>();
     try {
       await observe(async () => {

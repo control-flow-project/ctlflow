@@ -93,6 +93,6 @@ test('C# and Rust products inherit MIT metadata without changing publication per
 });
 
 test('the upstream Matrix specification license is retained unchanged', () => {
-  const notice = readFileSync(join(root, 'services/crossfire/node/packages/agent-tools/assets/matrix-spec-LICENSE.txt'));
+  const notice = readFileSync(join(root, 'services/crossfire/node/packages/agent-tools/assets/messaging-LICENSE.txt'));
   assert.equal(createHash('sha256').update(notice).digest('hex'), '0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594');
 });

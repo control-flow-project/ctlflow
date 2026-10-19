@@ -1,13 +1,15 @@
 pub mod agent;
 pub mod authorization;
+pub mod backend_data;
 pub mod coordination;
 pub mod enrollment;
 pub mod fleet;
 pub mod identity;
 pub mod listener;
 pub mod logging;
-pub mod matrix;
 pub mod member;
+pub mod messaging;
+pub mod messaging_client;
 pub mod notice;
 pub mod permission;
 pub mod policy;

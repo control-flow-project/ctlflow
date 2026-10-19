@@ -8,30 +8,18 @@ namespace Crossfire.AdapterMatrix;
 
 public sealed partial class AccountAuthority
 {
-    public async ValueTask<Result<NativeMatrixEvent>> Event(string matrixId, string roomId, string eventId, CancellationToken cancellation = default)
+    public async ValueTask<Result<BackendEvent>> Event(string matrixId, string roomId, string eventId, CancellationToken cancellation = default)
     {
         var account = await AsUser(matrixId, cancellation);
-        if (!account.IsSuccess) return Result<NativeMatrixEvent>.Fail(account.Error);
+        if (!account.IsSuccess) return Result<BackendEvent>.Fail(account.Error);
         var result = await MatrixJson.Ok(client, account.Value, "GET", MatrixJson.Api + "/rooms/" + MatrixJson.Segment(roomId) + "/event/" + MatrixJson.Segment(eventId), cancellation: cancellation);
-        if (!result.IsSuccess) return Result<NativeMatrixEvent>.Fail(result.Error);
-        var input = result.Value;
-        var sender = RoomState.String(input, "sender"); var type = RoomState.String(input, "type");
-        if (RoomState.String(input, "event_id") != eventId || sender is null || !Validation.UserId(sender) || type is null
-            || !input.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Object)
-            return Results.Fail<NativeMatrixEvent>("native", "Invalid native event");
-        var mentions = content.TryGetProperty("m.mentions", out var mentionValues) ? mentionValues : default;
-        var relation = content.TryGetProperty("m.relates_to", out var relationValues) ? relationValues : default;
-        var identifiers = mentions.ValueKind == JsonValueKind.Object && mentions.TryGetProperty("user_ids", out var values) && values.ValueKind == JsonValueKind.Array ? values : default;
-        var users = new List<string>();
-        if (identifiers.ValueKind == JsonValueKind.Array) foreach (var user in identifiers.EnumerateArray())
-        {
-            if (user.ValueKind != JsonValueKind.String || !Validation.UserId(user.GetString()!)) return Results.Fail<NativeMatrixEvent>("native", "Invalid native mention identities");
-            users.Add(user.GetString()!);
-        }
-        var messageType = RoomState.String(content, "msgtype");
-        return Result<NativeMatrixEvent>.Success(new(eventId, roomId, sender, type, messageType, RoomState.String(content, "body"), users,
-            content.TryGetProperty("m.new_content", out _) || RoomState.String(relation, "rel_type") == "m.replace",
-            type == "m.room.message" && messageType == "m.notice" && content.TryGetProperty("org.crossfire.listener_notice", out var notice) && notice.ValueKind == JsonValueKind.True));
+        if (!result.IsSuccess) return Result<BackendEvent>.Fail(result.Error);
+        var normalized = MessageEvents.Parse(result.Value, roomId);
+        if (!normalized.IsSuccess) return Result<BackendEvent>.Fail(normalized.Error);
+        var value = normalized.Value;
+        if (value.EventId != eventId) return Results.Fail<BackendEvent>("native", "Matrix event identity changed");
+        return Result<BackendEvent>.Success(new(value.EventId, value.RoomId, value.Sender, value.Type, value.Content.Kind, value.Content.Body,
+            value.Content.Mentions, value.Content.Edited, value.Content.Control));
     }
 
     public async ValueTask<Result<string>> SendNotice(string matrixId, string roomId, string transactionId, string body, string sender, CancellationToken cancellation = default)

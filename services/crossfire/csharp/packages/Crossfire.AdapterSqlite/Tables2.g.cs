@@ -28,7 +28,7 @@ public sealed partial class CrossfireDbContext
             entity.Property(value => value.ExpiresAt).HasColumnName("expires_at").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.ConsumedByMemberId).HasColumnName("consumed_by_member_id").HasColumnType("TEXT").ValueGeneratedNever();
             entity.Property(value => value.RevokedAt).HasColumnName("revoked_at").HasColumnType("INTEGER").ValueGeneratedNever();
-            entity.Property(value => value.ClaimMatrixUserId).HasColumnName("claim_matrix_user_id").HasColumnType("TEXT").ValueGeneratedNever();
+            entity.Property(value => value.ClaimBackendUserId).HasColumnName("claim_backend_user_id").HasColumnType("TEXT").ValueGeneratedNever();
             entity.Property(value => value.ClaimDisplayName).HasColumnName("claim_display_name").HasColumnType("TEXT").ValueGeneratedNever();
             entity.Property(value => value.ClaimFingerprint).HasColumnName("claim_fingerprint").HasColumnType("TEXT").ValueGeneratedNever();
         });
@@ -63,10 +63,10 @@ public sealed partial class CrossfireDbContext
         model.Entity<WakeNoticeRow>(entity =>
         {
             entity.ToTable("wake_notice");
-            entity.HasKey(value => new { value.ReceiverAgentId, value.EventId });
+            entity.HasKey(value => new { value.ReceiverAgentId, value.RoomId, value.EventId });
             entity.Property(value => value.ReceiverAgentId).HasColumnName("receiver_agent_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.EventId).HasColumnName("event_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
-            entity.Property(value => value.SenderMatrixId).HasColumnName("sender_matrix_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
+            entity.Property(value => value.SenderBackendUserId).HasColumnName("sender_backend_user_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.RoomId).HasColumnName("room_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.ReservedAt).HasColumnName("reserved_at").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.MessageBody).HasColumnName("message_body").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();

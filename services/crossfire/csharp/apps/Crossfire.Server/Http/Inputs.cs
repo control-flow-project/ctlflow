@@ -57,13 +57,13 @@ public static class Inputs
         return permissions.Map(value => new CoordinationPolicy(mode.Value, senders.Value, value));
     }
 
-    private static Result<MatrixWakeSender> Sender(JsonElement input)
+    private static Result<BackendWakeSender> Sender(JsonElement input)
     {
-        var fields = Validation.Fields(input, ["matrixUserId", "includeAgents"]);
-        if (!fields.IsSuccess) return Result<MatrixWakeSender>.Fail(fields.Error);
-        var id = Validation.Text(input.GetProperty("matrixUserId"));
-        if (!id.IsSuccess || !Validation.UserId(id.Value)) return Results.Fail<MatrixWakeSender>("invalid", "Invalid Matrix user ID");
-        return Validation.Boolean(input.GetProperty("includeAgents")).Map(include => new MatrixWakeSender(id.Value, include));
+        var fields = Validation.Fields(input, ["backendUserId", "includeAgents"]);
+        if (!fields.IsSuccess) return Result<BackendWakeSender>.Fail(fields.Error);
+        var id = Validation.Text(input.GetProperty("backendUserId"));
+        if (!id.IsSuccess || !Validation.UserId(id.Value)) return Results.Fail<BackendWakeSender>("invalid", "Invalid backend user ID");
+        return Validation.Boolean(input.GetProperty("includeAgents")).Map(include => new BackendWakeSender(id.Value, include));
     }
 
     private static Result<RosterInstance> Instance(JsonElement input)
@@ -89,12 +89,12 @@ public static class Inputs
 
     public static Result<EnrollmentRoster> Roster(JsonElement input, bool introduction)
     {
-        string[] required = introduction ? ["controller", "ownerMatrixId", "fleetKey", "instances", "enrollmentId", "claimSecret"] : ["controller", "ownerMatrixId", "fleetKey", "instances"];
+        string[] required = introduction ? ["controller", "ownerBackendUserId", "fleetKey", "instances", "enrollmentId", "claimSecret"] : ["controller", "ownerBackendUserId", "fleetKey", "instances"];
         var fields = Validation.Fields(input, required, ["controllerCredential"]);
         if (!fields.IsSuccess) return Result<EnrollmentRoster>.Fail(fields.Error);
-        var controller = Controller(input.GetProperty("controller")); var owner = Validation.Text(input.GetProperty("ownerMatrixId")); var key = Name(input, "fleetKey");
+        var controller = Controller(input.GetProperty("controller")); var owner = Validation.Text(input.GetProperty("ownerBackendUserId")); var key = Name(input, "fleetKey");
         if (!controller.IsSuccess) return Result<EnrollmentRoster>.Fail(controller.Error);
-        if (!owner.IsSuccess || !Validation.UserId(owner.Value)) return Results.Fail<EnrollmentRoster>("invalid", "Invalid Matrix owner ID");
+        if (!owner.IsSuccess || !Validation.UserId(owner.Value)) return Results.Fail<EnrollmentRoster>("invalid", "Invalid backend owner ID");
         if (!key.IsSuccess) return Result<EnrollmentRoster>.Fail(key.Error);
         var instances = Validation.List(input.GetProperty("instances"), Instance, 100, 1);
         if (!instances.IsSuccess) return Result<EnrollmentRoster>.Fail(instances.Error);

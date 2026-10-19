@@ -5,19 +5,26 @@ import type { Parsed } from './validation.js';
 import { fleetControl } from '../fleet-control.js';
 import { coordinationPolicy } from '../coordination-policy.js';
 import { nativeRuntimeSummary } from '../runtime.js';
-export const principal = check.object({ principalId: check.identifier, matrixUserId: check.matrixUserId, kind: check.choice('human', 'agent'),
-  displayName: check.text(255), ownerId: check.identifier, ownerMatrixId: check.matrixUserId });
-export const principalIdentity = check.refine(check.object({ matrixUserId: check.matrixUserId, kind: check.choice('human', 'agent', 'unknown'),
-  ownerMatrixId: check.nullable(check.matrixUserId), displayName: check.nullable(check.text(255)), ownerDisplayName: check.nullable(check.text(255)) }), identity => (identity.kind === 'agent') === (identity.ownerMatrixId !== null),
+import { backendConfiguration } from '../client.js';
+const backendLink = check.refine(check.text(2048), value => {
+  try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password && value === value.trim() && !/[\u0000-\u0020\u007f]/u.test(value); }
+  catch { return false; }
+}, 'Expected an absolute HTTP(S) backend link without credentials');
+export const messagingBackend = check.object({ type: check.name, label: check.text(100), chatUrl: backendLink, signupUrl: backendLink,
+  signupInstructions: check.list(check.text(2000), 20), configuration: backendConfiguration });
+export const principal = check.object({ principalId: check.identifier, backendUserId: check.backendUserId, kind: check.choice('human', 'agent'),
+  displayName: check.text(255), ownerId: check.identifier, ownerBackendUserId: check.backendUserId });
+export const principalIdentity = check.refine(check.object({ backendUserId: check.backendUserId, kind: check.choice('human', 'agent', 'unknown'),
+  ownerBackendUserId: check.nullable(check.backendUserId), displayName: check.nullable(check.text(255)), ownerDisplayName: check.nullable(check.text(255)) }), identity => (identity.kind === 'agent') === (identity.ownerBackendUserId !== null),
   'Only registered agents have an owner');
 export const principalIdentities = check.refine(check.list(principalIdentity, 100, 1),
-  identities => new Set(identities.map(identity => identity.matrixUserId)).size === identities.length, 'Resolved identities must be unique');
+  identities => new Set(identities.map(identity => identity.backendUserId)).size === identities.length, 'Resolved identities must be unique');
 export const role = check.object({ code: check.text(100), principalKind: check.choice('human', 'agent'), label: check.text(100) });
 export const permission = check.object({ code: check.text(100), grantScope: check.choice('role', 'agent_room'), description: check.text(300) });
 export const application = check.object({ appliedRevision: check.nullable(check.integer()), appliedStatus: check.nullable(check.status),
   nativeDisplayName: check.nullable(check.text(255)), lastAttemptAt: check.nullable(check.integer()), lastSuccessAt: check.nullable(check.integer()),
   errorCode: check.nullable(check.text(100)), errorMessage: check.nullable(check.text(4096)) });
-export const member = check.object({ memberId: check.identifier, matrixUserId: check.matrixUserId, displayName: check.text(HUMAN_SIGNUP.labelMax),
+export const member = check.object({ memberId: check.identifier, backendUserId: check.backendUserId, displayName: check.text(HUMAN_SIGNUP.labelMax),
   roleCode: check.choice('member', 'administrator'), status: check.status, revision: check.integer(), createdAt: check.integer(), application });
 export const session = check.object({ member, csrfSecret: check.secret, permissions: check.list(check.text(100), 100) });
 export const listenerRun = check.object({ runId: check.identifier, agentId: check.identifier, release: check.nullable(check.text(200)),
@@ -26,8 +33,8 @@ export const listenerRun = check.object({ runId: check.identifier, agentId: chec
   stoppedAt: check.nullable(check.integer()), disconnectRequestedAt: check.nullable(check.integer()) });
 export const activity = check.object({ status: check.choice('online', 'offline', 'disconnecting'), activeMs: check.integer(),
   messagesDelivered: check.integer(), lastSeenAt: check.nullable(check.integer()), activeRuns: check.list(listenerRun, 100) });
-export const owner = check.object({ memberId: check.identifier, matrixUserId: check.matrixUserId, displayName: check.text(HUMAN_SIGNUP.labelMax), status: check.status });
-export const agent = check.object({ agentId: check.identifier, matrixUserId: check.matrixUserId, name: check.name, displayName: check.text(255),
+export const owner = check.object({ memberId: check.identifier, backendUserId: check.backendUserId, displayName: check.text(HUMAN_SIGNUP.labelMax), status: check.status });
+export const agent = check.object({ agentId: check.identifier, backendUserId: check.backendUserId, name: check.name, displayName: check.text(255),
   owner, status: check.status, revision: check.integer(), createdAt: check.integer(), application, activity, nativeRuntime: check.nullable(nativeRuntimeSummary),
   deployment: check.object({ fleetId: check.identifier, fleetKey: check.name, label: check.text(100), controllerName: check.text(100), reportedAt: check.integer(), instanceKey: check.name }),
   canRetire: check.boolean, allowedActions: check.list(check.choice('configure', 'room-grant.manage', 'retire'), 3) });
@@ -38,34 +45,32 @@ export const wakePolicy = check.refine(check.object({ agentId: check.identifier,
     && policy.senders.every(sender => sender.identity.principalId !== policy.agentId)
     && (policy.mode !== 'everyone' || policy.senders.length === 0), 'Invalid selected wake authority');
 export const grant = check.object({ agentId: check.identifier, roomId: check.roomId, generation: check.identifier, authorizerId: check.identifier,
-  addedById: check.identifier, accessMode: check.choice('none', 'read', 'reply', 'custom'), powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)),
+  addedById: check.identifier, accessMode: check.choice('none', 'read', 'reply', 'custom'), nativeAccess: check.nullable(check.backendParameters),
   muted: check.boolean, revision: check.integer(), accessRevision: check.integer(), updatedAt: check.integer() });
-export const grantApplication = check.refine(check.object({ observedGeneration: check.nullable(check.identifier), appliedRevision: check.nullable(check.integer()),
-  appliedAccessRevision: check.nullable(check.integer()), membership: check.nullable(check.choice('join', 'invite', 'leave', 'ban')), creator: check.boolean,
-  powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), lastAttemptAt: check.nullable(check.integer()), lastSuccessAt: check.nullable(check.integer()),
-  errorCode: check.nullable(check.text(100)), errorMessage: check.nullable(check.text(4096)) }),
-  application => !application.creator || application.powerLevel === null, 'Native creators have no finite power level');
+export const grantApplication = check.object({ observedGeneration: check.nullable(check.identifier), appliedRevision: check.nullable(check.integer()),
+  appliedAccessRevision: check.nullable(check.integer()), membership: check.nullable(check.choice('join', 'invite', 'leave', 'ban')),
+  nativeAccess: check.nullable(check.backendParameters), lastAttemptAt: check.nullable(check.integer()), lastSuccessAt: check.nullable(check.integer()),
+  errorCode: check.nullable(check.text(100)), errorMessage: check.nullable(check.text(4096)) });
 export const grantView = check.object({ agentId: check.identifier, revision: check.integer(), grant: check.nullable(grant),
   ownerConversation: check.boolean,
   application: check.nullable(grantApplication), permissions: check.list(check.choice('room.agent.invite'), 1),
   allowedActions: check.list(check.choice('set', 'remove', 'permissions.set'), 3) });
 export const deliveryGrant = check.object({ roomId: check.roomId, accessMode: check.choice('read', 'reply', 'custom'),
-  powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), muted: check.boolean });
-export const deliveryPolicy = check.refine(check.object({ agentId: check.identifier, matrixUserId: check.matrixUserId, ownerMatrixId: check.matrixUserId,
+  nativeAccess: check.nullable(check.backendParameters), muted: check.boolean });
+export const deliveryPolicy = check.refine(check.object({ agentId: check.identifier, backendUserId: check.backendUserId, ownerBackendUserId: check.backendUserId,
   maxMessageBytes: check.integer(4096, 4194304),
   fleetIdleTimeoutSeconds: check.integer(0, 604800),
   status: check.status, ownerStatus: check.status, ownerConversation: check.nullable(check.roomId), roomGrants: check.list(deliveryGrant, 101), wakeMode: check.wakeMode,
-  senderMatrixIds: check.list(check.matrixUserId, 2000) }), policy =>
-  new Set(policy.senderMatrixIds).size === policy.senderMatrixIds.length && !policy.senderMatrixIds.includes(policy.matrixUserId)
+  senderBackendUserIds: check.list(check.backendUserId, 2000) }), policy =>
+  new Set(policy.senderBackendUserIds).size === policy.senderBackendUserIds.length && !policy.senderBackendUserIds.includes(policy.backendUserId)
   && new Set(policy.roomGrants.map(grant => grant.roomId)).size === policy.roomGrants.length
-  && policy.roomGrants.every(grant => (grant.accessMode === 'custom') === (grant.powerLevel !== null))
+  && policy.roomGrants.every(grant => (grant.accessMode === 'custom') === (grant.nativeAccess !== null))
   && (policy.ownerConversation === null || policy.roomGrants.some(grant => grant.roomId === policy.ownerConversation && grant.accessMode === 'reply' && !grant.muted))
-  && (policy.status === 'active' && policy.ownerStatus === 'active' || policy.senderMatrixIds.length === 0), 'Invalid resolved delivery authority');
-export const roomAuthority = check.refine(check.object({ matrixUserId: check.matrixUserId, powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), creator: check.boolean,
-  creatorIds: check.list(check.matrixUserId, 100), readLevel: check.integer(Number.MIN_SAFE_INTEGER), replyLevel: check.integer(Number.MIN_SAFE_INTEGER),
-  inviteLevel: check.integer(Number.MIN_SAFE_INTEGER), kickLevel: check.integer(Number.MIN_SAFE_INTEGER), changePowerLevel: check.integer(Number.MIN_SAFE_INTEGER),
-  nativePermissions: check.list(check.object({ action: check.text(255), level: check.integer(Number.MIN_SAFE_INTEGER) }), 1000) }),
-  authority => authority.creator === (authority.powerLevel === null), 'Native creator authority has no finite power level');
+  && (policy.status === 'active' && policy.ownerStatus === 'active' || policy.senderBackendUserIds.length === 0), 'Invalid resolved delivery authority');
+export const roomAuthority = check.object({ backendUserId: check.backendUserId, canInvite: check.boolean, authorityRevision: check.text(255),
+  accessModes: check.list(check.choice('read', 'reply', 'custom'), 3),
+  accessFields: check.list(check.object({ key: check.text(100), label: check.text(255), minimum: check.integer(Number.MIN_SAFE_INTEGER), maximum: check.integer(Number.MIN_SAFE_INTEGER), defaultValue: check.integer(Number.MIN_SAFE_INTEGER) }), 64),
+  permissions: check.list(check.object({ action: check.text(255), label: check.text(1000), allowed: check.boolean }), 1000) });
 export const room = check.object({ roomId: check.roomId, name: check.text(255), topic: check.text(4096, 0), alias: check.nullable(check.text(255)),
   authority: check.nullable(roomAuthority) });
 export const enrollmentItem = check.object({ instanceKey: check.name, requestedName: check.name, currentName: check.nullable(check.name), outcome: check.choice('claimed', 'existing'),
@@ -79,9 +84,9 @@ export const enrollmentDecision = check.object({ enrollmentId: check.identifier,
 export const preflight = check.object({ available: check.boolean, instances: check.integer(1, 100) });
 export const enrollmentExchange = check.object({ status: check.choice('pending', 'rejected', 'expired', 'provisioning', 'ready'),
   fleet: check.nullable(check.object({ fleetId: check.identifier, controllerCredential: check.nullable(check.text(200)) })),
-  ownerMatrixId: check.matrixUserId, instances: check.list(check.object({ instanceKey: check.name, name: check.name, agentId: check.nullable(check.identifier),
+  ownerBackendUserId: check.backendUserId, instances: check.list(check.object({ instanceKey: check.name, name: check.name, agentId: check.nullable(check.identifier),
     status: check.choice('ready', 'provisioning'), errorCode: check.nullable(check.text(100)), account: check.nullable(check.object({
-      matrixUserId: check.matrixUserId, accessToken: check.text(8192), deviceId: check.text(255) })) }), 100) });
+      userId: check.backendUserId, accessToken: check.text(8192), native: check.backendParameters })) }), 100) });
 export const fleet = check.object({ fleetId: check.identifier, owner: principal, fleetKey: check.name, label: check.text(100), controller,
   revision: check.integer(), createdAt: check.integer(), updatedAt: check.integer(), delivery: fleetControl,
   canArchive: check.boolean, allowedActions: check.list(check.choice('configure', 'archive'), 2) });

@@ -8,13 +8,15 @@ responsibilities and invariants.
 A replacement updates consumers, contracts, storage, tests and documentation
 and removes the superseded path. Compatibility aliases, alternate state readers,
 implicit fallbacks and parallel old/new implementations are prohibited.
-Forward migrations preserve deployed data without keeping old runtime models.
-Production resets are prohibited.
+Until the owner explicitly declares production, application databases are resettable.
+Create the canonical schema directly; do not implement historical conversion,
+admission or compatibility handling. Preserve credentials, source and native histories.
+Resets are explicit operations, never automatic startup behavior.
 
 Existing state never justifies keeping an old runtime reader, writer, handler,
 alias, bridge or hidden fallback. A specific exception requires explicit owner
-approval; none is currently approved. A necessary forward migration produces
-only the current schema. Independently selected language targets implement that
+approval; none is currently approved. There are no historical schema compatibility
+paths. Independently selected language targets implement that
 same contract and never substitute for one another.
 
 ## 1. Products
@@ -94,6 +96,10 @@ Composition roots select adapters. Domain code imports pure values, repository
 ports and external-service ports, not HTTP frameworks, drivers, adapters or UI.
 Contracts may import pure domain values; domain code does not import contracts.
 
+The [messaging boundary](architecture/messaging-backends.md) applies equally to
+server authority, listener acquisition, invitations, native public HTTP and UI
+presentation. Generic owners use only neutral fields and opaque identifiers.
+
 | Owner | Boundary |
 | --- | --- |
 | Domain | Authorization, identity, revisions, desired state and expected failures |
@@ -163,7 +169,7 @@ its distribution. Current documentation contains no promotional claims.
 - [Target installation and packaging](distributions/README.md)
 
 The immutable intentional-tool release contains README.md, SKILL.md,
-crossfire-client.mjs and matrix-spec-LICENSE.txt. One private build export
+crossfire-client.mjs and messaging-LICENSE.txt. One private build export
 produces the server/fleetd bytes. Activation verifies the complete local release.
 Recovery and wake do not download or silently install software.
 
@@ -178,7 +184,7 @@ and root-descriptor digests for each image. The producer exports named images so
 both remain present in the OCI index. Current Docker classic/containerd stores
 expose different native identity objects; each target's Docker adapter verifies
 that exact object and returns the immutable execution handle. A malformed
-descriptor never retries another identity. Schema 1 is rejected, not imported.
+descriptor never retries another identity.
 The common Knex image copies the production dependency closure into a clean base;
 it does not ship the compiler/build stage or other target/test source.
 GAAP and Bad Bets select C# NativeAOT server packages by default. Their branding,
@@ -432,6 +438,36 @@ privileged service or boot service is installed.
 
 ## 8. Native lifecycle
 
+### Read-only diagnostics
+
+`fleet diagnose [FLEET]` and `fleet agent diagnose FLEET INSTANCE` read the same
+authenticated fleetd `GET /api/diagnostics` contract across Node, managed C#,
+NativeAOT and Rust. Optional fleetId/instanceKey query fields select the scope;
+the default is the controller. Reports collect independent, timestamped checks
+with stable IDs and pass/fail/unknown/not-applicable outcomes, without repair.
+Unknown is not readiness evidence. Failed checks set the CLI exit code to 1.
+
+fleet diagnoses transport/authentication even when fleetd is unavailable, without
+reading its private registry as a second authority. fleetd owns local state and
+held native lifecycle observations. Existing coordination connection/delivery
+observations remain owned by crossfire's connection adapter. Native adapters
+read provider metadata through existing owned connections only: Codex account/read
+without refresh, Pi selected/available model metadata. Metadata presence is not
+successful inference or credential-validity certification. No native wake, model
+turn, credential refresh, checkpoint mutation or automatic remediation is allowed.
+
+One report is bounded to the selected existing roster, four concurrent native
+probes, five seconds per probe and twenty seconds overall; CLI transport and
+inspection have a thirty-second deadline. Missing/timed-out facts are unknown.
+Reports exclude private paths, credentials, raw exceptions and account identity.
+Connection/history observations are not relabeled as fresh external/file checks.
+Working, paused, sleeping, stopped and decision waits remain distinct normal states.
+
+- [Diagnostic API](../services/fleetd/docs/diagnostics.md)
+- [Diagnostic commands](../services/fleet/docs/diagnostics.md)
+
+### Native ownership
+
 fleetd embeds one listener host with independent agent credentials, permissions,
 cursors, journals and histories. There is no listener process per agent or shared
 service-account inbox. When engines sleep, fleetd remains the listening process.
@@ -508,6 +544,9 @@ Delivery admission and reporting have distinct cancellation lifetimes. Pausing
 new input retains the authenticated reporting run, native observations, owner
 questions and explicit answers for work already running. Lost controller
 authority closes both. Paused delivery cannot admit scheduled or chat input.
+Cancelling an in-flight delivery receipt leaves authenticated reporting connected.
+The same receipt remains retryable; cancellation is not a controller transport
+failure and cannot expire a pending native question.
 
 Reset stops selected processes before retiring any selected history. It exports
 available authorized Matrix history/nonsecret configuration to verified private
@@ -921,17 +960,17 @@ and one-shot migration image, as in Lesser/Snapped. Every future SQL store follo
 that owner/nesting. Unimplemented backends have no placeholder runtime.
 Fleet file state and external Conduit RocksDB are not invented SQL stores.
 
-Current schema is 18: 63 singular application tables plus Knex tracking.
-Fresh stores and supported deployed 13–17 stores advance through Knex.
-Inventoried schema-17 stores lacking history may be adopted without business
-changes. Unsupported/foreign/future stores fail without mutation.
-Conversion preserves identities, credentials, grants, receipts, usage, audit and
-publication attribution transactionally, checking foreign keys. Failure restores
-original schema/data/version. Runtime adapters validate only; Node, C# and Rust never create/migrate schema.
+Current schema is 1: 63 singular application tables plus Knex tracking.
+One 00_initial migration creates the final schema, constraints, indexes and reference
+data directly. No historical schema admission, conversion or special obsolete-store
+handling exists. Runtime adapters validate the current contract; Node, C# and Rust
+never create or migrate schemas. Switching current implementations requires no
+conversion. Future compatibility requires explicit owner approval.
 
 Tables are STRICT with enabled FKs, singular snake_case fields, integer UTC times
 and checked revisions/counters. Relations own permissions, selections, rosters,
-settings and questions; no serialized JSON state bags.
+settings and questions. Backend-owned native account/access objects are bounded
+opaque JSON, never interpreted by generic domain, persistence or UI code.
 Historical enrollment archives retain attribution, never live authority.
 
 Indexes serve concrete queries/FKs. Scope/filter/count/order/page precedes

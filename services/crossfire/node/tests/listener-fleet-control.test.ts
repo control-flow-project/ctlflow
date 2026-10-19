@@ -91,7 +91,7 @@ test('pause releases a restored empty publication so explicit unread tools retai
   const native = await fakeCodex(scope), matrix = await matrixFixture(scope, native.directory, clock), stop = new AbortController();
   const binding = createListenerControl(async () => {}, () => CONTROLLER); binding.update({ connected: true, active: true, input: null });
   const publication = matrix.cursorFile + '.chat-publication';
-  writeJson(publication, { mode: 'shared', batch: { events: [], cursors: { [ROOM]: 'never-committed' }, more_rooms: [], latest: {} }, identities: [], steps: [] });
+  writeJson(publication, { mode: 'shared', batch: { events: [], cursors: { [ROOM]: 'never-committed' }, moreRooms: [], latest: {} }, identities: [], steps: [] });
   let queries: HistoryQueries | undefined;
   const running = listen({ ...matrix, control: binding.connection, runtime: native.runtime, reconcileMs: 1000, pollMs: 100, debounceMs: 0, limit: 20,
     ready: (_test, selected) => { queries = selected; binding.update({ connected: false, active: false, input: null }); } }, stop.signal).catch(error => error);

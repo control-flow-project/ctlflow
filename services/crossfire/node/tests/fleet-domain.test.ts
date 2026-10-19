@@ -18,9 +18,9 @@ test('twenty-instance approval, scoped controller, and same-key fleets retain ex
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const other = await fixture.member('other');
   async function enroll(owner: typeof admin, count: number, prefix: string) {
-    const request = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: owner.member.principal.matrixUserId,
+    const request = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: owner.member.principal.backendUserId,
       fleetKey: 'research', controller: { name: prefix + '-computer', metadata: { site: prefix } },
-      instances: Array.from({ length: count }, (_, index) => ({ instanceKey: 'worker-' + index, name: prefix + '-' + index, coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.matrixUserId) })) };
+      instances: Array.from({ length: count }, (_, index) => ({ instanceKey: 'worker-' + index, name: prefix + '-' + index, coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.backendUserId) })) };
     const introduced = value(await introduceEnrollment(services, request));
     value(decideEnrollment(services, owner.actor, request.enrollmentId,
       { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
@@ -49,9 +49,9 @@ test('twenty-instance approval, scoped controller, and same-key fleets retain ex
   value(removeFleetAgent(services, controller, fleetId, agent.agentId!, { expectedRevision: expectedRevision(), instanceKey: agent.instanceKey }, randomUUID()));
   assert.equal(value(services.directory.agent(agent.agentId!))!.principal.status, 'suspended');
   assert(value(services.repositories.fleetInstance.findByAgent(agent.agentId!))?.retiredAt);
-  const restoration = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId,
+  const restoration = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: admin.member.principal.backendUserId,
     fleetKey: 'research', controller: { name: 'Laptop', metadata: { zone: 'desk' } }, controllerCredential: first.fleet!.controllerCredential!,
-    instances: [{ instanceKey: agent.instanceKey, name: agent.name, coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId),
+    instances: [{ instanceKey: agent.instanceKey, name: agent.name, coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.backendUserId),
       identity: { agentId: agent.agentId!, accessToken: agent.account!.accessToken } }] };
   assert.equal((await introduceEnrollment(services, { ...restoration, instances: [{ ...restoration.instances[0]!, identity: { agentId: agent.agentId!, accessToken: secret() } }] })).ok, false);
   const pending = value(await introduceEnrollment(services, restoration));
@@ -59,9 +59,9 @@ test('twenty-instance approval, scoped controller, and same-key fleets retain ex
   value(decideEnrollment(services, admin.actor, restoration.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: pending.request.verificationCode }, randomUUID()));
   assert.equal(value(services.directory.agent(agent.agentId!))!.principal.status, 'active');
   assert.equal(value(services.repositories.fleetInstance.findByAgent(agent.agentId!))?.retiredAt, null);
-  const roomId = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Research')).roomId;
+  const roomId = value(await fixture.native.createRoom(admin.member.principal.backendUserId, 'Research')).roomId;
   const plan = { fleetId, agents: first.instances.map(instance => ({ instanceKey: instance.instanceKey,
-    grants: [{ roomId, accessMode: 'reply' as const, powerLevel: null, muted: false }] })) };
+    grants: [{ roomId, accessMode: 'reply' as const, nativeAccess: null, muted: false }] })) };
   const preview = value(await previewGrantPlan(services, admin.actor, plan));
   assert.equal(preview.snapshots.length, 20); assert.equal(preview.changes.length, 20);
   value(await applyGrantPlan(services, admin.actor, { plan, digest: preview.digest, snapshots: preview.snapshots }, randomUUID()));

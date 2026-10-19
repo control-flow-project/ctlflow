@@ -1,3 +1,4 @@
+import { roomContext, contextRoom, validHistoryContext } from '@ctlflow/crossfire-kernel/history-context';
 import { lstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -5,7 +6,7 @@ import type { OwnedRuntimeInput, NativeActivity, NativeContextActivity } from '@
 import type { InputAdmission } from '@ctlflow/crossfire-agent-core/runtime';
 import { captureHistory } from '@ctlflow/crossfire-adapter-runtime/native-file';
 import { deliveryJournalExists, readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal';
-import { failureError } from '@ctlflow/crossfire-kernel/result';
+import { failure, failureError } from '@ctlflow/crossfire-kernel/result';
 import { piState, allocatePi, initializePiBinding, piHistory, verifyPiHistory, instructionDigest, verifyInstructions, flushPiHistory } from './state.js';
 import { startPi, record, type PiProcess } from './protocol.js';
 import { admitPi } from './admission.js';
@@ -46,7 +47,7 @@ export function piHistories(input: OwnedRuntimeInput, home: string, binary: stri
       if (admission) throw failureError({ code: 'unavailable', message: 'Exact Pi room history is opening; immediate input has not been accepted' });
       return starting.get(context)!;
     }
-    if (!context || context.length > 255) throw new Error('Invalid Pi context');
+    if (!validHistoryContext(context)) throw new Error('Invalid Pi context');
     const initialization = new AbortController(), cancelled = () => initialization.abort(admission?.signal.reason);
     admission?.signal.addEventListener('abort', cancelled, { once: true });
     const scope = AbortSignal.any([lifetime, initialization.signal]);
@@ -61,7 +62,7 @@ export function piHistories(input: OwnedRuntimeInput, home: string, binary: stri
       let native: PiProcess | undefined, connection: PiConnection | undefined;
       let sessionId = expected ?? '', run = new AbortController(), fault: unknown, interrupted = false;
       const hooks = { ...input.hooks, observe: (event: Parameters<NonNullable<typeof input.hooks.observe>>[0]) => input.hooks.observe?.(event.kind === 'state'
-        ? { ...event, observation: { ...event.observation, roomId: context === 'shared' || context === 'control' ? null : context } } : event) };
+        ? { ...event, observation: { ...event.observation, roomId: contextRoom(context) } } : event) };
       const observation = piObservation(hooks, () => sessionId);
       const usage = piUsage(hooks, () => sessionId);
       const questions = new Set<Promise<void>>();
@@ -129,6 +130,11 @@ export function piHistories(input: OwnedRuntimeInput, home: string, binary: stri
     try { return await pending; } finally { starting.delete(context); admission?.signal.removeEventListener('abort', cancelled); }
   }
   return { open, signal: lifetime,
+    async provider(signal: AbortSignal) {
+      const connection = opened.values().next().value;
+      if (!connection) return failure('unavailable', 'No existing native connection is available for provider inspection');
+      return connection.provider(signal);
+    },
     async activity(): Promise<NativeActivity> {
       lifetime.throwIfAborted();
       if (starting.size) return { busy: true, contexts: [] };
@@ -154,7 +160,7 @@ export function piHistories(input: OwnedRuntimeInput, home: string, binary: stri
     },
     acknowledge(ids: readonly string[]) { for (const connection of opened.values()) connection.acknowledge(ids); },
     async activeTurn(room?: string, admission?: InputAdmission) {
-      const context = mode === 'shared' ? 'shared' : room ?? 'control', connection = admission ? await open(context, admission) : opened.get(context);
+      const context = mode === 'shared' ? 'shared' : room === undefined ? 'control' : roomContext(room), connection = admission ? await open(context, admission) : opened.get(context);
       const turn = connection ? await connection.turnControl.activeTurn(undefined, admission) : null;
       return turn ? JSON.stringify([context, turn]) : null;
     },

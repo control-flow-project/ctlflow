@@ -30,6 +30,16 @@ public static class HttpAcceptance
         {
             Interlocked.Increment(ref requests); context.Response.ContentType = "application/json";
             var path = context.Request.Path.Value;
+            if (path == "/proxy/native")
+            {
+                Equal(context.Request.Headers.Host.ToString(), "chat.example.test", "native forwarding retains the public host");
+                Equal(context.Request.Headers.Authorization.ToString(), "Bearer native-token", "native forwarding retains only its native credential");
+                foreach (var name in new[] { "Cookie", "Set-Cookie", "X-Private", "Forwarded", "X-Forwarded-Proto" }) Equal(context.Request.Headers.ContainsKey(name), false, "native forwarding excludes " + name);
+                context.Response.Headers.SetCookie = "backend-secret=value"; context.Response.Headers.Connection = "X-Private";
+                context.Response.Headers["X-Private"] = "hidden"; context.Response.Headers["X-Result"] = "visible";
+                await context.Response.WriteAsync("native-response"); return;
+            }
+            if (path == "/unchanged") { context.Response.StatusCode = 304; return; }
             if (path == "/api/agents")
             {
                 await context.Response.WriteAsync("{\"data\":[],\"meta\":{\"requestId\":\"11111111-1111-4111-8111-111111111111\",\"page\":1,\"pageSize\":20,\"totalItems\":0,\"totalPages\":" + (invalidPages ? "0" : "1") + "}}"); return;
@@ -93,6 +103,30 @@ public static class HttpAcceptance
             { using var refusal = await probe.GetAsync(origin + "/proxy-probe"); Equal((int)refusal.StatusCode, 502, "hostile proxy fixture actually intercepts a default client"); }
             Equal(forwarded, 1, "the owned rejecting proxy receives only the credential-free control probe"); Interlocked.Exchange(ref forwarded, 0);
             using var client = NativeHttp.Client(); var before = requests;
+            using (var nativeProxy = new MatrixProxy())
+            {
+                var forwardedContext = new DefaultHttpContext(); forwardedContext.Request.Method = "GET";
+                forwardedContext.Request.Headers.Authorization = "Bearer native-token"; forwardedContext.Request.Headers.Cookie = "crossfire-session=private";
+                forwardedContext.Request.Headers.SetCookie = "untrusted=value";
+                forwardedContext.Request.Headers.Connection = "X-Private"; forwardedContext.Request.Headers["X-Private"] = "hidden";
+                forwardedContext.Request.Headers["Forwarded"] = "for=spoofed"; forwardedContext.Request.Headers["X-Forwarded-Proto"] = "http";
+                forwardedContext.Response.Body = new MemoryStream();
+                await nativeProxy.Forward(forwardedContext, origin, "chat.example.test", "/proxy/native");
+                Equal(forwardedContext.Response.StatusCode, 200, "native proxy forwards a successful response");
+                Equal(Encoding.UTF8.GetString(((MemoryStream)forwardedContext.Response.Body).ToArray()), "native-response", "native proxy streams exact response bytes");
+                Equal(forwardedContext.Response.Headers.ContainsKey("Set-Cookie") || forwardedContext.Response.Headers.ContainsKey("X-Private"), false, "native responses cannot write cookies or hop headers");
+                Equal(forwardedContext.Response.Headers["X-Result"].ToString(), "visible", "end-to-end response headers remain available");
+                var redirect = new DefaultHttpContext(); redirect.Request.Method = "GET";
+                await nativeProxy.Forward(redirect, origin, "chat.example.test", "/redirect"); Equal(redirect.Response.StatusCode, 502, "native proxy rejects redirects rather than navigating to another origin");
+                var unchanged = new DefaultHttpContext(); unchanged.Request.Method = "GET";
+                await nativeProxy.Forward(unchanged, origin, "chat.example.test", "/unchanged"); Equal(unchanged.Response.StatusCode, 304, "cache validation is not a redirect");
+                var secureOrigin = Environment.GetEnvironmentVariable("CROSSFIRE_TLS_TEST_ORIGIN") ?? throw new InvalidOperationException("Run core acceptance with its mandatory trusted TLS fixture");
+                var secure = new DefaultHttpContext(); secure.Request.Method = "GET"; secure.Response.Body = new MemoryStream();
+                await nativeProxy.Forward(secure, secureOrigin, "chat.example.test", "/native");
+                Equal(secure.Response.StatusCode, 200, "HTTPS validates the configured backend certificate, not the public Host header");
+                using var reply = JsonDocument.Parse(((MemoryStream)secure.Response.Body).ToArray());
+                Equal(reply.RootElement.GetProperty("host").GetString(), "chat.example.test", "TLS target isolation preserves the public HTTP Host");
+            }
             var operations = new OperationClient(client, origin, () => "exact-agent-token", RestOperations.All);
             Equal((await operations.Call(new("release", new Dictionary<string, string>()), CancellationToken.None)).IsSuccess, true, "public operation omits an available bearer credential");
             Equal((await operations.Call(new("agent", new Dictionary<string, string> { ["agentId"] = "11111111-1111-4111-8111-111111111111" }), CancellationToken.None)).IsSuccess, true, "authenticated operation retains its exact credential");
@@ -124,8 +158,8 @@ public static class HttpAcceptance
             Equal((await authority.AsUser("@owner:example.test")).Value.Token, "native-owner-token", "cached authority reverified");
             Equal((await authority.Deactivate("@crossfire:example.test")).Error.Code, "forbidden", "protected service account");
             authority.Dispose(); Equal((await authority.Identify("native-owner-token")).IsSuccess, false, "closed authority rejects new operations");
-            Equal(Validation.UserId("@name\ufeff:example.test"), false, "ECMAScript whitespace rejection");
-            Equal(Validation.UserId("@name\u0085:example.test"), true, "no additional whitespace restriction");
+            Equal(MatrixSyntax.UserId("@name\ufeff:example.test"), false, "Matrix whitespace rejection belongs to the adapter");
+            Equal(MatrixSyntax.UserId("@name\u0085:example.test"), true, "native syntax does not add non-ECMAScript whitespace restrictions");
             Equal(MatrixJson.Segment("!room:'()*"), "!room%3A'()*", "canonical Matrix path encoding");
             using var apiError = JsonDocument.Parse(JsonSerializer.Serialize(new ApiFailure(new("invalid", "Invalid request"), new(Identity.Identifier())), ApiJson.Default.ApiFailure));
             Equal(apiError.RootElement.GetProperty("error").TryGetProperty("fieldErrors", out _), false, "optional API error field omission");

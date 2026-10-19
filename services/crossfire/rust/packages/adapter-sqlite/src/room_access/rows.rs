@@ -1,7 +1,7 @@
 use crate::tables::{
     agent_owner_conversation, agent_room_grant, agent_room_permission, room_grant_application,
 };
-use crossfire_domain::{matrix::Membership, room_access::values::*};
+use crossfire_domain::{messaging::Membership, room_access::values::*};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use diesel::prelude::*;
 pub(super) fn invalid() -> Failure {
@@ -9,6 +9,16 @@ pub(super) fn invalid() -> Failure {
         ErrorCode::Unavailable,
         "Invalid stored room authorization state",
     )
+}
+fn native_access(
+    value: Option<String>,
+) -> Result<Option<serde_json::Map<String, serde_json::Value>>> {
+    value
+        .map(|value| {
+            let parsed: serde_json::Value = serde_json::from_str(&value).map_err(|_| invalid())?;
+            crossfire_contracts::messaging::backend_data(&parsed).map_err(|_| invalid())
+        })
+        .transpose()
 }
 fn boolean(value: i64) -> Result<bool> {
     match value {
@@ -28,7 +38,7 @@ pub(super) struct GrantRow {
     invitation_event_id: Option<String>,
     admission_kind: String,
     access_mode: String,
-    power_level: Option<i64>,
+    native_access: Option<String>,
     muted: i64,
     revision: i64,
     access_revision: i64,
@@ -49,7 +59,11 @@ impl From<&Grant> for GrantRow {
             }
             .to_owned(),
             access_mode: value.intent.access.code().to_owned(),
-            power_level: value.intent.power,
+            native_access: value
+                .intent
+                .native_access
+                .as_ref()
+                .map(|value| serde_json::Value::Object(value.clone()).to_string()),
             muted: i64::from(value.intent.muted),
             revision: value.revision,
             access_revision: value.access_revision,
@@ -82,7 +96,7 @@ impl TryFrom<GrantRow> for Grant {
             admission,
             intent: Intent {
                 access,
-                power: value.power_level,
+                native_access: native_access(value.native_access)?,
                 muted: boolean(value.muted)?,
             },
             revision: value.revision,
@@ -139,8 +153,7 @@ pub(super) struct ApplicationRow {
     applied_revision: Option<i64>,
     applied_access_revision: Option<i64>,
     membership: Option<String>,
-    creator: i64,
-    power_level: Option<i64>,
+    native_access: Option<String>,
     last_attempt_at: Option<i64>,
     last_success_at: Option<i64>,
     next_check_at: i64,
@@ -164,8 +177,10 @@ impl From<&Application> for ApplicationRow {
                 }
                 .to_owned()
             }),
-            creator: i64::from(value.creator),
-            power_level: value.power,
+            native_access: value
+                .native_access
+                .as_ref()
+                .map(|value| serde_json::Value::Object(value.clone()).to_string()),
             last_attempt_at: value.last_attempt_at,
             last_success_at: value.last_success_at,
             next_check_at: value.next_check_at,
@@ -194,8 +209,7 @@ impl TryFrom<ApplicationRow> for Application {
             applied_revision: value.applied_revision,
             applied_access_revision: value.applied_access_revision,
             membership,
-            creator: boolean(value.creator)?,
-            power: value.power_level,
+            native_access: native_access(value.native_access)?,
             last_attempt_at: value.last_attempt_at,
             last_success_at: value.last_success_at,
             next_check_at: value.next_check_at,

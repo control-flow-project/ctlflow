@@ -1,89 +1,45 @@
-# SQL database ownership
+# crossfire databases
 
-Knex creates and migrates every owned SQL database, independent of application
-language. Node uses Tinqer, C# uses EF and Rust uses Diesel for application queries.
-No application creates tables, seeds reference data or migrates on open.
-
-## Layout
+Knex is the only database creation and migration owner for Node, C# and Rust.
+Applications open the same current SQLite database and never create tables or run
+ORM migrations. EF, Tinqer and Diesel own their respective application queries.
 
 ```text
-services/crossfire/
-  knexfile.management.mjs
-  database/
-    package.json
-    management/
-      sqlite/
-        configuration.mjs
-        configuration.d.mts
-        contract.json
-        migrations/
-          20261014000000_initial_schema.mjs
-          20261014000001_initial_data.mjs
-          20261018000000_listener_activity_index.mjs
-          assets/
-            schema-17.json
-            sqlite.mjs
-            deployed-schema.mjs
-            enrollment.mjs
-        seeds/
-          README.md
+database/
+  package.json
+  management/sqlite/
+    contract.json
+    schema.json
+    configuration.mjs
+    migrations/
+      00_initial.mjs
+      assets/sqlite.mjs
+    seeds/
 ```
 
-This uses Lesser's named-database/backend nesting and Snapped's ESM migration
-style. It is not a byte-for-byte copy of both repositories.
-`@ctlflow/crossfire-data` is private.
+The initial migration creates current tables, constraints, indexes, triggers and
+reference data in one transaction. The schema JSON contains required SQLite
+STRICT/trigger DDL; Knex executes it. There is no historical schema admission,
+conversion or compatibility decoder. Nullable columns represent domain absence,
+not older-data accommodation. Backend-specific access data is bounded opaque JSON.
+Event identities are room-scoped. A blocked-mention notice's primary key is
+receiver_agent_id, room_id, event_id; updates and retention use all three fields.
 
-Management is the current owned SQL store. Conduit's externally owned RocksDB,
-native histories and controller file state are not converted into artificial
-Knex databases. A new supported database gets its own named directory and
-knexfile; unsupported backends do not get placeholder implementations.
+Use the service's knexfile.management.mjs and one-shot migration container.
+The service scripts migrate:latest:management:sqlite and
+migrate:status:management:sqlite use that same owner. Repeated initialization is
+idempotent. Runtime startup validates the current identity and completed Knex
+migration list without modifying them.
 
-## Current contract
+Database paths are absolute, private, owned files in private non-symlink directories.
+SQLite uses WAL, full synchronization, foreign keys and a busy timeout. Backups
+include committed WAL data through native SQLite backup operations. Before an
+explicit database operation, stop writers and verify its backup. Resets are never
+automatic. Credentials and saved native histories are outside reset authorization.
 
-The store uses application ID 1129465426 and schema 18.
-Its baseline has 63 singular STRICT application tables with normalized relations.
-Knex owns its tracking/locking tables separately.
-Roles and permissions are versioned reference data, not development demo seeds.
+Every SQL store follows database/<database>/<backend>/{migrations,seeds}, with a
+per-database knexfile. There are no placeholder stores. Fleet file state and
+Conduit's externally owned RocksDB are not Knex databases.
 
-- [Migration contract](management/sqlite/contract.json)
-- [Baseline schema](management/sqlite/migrations/assets/schema-17.json)
-
-The applied migration filenames are part of runtime admission.
-Append a forward migration for a new release; do not edit released migration
-bytes. Update the current contract, generated EF/Diesel metadata and affected queries/tests
-together. No EF migration history or second DDL owner exists.
-
-## Commands
-
-```sh
-CROSSFIRE_DATA_DIR=/absolute/private/runtime \
-  npm run migrate:latest:management:sqlite --workspace=@ctlflow/crossfire
-CROSSFIRE_DATA_DIR=/absolute/private/runtime \
-  npm run migrate:status:management:sqlite --workspace=@ctlflow/crossfire
-```
-
-The migration-make script creates the next ESM migration.
-Runtime deployment uses the same one-shot migration image for Node, both C#
-outputs and Rust. It needs no provider/model work or Matrix credentials.
-
-Supported deployed versions 13–17 convert transactionally to 18.
-The activity-index migration replaces one index without rewriting application
-rows. File-backed stores use WAL and full synchronous durability across all runtimes.
-A current schema without Knex history is adopted without changing application
-rows. Foreign, future and unsupported older stores are rejected before mutation.
-Rollback/reset is not an upgrade strategy.
-
-## Upgrade order
-
-Acquire exclusive instance ownership, stop/confirm owned writers, verify the
-required private backup, run Knex, then start the selected application.
-Failure blocks later phases. Current migrated stores do not accumulate redundant
-upgrade backups. Never force-unlock a Knex migration while a writer might remain.
-
-All implementations open the same file. Fixtures also use actual Knex migrations,
-including the EF model generator's input. Acceptance checks historical values,
-rollback, repeated execution, startup refusal, same-file access and actual
-migration-container behavior.
-
-- [Operations](../docs/operations.md)
-- [Logging and current recovery records](../docs/logging.md)
+Generate C# EF and Rust Diesel mappings from this current schema; drift checks
+and shared interchange tests verify all implementations use identical storage.

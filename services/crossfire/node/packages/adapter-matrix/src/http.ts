@@ -3,14 +3,16 @@ import { object } from "@ctlflow/crossfire-contracts/validation";
 import type { Readable } from "node:stream";
 import { Agent, fetch } from 'undici';
 import { MAX_JSON_BYTES } from "@ctlflow/crossfire-contracts/limits";
+import { collect } from '@ctlflow/crossfire-kernel/collect';
 
-import type { Json, JsonObject } from '@ctlflow/crossfire-contracts/json';
+import type { Json, JsonObject } from '@ctlflow/crossfire-kernel/json';
 export type Native = { base: string; token?: string; signal?: AbortSignal; timeoutMs?: number };
 export type NativeResponse = { status: number; body: JsonObject };
-import { API, segment, json } from '@ctlflow/crossfire-contracts/matrix';
+import { json } from '@ctlflow/crossfire-kernel/json';
+import { API, segment } from './protocol.js';
 import { endpoint } from '@ctlflow/crossfire-contracts/origin';
 import { markdownMessage } from './message.js';
-import { roomState, type RoomStateEvent } from '@ctlflow/crossfire-contracts/matrix-room';
+import { roomState, type RoomStateEvent } from './room/state.js';
 import { truncateUtf16 } from '@ctlflow/crossfire-kernel/text';
 
 const dispatcher = new Agent({ allowH2: false });
@@ -39,17 +41,6 @@ export async function nativeOpen(client: Native, method: string, path: string, b
   }
 }
 
-export async function collect(source: AsyncIterable<Uint8Array>, maximum = MAX_JSON_BYTES): Promise<Buffer> {
-  if (!Number.isSafeInteger(maximum) || maximum < 1) throw new Error("Invalid finite response byte limit");
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for await (const chunk of source) {
-    size += chunk.byteLength;
-    if (size > maximum) throw Object.assign(new Error("Response exceeds its finite byte limit"), { code: 'body_too_large' });
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
 
 export async function nativeJson(client: Native, method: string, path: string, body?: unknown, maximumBytes = MAX_JSON_BYTES): Promise<Result<{ status: number; body: Json }>> {
   if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 1 || maximumBytes > 64 * 1024 * 1024) return failure('invalid', 'Invalid HTTP response resource bound');
@@ -78,7 +69,10 @@ export function matrix(client: Native) {
     if (result.value.status >= 300) {
       const content = object(result.value.body);
       const code = content.ok && typeof content.value.errcode === "string" ? truncateUtf16(content.value.errcode, 80) : "ERROR";
-      throw Object.assign(new Error("Native HTTP " + result.value.status + ": " + code), { status: result.value.status });
+      const status = result.value.status;
+      const failureCode = status === 401 ? 'unauthorized' : status === 403 ? 'forbidden' : status === 404 ? 'missing'
+        : status === 409 ? 'conflict' : status === 429 ? 'rate_limit' : status >= 500 ? 'unavailable' : 'invalid';
+      throw Object.assign(new Error('HTTP ' + status + ' Matrix request failed: ' + code), { status, code: failureCode });
     }
     return result.value.body as T;
   }

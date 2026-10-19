@@ -1,3 +1,4 @@
+import { messageEvent } from '@ctlflow/crossfire-adapter-matrix/events';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -63,7 +64,7 @@ test('context bounds cover the entire output and never truncate native continuat
 
 test('native policy rejects privileged operations, foreign identities, remote routes, and unused flags before mutation', async context => {
   const fixture = await matrixFixture(context, temporary(context));
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   for (const operation of operations.filter(operation => operation.access !== 'agent')) {
     await assert.rejects(executeOperation(client, fixture.settings, fixture.account, operation, {}), /not an enabled/);
   }
@@ -96,19 +97,19 @@ test('native bodies support Markdown once and reject ambiguous, excessive or mal
 
 test('explicit repeated targets produce native mentions; visual links, quotations and ordinary updates never infer controls', async scope => {
   const fixture = await matrixFixture(scope, temporary(scope));
-  const client = matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token });
+  const client = matrix({ base: fixture.settings.server, token: fixture.account.accessToken });
   const peer = '@agent-holmes:test.localhost', body = `[peer](https://matrix.to/#/${SELF}): use the saved evidence.`;
   const operation = selectOperation('send-message'), base = { 'room-id': ROOM, 'event-type': 'm.room.message', markdown: body };
   await executeOperation(client, fixture.settings, fixture.account, operation, { ...base, 'txn-id': 'targeted', 'mention-user': [SELF, peer] });
   const sent = fixture.requests.find(request => request.path.endsWith('/targeted'))!;
   assert.deepEqual(sent.body, { ...messageContent({ msgtype: 'm.text', body }), 'm.mentions': { user_ids: [SELF, peer] } });
   const event = { ...message('$explicit-target', peer, body), content: sent.body as ReturnType<typeof message>['content'] };
-  assert.equal(mentionsAgent(event, SELF), true);
+  assert.equal(mentionsAgent(messageEvent(event, ROOM), SELF), true);
   for (const [index, text] of [body, `> ${body}`, '```\n' + body + '\n```', 'Routine progress: one page read.'].entries()) {
     await executeOperation(client, fixture.settings, fixture.account, operation, { ...base, 'txn-id': 'ordinary-' + index, markdown: text });
     const ordinary = fixture.requests.find(request => request.path.endsWith('/ordinary-' + index))!.body as ReturnType<typeof message>['content'];
     assert.equal(Object.hasOwn(ordinary, 'm.mentions'), false);
-    assert.equal(mentionsAgent({ ...event, content: ordinary }, SELF), false);
+    assert.equal(mentionsAgent(messageEvent({ ...event, content: ordinary }, ROOM), SELF), false);
   }
   const count = fixture.requests.length;
   await executeOperation(client, fixture.settings, fixture.account, operation, { ...base, 'txn-id': 'targeted', 'mention-user': [SELF, peer] });
@@ -129,7 +130,7 @@ test('built native CLI sends repeated explicit handoff targets through the same 
 
 test('invalid, competing and nonfresh mention targets fail before a Matrix request', async scope => {
   const fixture = await matrixFixture(scope, temporary(scope)), operation = selectOperation('send-message');
-  const client = matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token });
+  const client = matrix({ base: fixture.settings.server, token: fixture.account.accessToken });
   const base = { 'room-id': ROOM, 'event-type': 'm.room.message' };
   for (const targets of [true, [], ['@peer:test', '@peer:test'], ['peer'], ['@peer:bad host']] as const) {
     await assert.rejects(executeOperation(client, fixture.settings, fixture.account, operation, { ...base, markdown: 'Stop.', 'mention-user': targets }), /distinct exact Matrix/);
@@ -167,7 +168,7 @@ test('CLI exposes the native manifest and rejects every superseded top-level com
   const help = await execute(process.execPath, [script, 'matrix', 'send-message', '--help']);
   assert(JSON.parse(help.stdout).cli_options.includes('mention-user'));
   for (const command of ['init', 'read', 'listen', 'send', 'history', 'rooms', 'who', 'upload', 'download']) {
-    await assert.rejects(execute(process.execPath, [script, command]), /Use agent, room, report or matrix/);
+    await assert.rejects(execute(process.execPath, [script, command]), /Use agent, room, report or a configured messaging namespace/);
   }
 });
 

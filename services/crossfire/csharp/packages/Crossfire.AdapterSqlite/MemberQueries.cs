@@ -6,16 +6,16 @@ namespace Crossfire.AdapterSqlite;
 
 public static class MemberQueries
 {
-    public static Result<Principal?> ByMatrixId(CrossfireDbContext context, string matrixId)
-        => Stored.Read(() => context.Principal.AsNoTracking().Where(row => row.MatrixUserId == matrixId)
-            .Select(row => new Principal(row.Id, row.MatrixUserId, row.Kind, row.Status, row.Revision, row.CreatedAt)).SingleOrDefault());
+    public static Result<Principal?> ByBackendUserId(CrossfireDbContext context, string matrixId)
+        => Stored.Read(() => context.Principal.AsNoTracking().Where(row => row.BackendUserId == matrixId)
+            .Select(row => new Principal(row.Id, row.BackendUserId, row.Kind, row.Status, row.Revision, row.CreatedAt)).SingleOrDefault());
 
     public static Result<MemberView?> Find(CrossfireDbContext context, string id)
         => Stored.Read(() => context.Member.AsNoTracking().Where(row => row.PrincipalId == id)
             .Join(context.Principal, member => member.PrincipalId, principal => principal.Id, (member, principal) => new { member, principal })
             .Join(context.PrincipalRole, joined => joined.member.PrincipalId, role => role.PrincipalId, (joined, role) => new { joined.member, joined.principal, role })
             .Join(context.PrincipalApplication, joined => joined.member.PrincipalId, application => application.PrincipalId, (joined, application) =>
-                new MemberView(new Principal(joined.principal.Id, joined.principal.MatrixUserId, joined.principal.Kind, joined.principal.Status, joined.principal.Revision, joined.principal.CreatedAt),
+                new MemberView(new Principal(joined.principal.Id, joined.principal.BackendUserId, joined.principal.Kind, joined.principal.Status, joined.principal.Revision, joined.principal.CreatedAt),
                     new Member(joined.member.PrincipalId, joined.member.PrincipalKind, joined.member.DisplayName),
                     new PrincipalRole(joined.role.PrincipalId, joined.role.PrincipalKind, joined.role.RoleCode, joined.role.AssignedByMemberId, joined.role.AssignedAt),
                     new PrincipalApplication(application.PrincipalId, application.AppliedRevision, application.AppliedIntentHash, application.AppliedStatus, application.NativeDisplayName,
@@ -31,7 +31,7 @@ public static class MemberQueries
             .Join(context.PrincipalRole, joined => joined.member.PrincipalId, role => role.PrincipalId, (joined, role) => new { joined.member, joined.principal, role })
             .Join(context.PrincipalApplication, joined => joined.member.PrincipalId, application => application.PrincipalId, (joined, application) => new { joined.member, joined.principal, joined.role, application })
             .OrderBy(joined => joined.principal.CreatedAt).ThenBy(joined => joined.principal.Id).Skip(offset).Take(pageSize)
-            .Select(joined => new MemberView(new Principal(joined.principal.Id, joined.principal.MatrixUserId, joined.principal.Kind, joined.principal.Status, joined.principal.Revision, joined.principal.CreatedAt),
+            .Select(joined => new MemberView(new Principal(joined.principal.Id, joined.principal.BackendUserId, joined.principal.Kind, joined.principal.Status, joined.principal.Revision, joined.principal.CreatedAt),
                 new Member(joined.member.PrincipalId, joined.member.PrincipalKind, joined.member.DisplayName),
                 new PrincipalRole(joined.role.PrincipalId, joined.role.PrincipalKind, joined.role.RoleCode, joined.role.AssignedByMemberId, joined.role.AssignedAt),
                 new PrincipalApplication(joined.application.PrincipalId, joined.application.AppliedRevision, joined.application.AppliedIntentHash, joined.application.AppliedStatus,

@@ -2,6 +2,7 @@ import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
 import type { ControllerState, ListenerControl } from '@ctlflow/crossfire-agent-core/listener-control-port';
 import type { NativeSessionState } from '@ctlflow/crossfire-agent-core/runtime';
+import type { NativeDiagnostic } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import type { Configuration, Registration, Roster, Operation, Approval, Instance, Controller, FleetDelivery, FleetMessageResult, DesiredIntent, ResumeSelection, RetainedContext, SetupInput, SetupConfiguration } from './model.js';
 export type Registry = {
   registrations(): Result<Registration[]>;
@@ -21,6 +22,7 @@ export type Registry = {
   retrySetup(previousId: string, operationId: string): Result<void>;
 };
 export type Running = { sessionId: string; signal: AbortSignal; nativeState(): NativeSessionState;
+  diagnostics(signal: AbortSignal): Promise<NativeDiagnostic>;
   resume(): Promise<Result<void>>;
   attachment(): Promise<Result<RuntimeAttachment>>;
   attachments(): Promise<Result<{ context: string; attachment: RuntimeAttachment }[]>>;

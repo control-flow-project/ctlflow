@@ -1,21 +1,17 @@
 use crossfire_contracts::{origin, validation as check};
-use crossfire_kernel::{Failure, Result, failure::ErrorCode, secret::Secret};
+pub use crossfire_domain::messaging::Account;
+use crossfire_domain::messaging::BackendConfiguration;
+use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use serde_json::{Value, json};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
     pub instance: String,
-    pub homeserver: String,
-    pub server_name: String,
+    pub server: String,
+    pub backend: BackendConfiguration,
     pub owner: String,
     pub max_upload_bytes: usize,
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Account {
-    pub user_id: String,
-    pub access_token: Secret,
-    pub device_id: String,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Profile {
@@ -26,20 +22,10 @@ pub struct Profile {
 }
 pub fn parse(value: &Value) -> Result<Profile> {
     let root = check::object(value, &["id", "workspace", "account", "settings"], &[])?;
-    let account = check::object(
-        &root["account"],
-        &["user_id", "access_token", "device_id"],
-        &[],
-    )?;
+    let account = crossfire_contracts::messaging::account(&root["account"])?;
     let settings = check::object(
         &root["settings"],
-        &[
-            "instance",
-            "homeserver",
-            "server_name",
-            "owner",
-            "max_upload_bytes",
-        ],
+        &["instance", "server", "backend", "owner", "maxUploadBytes"],
         &[],
     )?;
     let workspace = PathBuf::from(check::text(&root["workspace"], 1, 4096)?);
@@ -49,22 +35,18 @@ pub fn parse(value: &Value) -> Result<Profile> {
             "Agent workspaces must be fully qualified",
         ));
     }
-    let homeserver = check::text(&settings["homeserver"], 1, 2048)?;
-    origin::parse(homeserver)?;
+    let server = check::text(&settings["server"], 1, 2048)?;
+    origin::parse(server)?;
     Ok(Profile {
         workspace,
         id: check::identifier(&root["id"])?.to_owned(),
-        account: Account {
-            user_id: check::matrix_user_id(&account["user_id"])?.to_owned(),
-            access_token: Secret::new(check::text(&account["access_token"], 1, 8192)?.to_owned()),
-            device_id: check::text(&account["device_id"], 1, 255)?.to_owned(),
-        },
+        account,
         settings: Settings {
-            instance: check::text(&settings["instance"], 1, 100)?.to_owned(),
-            homeserver: homeserver.to_owned(),
-            server_name: check::text(&settings["server_name"], 1, 255)?.to_owned(),
-            owner: check::matrix_user_id(&settings["owner"])?.to_owned(),
-            max_upload_bytes: check::integer(&settings["max_upload_bytes"], 1, 16 * 1024 * 1024)?
+            instance: check::name(&settings["instance"])?.to_owned(),
+            server: server.to_owned(),
+            backend: crossfire_contracts::messaging::configuration(&settings["backend"])?,
+            owner: check::backend_user_id(&settings["owner"])?.to_owned(),
+            max_upload_bytes: check::integer(&settings["maxUploadBytes"], 1, 16 * 1024 * 1024)?
                 as usize,
         },
     })
@@ -75,6 +57,6 @@ pub fn value(profile: &Profile) -> Result<Value> {
         .to_str()
         .ok_or_else(|| Failure::new(ErrorCode::Invalid, "Agent workspace is not valid Unicode"))?;
     Ok(
-        json!({"id":profile.id,"workspace":workspace,"account":{"user_id":profile.account.user_id,"access_token":profile.account.access_token.expose(),"device_id":profile.account.device_id},"settings":{"instance":profile.settings.instance,"homeserver":profile.settings.homeserver,"server_name":profile.settings.server_name,"owner":profile.settings.owner,"max_upload_bytes":profile.settings.max_upload_bytes}}),
+        json!({"id":profile.id,"workspace":workspace,"account":crossfire_contracts::messaging::account_value(&profile.account),"settings":{"instance":profile.settings.instance,"server":profile.settings.server,"backend":crossfire_contracts::messaging::configuration_value(&profile.settings.backend),"owner":profile.settings.owner,"maxUploadBytes":profile.settings.max_upload_bytes}}),
     )
 }

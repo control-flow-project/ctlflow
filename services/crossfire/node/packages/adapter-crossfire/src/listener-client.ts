@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
-import { collect } from '@ctlflow/crossfire-adapter-matrix/http';
+import { collect } from '@ctlflow/crossfire-kernel/collect';
 import { fields } from '@ctlflow/crossfire-contracts/validation';
 import { failure, type Result } from '@ctlflow/crossfire-kernel/result';
 import { listenerRecord, listenerStatus, historyResult, type ListenerRequest, type LocalListener, type HistoryResult } from './listener-protocol.js';

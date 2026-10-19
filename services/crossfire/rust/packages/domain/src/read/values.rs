@@ -43,9 +43,9 @@ pub struct DiscoveryFilter<'a> {
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrincipalIdentity {
-    pub matrix_user_id: String,
+    pub backend_user_id: String,
     pub kind: Option<PrincipalKind>,
-    pub owner_matrix_id: Option<String>,
+    pub owner_backend_user_id: Option<String>,
     pub display_name: Option<String>,
     pub owner_display_name: Option<String>,
 }

@@ -34,14 +34,14 @@ public static class RoomGrantChanges
         var newGeneration = previous is null || previous.AccessMode == "none" && input.AccessMode != "none"
             || proof.InvitationEventId is not null && proof.InvitationEventId != previous.InvitationEventId;
         var generation = newGeneration ? ports.Identifier() : previous!.Generation;
-        var accessChanged = previous is null || previous.AccessMode != input.AccessMode || previous.PowerLevel != input.PowerLevel;
+        var accessChanged = previous is null || previous.AccessMode != input.AccessMode || !BackendData.Equal(previous.NativeAccess, input.NativeAccess);
         if (newGeneration || input.AccessMode == "none")
         {
             var removed = ports.ReplacePermissions(input.AgentId, input.RoomId, []);
             if (!removed.IsSuccess) return Result<RoomGrant?>.Fail(removed.Error);
         }
         var grant = new RoomGrant(input.AgentId, input.RoomId, generation, proof.AuthorizerId, newGeneration ? actor.PrincipalId : previous!.AddedById,
-            proof.InvitationEventId, proof.AdmissionKind, input.AccessMode, input.PowerLevel, input.Muted,
+            proof.InvitationEventId, proof.AdmissionKind, input.AccessMode, input.NativeAccess, input.Muted,
             checked((previous?.Revision ?? -1) + 1), checked((previous?.AccessRevision ?? -1) + (accessChanged ? 1 : 0)), ports.Authorization.Now());
         var saved = ports.Save(grant, previous is null);
         if (!saved.IsSuccess) return Result<RoomGrant?>.Fail(saved.Error);
@@ -53,7 +53,7 @@ public static class RoomGrantChanges
         var application = ports.Application(input.AgentId, input.RoomId);
         if (!application.IsSuccess) return Result<RoomGrant?>.Fail(application.Error);
         var scheduled = ports.SaveApplication(application.Value is null
-            ? new(input.AgentId, input.RoomId, null, null, null, null, false, null, null, null, ports.Authorization.Now(), null, null)
+            ? new(input.AgentId, input.RoomId, null, null, null, null, null, null, null, ports.Authorization.Now(), null, null)
             : application.Value with { NextCheckAt = ports.Authorization.Now() });
         if (!scheduled.IsSuccess) return Result<RoomGrant?>.Fail(scheduled.Error);
         var target = ports.Authorization.Agent(input.AgentId);

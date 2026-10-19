@@ -17,7 +17,7 @@ export type WakeRuleSummary = WakeRule & { owner: PrincipalSummary; agentCount: 
 export type WakeRuleDetails = WakeRuleSummary & { agents: (PrincipalSummary & WakeRuleAgent)[] };
 export type ScheduledWake = {
   deliveryId: string; ruleId: string; ruleRevision: number; name: string; message: string;
-  scheduledAt: number; sessionId: string; ownerMatrixId: string; authorizerMatrixId: string;
+  scheduledAt: number; sessionId: string; ownerBackendUserId: string; authorizerBackendUserId: string;
 };
 export type WakeRuleRepository = {
   find(id: string): Result<WakeRule | null>;

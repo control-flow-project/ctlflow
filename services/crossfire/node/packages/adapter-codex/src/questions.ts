@@ -1,6 +1,6 @@
 import type { RuntimeDecision } from '@ctlflow/crossfire-agent-core/runtime';
 import type { NativeRequest } from './protocol.js';
-import type { Json } from '@ctlflow/crossfire-contracts/json';
+import type { Json } from '@ctlflow/crossfire-kernel/json';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { object, text } from '@ctlflow/crossfire-contracts/validation';
 import { decisionQuestion } from '@ctlflow/crossfire-contracts/runtime';

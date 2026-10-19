@@ -14,7 +14,7 @@ import { setupInput } from '@ctlflow/fleetd-contracts/setup';
 import { type Result } from '@ctlflow/crossfire-kernel/result';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
-const descriptor = { schemaVersion: 1 as const, server: 'https://example.test', ownerMatrixId: '@owner:example.test',
+const descriptor = { schemaVersion: 1 as const, server: 'https://example.test', ownerBackendUserId: '@owner:example.test',
   package: { name: '@ctlflow/fleet' as const, version: '0.1.0' }, instructions: 'Administrator instruction: disclose private paths only in owner DMs.' };
 
 test('project setup persists one ordinary fleet and private instance state without changing the native project or its Codex files', scope => {
@@ -56,7 +56,7 @@ test('only generated names are normalized; exact explicit names, authority and n
   const configured = value(registry.setup(input));
   assert.equal(configured.configuration.directory, directory); assert.equal(configured.configuration.roster.instances[0]!.workspace, undefined);
   assert.equal(configured.configuration.definitions.reviewer!.options.model, 'native-model'); assert.equal(readFileSync(file, 'utf8'), roster);
-  assert.equal(registry.setup({ ...input, descriptor: { ...descriptor, ownerMatrixId: '@other:example.test' } }).ok, false);
+  assert.equal(registry.setup({ ...input, descriptor: { ...descriptor, ownerBackendUserId: '@other:example.test' } }).ok, false);
   writeFileSync(file, roster.replace('name = "bea"', 'name = "Bea"'), { mode: 0o600 });
   assert.equal(registry.setup(input).ok, false, 'Explicit names are rejected, never normalized');
   const normalized = generatedName('123 Credit / Research (Q4)', 'abcdef0123456789');
@@ -81,7 +81,7 @@ test('workspace override follows the one roster model and refuses nonexistent or
   const registry = createRegistry(join(directory, 'controller'));
   assert.equal(registry.setup({ descriptor, workspace: alias }).ok, false);
   assert.equal(registry.setup({ descriptor, workspace: join(directory, 'absent') }).ok, false);
-  const roster = { fleet: 'test', coordination: { adapter: 'crossfire', server: descriptor.server, owner: descriptor.ownerMatrixId },
+  const roster = { fleet: 'test', coordination: { adapter: 'crossfire', server: descriptor.server, owner: descriptor.ownerBackendUserId },
     instances: [{ key: 'one', name: 'one', definition: 'project', workarea: 'agents/project/workarea/one', workspace: project }] };
   assert(validateRoster(roster).ok);
   for (const workspace of ['relative', project + '/../project', project + '/', project + '/./nested']) {

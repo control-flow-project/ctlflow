@@ -110,7 +110,7 @@ fn fleet_messages_are_authorized_bounded_repeatable_attributed_and_receipted_by_
     )?;
     assert_eq!(control.messages.len(), 1);
     assert_eq!(
-        control.messages[0].sender_matrix_id.as_deref(),
+        control.messages[0].sender_backend_user_id.as_deref(),
         Some("@owner:example.test")
     );
     assert_eq!(

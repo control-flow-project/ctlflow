@@ -95,7 +95,7 @@ public static class FleetMessages
         if (!sender.IsSuccess) return Result<FleetControlSnapshot>.Fail(sender.Error);
         if (message.Value.AuthorPrincipalId is not null && sender.Value is null) return Results.Fail<FleetControlSnapshot>("unavailable", "Fleet message sender is missing");
         var command = new FleetMessageCommand(message.Value.Id, fleetId, message.Value.Body, message.Value.CreatedAt, message.Value.ExpiresAt,
-            new(message.Value.AuthorPrincipalId is null ? "controller" : "human", sender.Value?.MatrixUserId),
+            new(message.Value.AuthorPrincipalId is null ? "controller" : "human", sender.Value?.BackendUserId),
             deliveries.Value.Where(value => value.Status == "pending").Select(value => value.AgentId).ToArray());
         return Result<FleetControlSnapshot>.Success(snapshot with { Messages = [command] });
     }

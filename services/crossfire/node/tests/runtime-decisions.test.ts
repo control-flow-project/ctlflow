@@ -64,7 +64,7 @@ test('large native reviews are independent of chat size and lists project only p
 
 test('execution state is per native history, incidents are deduplicated and lazy management DMs are durable', async scope => {
   const fixture_ = await fixture(scope), { services, agent, runId, request, native } = fixture_;
-  value(await native.matrix.provision(services.instance.serviceMatrixId, 'fixture-secret', 'fixture'));
+  value(await native.messaging.provision(services.messaging.serviceUserId(), 'fixture-secret', { deviceId: 'fixture' }));
   const base = { sessionId: request.sessionId, roomId: null, runtime: 'codex', historyMode: 'per-room' as const, maxInputBytes: 100000,
     lastActivityAt: services.clock.now(), historyAvailable: true,
     observedAt: services.clock.now(), settings: [{ name: 'model', configured: 'fixture-model', effective: 'fixture-model' }], errorMessage: null };
@@ -140,7 +140,7 @@ test('runs with identical start times select only the greatest ID for contact mo
 
 test('management DMs cannot admit agents through discovery, grants, invitations or direct storage', async scope => {
   const { services, native, owner, admin, agent, runId } = await fixture(scope);
-  value(await native.matrix.provision(services.instance.serviceMatrixId, 'fixture-secret', 'fixture'));
+  value(await native.messaging.provision(services.messaging.serviceUserId(), 'fixture-secret', { deviceId: 'fixture' }));
   value(openIncident(services, { ownerId: owner.actor.principalId, agentId: agent.id, fleetId: null, runId,
     sessionId: null, kind: 'failure', message: 'Native execution stopped' }));
   value(await reconcileRuntime(services, () => false));
@@ -151,21 +151,21 @@ test('management DMs cannot admit agents through discovery, grants, invitations 
     assert.equal((await readRoom(services, actor, conversation.roomId, agent.id)).ok, false);
     assert.equal((await changeRoomGrant(services, actor, { agentId: agent.id, roomId: conversation.roomId,
       expectedRevision: value(services.directory.agent(agent.id))!.principal.revision, expectedGeneration: null,
-      accessMode: 'reply', powerLevel: null, muted: false }, randomUUID())).ok, false);
+      accessMode: 'reply', nativeAccess: null, muted: false }, randomUUID())).ok, false);
     assert.equal(setRoomPermission(services, actor, { agentId: agent.id, roomId: conversation.roomId,
       expectedRevision: value(services.directory.agent(agent.id))!.principal.revision, expectedGeneration: 'missing', permissions: ['room.agent.invite'] }, randomUUID()).ok, false);
   }
   const grant = { agentId: agent.id, roomId: conversation.roomId, generation: 'invalid-management-grant', authorizerId: owner.actor.principalId,
     addedById: owner.actor.principalId, invitationEventId: null, admissionKind: 'managed' as const, accessMode: 'reply' as const,
-    powerLevel: null, muted: false, revision: 0, accessRevision: 0, updatedAt: services.clock.now() };
+    nativeAccess: null, muted: false, revision: 0, accessRevision: 0, updatedAt: services.clock.now() };
   assert.equal(services.repositories.agentRoomGrant.insert(grant).ok, false);
   value(services.repositories.agentRoomGrant.insert({ ...grant, accessMode: 'none' }));
   assert.equal(services.repositories.agentRoomGrant.update(grant).ok, false);
   assert.equal(services.repositories.agentRoomPermission.insert({ agentId: agent.id, roomId: conversation.roomId, generation: grant.generation,
     permissionCode: 'room.agent.invite', grantScope: 'agent_room', grantedByMemberId: owner.actor.principalId, grantedAt: services.clock.now() }).ok, false);
-  const ownerMatrixId = value(services.directory.member(owner.actor.principalId))!.principal.matrixUserId;
-  native.rooms.get(conversation.roomId)!.members.set(agent.matrixUserId, { matrixUserId: agent.matrixUserId, displayName: 'ada', membership: 'invite', creator: false, powerLevel: 0 });
-  native.invitations.set(conversation.roomId + ':' + agent.matrixUserId, { roomId: conversation.roomId, eventId: '$management-invite', senderMatrixId: ownerMatrixId, direct: false });
+  const ownerBackendUserId = value(services.directory.member(owner.actor.principalId))!.principal.backendUserId;
+  native.rooms.get(conversation.roomId)!.members.set(agent.backendUserId, { backendUserId: agent.backendUserId, displayName: 'ada', membership: 'invite', creator: false, powerLevel: 0 });
+  native.invitations.set(conversation.roomId + ':' + agent.backendUserId, { roomId: conversation.roomId, eventId: '$management-invite', senderBackendUserId: ownerBackendUserId, direct: false });
   assert.equal((await acceptRoomInvitation(services, agent.actor, agent.id, conversation.roomId, randomUUID())).ok, false);
   assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id })), null);
 });

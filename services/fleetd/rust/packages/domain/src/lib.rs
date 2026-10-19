@@ -2,6 +2,7 @@ pub mod binding;
 pub mod controller;
 pub mod controller_model;
 pub mod controller_ports;
+pub mod diagnostics;
 pub mod lifecycle_observer;
 pub mod model;
 pub mod native_lifecycle;

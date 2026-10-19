@@ -3,6 +3,7 @@
 - [Setup and descriptor validation](setup.md)
 - [Controller authentication and OS configuration](authentication.md)
 - [Operation, sleep and recovery](operations.md)
+- [Diagnostic API](diagnostics.md)
 - [Wake and invitation policy](coordination.md)
 - [Storage ownership and forward conversions](storage.md)
 - [Read-only inspection and explicit provider acceptance](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/node/tools/README.md)

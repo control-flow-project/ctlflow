@@ -1,3 +1,4 @@
+using Crossfire.Domain;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AdapterRuntime;
@@ -29,6 +30,11 @@ public sealed class CodexHistories : OwnedRuntimeConnection, TurnControl
     public TurnControl TurnControl => this;
     public RuntimeLifecycle? Lifecycle => null;
     private CodexConnection Primary => selected ?? throw new InvalidOperationException("Native primary history is not initialized");
+    public ValueTask<Result<ProviderState>> Provider(CancellationToken cancellation)
+    {
+        CodexConnection? connection; lock (gate) connection = selected;
+        return connection is null ? ValueTask.FromResult(Results.Fail<ProviderState>("unavailable", "No owned native provider connection is running")) : connection.Provider(cancellation);
+    }
     private CodexHistories(OwnedProcess process, OwnedRuntimeInput input, CodexOptions options, string home, ContextRegistryState registry, CancellationToken cancellation)
     {
         this.process = process; this.input = input; this.options = options; this.home = home; this.registry = registry;
@@ -95,7 +101,7 @@ public sealed class CodexHistories : OwnedRuntimeConnection, TurnControl
             lock (gate) if (previous is null && context is not ("shared" or "control") && registry.Bindings.Count(binding => binding.Context is not ("shared" or "control")) >= 2000)
             { result = Results.Fail<CodexConnection>("invalid", "Native room history budget is exhausted"); return; }
             var hooks = input.Hooks with { Observe = value => input.Hooks.Observe?.Invoke(value is NativeState state
-                ? state with { RoomId = context is "shared" or "control" ? null : context } : value) };
+                ? state with { RoomId = HistoryContext.Room(context) } : value) };
             var selected = await CodexSession.Open(process.Endpoint, process.Token, input.Workspace, options,
                 previous is null ? new CreateThread(input.Name + (context == "shared" ? "" : " · " + context)) : new ResumeThread(previous), hooks, value => connection?.Event(value), contextLifetime.Token);
             if (!selected.IsSuccess) { result = Result<CodexConnection>.Fail(selected.Error); return; } session = selected.Value;
@@ -175,12 +181,12 @@ public sealed class CodexHistories : OwnedRuntimeConnection, TurnControl
     { lock (gate) { if (closing is not null) return Results.Fail<Unit>("unavailable", "Native history owner stopped"); foreach (var context in opened.Values) { var saved = context.Connection.Acknowledge(messageIds); if (!saved.IsSuccess) return saved; } } return Results.Done(); }
     public async ValueTask<Result<RuntimeConnection>> Conversation(string room, InputAdmission? admission = null)
     {
-        if (!Validation.RoomId(room)) return Results.Fail<RuntimeConnection>("invalid", "Supply an exact Matrix room identity");
-        return (await Open(input.HistoryMode == NativeHistoryMode.Shared ? "shared" : room, admission)).Map<RuntimeConnection>(value => value);
+        if (!Validation.RoomId(room)) return Results.Fail<RuntimeConnection>("invalid", "Supply an exact messaging room identity");
+        return (await Open(input.HistoryMode == NativeHistoryMode.Shared ? "shared" : HistoryContext.ForRoom(room), admission)).Map<RuntimeConnection>(value => value);
     }
     public async ValueTask<Result<string?>> ActiveTurn(string? room = null, InputAdmission? admission = null)
     {
-        var context = input.HistoryMode == NativeHistoryMode.Shared ? "shared" : room ?? "control"; CodexConnection? connection;
+        var context = input.HistoryMode == NativeHistoryMode.Shared ? "shared" : room is null ? "control" : HistoryContext.ForRoom(room); CodexConnection? connection;
         if (admission is not null) { var selected = await Open(context, admission); if (!selected.IsSuccess) return Result<string?>.Fail(selected.Error); connection = selected.Value; }
         else { lock (gate) connection = opened.GetValueOrDefault(context)?.Connection; }
         if (connection is null) return Result<string?>.Success(null);

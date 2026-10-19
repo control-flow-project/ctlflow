@@ -11,16 +11,17 @@ public static class EnrollmentLifecycleAcceptance
     public static async Task Verify(CrossfireDbContext context, Actor owner, Actor other, long start)
     {
         var now = start;
-        var identity = ((NativeAuthentication)owner.Authentication!).MatrixUserId;
+        var identity = ((NativeAuthentication)owner.Authentication!).BackendUserId;
         var policy = new CoordinationPolicy("selected", [new(identity, true)], ["room.agent.invite"]);
         var nativeCalls = 0;
-        var ports = EnrollmentCommands.Ports(context, () => now, "example.test", (token, cancellation) =>
+        var messaging = MessagingFixture.Ports() with { AgentUserId = id => "@agent-" + id + ":example.test", Identify = (token, cancellation) =>
         {
             Equal(context.Database.CurrentTransaction is null, true, "enrollment native proof occurs before transaction");
             nativeCalls++;
             var separator = token.IndexOf('|');
             return ValueTask.FromResult(separator < 0 ? Results.Fail<string>("unauthorized", "Invalid credential") : Result<string>.Success(token[(separator + 1)..]));
-        }, (user, room, cancellation) => ValueTask.FromResult(Results.Fail<RoomFacts>("missing", "No room in enrollment fixture")));
+        }, Room = (user, room, subject, cancellation) => ValueTask.FromResult(Results.Fail<RoomFacts>("missing", "No room in enrollment fixture")) };
+        var ports = EnrollmentCommands.Ports(context, () => now, messaging);
         var name = "specialist-" + Identity.Identifier()[..8];
         var roster = new EnrollmentRoster(identity, "fleet-" + Identity.Identifier()[..8], new("Native enrollment", new Dictionary<string, string> { ["host"] = "test" }),
             [new("specialist", name, null, policy)]);
@@ -53,12 +54,12 @@ public static class EnrollmentLifecycleAcceptance
         var item = EnrollmentQueries.Items(context, introduction.EnrollmentId).Value.Single();
         var agentId = item.AgentId!;
         var agent = AuthorizationQueries.AgentView(context, agentId).Value!;
-        Equal(agent.Principal.MatrixUserId, "@agent-" + agentId + ":example.test", "approved native identity uses stable agent UUID");
+        Equal(agent.Principal.BackendUserId, "@agent-" + agentId + ":example.test", "approved native identity uses stable agent UUID");
         Equal(agent.Name, name, "reserved name belongs to approved stable identity");
         Equal(WakeCommands.Senders(context, agentId).Value.Single().SenderPrincipalId, owner.PrincipalId, "approval installs reviewed wake selection");
         Equal(RoomGrantQueries.FleetPolicy(context, agentId).Value!.Permissions.Single(), "room.agent.invite", "approval installs reviewed invitation permission");
         Equal(EnrollmentClaims.Exchange(ports, introduction.EnrollmentId, introduction.ClaimSecret).Value.Status, "provisioning", "approval is distinct from native provisioning");
-        var nativeToken = "token|" + agent.Principal.MatrixUserId;
+        var nativeToken = "token|" + agent.Principal.BackendUserId;
         Equal(Transactions.Run(context, () =>
         {
             context.AgentCredential.Single(row => row.AgentId == agentId).AccessToken = nativeToken;
@@ -102,7 +103,7 @@ public static class EnrollmentLifecycleAcceptance
         now += PolicyQueries.Find(context).Value!.EnrollmentSeconds * 1000 + 1;
         Equal(EnrollmentClaims.Exchange(ports, expiring.EnrollmentId, expiring.ClaimSecret).Value.Status, "expired", "expired pending exchange never releases secrets");
         Equal(EnrollmentClaims.Exchange(ports, freshRename.EnrollmentId, freshRename.ClaimSecret).Value.Status, "expired", "approved enrollment claim also expires without releasing credentials");
-        Equal(EnrollmentClaims.Exchange(ports, expiring.EnrollmentId, expiring.ClaimSecret).Value.OwnerMatrixId, identity, "expired exchange preserves the authenticated claim owner representation");
+        Equal(EnrollmentClaims.Exchange(ports, expiring.EnrollmentId, expiring.ClaimSecret).Value.OwnerBackendUserId, identity, "expired exchange preserves the authenticated claim owner representation");
         Equal(Transactions.Run(context, () => EnrollmentRequests.Expire(ports)).IsSuccess, true, "pending expiry is transactional");
         Equal(EnrollmentQueries.Find(context, expiring.EnrollmentId).Value!.Status, "expired", "expiry stored as canonical state");
         Equal(EnrollmentAdmissionQueries.Name(context, expiredName).Value is null, true, "expiry releases name reservation");

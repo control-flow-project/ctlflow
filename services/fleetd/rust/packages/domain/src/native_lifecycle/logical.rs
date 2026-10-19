@@ -11,6 +11,12 @@ impl<
         self.owner.calls.fetch_add(1, Ordering::AcqRel);
         Operation(&self.owner.calls)
     }
+    fn context(&self) -> String {
+        self.room
+            .as_deref()
+            .map(crossfire_kernel::history_context::for_room)
+            .unwrap_or_else(|| self.owner.primary().to_owned())
+    }
     async fn select(
         &self,
         native: &A::Connection,
@@ -72,10 +78,7 @@ impl<
         priority: Option<InputPriority>,
     ) -> Result<()> {
         let _call = self.entered();
-        self.owner.touch(
-            message,
-            self.room.as_deref().unwrap_or_else(|| self.owner.primary()),
-        )?;
+        self.owner.touch(message, &self.context())?;
         if stop.is_cancelled() {
             return Err(unavailable("Native input cancelled before admission"));
         }
@@ -91,10 +94,7 @@ impl<
         self.owner
             .tracker
             .capture_input(crate::model::InterruptedContext {
-                context: self
-                    .room
-                    .clone()
-                    .unwrap_or_else(|| self.owner.primary().to_owned()),
+                context: self.context(),
                 session_id: self.session.clone(),
             })?;
         selected
@@ -127,10 +127,7 @@ impl<
     }
     async fn recover(&self, text: &str, message: &str, stop: CancellationToken) -> Result<bool> {
         let _call = self.entered();
-        self.owner.touch(
-            message,
-            self.room.as_deref().unwrap_or_else(|| self.owner.primary()),
-        )?;
+        self.owner.touch(message, &self.context())?;
         let native = self.owner.ensure(None).await?;
         let selected = self.select(native.as_ref(), None).await?;
         let received = selected
@@ -152,16 +149,14 @@ impl<
         if messages.is_empty() {
             return Ok(());
         }
-        let native = self
-            .owner
-            .state
-            .lock()
-            .map_err(|_| ownership())?
-            .native
-            .clone()
-            .ok_or_else(|| {
-                unavailable("Exact receipt acknowledgment is awaiting native recovery")
-            })?;
+        let native = {
+            let state = self.owner.state.lock().map_err(|_| ownership())?;
+            state
+                .native
+                .clone()
+                .filter(|native| state.phase == Phase::Running && !native.lifetime().is_cancelled())
+        }
+        .ok_or_else(|| unavailable("Exact receipt acknowledgment is awaiting native recovery"))?;
         native.acknowledge(messages)?;
         let mut state = self.owner.state.lock().map_err(|_| ownership())?;
         for message in messages {
@@ -174,10 +169,21 @@ impl<
         let native = self.owner.ensure(admission).await?;
         let selected = native.conversation(room, admission).await?;
         let contexts = self.owner.contexts().await?;
+        let history = contexts
+            .iter()
+            .find(|value| value.session_id == selected.session_id())
+            .ok_or_else(|| {
+                Failure::new(
+                    ErrorCode::Conflict,
+                    "The selected room has no saved native history",
+                )
+            })?;
+        let selected_room =
+            crossfire_kernel::history_context::room(&history.context).map(str::to_owned);
         self.owner.state.lock().map_err(|_| ownership())?.contexts = contexts;
         Ok(Self {
             owner: self.owner.clone(),
-            room: Some(room.to_owned()),
+            room: selected_room,
             session: selected.session_id().to_owned(),
         })
     }
@@ -235,6 +241,12 @@ impl<
     T: Clock + Send + Sync,
 > OwnedConnection for Logical<A, H, W, T>
 {
+    async fn provider(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Result<crossfire_agent_core::owned_runtime::ProviderState> {
+        Ok(self.owner.diagnostics(cancellation).await?.provider)
+    }
     async fn activity(&self) -> Result<NativeActivity> {
         let (native, phase) = {
             let state = self.owner.state.lock().map_err(|_| ownership())?;

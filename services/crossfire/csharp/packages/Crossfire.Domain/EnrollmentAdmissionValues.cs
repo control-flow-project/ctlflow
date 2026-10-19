@@ -8,7 +8,7 @@ public sealed record RequestedFleetPolicy(string WakeMode, IReadOnlyList<WakeSel
 public sealed record EnrollmentPolicy(string InstanceKey, RequestedFleetPolicy Policy);
 public sealed record VerifiedRoster(string OwnerId, long OwnerRevision, IReadOnlyList<EnrollmentExisting> Existing, IReadOnlyList<EnrollmentPolicy> Policies);
 public sealed record EnrollmentCapacity(InstancePolicy Policy, long OwnerLimit, long OwnerCount, long InstanceCount, long Remaining);
-public sealed record EnrollmentAdmissionPorts(FleetPorts Fleet, Func<string, Result<Principal?>> PrincipalByMatrixId,
+public sealed record EnrollmentAdmissionPorts(FleetPorts Fleet, Func<string, Result<Principal?>> PrincipalByBackendUserId,
     Func<string, Result<MemberView?>> Member, Func<string, string, Result<FleetRecord?>> ByKey,
     Func<string, string, string, Result<FleetBinding?>> Binding, Func<string, Result<AgentName?>> Name,
     Func<string, Result<string?>> AgentToken, Func<Result<InstancePolicy?>> Policy,
@@ -24,7 +24,7 @@ public static class EnrollmentValidation
 
     public static Result<Unit> Roster(EnrollmentRoster roster)
     {
-        if (!IdentitySyntax.MatrixUser(roster.OwnerMatrixId) || !IdentitySyntax.Name(roster.FleetKey) || roster.Instances.Count is < 1 or > 100
+        if (!IdentitySyntax.BackendIdentifier(roster.OwnerBackendUserId) || !IdentitySyntax.Name(roster.FleetKey) || roster.Instances.Count is < 1 or > 100
             || roster.Instances.Any(value => !IdentitySyntax.Name(value.InstanceKey) || !IdentitySyntax.Name(value.Name))
             || roster.Instances.Select(value => value.InstanceKey).Distinct(StringComparer.Ordinal).Count() != roster.Instances.Count
             || roster.Instances.Select(value => value.Name).Distinct(StringComparer.Ordinal).Count() != roster.Instances.Count)
@@ -35,10 +35,10 @@ public static class EnrollmentValidation
         {
             var policy = instance.CoordinationPolicy;
             if (policy.WakeMode is not ("humans" or "everyone" or "selected") || policy.Senders.Count > 2000
-                || policy.Senders.Select(value => value.MatrixUserId).Distinct(StringComparer.Ordinal).Count() != policy.Senders.Count
-                || policy.WakeMode == "everyone" && policy.Senders.Count != 0 || policy.Senders.Any(value => !IdentitySyntax.MatrixUser(value.MatrixUserId))
+                || policy.Senders.Select(value => value.BackendUserId).Distinct(StringComparer.Ordinal).Count() != policy.Senders.Count
+                || policy.WakeMode == "everyone" && policy.Senders.Count != 0 || policy.Senders.Any(value => !IdentitySyntax.BackendIdentifier(value.BackendUserId))
                 || policy.Permissions.Count > 1 || policy.Permissions.Any(value => value != "room.agent.invite"))
-                return Results.Fail<Unit>("invalid", "Supply a valid wake mode, unique selected Matrix identities and supported room permissions");
+                return Results.Fail<Unit>("invalid", "Supply a valid wake mode, unique selected Messaging identities and supported room permissions");
         }
         return Results.Done();
     }

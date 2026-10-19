@@ -6,7 +6,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { API } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { listen, type ListenerOptions } from '@ctlflow/crossfire-adapter-crossfire/listener';
 import { fakeCodex, inputReceipt, matrixFixture, message, ROOM, SELF, THREAD, until } from './test-support/listener.js';
@@ -32,7 +32,7 @@ test('listener long-polls silently, wakes promptly, drains backlog, and checkpoi
   const ids = inputs.flatMap(request => {
     const input = request.params!.input as { text: string }[];
     const batch = JSON.parse(input[0]!.text.slice(input[0]!.text.indexOf('\n') + 1));
-    return batch.events.map((event: { event_id: string }) => event.event_id);
+    return batch.events.map((event: { eventId: string }) => event.eventId);
   });
   assert.deepEqual(ids, Array.from({ length: 7 }, (_, index) => '$' + index));
   const polls = matrix.requests.filter(request => request.path === API + '/sync');

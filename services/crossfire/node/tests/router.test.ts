@@ -1,3 +1,4 @@
+import { matrixPublicRoutes } from '@ctlflow/crossfire-adapter-matrix/web/router';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -23,7 +24,7 @@ async function fixture(scope: TestContext) {
   symlinkSync(join(directory, 'outside.html'), join(element, 'escape.html'));
   symlinkSync(directory, join(element, 'escape'));
   const routes = { element, web, publicOrigin: 'http://127.0.0.1', matrixOrigin: 'http://127.0.0.1', service: createServer() };
-  const server = publicRouter(routes);
+  const server = publicRouter({ get publicOrigin() { return routes.publicOrigin; }, service: routes.service, web: routes.web, backend: matrixPublicRoutes(routes) });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const address = server.address();
@@ -47,7 +48,7 @@ test('only exact current native registration and fallback paths reach Crossfire;
   const service = createServer((request, response) => { management.push(request.url!); response.end('management'); });
   const matrixOrigin = await listen(createServer((request, response) => { matrix.push(request.url!); response.end('matrix'); }));
   const routes = { publicOrigin: 'http://127.0.0.1', service, matrixOrigin, web: '/', element: '/' };
-  const router = publicRouter(routes); routes.publicOrigin = await listen(router);
+  const router = publicRouter({ get publicOrigin() { return routes.publicOrigin; }, service: routes.service, web: routes.web, backend: matrixPublicRoutes(routes) }); routes.publicOrigin = await listen(router);
   const origin = new URL(routes.publicOrigin);
   const request = (path: string) => new Promise<{ status: number; cache: string | undefined }>((resolve, reject) => {
     const operation = send({ hostname: origin.hostname, port: origin.port, path, method: 'POST' }, response => {

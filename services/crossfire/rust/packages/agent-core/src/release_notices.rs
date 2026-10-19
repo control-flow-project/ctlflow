@@ -28,7 +28,7 @@ impl<S: LocalState> Notices<S> {
         session: &str,
     ) -> Result<Self> {
         check::text(&json!(session), 1, 200)?;
-        check::matrix_user_id(&json!(owner))?;
+        check::backend_user_id(&json!(owner))?;
         release::identity(installed)?;
         let result = Self {
             storage,

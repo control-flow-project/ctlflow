@@ -9,8 +9,13 @@ import { bind, reply, paged, actor } from '../bind.js';
 import * as view from '../representation/instance.js';
 export function instanceRoutes(instance: string, startedAt: number, loggingError: () => string | null) {
   return [
+    bind(operations.messagingBackend, context => success({ data: context.services.messaging.describe(context.services.instance.publicOrigin) })),
+    bind(operations.authenticateBackend, async (context, _params, _query, input) => {
+      const result = await context.services.messaging.authenticate(input.username, input.password);
+      return result.ok ? success({ data: { accessToken: result.value } }) : result;
+    }),
     bind(operations.principals, (context, _params, query) => paged(discoverPrincipals(context.services, actor(context), query))),
-    bind(operations.resolvePrincipals, (context, _params, _query, input) => reply(resolvePrincipals(context.services, actor(context), input.matrixUserIds))),
+    bind(operations.resolvePrincipals, (context, _params, _query, input) => reply(resolvePrincipals(context.services, actor(context), input.backendUserIds))),
     bind(operations.roles, context => reply(readRoles(context.services, actor(context)))),
     bind(operations.permissions, context => reply(readPermissions(context.services, actor(context)))),
     bind(operations.policy, context => reply(readPolicy(context.services, actor(context)), view.policy)),

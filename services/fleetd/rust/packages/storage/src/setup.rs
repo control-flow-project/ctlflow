@@ -81,7 +81,7 @@ impl Setup {
                     .ok_or_else(|| invalid("Invalid setup completion state"))?;
                 let server = check::text(&source["server"], 1, 2048)?.to_owned();
                 origin::parse(&server)?;
-                let owner = check::matrix_user_id(&source["owner"])?.to_owned();
+                let owner = check::backend_user_id(&source["owner"])?.to_owned();
                 let workspace = PathBuf::from(check::text(&source["workspace"], 1, 4096)?);
                 if !workspace.is_absolute() {
                     return Err(invalid("Invalid saved project workspace"));

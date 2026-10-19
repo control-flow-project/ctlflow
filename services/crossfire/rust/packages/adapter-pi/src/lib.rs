@@ -7,6 +7,7 @@ pub mod observation;
 pub mod options;
 pub mod owned;
 pub mod protocol;
+pub mod provider;
 pub mod questions;
 pub mod receipt;
 pub mod state;

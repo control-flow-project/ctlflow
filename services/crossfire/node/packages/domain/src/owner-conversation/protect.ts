@@ -15,6 +15,6 @@ export function protectOwnerConversation(services: Dependencies, input: GrantCha
   const conversation = privateConversation(services, input.roomId);
   if (!conversation.ok) return conversation;
   if (conversation.value && (conversation.value.kind === 'management' || conversation.value.agentId !== input.agentId)) return failure('forbidden', 'Another agent cannot join a private owner DM');
-  return conversation.value && (input.accessMode !== 'reply' || input.powerLevel !== null || input.muted)
+  return conversation.value && (input.accessMode !== 'reply' || input.nativeAccess !== null || input.muted)
     ? failure('forbidden', 'Owner DMs always have read-and-reply access and cannot be muted or removed') : success(undefined);
 }

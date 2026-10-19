@@ -9,7 +9,7 @@ import { createResumeWork } from '@ctlflow/fleetd-storage/resume-work';
 import { continuationText, resumeInterruptedWork, type ResumeWorkStore } from '@ctlflow/fleetd-domain/resume-work';
 import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import type { RuntimeConnection } from '@ctlflow/crossfire-agent-core/runtime';
-import { failure, type Result } from '@ctlflow/crossfire-kernel/result';
+import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 
 function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.message); return result.value; }
 function fixture(scope: Parameters<typeof cleanup>[0]) {
@@ -17,8 +17,9 @@ function fixture(scope: Parameters<typeof cleanup>[0]) {
   cleanup(scope, () => rmSync(state, { recursive: true, force: true }));
   return { state, file: join(state, 'resume-work.json'), store: createResumeWork(state, () => 1000) };
 }
-function connection(sessionId: string, receipts: Set<string>, delivered: { sessionId: string; messageId: string; text: string }[]): RuntimeConnection & Pick<OwnedRuntimeConnection, 'turnControl' | 'activity'> {
+function connection(sessionId: string, receipts: Set<string>, delivered: { sessionId: string; messageId: string; text: string }[]): RuntimeConnection & Pick<OwnedRuntimeConnection, 'turnControl' | 'activity' | 'provider'> {
   return { sessionId, signal: new AbortController().signal, approval: 'listener',
+    provider: async () => success('unknown'),
     deliver: async (text, messageId) => { receipts.add(messageId); delivered.push({ sessionId, messageId, text }); },
     recover: async (_text, messageId) => receipts.has(messageId), acknowledge: ids => { for (const id of ids) receipts.delete(id); },
     settle: async () => false, inspect: async () => ({ busy: false }), activity: async () => ({ busy: false, contexts: [] }), close: async () => {},
@@ -26,7 +27,7 @@ function connection(sessionId: string, receipts: Set<string>, delivered: { sessi
 }
 
 test('every continuation asks for current AGENTS.md instructions before resuming unfinished work', () => {
-  for (const context of ['shared', 'control', '!room:test']) {
+  for (const context of ['shared', 'control', 'room/control']) {
     const text = continuationText({ context, sessionId: randomUUID(), messageId: randomUUID(), checkpointedAt: 1000 });
     const reminder = 'Before continuing, re-read the applicable AGENTS.md files and follow their current instructions.';
     assert(text.includes(reminder));
@@ -57,7 +58,7 @@ test('malformed, shared, oversized and dangling-symlink work checkpoints fail cl
 
 test('completed-context clearing is atomic, identity-qualified and cannot erase another room', scope => {
   const { file, store } = fixture(scope);
-  const contexts = ['!active:test', '!completed:test'].map(context => ({ context, sessionId: randomUUID() }));
+  const contexts = ['room/control', 'room/completed'].map(context => ({ context, sessionId: randomUUID() }));
   value(store.capture(contexts)); const before = readFileSync(file);
   assert.equal(store.clear([{ ...contexts[1]!, sessionId: randomUUID() }]).ok, false);
   assert.equal(store.clear([contexts[1]!, contexts[1]!]).ok, false);
@@ -70,16 +71,16 @@ test('completed-context clearing is atomic, identity-qualified and cannot erase 
 
 test('room continuations retain attribution, never approve decisions and touch only their exact saved native histories', async scope => {
   const { store } = fixture(scope), receipts = new Set<string>(), delivered: { sessionId: string; messageId: string; text: string }[] = [];
-  const contexts: SavedRuntimeContext[] = ['control', '!room-a:test', '!room-b:test'].map(context => ({ context, sessionId: randomUUID(), runtime: 'fixture', workspace: '/fixture' }));
+  const contexts: SavedRuntimeContext[] = ['control', 'room/control', 'room/room-b'].map(context => ({ context, sessionId: randomUUID(), runtime: 'fixture', workspace: '/fixture' }));
   const targets = new Map(contexts.map(context => [context.context, connection(context.sessionId, receipts, delivered)]));
   const primary = targets.get('control')!;
   const owned: OwnedRuntimeConnection = { ...primary, attachment: { runtime: 'fixture', sessionId: primary.sessionId, workspace: '/fixture', connection: {} },
-    attachments: async () => [], conversation: async context => targets.get(context) ?? assert.fail('Cannot create a new history') };
+    attachments: async () => [], conversation: async room => targets.get('room/' + room) ?? assert.fail('Cannot create a new history') };
   value(store.capture(contexts.slice(1).map(({ context, sessionId }) => ({ context, sessionId })))); await resumeInterruptedWork(owned, 'control', contexts, store);
   assert.deepEqual(delivered.map(item => item.sessionId), contexts.slice(1).map(item => item.sessionId));
   assert(delivered.every(item => item.text.includes('re-read the applicable AGENTS.md files')));
   assert(delivered.every(item => item.text.includes('not a new assignment') && item.text.includes('No pending question or permission has been answered or approved')));
-  assert(delivered[0]!.text.includes('!room-a:test') && !delivered[0]!.text.includes('!room-b:test'));
+  assert(delivered[0]!.text.includes('saved room history control.') && !delivered[0]!.text.includes('saved room history room-b.'));
   assert.equal(receipts.size, 0); assert.equal(value(store.read()).length, 2);
   assert(value(store.read()).every(work => delivered.some(item => item.messageId === work.messageId)), 'Every unfinished context retains the identity of its submitted reminder');
 });
@@ -107,7 +108,7 @@ test('all saved context identities are validated before any continuation or conv
   const primary = connection(sessionId, new Set(), delivered);
   const owned: OwnedRuntimeConnection = { ...primary, attachment: { runtime: 'fixture', sessionId, workspace: '/fixture', connection: {} },
     attachments: async () => [], conversation: async () => assert.fail('No new history may be created') };
-  value(store.capture([{ context: 'shared', sessionId }, { context: '!missing:test', sessionId: randomUUID() }]));
+  value(store.capture([{ context: 'shared', sessionId }, { context: 'room/missing', sessionId: randomUUID() }]));
   await assert.rejects(resumeInterruptedWork(owned, 'shared', [{ context: 'shared', sessionId, runtime: 'fixture', workspace: '/fixture' }], store), /different native history/);
   assert.equal(delivered.length, 0); assert.equal(value(store.read()).length, 2);
   assert(continuationText(value(store.read())[0]!).includes('Do not infer a destination room'));

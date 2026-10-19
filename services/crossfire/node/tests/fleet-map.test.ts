@@ -21,12 +21,12 @@ import { httpFixture } from './support/http.js';
 
 async function preparedMap(scope: Parameters<typeof applicationFixture>[0]) {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
-  const { fleet, instances, ready, controller } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
+  const { fleet, instances, ready, controller } = await mapFleet(services, admin.actor, admin.member.principal.backendUserId);
   const contacted = instances.at(-1)!.agentId!;
   value(await connectOwnerConversation(services, { kind: 'agent', principalId: contacted }, contacted));
   const other = await fixture.member('alice'), specialist = await fixture.agent(other.actor, 'specialist');
   const rooms = [];
-  for (const name of ['Credit review', 'Covenant review', 'Risk review', 'Source documents', 'Unavailable name']) rooms.push(value(await fixture.native.createRoom(admin.member.principal.matrixUserId, name)));
+  for (const name of ['Credit review', 'Covenant review', 'Risk review', 'Source documents', 'Unavailable name']) rooms.push(value(await fixture.native.createRoom(admin.member.principal.backendUserId, name)));
   for (let index = 0; index < instances.length; index++) {
     const id = instances[index]!.agentId!, agent = value(services.directory.agent(id))!;
     const mode = WAKE_POLICIES[index % 6 === 4 ? 1 : index % 6 === 5 ? 2 : 0]!;
@@ -38,13 +38,13 @@ async function preparedMap(scope: Parameters<typeof applicationFixture>[0]) {
     const roomId = rooms[index % rooms.length]!.roomId, current = value(services.directory.agent(id))!;
     value(await changeRoomGrant(services, admin.actor, { agentId: id, roomId, expectedRevision: current.principal.revision,
       expectedGeneration: null, accessMode: index % 3 === 0 ? 'read' : index % 3 === 1 ? 'reply' : 'custom',
-      powerLevel: index % 3 === 2 ? 25 : null, muted: index % 4 === 0 }, randomUUID()));
+      nativeAccess: index % 3 === 2 ? { powerLevel: 25 } : null, muted: index % 4 === 0 }, randomUUID()));
     if (index % 3 !== 0) value(await reconcileRoomGrant(services, id, roomId));
   }
   const failed = value(services.repositories.roomGrantApplication.find({ agentId: instances[1]!.agentId!, roomId: rooms[1]!.roomId }))!;
   value(services.repositories.roomGrantApplication.update({ ...failed, errorCode: 'native', errorMessage: 'Observed native failure' }));
   const removed = value(services.repositories.agentRoomGrant.find({ agentId: instances[2]!.agentId!, roomId: rooms[2]!.roomId }))!;
-  value(services.repositories.agentRoomGrant.update({ ...removed, accessMode: 'none', powerLevel: null, revision: removed.revision + 1, accessRevision: removed.accessRevision + 1 }));
+  value(services.repositories.agentRoomGrant.update({ ...removed, accessMode: 'none', nativeAccess: null, revision: removed.revision + 1, accessRevision: removed.accessRevision + 1 }));
   const inactive = value(services.repositories.principal.find({ id: specialist.id }))!;
   value(services.repositories.principal.update({ ...inactive, status: 'suspended' }));
   fixture.native.rooms.delete(rooms[4]!.roomId);
@@ -58,9 +58,9 @@ test('fleet map is a complete, scoped, batched projection with canonical wake el
     collection: { ...services.collection, roomGrants() { assert.fail('No per-agent grant query'); }, wakeSenders() { assert.fail('No per-agent wake query'); },
       wakeSendersForAgents(ids: string[]) { batchWake++; return services.collection.wakeSendersForAgents(ids); } },
     directory: { ...services.directory, activePrincipals() { activeReads++; return services.directory.activePrincipals(); } },
-    matrix: { ...services.matrix, async room(matrixId: string, roomId: string) {
+    messaging: { ...services.messaging, async room(matrixId: string, roomId: string) {
       nativeActive++; maximumNative = Math.max(maximumNative, nativeActive);
-      try { await yieldLoop(); return await services.matrix.room(matrixId, roomId); } finally { nativeActive--; }
+      try { await yieldLoop(); return await services.messaging.room(matrixId, roomId); } finally { nativeActive--; }
     } } };
   const snapshot = value(await readFleetMap(dependencies, admin.actor, fleet.id));
   const map = value(mapSchema(mapRepresentation(snapshot)));
@@ -71,7 +71,7 @@ test('fleet map is a complete, scoped, batched projection with canonical wake el
   for (const agent of snapshot.agents) {
     const source = snapshot.sources.find(entry => entry.sourceId === agent.sourceId)!;
     const matrixIds = snapshot.principals.filter(principal => source.eligiblePrincipalIds.includes(principal.principalId) && principal.principalId !== agent.record.principal.id)
-      .map(principal => principal.matrixUserId).sort();
+      .map(principal => principal.backendUserId).sort();
     assert.deepEqual(matrixIds, value(resolveWakePolicy(services, agent.record)).senders);
   }
   const selected = map.sources.find(source => source.mode === 'selected' && source.senders.some(sender => sender.principalId === specialist.id))!;
@@ -94,13 +94,13 @@ test('fleet map is a complete, scoped, batched projection with canonical wake el
   assert(!mapSchema({ ...map, connections: [{ ...map.connections[0]!, roomId: '!not-in-this-map' }] }).ok);
   assert(!mapSchema({ ...map, secrets: 'not-allowed' }).ok);
   const credit = map.rooms.find(room => room.name === 'Credit review')!;
-  const ownerMembership = fixture.native.rooms.get(credit.roomId)!.members.get(admin.member.principal.matrixUserId)!;
+  const ownerMembership = fixture.native.rooms.get(credit.roomId)!.members.get(admin.member.principal.backendUserId)!;
   ownerMembership.membership = 'leave';
   const pending = map.connections.find(connection => connection.roomId === credit.roomId && connection.application?.membership !== 'join')!;
-  const observed = value(await readFleetMap({ ...services, matrix: { ...services.matrix, async room(matrixId, roomId) {
-    if (roomId === credit.roomId) assert.notEqual(matrixId, map.agents.find(agent => agent.agentId === pending.agentId)!.matrixUserId,
+  const observed = value(await readFleetMap({ ...services, messaging: { ...services.messaging, async room(matrixId, roomId) {
+    if (roomId === credit.roomId) assert.notEqual(matrixId, map.agents.find(agent => agent.agentId === pending.agentId)!.backendUserId,
       'Use a known joined agent, not a pending observer, when the owner is absent');
-    return services.matrix.room(matrixId, roomId);
+    return services.messaging.room(matrixId, roomId);
   } } }, admin.actor, fleet.id));
   assert.equal(observed.rooms.find(room => room.roomId === credit.roomId)!.name, 'Credit review');
 });
@@ -115,8 +115,8 @@ test('fleet map authorization is rechecked after native reads, and oversized/inc
   } } }, admin.actor, fleet.id);
   assert(!incomplete.ok); assert.equal(incomplete.error.code, 'unavailable');
   let revoked = false;
-  const changed = await readFleetMap({ ...services, matrix: { ...services.matrix, async room(matrixId, roomId) {
-    const observed = await services.matrix.room(matrixId, roomId);
+  const changed = await readFleetMap({ ...services, messaging: { ...services.messaging, async room(matrixId, roomId) {
+    const observed = await services.messaging.room(matrixId, roomId);
     if (!revoked) { revoked = true; value(services.repositories.principal.update({ ...admin.member.principal, status: 'suspended' })); }
     return observed;
   } } }, admin.actor, fleet.id);

@@ -19,15 +19,16 @@ public static class ServerAcceptance
 {
     public static async Task Verify(AccountAuthority matrix, string database, string releaseDirectory, string owner, string ownerToken, string serverName, string matrixOrigin)
     {
-        var configuration = new ServerConfiguration("fixture", serverName, "http://127.0.0.1", "http://localhost:8082", matrixOrigin, owner,
-            "fixture-jwt", "fixture-registration", new(1073741824, 134217728, 4096, 128, 8), 7);
+        var backend = new BackendConfiguration("matrix", WireJson.Object(writer => { writer.WriteString("serverName", serverName); writer.WriteString("origin", matrixOrigin); writer.WriteString("jwtSecret", new string('j', 43)); writer.WriteString("registrationSecret", new string('r', 43)); }));
+        var configuration = new ServerConfiguration("fixture", "http://127.0.0.1", "http://localhost:8082", backend, owner, new(1073741824, 134217728, 4096, 128, 8), 7);
         var release = Releases.Load(releaseDirectory);
         using var reports = new PublicationStore(database + ".publications", configuration.PublicationBudget.Uploads, path => new StateLock(path));
         using var diagnostics = new DiagnosticStore(database + ".logs", configuration.LoggingRetentionDays, Identity.Now);
         using var storage = new ManagementStorage(database);
-        var state = new ApiState(configuration, storage, release, matrix, reports, diagnostics, Identity.Now(), Identity.Now);
+        var state = new ApiState(configuration, storage, release, matrix.Ports(), matrix.RoomOperation, reports, diagnostics, Identity.Now(), Identity.Now);
         var wakeCount = 0;
-        await using var application = ApiApplication.Build(state, "http://127.0.0.1:0", () => wakeCount++);
+        await using var application = ApiApplication.Build(state, "http://127.0.0.1:0", () => wakeCount++, (admission, changed) =>
+        { var handler = NativeWeb.Create(MessagingComposition.Web(state, new(matrixOrigin, serverName, new string('j', 43), new string('r', 43), matrix.Ports().ServiceUserId())), WireJson.Object(_ => { }), admission, changed); return (http, path, request) => handler(http, path, request); });
         await application.StartAsync();
         await using var contentApplication = ContentApplication.Build(state, "http://127.0.0.1:0");
         await contentApplication.StartAsync();
@@ -85,7 +86,7 @@ public static class ServerAcceptance
         await Request("GET", "/api/members", "members");
         await Request("GET", "/api/members/" + memberId, "member");
         await Request("GET", "/api/principals", "principals");
-        var resolved = await Request("POST", "/api/principal-resolutions", "resolvePrincipals", JsonValues.Object(writer => JsonValues.Strings(writer, "matrixUserIds", [owner, "@unknown:" + serverName])));
+        var resolved = await Request("POST", "/api/principal-resolutions", "resolvePrincipals", JsonValues.Object(writer => JsonValues.Strings(writer, "backendUserIds", [owner, "@unknown:" + serverName])));
         Equal(resolved[1].GetProperty("kind").GetString(), "unknown", "unknown directory identities remain unknown, never inferred from a label");
         await Request("GET", "/api/roles", "roles");
         await Request("GET", "/api/permissions", "permissions");
@@ -108,10 +109,10 @@ public static class ServerAcceptance
         var roster = JsonValues.Object(writer =>
         {
             writer.WriteStartObject("controller"); writer.WriteString("name", "HTTP controller"); writer.WriteEndObject();
-            writer.WriteString("ownerMatrixId", owner); writer.WriteString("fleetKey", "http-fleet"); writer.WriteStartArray("instances");
+            writer.WriteString("ownerBackendUserId", owner); writer.WriteString("fleetKey", "http-fleet"); writer.WriteStartArray("instances");
             writer.WriteStartObject(); writer.WriteString("instanceKey", "http-specialist"); writer.WriteString("name", "http-specialist");
             writer.WriteStartObject("coordinationPolicy"); writer.WriteString("wakeMode", "selected"); writer.WriteStartArray("senders");
-            writer.WriteStartObject(); writer.WriteString("matrixUserId", owner); writer.WriteBoolean("includeAgents", true); writer.WriteEndObject(); writer.WriteEndArray();
+            writer.WriteStartObject(); writer.WriteString("backendUserId", owner); writer.WriteBoolean("includeAgents", true); writer.WriteEndObject(); writer.WriteEndArray();
             JsonValues.Strings(writer, "permissions", ["room.agent.invite"]); writer.WriteEndObject(); writer.WriteEndObject(); writer.WriteEndArray();
         });
         await Request("POST", "/api/enrollments/preflight", "preflight", roster);
@@ -168,7 +169,7 @@ public static class ServerAcceptance
         agent = await Request("GET", "/api/agents/" + agentId, "agent");
         var grant = await Request("PUT", grantPath, "setGrant", JsonValues.Object(writer =>
         {
-            writer.WriteNumber("expectedRevision", agent.GetProperty("revision").GetInt64()); writer.WriteNull("expectedGeneration"); writer.WriteString("accessMode", "reply"); writer.WriteNull("powerLevel"); writer.WriteBoolean("muted", false);
+            writer.WriteNumber("expectedRevision", agent.GetProperty("revision").GetInt64()); writer.WriteNull("expectedGeneration"); writer.WriteString("accessMode", "reply"); writer.WriteNull("nativeAccess"); writer.WriteBoolean("muted", false);
         }));
         await Request("GET", "/api/agents/" + agentId + "/room-grants", "grants");
         var filteredGrants = await Request("GET", "/api/agents/" + agentId + "/room-grants?roomIds=%5B%5D", "grants");
@@ -186,14 +187,14 @@ public static class ServerAcceptance
         grant = await Request("DELETE", grantPath, "removeGrant", JsonValues.Object(writer =>
         { writer.WriteNumber("expectedRevision", grant.GetProperty("revision").GetInt64()); writer.WriteString("expectedGeneration", grant.GetProperty("grant").GetProperty("generation").GetString()); }));
         Equal(grant.GetProperty("permissions").GetArrayLength(), 0, "removal revokes membership-generation-scoped permissions");
-        var invited = await MatrixJson.Ok(client, nativeOwner, "POST", MatrixJson.Api + "/rooms/" + MatrixJson.Segment(roomId) + "/invite", JsonValues.Object(writer => writer.WriteString("user_id", exchanged.GetProperty("instances")[0].GetProperty("account").GetProperty("matrixUserId").GetString())));
+        var invited = await MatrixJson.Ok(client, nativeOwner, "POST", MatrixJson.Api + "/rooms/" + MatrixJson.Segment(roomId) + "/invite", JsonValues.Object(writer => writer.WriteString("user_id", exchanged.GetProperty("instances")[0].GetProperty("account").GetProperty("userId").GetString())));
         Equal(invited.IsSuccess, true, "HTTP acceptance fixture uses an actual native invitation");
         var accepted = await Request("POST", "/api/agents/" + agentId + "/room-invitation-acceptances", "acceptRoomInvitation", JsonValues.Object(writer => writer.WriteString("roomId", roomId)), bearer: agentToken, nativeOnly: true);
         Equal(accepted.GetProperty("accepted").GetBoolean(), true, "HTTP invitation acceptance confirms actual Matrix membership");
         var roomPlan = JsonValues.Object(writer =>
         {
             writer.WriteString("fleetId", fleetId); writer.WriteStartArray("agents"); writer.WriteStartObject(); writer.WriteString("instanceKey", "http-specialist"); writer.WriteStartArray("grants");
-            writer.WriteStartObject(); writer.WriteString("roomId", roomId); writer.WriteString("accessMode", "read"); writer.WriteNull("powerLevel"); writer.WriteBoolean("muted", false); writer.WriteEndObject(); writer.WriteEndArray(); writer.WriteEndObject(); writer.WriteEndArray();
+            writer.WriteStartObject(); writer.WriteString("roomId", roomId); writer.WriteString("accessMode", "read"); writer.WriteNull("nativeAccess"); writer.WriteBoolean("muted", false); writer.WriteEndObject(); writer.WriteEndArray(); writer.WriteEndObject(); writer.WriteEndArray();
         });
         var reviewedPlan = await Request("POST", "/api/room-grant-previews", "previewGrants", JsonValues.Object(writer => { writer.WritePropertyName("plan"); roomPlan.WriteTo(writer); }));
         var applyPlan = JsonValues.Object(writer =>
@@ -213,7 +214,7 @@ public static class ServerAcceptance
             else
             {
                 writer.WriteStartObject("statistics"); writer.WriteNumber("sequence", 1); writer.WriteNumber("startedAt", Identity.Now() - 1000); writer.WriteNumber("endedAt", Identity.Now()); writer.WriteNumber("dropped", 0);
-                writer.WriteStartArray("flows"); writer.WriteStartObject(); writer.WriteString("roomId", "!http-fixture:" + serverName); writer.WriteString("senderMatrixId", owner); writer.WriteString("messageType", "m.text");
+                writer.WriteStartArray("flows"); writer.WriteStartObject(); writer.WriteString("roomId", "!http-fixture:" + serverName); writer.WriteString("senderBackendUserId", owner); writer.WriteString("messageType", "m.text");
                 writer.WriteNumber("observed", 2); writer.WriteNumber("delivered", 2); writer.WriteNumber("contentBytes", 100); writer.WriteNumber("deliveredBytes", 100); writer.WriteNumber("attachmentBytes", 0); writer.WriteNumber("largestBytes", 70); writer.WriteEndObject(); writer.WriteEndArray();
                 writer.WriteStartArray("usage"); writer.WriteStartObject(); writer.WriteString("runtime", "codex"); writer.WriteString("sessionId", "http-native-history"); writer.WriteStartObject("tokens");
                 writer.WriteNumber("input", 100); writer.WriteNumber("cachedInput", 20); writer.WriteNull("cacheWriteInput"); writer.WriteNumber("output", 10); writer.WriteNumber("reasoningOutput", 5); writer.WriteNumber("total", 110);
@@ -224,14 +225,14 @@ public static class ServerAcceptance
         Equal(report.GetProperty("statisticsAccepted").GetBoolean(), true, "native traffic and usage summary is accepted independently of listener heartbeat");
         grant = await Request("GET", grantPath, "grant");
         grant = await Request("PUT", grantPath, "setGrant", JsonValues.Object(writer =>
-        { writer.WriteNumber("expectedRevision", grant.GetProperty("revision").GetInt64()); writer.WriteString("expectedGeneration", grant.GetProperty("grant").GetProperty("generation").GetString()); writer.WriteString("accessMode", "reply"); writer.WriteNull("powerLevel"); writer.WriteBoolean("muted", false); }));
+        { writer.WriteNumber("expectedRevision", grant.GetProperty("revision").GetInt64()); writer.WriteString("expectedGeneration", grant.GetProperty("grant").GetProperty("generation").GetString()); writer.WriteString("accessMode", "reply"); writer.WriteNull("nativeAccess"); writer.WriteBoolean("muted", false); }));
         await Request("PUT", "/api/agents/" + agentId + "/wake-policy", "changeWakePolicy", JsonValues.Object(writer =>
         { writer.WriteNumber("expectedRevision", grant.GetProperty("revision").GetInt64()); writer.WriteString("mode", "selected"); writer.WriteStartArray("senders"); writer.WriteEndArray(); }));
-        var agentMatrixId = exchanged.GetProperty("instances")[0].GetProperty("account").GetProperty("matrixUserId").GetString()!;
+        var agentBackendUserId = exchanged.GetProperty("instances")[0].GetProperty("account").GetProperty("userId").GetString()!;
         async Task<string> Mention()
         {
             var sent = await MatrixJson.Ok(client, nativeOwner, "PUT", MatrixJson.Api + "/rooms/" + MatrixJson.Segment(roomId) + "/send/m.room.message/" + Identity.Identifier(), JsonValues.Object(writer =>
-            { writer.WriteString("msgtype", "m.text"); writer.WriteString("body", "Please review this report."); writer.WriteStartObject("m.mentions"); JsonValues.Strings(writer, "user_ids", [agentMatrixId]); writer.WriteEndObject(); }));
+            { writer.WriteString("msgtype", "m.text"); writer.WriteString("body", "Please review this report."); writer.WriteStartObject("m.mentions"); JsonValues.Strings(writer, "user_ids", [agentBackendUserId]); writer.WriteEndObject(); }));
             Equal(sent.IsSuccess, true, "blocked-mention fixture uses actual Matrix metadata"); return sent.Value.GetProperty("event_id").GetString()!;
         }
         var mentionedEvent = await Mention(); var noticePath = "/api/agents/" + agentId + "/wake-notices/" + Uri.EscapeDataString(mentionedEvent); var noticeBody = JsonValues.Object(writer => writer.WriteString("roomId", roomId));
@@ -240,8 +241,14 @@ public static class ServerAcceptance
         using (var noticeDatabase = new CrossfireDbContext(DatabaseConnections.Options(database)))
         {
             var ports = WakeNoticeQueries.Ports(noticeDatabase, Identity.Now, matrix.Ports());
-            Equal((await WakeNotices.Publish(ports, agentId, mentionedEvent)).IsSuccess, true, "native blocked notice is published through the same Matrix authority");
-            Equal(ports.Find(agentId, mentionedEvent).Value?.Status, "sent", "native publication owns the sent state");
+            Equal((await WakeNotices.Publish(ports, agentId, roomId, mentionedEvent)).IsSuccess, true, "native blocked notice is published through the same Matrix authority");
+            Equal(ports.Find(agentId, roomId, mentionedEvent).Value?.Status, "sent", "native publication owns the sent state");
+            var original = ports.Find(agentId, roomId, mentionedEvent).Value!;
+            var sibling = original with { RoomId = roomId + "-other", Status = "pending", SentAt = null, NativeEventId = null, NextAttemptAt = Identity.Now() + 86400000 };
+            Equal(ports.Save(sibling, true).IsSuccess, true, "different rooms can use the same event ID");
+            Equal(ports.Find(agentId, sibling.RoomId, mentionedEvent).Value?.Status, "pending", "room-scoped lookup selects only the requested notice");
+            Equal(ports.Save(sibling with { Status = "denied", NextAttemptAt = null }, false).IsSuccess, true, "room-scoped update selects exactly one notice");
+            Equal(ports.Find(agentId, roomId, mentionedEvent).Value?.Status, "sent", "updating another room cannot change the original notice");
         }
         Equal((await Request("PUT", noticePath, "wakeNotice", noticeBody, bearer: agentToken, nativeOnly: true)).GetProperty("outcome").GetString(), "sent", "notice event retries retain the native outcome");
         var subsequent = await Mention();

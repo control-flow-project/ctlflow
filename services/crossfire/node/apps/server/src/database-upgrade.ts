@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto';
 import { privateDir } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { validateSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/validate-schema';
 import { databaseIdentity, databaseValid } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
-import { admitDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 
 export type UpgradePorts = {
   stopWriters(): Promise<void>;
@@ -33,9 +32,7 @@ export async function backupBeforeMigration(directory: string): Promise<string |
   const database = new Database(path, { readonly: true, fileMustExist: true });
   let backup: string | undefined;
   try {
-    admitDatabase(database);
-    if (databaseIdentity(database).application === 0) return null;
-    try { validateSchema(database); return null; } catch {}
+    validateSchema(database);
     verify(database);
     const parent = privateDir(join(directory, 'backups'));
     backup = join(parent, 'management-' + randomUUID() + '.sqlite');

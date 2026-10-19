@@ -11,11 +11,11 @@ public static class AuthenticationAcceptance
     public static async Task Verify(CrossfireDbContext context, Actor owner, Actor administrator, long now)
     {
         var fixture = FleetFixture.Create(context, owner, now);
-        var ports = new NativeActorPorts(AuthorizationQueries.Ports(context, () => now), id => MemberQueries.ByMatrixId(context, id), (token, cancellation) =>
+        var ports = new NativeActorPorts(AuthorizationQueries.Ports(context, () => now), id => MemberQueries.ByBackendUserId(context, id), (token, cancellation) =>
             ValueTask.FromResult(token switch
             {
-                "agent-token" => Result<string>.Success(((NativeAuthentication)fixture.Actor.Authentication!).MatrixUserId),
-                "human-token" => Result<string>.Success(((NativeAuthentication)owner.Authentication!).MatrixUserId),
+                "agent-token" => Result<string>.Success(((NativeAuthentication)fixture.Actor.Authentication!).BackendUserId),
+                "human-token" => Result<string>.Success(((NativeAuthentication)owner.Authentication!).BackendUserId),
                 "unregistered-token" => Result<string>.Success("@unknown:example.test"),
                 _ => Results.Fail<string>("unauthorized", "Invalid native identity")
             }));

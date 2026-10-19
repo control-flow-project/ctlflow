@@ -1,13 +1,14 @@
 import { createClient, type ClientOptions } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { failure } from '@ctlflow/crossfire-kernel/result';
+import type { JsonObject } from '@ctlflow/crossfire-kernel/json';
 
 export function roomAccess(options: ClientOptions) {
   const client = createClient(options);
   return {
     directory: (search: string, page: number, pageSize: number) => client.call(operations.principals, {}, {}, new URLSearchParams({ kind: 'agent', search, page: String(page), pageSize: String(pageSize) })),
     read: (agentId: string, roomId: string) => client.call(operations.grant, { agentId, roomId }, {}),
-    async change(agentId: string, roomId: string, intent: { accessMode: 'read' | 'reply' | 'custom'; powerLevel: number | null } | null) {
+    async change(agentId: string, roomId: string, intent: { accessMode: 'read' | 'reply' | 'custom'; nativeAccess: JsonObject | null } | null) {
       const current = await client.call(operations.grant, { agentId, roomId }, {});
       if (!current.ok) return current;
       if (!current.value.data.allowedActions.includes(intent ? 'set' : 'remove')) return failure('forbidden', 'This agent lacks authority for that room operation');

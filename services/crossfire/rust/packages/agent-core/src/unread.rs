@@ -1,15 +1,18 @@
+use crate::history_resources::HISTORY_BYTES;
 use crate::{
     chat::{self, Artifacts},
     events::{self, Event, invalid},
     local_state::LocalState,
-    matrix::{HISTORY_BYTES, Matrix},
     profile::Settings,
-    receive_pages::{self, IMPORTANT, Page},
+    receive_pages,
     receive_state::{self, Batch, Cursors},
+};
+use crossfire_domain::messaging_client::MessagingClient;
+use crossfire_domain::messaging_client::{
+    Direction, EventType, MessageEvent, MessagePage, MessagePageRequest,
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use tokio_util::sync::CancellationToken;
 
@@ -18,7 +21,7 @@ use tokio_util::sync::CancellationToken;
 pub struct HistoryEnd {
     pub cursor: String,
     #[serde(deserialize_with = "crossfire_kernel::data::required_option")]
-    pub event: Option<Value>,
+    pub event: Option<MessageEvent>,
 }
 pub struct Window<'a> {
     pub cursors: &'a Cursors,
@@ -33,23 +36,17 @@ pub struct Options<'a> {
     pub allowed: &'a BTreeSet<String>,
     pub window: Option<Window<'a>>,
 }
-fn collect(values: Vec<Value>, room: &str, messages: &mut Vec<Event>) -> Result<()> {
+fn collect(values: Vec<MessageEvent>, room: &str, messages: &mut Vec<Event>) -> Result<()> {
     for value in values {
-        if !value
-            .get("type")
-            .and_then(Value::as_str)
-            .is_some_and(|kind| IMPORTANT.contains(&kind))
-            || events::notice(&value)
-        {
-            continue;
+        if value.event_type != EventType::Other && !events::notice(&value) {
+            messages.push(events::take(value, room)?);
         }
-        messages.push(events::take(value, room)?);
     }
     Ok(())
 }
 pub async fn read(
     storage: &impl LocalState,
-    matrix: &impl Matrix,
+    messaging: &impl MessagingClient,
     settings: &Settings,
     artifacts: &impl Artifacts,
     options: Options<'_>,
@@ -61,7 +58,7 @@ pub async fn read(
     {
         return Err(invalid("Invalid receive budget"));
     }
-    let joined = receive_pages::joined(matrix, stop.clone()).await?;
+    let joined = receive_pages::joined(messaging, stop.clone()).await?;
     let selected: Vec<_> = options
         .selector
         .map_or_else(|| joined.clone(), |room| BTreeSet::from([room.to_owned()]))
@@ -108,29 +105,31 @@ pub async fn read(
         let fresh = !batch.cursors.contains_key(room);
         let head = if fresh {
             let head = match end {
-                Some(end) => Page {
-                    chunk: end.event.clone().into_iter().collect(),
+                Some(end) => MessagePage {
+                    events: end.event.clone().into_iter().collect(),
                     start: None,
                     end: Some(end.cursor.clone()),
                     requested_limit: 1,
                 },
                 None => {
                     receive_pages::history(
-                        matrix,
+                        messaging,
                         room,
-                        &BTreeMap::from([("dir".to_owned(), "b".to_owned())]),
-                        1,
+                        &MessagePageRequest {
+                            direction: Direction::Backward,
+                            limit: 1,
+                            from: None,
+                            to: None,
+                            filter: None,
+                        },
                         stop.clone(),
                     )
                     .await?
                 }
             };
             if head.end.is_none() && boundary.is_none() {
-                let sync = receive_pages::sync(matrix, None, 0, stop.clone()).await?;
-                boundary = sync
-                    .get("next_batch")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned);
+                let sync = receive_pages::sync(messaging, None, 0, stop.clone()).await?;
+                boundary = Some(sync.cursor);
             }
             Some(head)
         } else {
@@ -150,10 +149,10 @@ pub async fn read(
                 .ok_or_else(|| invalid("Missing retained room position"))?
         };
         let mut from = start.clone();
-        let mut finished = head.as_ref().is_some_and(|head| head.chunk.is_empty());
+        let mut finished = head.as_ref().is_some_and(|head| head.events.is_empty());
         let mut messages = Vec::new();
         if let Some(head) = head {
-            collect(head.chunk, room, &mut messages)?;
+            collect(head.events, room, &mut messages)?;
             if chat::acquisition_bytes(&messages, settings)? > options.maximum {
                 messages = artifacts.stage(messages)?;
             }
@@ -163,45 +162,45 @@ pub async fn read(
             if finished || messages.len() >= quota {
                 break;
             }
-            let mut query = BTreeMap::from([
-                ("dir".to_owned(), if fresh { "b" } else { "f" }.to_owned()),
-                ("from".to_owned(), from.clone()),
-            ]);
-            if !fresh && let Some(end) = end {
-                query.insert("to".to_owned(), end.cursor.clone());
-            }
-            let mut page = receive_pages::history(
-                matrix,
-                room,
-                &query,
-                quota.saturating_sub(messages.len()).clamp(1, 100),
-                stop.clone(),
-            )
-            .await?;
+            let query = MessagePageRequest {
+                direction: if fresh {
+                    Direction::Backward
+                } else {
+                    Direction::Forward
+                },
+                from: Some(from.clone()),
+                to: if fresh {
+                    None
+                } else {
+                    end.map(|value| value.cursor.clone())
+                },
+                filter: None,
+                limit: quota.saturating_sub(messages.len()).clamp(1, 100),
+            };
+            let mut page = receive_pages::history(messaging, room, &query, stop.clone()).await?;
             if !fresh
                 && let Some(terminal) = end.and_then(|end| end.event.as_ref())
-                && page.chunk.len() < page.requested_limit
+                && page.events.len() < page.requested_limit
                 && !page
-                    .chunk
+                    .events
                     .iter()
-                    .any(|value| value.get("event_id") == terminal.get("event_id"))
-                && !messages.iter().any(|value| {
-                    Some(value.event_id.as_str())
-                        == terminal.get("event_id").and_then(Value::as_str)
-                })
+                    .any(|value| value.event_id == terminal.event_id)
+                && !messages
+                    .iter()
+                    .any(|value| value.event_id == terminal.event_id)
             {
-                page.chunk.push(terminal.clone());
+                page.events.push(terminal.clone());
             }
-            finished = page.chunk.is_empty()
-                || page.chunk.len() < page.requested_limit
+            finished = page.events.is_empty()
+                || page.events.len() < page.requested_limit
                 || end.is_some_and(|end| {
                     end.event.as_ref().is_none_or(|event| {
-                        page.chunk
+                        page.events
                             .iter()
-                            .any(|value| value.get("event_id") == event.get("event_id"))
+                            .any(|value| value.event_id == event.event_id)
                     }) || page.end.as_ref() == Some(&end.cursor)
                 });
-            collect(page.chunk, room, &mut messages)?;
+            collect(page.events, room, &mut messages)?;
             if chat::acquisition_bytes(&messages, settings)? > options.maximum {
                 messages = artifacts.stage(messages)?;
             }

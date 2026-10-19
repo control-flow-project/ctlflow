@@ -139,11 +139,11 @@ pub fn parse(value: &Value, fleet: &str) -> Result<Snapshot> {
             if expires_at <= created_at {
                 return Err(invalid());
             }
-            let sender = check::object(&message["sender"], &["kind", "matrixUserId"], &[])?;
+            let sender = check::object(&message["sender"], &["kind", "backendUserId"], &[])?;
             let human = check::choice(&sender["kind"], &["human", "controller"])? == "human";
             if human {
-                check::matrix_user_id(&sender["matrixUserId"])?;
-            } else if !sender["matrixUserId"].is_null() {
+                check::backend_user_id(&sender["backendUserId"])?;
+            } else if !sender["backendUserId"].is_null() {
                 return Err(invalid());
             }
             Ok(Message {

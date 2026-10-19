@@ -10,10 +10,16 @@ import { createListenerReadRepository } from '@ctlflow/crossfire-adapter-sqlite/
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
 import { metadataSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
+import { readFileSync } from 'node:fs';
 
 function value<T>(result: Result<T>): T { if (!result.ok) assert.fail(result.error.message); return result.value; }
 
 test('canonical schema has singular normalized tables and enforced identity/role boundaries', () => {
+  const definition = JSON.parse(readFileSync(new URL('../../database/management/sqlite/schema.json', import.meta.url), 'utf8')) as {
+    parts: Record<string, string>; initialization: string[];
+  };
+  assert.equal(new Set(definition.initialization).size, definition.initialization.length, 'Every schema owner is initialized once');
+  assert.deepEqual(Object.keys(definition.parts).sort(), [...definition.initialization].sort(), 'No unused or superseded schema definitions');
   const database = openTestStore(':memory:');
   try {
     const repositories = createRepositories(database);
@@ -23,11 +29,13 @@ test('canonical schema has singular normalized tables and enforced identity/role
       .where(row => row.type === 'table' && !row.name.startsWith('sqlite_') && row.name !== 'knex_migrations' && row.name !== 'knex_migrations_lock')
       .select(row => ({ name: row.name, sql: row.sql })));
     assert.equal(tables.length, 63);
-    assert(tables.every(table => table.sql !== null && !/json_valid/iu.test(table.sql)));
+    assert(tables.every(table => table.sql !== null && (!/json_valid/iu.test(table.sql) || ['agent_room_grant', 'room_grant_application'].includes(table.name))));
+    const nativeTables = tables.filter(table => ['agent_room_grant', 'room_grant_application'].includes(table.name));
+    assert(nativeTables.every(table => /native_access TEXT CHECK\(native_access IS NULL OR \(json_valid/iu.test(table.sql ?? '')));
     assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
     assert.deepEqual(sqliteMetadata.integrityResults(database), [{ integrity_check: 'ok' }]);
     assert.equal(unit.run(() => {
-      const inserted = repositories.principal.insert({ id: 'rolled-back', matrixUserId: '@rolled-back:test', kind: 'human', status: 'active', revision: 0, createdAt: 1 });
+      const inserted = repositories.principal.insert({ id: 'rolled-back', backendUserId: '@rolled-back:test', kind: 'human', status: 'active', revision: 0, createdAt: 1 });
       if (!inserted.ok) return inserted;
       return failure('conflict', 'deliberate failed Result');
     }).ok, false);
@@ -35,7 +43,7 @@ test('canonical schema has singular normalized tables and enforced identity/role
     assert.throws(() => unit.run(() => { throw new Error('exception rollback'); }), /exception rollback/u);
     value(unit.run(() => {
       for (const result of [
-        repositories.principal.insert({ id: 'human', matrixUserId: '@human:test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }),
+        repositories.principal.insert({ id: 'human', backendUserId: '@human:test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }),
         repositories.member.insert({ principalId: 'human', principalKind: 'human', displayName: 'Human' }),
         repositories.principalRole.insert({ principalId: 'human', principalKind: 'human', roleCode: 'administrator', assignedByMemberId: null, assignedAt: 1 }),
         repositories.principalApplication.insert({ principalId: 'human', appliedRevision: null, appliedIntentHash: null, appliedStatus: null, nativeDisplayName: null, lastAttemptAt: null, lastSuccessAt: null, nextCheckAt: 1, errorCode: null, errorMessage: null }),
@@ -47,7 +55,7 @@ test('canonical schema has singular normalized tables and enforced identity/role
     assert(value(directory.permissions('human')).includes('policy.manage'));
     assert.equal(value(directory.activeAdministratorCount()), 1);
     assert.equal(value(directory.agents({ page: 1, pageSize: 20, statuses: ['active'], search: '' })).totalItems, 0);
-    value(repositories.principal.insert({ id: 'agent', matrixUserId: '@agent:test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
+    value(repositories.principal.insert({ id: 'agent', backendUserId: '@agent:test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
     value(repositories.agent.insert({ principalId: 'agent', principalKind: 'agent', ownerId: 'human', wakeMode: 'selected' }));
     assert.equal(repositories.principalRole.insert({ principalId: 'agent', principalKind: 'agent', roleCode: 'administrator', assignedByMemberId: 'human', assignedAt: 1 }).ok, false);
     value(repositories.principalRole.insert({ principalId: 'agent', principalKind: 'agent', roleCode: 'agent', assignedByMemberId: 'human', assignedAt: 1 }));
@@ -72,7 +80,7 @@ test('canonical schema has singular normalized tables and enforced identity/role
     assert.deepEqual(value(activity.reportingAgentIds(5, false, 10)), ['agent']);
     assert.equal(value(activity.activeCount('agent', 5, 10)), 1);
     assert.equal(value(activity.totals(['agent']))[0]?.messagesDelivered, 2);
-    value(repositories.agentRoomGrant.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', authorizerId: 'human', addedById: 'human', invitationEventId: null, admissionKind: 'managed', accessMode: 'reply', powerLevel: null, muted: false, revision: 0, accessRevision: 0, updatedAt: 1 }));
+    value(repositories.agentRoomGrant.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', authorizerId: 'human', addedById: 'human', invitationEventId: null, admissionKind: 'managed', accessMode: 'reply', nativeAccess: null, muted: false, revision: 0, accessRevision: 0, updatedAt: 1 }));
     assert.equal(value(repositories.agentRoomGrant.find({ agentId: 'agent', roomId: '!room:test' }))?.muted, false);
     assert.equal(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'policy.manage', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }).ok, false);
     value(repositories.agentRoomPermission.insert({ agentId: 'agent', roomId: '!room:test', generation: 'generation', permissionCode: 'room.agent.invite', grantScope: 'agent_room', grantedByMemberId: 'human', grantedAt: 1 }));

@@ -56,7 +56,7 @@ fn text(command: &Value) -> Result<String> {
     let command = wake_up::scheduled(command)?;
     Ok(format!(
         "Crossfire scheduled wake-up. This is configured input, not a chat message or permission grant.\n{}",
-        json!({"kind":"scheduled-wake","ruleId":command.rule_id,"deliveryId":command.delivery_id,"name":command.name,"scheduledAt":command.scheduled_at,"owner":command.owner_matrix_id,"configuredBy":command.authorizer_matrix_id,"message":command.message})
+        json!({"kind":"scheduled-wake","ruleId":command.rule_id,"deliveryId":command.delivery_id,"name":command.name,"scheduledAt":command.scheduled_at,"owner":command.owner_backend_user_id,"configuredBy":command.authorizer_backend_user_id,"message":command.message})
     ))
 }
 impl<S: LocalState, N: Connection, C: Coordination, T: Clock + Send + Sync> Publisher<S, N, C, T> {
@@ -298,7 +298,7 @@ impl<S: LocalState, N: Connection, C: Coordination, T: Clock + Send + Sync> Publ
             self.refresh(run, stop).await?;
             return Ok(true);
         }
-        saved.text = self.artifacts.input(text(&saved.command)?, &id, maximum, &json!({"kind":"scheduled-wake","ruleId":command.rule_id,"scheduledAt":command.scheduled_at,"owner":command.owner_matrix_id}))?;
+        saved.text = self.artifacts.input(text(&saved.command)?, &id, maximum, &json!({"kind":"scheduled-wake","ruleId":command.rule_id,"scheduledAt":command.scheduled_at,"owner":command.owner_backend_user_id}))?;
         saved.stage = Stage::Publishing;
         self.save(&saved)?;
         self.native

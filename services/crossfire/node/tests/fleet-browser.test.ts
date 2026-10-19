@@ -1,3 +1,4 @@
+import { connectMatrix } from '@ctlflow/crossfire-adapter-matrix/connection';
 import { defaultCoordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-policy';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
@@ -11,7 +12,7 @@ import { releaseFixture } from './release-fixture.js';
 import { value, secret } from './support/application.js';
 import { introduceEnrollment } from '@ctlflow/crossfire-domain/enrollment/introduce';
 import { exchangeEnrollment } from '@ctlflow/crossfire-domain/enrollment/exchange';
-import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { API } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { checkPaperLayout } from '../tools/browser/layout.js';
 import { mapFleet } from './support/map-fleet.js';
@@ -37,11 +38,11 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
   const directory = mkdtempSync(join(process.cwd(), '.temp/fleet-browser-'));
   const other = await fixture.member('alice'), guest = await fixture.agent(other.actor, 'visitor');
-  const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId, fleetKey: 'research',
+  const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: admin.member.principal.backendUserId, fleetKey: 'research',
     controller: { name: 'Research workstation', metadata: { site: 'local' } }, instances: [
-      { instanceKey: 'alpha', name: 'alpha', coordinationPolicy: { wakeMode: 'selected' as const, senders: [{ matrixUserId: admin.member.principal.matrixUserId, includeAgents: true }], permissions: ['room.agent.invite' as const] } },
-      { instanceKey: 'beta', name: 'beta', coordinationPolicy: { ...defaultCoordinationPolicy(admin.member.principal.matrixUserId), wakeMode: 'selected' as const,
-        senders: [admin.member.principal.matrixUserId, guest.matrixUserId].map(matrixUserId => ({ matrixUserId, includeAgents: false })) } }] };
+      { instanceKey: 'alpha', name: 'alpha', coordinationPolicy: { wakeMode: 'selected' as const, senders: [{ backendUserId: admin.member.principal.backendUserId, includeAgents: true }], permissions: ['room.agent.invite' as const] } },
+      { instanceKey: 'beta', name: 'beta', coordinationPolicy: { ...defaultCoordinationPolicy(admin.member.principal.backendUserId), wakeMode: 'selected' as const,
+        senders: [admin.member.principal.backendUserId, guest.backendUserId].map(backendUserId => ({ backendUserId, includeAgents: false })) } }] };
   const introduced = value(await introduceEnrollment(services, input));
   const browser = await chromium.launch(browserOptions);
   cleanup(scope, () => browser.close());
@@ -55,8 +56,8 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await expect(page.getByText('Remove only its own additions', { exact: true })).toBeVisible();
   await page.getByText('2 selected entries', { exact: true }).click();
   await page.getByText('1 selected entry', { exact: true }).click();
-  await expect(page.getByRole('table', { name: 'Enrollment roster' })).toContainText(guest.matrixUserId);
-  await expect(page.getByRole('table', { name: 'Enrollment roster' })).toContainText(admin.member.principal.matrixUserId);
+  await expect(page.getByRole('table', { name: 'Enrollment roster' })).toContainText(guest.backendUserId);
+  await expect(page.getByRole('table', { name: 'Enrollment roster' })).toContainText(admin.member.principal.backendUserId);
   for (const width of [1440, 390]) {
     await page.setViewportSize({ width, height: 1000 });
     await checkPaperLayout(page);
@@ -83,7 +84,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   const reporting = value(reportListener(services, { kind: 'agent', principalId: alpha.agentId }, alpha.agentId, randomUUID(), {
     release: 'browser', stopped: true, controller, messagesDelivered: 12, statistics: { sequence: 1,
       startedAt: reportTime - 300000, endedAt: reportTime, dropped: 2,
-      flows: Array.from({ length: 25 }, (_, index) => ({ roomId, senderMatrixId: admin.member.principal.matrixUserId,
+      flows: Array.from({ length: 25 }, (_, index) => ({ roomId, senderBackendUserId: admin.member.principal.backendUserId,
         messageType: 'type-' + index, observed: 1, delivered: 1, contentBytes: 1024, deliveredBytes: 1024, attachmentBytes: 0, largestBytes: 1024 })),
       usage: [{ runtime: 'pi', sessionId: 'browser-pi-history', tokens: { input: 100, cachedInput: 20, cacheWriteInput: 0, output: 30, reasoningOutput: null, total: 130 } }] } }, 'browser'));
   assert(reporting.statisticsAccepted);
@@ -93,7 +94,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
         tokens: { input: 200, cachedInput: 40, cacheWriteInput: 0, output: 60, reasoningOutput: null, total: 260 } }] } }, 'browser'));
   const runtimeCommands: { action: string; agentId: string | null }[] = [];
   const runtimeRuns = new Map<string, string>();
-  const control = await browserController(scope, { origin, controller, owner: admin.member.principal.matrixUserId, execute: async command => {
+  const control = await browserController(scope, { origin, controller, owner: admin.member.principal.backendUserId, execute: async command => {
       runtimeCommands.push({ action: command.action, agentId: command.agentId });
       for (const instance of instances) {
         if (command.agentId !== null && command.agentId !== instance.agentId) continue;
@@ -252,13 +253,13 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
   await page.getByRole('link', { name: 'Choose who can wake' }).click();
   await page.getByRole('button', { name: 'Clear selection', exact: true }).click();
   await page.getByLabel('Show', { exact: true }).selectOption('agent');
-  await page.getByLabel('Search people or Matrix IDs').fill('visitor');
-  await page.getByLabel('Allow ' + guest.matrixUserId, { exact: true }).check();
-  await page.getByLabel('Search people or Matrix IDs').fill('no-match');
-  await expect(page.getByRole('table', { name: 'Selected wake-up people and agents' })).toContainText(guest.matrixUserId);
+  await page.getByLabel('Search people or messaging identities').fill('visitor');
+  await page.getByLabel('Allow ' + guest.backendUserId, { exact: true }).check();
+  await page.getByLabel('Search people or messaging identities').fill('no-match');
+  await expect(page.getByRole('table', { name: 'Selected wake-up people and agents' })).toContainText(guest.backendUserId);
   await page.getByRole('button', { name: 'Save wake-up policy' }).click();
   await expect(page).toHaveURL(origin + agentUrl); await page.reload();
-  await expect(page.getByRole('table', { name: 'Selected wake-up people and agents' })).toContainText(guest.matrixUserId);
+  await expect(page.getByRole('table', { name: 'Selected wake-up people and agents' })).toContainText(guest.backendUserId);
   assert.deepEqual(value(services.collection.wakeSenders({ agentId: alpha.agentId })).map(sender => sender.senderPrincipalId), [guest.id]);
   await page.goto(origin + '/manage/fleets/' + fleet.id + '/activity');
   await page.getByRole('navigation', { name: 'Fleet activity' }).getByRole('link', { name: 'Traffic & usage', exact: true }).click();
@@ -280,7 +281,7 @@ test('browser fleet review, room-plan confirmation, invitation delegation and se
       await page.goto(origin + route); await expect(page.locator('h1')).toBeVisible(); await expect(page.locator('.loading')).toHaveCount(0);
       await expect(page.getByRole('alert')).toHaveCount(0);
       await checkPaperLayout(page);
-      if (route.includes('/rooms/')) await expect(page.getByText('Reply requires native level 0.', { exact: true })).toHaveCSS('display', 'block');
+      if (route.includes('/rooms/')) await expect(page.getByText('Invitations allowed by the backend', { exact: true })).toBeVisible();
       if (route === '/manage/fleets/' + fleet.id) {
         const roster = page.getByRole('region', { name: 'Agents', exact: true });
         const table = roster.getByRole('table', { name: 'Fleet agents', exact: true });
@@ -351,12 +352,12 @@ test('stock Element room invite search finds an agent with no shared rooms witho
   const response = await searched;
   assert.equal(response.status(), 200);
   await expect(dialog.getByText('bea (bob)', { exact: true })).toBeVisible();
-  await expect(dialog.getByText(agent.matrixUserId, { exact: true })).toBeVisible();
+  await expect(dialog.getByText(agent.backendUserId, { exact: true })).toBeVisible();
   await page.screenshot({ path: join(directory, 'native-invite-zero-room.png'), fullPage: true });
   assert.equal(value(fixture.services.repositories.ownerConversation.find({ agentId: agent.id })), null);
-  assert.deepEqual(value(await fixture.services.matrix.joined(agent.matrixUserId)), []);
+  assert.deepEqual(value(await fixture.services.messaging.joined(agent.backendUserId)), []);
   assert.deepEqual(value(fixture.services.collection.roomGrants({ agentId: agent.id })), []);
-  assert.equal(value(await fixture.services.matrix.membership(owner.accepted.account.userId, agent.matrixUserId, String(room.room_id))).membership, 'leave');
+  assert.equal(value(await fixture.services.messaging.membership(owner.accepted.account.userId, agent.backendUserId, String(room.room_id))).membership, 'leave');
 });
 
 test('stock Element owner invitations and DMs enable read-and-reply access without management steps', { timeout: 120000 }, async scope => {
@@ -372,9 +373,8 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
     execute: async () => failure('invalid', 'This invitation fixture does not execute native lifecycle operations') });
   const binding = controller.listener(agent.id);
   let ended: unknown;
-  const receiver = listen({ log: (_message: string) => {}, binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: agent.token }), settings: {
-    instance: 'tests', server_name: 'architecture.localhost', homeserver: origin, owner: owner.accepted.account.userId, max_upload_bytes: 1024 },
-    account: { user_id: agent.matrixUserId, access_token: agent.token, device_id: 'CROSSFIRE_AGENT' },
+  const receiver = listen({ ...connectMatrix({ type: 'matrix', parameters: { origin, serverName: 'architecture.localhost' } }, { userId: agent.backendUserId, accessToken: agent.token, native: { deviceId: 'CROSSFIRE_AGENT' } }), log: (_message: string) => {}, binding: 'fixture', host, control: binding.control, coordination: createCoordination({ origin, token: agent.token }), settings: { instance: 'tests', server: origin, backend: { type: "matrix", parameters: { origin: origin, serverName: 'architecture.localhost' } }, owner: owner.accepted.account.userId, maxUploadBytes: 1024 },
+    account: { userId: agent.backendUserId, accessToken: agent.token, native: { deviceId: 'CROSSFIRE_AGENT' } },
     id: agent.id, release: release.manifest, cursorFile: join(runtime.directory, 'cursor.json'),
     limit: 100, pollMs: 100, debounceMs: 0, reconcileMs: 10000, runtime: runtime.runtime,
   }, stop.signal).catch(error => { ended = error; });
@@ -412,7 +412,7 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
 
   const createdDirectRooms: string[] = [];
   page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/createRoom')) createdDirectRooms.push(request.url()); });
-  await page.goto(origin + '/#/user/' + agent.matrixUserId);
+  await page.goto(origin + '/#/user/' + agent.backendUserId);
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   const composer = page.getByRole('region', { name: 'Message composer', exact: true }).getByRole('textbox');
   await composer.fill('Ada, this is your owner’s direct message.');
@@ -430,7 +430,7 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
   await until(() => JSON.stringify(runtime.requests()).includes('Ada, this is your owner’s direct message.') || ended !== undefined, 'Element DM task was not delivered', 30000);
   assert.equal(ended, undefined);
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId: conversation.roomId }))?.accessMode, 'reply');
-  assert.equal(value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId: conversation.roomId }))?.creator, true);
+  assert.equal(value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId: conversation.roomId }))?.nativeAccess?.creator, true);
   assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id }))!.roomId, conversation.roomId);
   assert.equal(runtime.requests().filter(request => request.method === 'turn/start').length, 1);
   await page.screenshot({ path: join(directory, 'element-owner-dm-admitted.png'), fullPage: true });
@@ -450,8 +450,8 @@ test('stock Element owner invitations and DMs enable read-and-reply access witho
 
 test('browser fleet connection map uses management theme, full roster, adaptive geometry and durable accessible selection', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin, origin, worker } = fixture;
-  const { fleet, instances, controller } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId);
-  const control = await browserController(scope, { origin, controller, owner: admin.member.principal.matrixUserId,
+  const { fleet, instances, controller } = await mapFleet(services, admin.actor, admin.member.principal.backendUserId);
+  const control = await browserController(scope, { origin, controller, owner: admin.member.principal.backendUserId,
     execute: async () => failure('unavailable', 'This map fixture has no native lifecycle executor') });
   for (const instance of [instances[0]!, instances.at(-1)!]) value(await connectOwnerConversation(services,
     { kind: 'agent', principalId: instance.agentId! }, instance.agentId!));
@@ -470,7 +470,7 @@ test('browser fleet connection map uses management theme, full roster, adaptive 
     if (index >= 20) continue;
     const record = value(services.directory.agent(id))!, modeIndex = index % 3;
     value(await changeRoomGrant(services, admin.actor, { agentId: id, roomId: roomIds[index % roomIds.length]!, expectedRevision: record.principal.revision,
-      expectedGeneration: null, accessMode: modeIndex === 0 ? 'read' : modeIndex === 1 ? 'reply' : 'custom', powerLevel: modeIndex === 2 ? 25 : null, muted: index % 5 === 0 }, randomUUID()));
+      expectedGeneration: null, accessMode: modeIndex === 0 ? 'read' : modeIndex === 1 ? 'reply' : 'custom', nativeAccess: modeIndex === 2 ? { powerLevel: 25 } : null, muted: index % 5 === 0 }, randomUUID()));
   }
   await worker.drain();
   const browser = await chromium.launch(browserOptions);

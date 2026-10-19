@@ -80,7 +80,7 @@ fn validate(plan: &Plan, mode: HistoryMode) -> Result<()> {
     }
     let mut senders = BTreeSet::new();
     for value in &plan.identities {
-        if !senders.insert(coordination::identity(value)?.matrix_user_id) {
+        if !senders.insert(coordination::identity(value)?.backend_user_id) {
             return Err(invalid("Duplicate retained sender identity"));
         }
     }
@@ -300,7 +300,9 @@ impl<S: LocalState, N: Connection, A: Artifacts> Publication<S, N, A> {
                     .iter()
                     .rev()
                     .filter_map(|index| plan.batch.events.get(*index))
-                    .find(|event| event.kind == "m.room.message")
+                    .find(|event| {
+                        event.kind == crossfire_domain::messaging_client::EventType::Message
+                    })
                     .and_then(|event| {
                         step.session
                             .as_ref()
@@ -367,7 +369,7 @@ impl<S: LocalState, N: Connection, A: Artifacts> Publication<S, N, A> {
             .iter()
             .map(|value| {
                 coordination::identity(value)
-                    .map(|identity| (identity.matrix_user_id.clone(), identity))
+                    .map(|identity| (identity.backend_user_id.clone(), identity))
             })
             .collect::<Result<BTreeMap<_, _>>>()?;
         let mut position = 0;

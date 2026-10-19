@@ -1,3 +1,7 @@
+use crossfire_adapter_matrix::{
+    agent::Client,
+    protocol::{Protocol, Request, Response},
+};
 mod support;
 use crossfire_agent_core::{
     controller_input::Acknowledgment,
@@ -6,7 +10,6 @@ use crossfire_agent_core::{
     listener_budget::Budget,
     listener_control::{Binding, Control},
     listener_hooks::ListenerHooks,
-    matrix::{Matrix, Request, Response},
     profile,
     runtime::{
         Admission, Approval, Connection, Hooks, InputPriority, InterruptResult, Lifecycle,
@@ -31,7 +34,7 @@ const RELEASE: &str = "0.1.20-000000000000000000000000";
 fn now() -> Result<i64> {
     Ok(1000)
 }
-type NativeHooks = ListenerHooks<Memory, Network, Network, fn() -> Result<i64>>;
+type NativeHooks = ListenerHooks<Memory, Network, Client<Arc<Network>>, fn() -> Result<i64>>;
 fn event(mention: bool) -> Value {
     json!({"event_id":if mention {"$mention"} else {"$initial"},"type":"m.room.message","sender":"@owner:local","origin_server_ts":1,"content":{"msgtype":"m.text","body":if mention {"new steering instruction"} else {"slow original request"},"m.mentions":{"user_ids":if mention {vec!["@agent:local"]} else {Vec::new()}}}})
 }
@@ -53,10 +56,10 @@ impl Coordination for Network {
             }
             OperationId::ReportRuntime => Ok(json!({"accepted":true})),
             OperationId::DeliveryPolicy => Ok(
-                json!({"agentId":AGENT,"matrixUserId":"@agent:local","ownerMatrixId":"@owner:local","maxMessageBytes":65536,"fleetIdleTimeoutSeconds":1800,"status":"active","ownerStatus":"active","ownerConversation":"!private:local","roomGrants":[{"roomId":"!room:local","accessMode":"reply","powerLevel":null,"muted":false},{"roomId":"!private:local","accessMode":"reply","powerLevel":null,"muted":false}],"wakeMode":"selected","senderMatrixIds":["@owner:local"]}),
+                json!({"agentId":AGENT,"backendUserId":"@agent:local","ownerBackendUserId":"@owner:local","maxMessageBytes":65536,"fleetIdleTimeoutSeconds":1800,"status":"active","ownerStatus":"active","ownerConversation":"!private:local","roomGrants":[{"roomId":"!room:local","accessMode":"reply","nativeAccess":null,"muted":false},{"roomId":"!private:local","accessMode":"reply","nativeAccess":null,"muted":false}],"wakeMode":"selected","senderBackendUserIds":["@owner:local"]}),
             ),
             OperationId::ResolvePrincipals => Ok(
-                json!([{"matrixUserId":"@owner:local","kind":"human","ownerMatrixId":null,"displayName":"Owner","ownerDisplayName":null}]),
+                json!([{"backendUserId":"@owner:local","kind":"human","ownerBackendUserId":null,"displayName":"Owner","ownerDisplayName":null}]),
             ),
             OperationId::OwnerConversation => Ok(json!({"roomId":"!private:local"})),
             OperationId::WakeMetadata => Ok(json!({"now":1000,"nextDueAt":null})),
@@ -79,7 +82,7 @@ impl Acknowledgment for Network {
         Ok(())
     }
 }
-impl Matrix for Network {
+impl Protocol for Network {
     async fn request(&self, request: &Request, stop: CancellationToken) -> Result<Response> {
         let path = &request.path;
         let body = if path.ends_with("/sync") {
@@ -295,7 +298,7 @@ async fn verify(prepared_query: bool) -> std::result::Result<(), Box<dyn std::er
     control.update(true, true, None, binding)?;
     let options = Options {
         profile: profile::parse(
-            &json!({"id":AGENT,"workspace":"/private/workarea","account":{"user_id":"@agent:local","access_token":"private","device_id":"NATIVE"},"settings":{"instance":"analyst","homeserver":"http://localhost:3000","server_name":"local","owner":"@owner:local","max_upload_bytes":16777216}}),
+            &json!({"id":AGENT,"workspace":"/private/workarea","account":{"userId":"@agent:local","accessToken":"private","native":{"deviceId":"NATIVE"}},"settings":{"instance":"analyst","server":"http://localhost:3000","backend":{"type":"matrix","parameters":{"origin":"http://localhost:3000","serverName":"local"}},"owner":"@owner:local","maxUploadBytes":16777216}}),
         )?,
         file: "receive".to_owned(),
         release: RELEASE.to_owned(),
@@ -311,7 +314,7 @@ async fn verify(prepared_query: bool) -> std::result::Result<(), Box<dyn std::er
     let resources = Resources {
         storage: storage.clone(),
         coordination: network.clone(),
-        matrix: network.clone(),
+        messaging: Arc::new(Client::from_protocol(network.clone(), "@agent:local")?),
         acknowledgment: network,
         control,
         budget: Arc::new(Budget::default()),

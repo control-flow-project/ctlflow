@@ -1,5 +1,6 @@
 use crossfire_adapter_filesystem::local_state::State;
 use crossfire_agent_core::{artifacts::Store, chat::Artifacts, events, local_state::LocalState};
+use crossfire_domain::messaging_client::{EventType, MessageContent, MessageEvent, MessageKind};
 use crossfire_kernel::{Result, time::Clock};
 use serde_json::{Value, json};
 use std::{
@@ -33,11 +34,28 @@ fn real_private_files_keep_large_messages_out_of_input_and_protect_pending_conte
     let instant = Arc::new(AtomicI64::new(1));
     let artifacts = Store::open(storage.clone(), root, Time(instant.clone()))?;
     let event = events::view(
-        &json!({"event_id":"$large","sender":"@human:local","type":"m.room.message","content":{"msgtype":"m.text","body":"é".repeat(70000)}}),
-        "!room:local",
+        &MessageEvent {
+            event_id: "event/large".to_owned(),
+            room_id: "room/main".to_owned(),
+            sender: "person/human".to_owned(),
+            event_type: EventType::Message,
+            subject_id: None,
+            sent_at: None,
+            omitted: None,
+            content: MessageContent {
+                kind: MessageKind::Text,
+                body: Some("é".repeat(70000)),
+                mentions: vec![],
+                edited: false,
+                control: false,
+                attachments: vec![],
+                attributes: Default::default(),
+            },
+        },
+        "room/main",
     )?;
     let staged = artifacts.stage(vec![event])?;
-    assert!(staged[0].content.get("body").is_none());
+    assert!(staged[0].content.body.is_none());
     let file = staged[0]
         .content_file
         .as_ref()

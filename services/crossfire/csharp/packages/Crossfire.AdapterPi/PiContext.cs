@@ -1,3 +1,4 @@
+using Crossfire.Domain;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AgentCore;
@@ -29,7 +30,7 @@ public sealed class PiContext : IAsyncDisposable
         history = PiState.History(home, binding); Binding = binding; session = binding.SessionId ?? "";
         lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellation); Lifetime = lifetime.Token;
         hooks = input.Hooks with { Observe = value => input.Hooks.Observe?.Invoke(value is NativeState state
-            ? state with { RoomId = binding.Context is "shared" or "control" ? null : binding.Context } : value) };
+            ? state with { RoomId = HistoryContext.Room(binding.Context) } : value) };
         observation = new(hooks, () => session, () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()); usage = new(hooks, () => session);
     }
     public static async ValueTask<Result<PiContext>> Open(string binary, string home, PiBinding binding, OwnedRuntimeInput input, PiOptions options, CancellationToken cancellation)

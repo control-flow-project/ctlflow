@@ -38,6 +38,7 @@ function fixture(execution: Partial<Execution> = {}) {
         const stop = new AbortController(), binding = createListenerControl(async () => {}, () => ({ fleetId: randomUUID(), connectionId: randomUUID(), credential: 'fixture-lease' }));
         binding.update({ connected: true, active: true, input: null });
         return success({ sessionId, signal: stop.signal, control: binding.connection,
+          diagnostics: async () => ({ checkedAt: 1, state: 'idle' as const, observedAt: 1, provider: 'unknown' as const, providerObservedAt: null, pendingInput: false, pendingDecision: false }),
           nativeState: () => ({ phase: 'running' as const, lastActivityAt: 1, historyAvailable: true }), resume: async () => success(undefined),
           contexts: async () => success([{ context: 'shared', runtime: 'codex', sessionId }]),
           attachment: async () => failure('conflict', 'No native process in domain fixture'), attachments: async () => success([]),
@@ -45,7 +46,7 @@ function fixture(execution: Partial<Execution> = {}) {
       }, ...execution,
     } };
   const controller = value(createController(services)), input: SetupInput = { workspace,
-    descriptor: { schemaVersion: 1, server: 'https://example.test', ownerMatrixId: '@owner:example.test', package: { name: '@ctlflow/fleet', version: '0.1.0' }, instructions: '' } };
+    descriptor: { schemaVersion: 1, server: 'https://example.test', ownerBackendUserId: '@owner:example.test', package: { name: '@ctlflow/fleet', version: '0.1.0' }, instructions: '' } };
   async function finish(operation: Operation): Promise<Operation> {
     await until(() => value(controller.operation(operation.operationId)).completedAt !== null);
     return value(controller.operation(operation.operationId));

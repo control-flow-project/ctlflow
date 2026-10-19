@@ -25,14 +25,19 @@ pub(super) fn prune(store: &mut Store, cutoff: i64, limit: i64) -> Result<Vec<us
         )
         .order(wake_notice::reserved_at.asc())
         .limit(limit)
-        .select((wake_notice::receiver_agent_id, wake_notice::event_id))
-        .load::<(String, String)>(store.database.connection())
+        .select((
+            wake_notice::receiver_agent_id,
+            wake_notice::room_id,
+            wake_notice::event_id,
+        ))
+        .load::<(String, String, String)>(store.database.connection())
         .map_err(failure)?;
-    for (receiver, event) in &notices {
+    for (receiver, room, event) in &notices {
         diesel::delete(
             wake_notice::table.filter(
                 wake_notice::receiver_agent_id
                     .eq(receiver)
+                    .and(wake_notice::room_id.eq(room))
                     .and(wake_notice::event_id.eq(event)),
             ),
         )
@@ -68,7 +73,7 @@ pub(super) fn prune(store: &mut Store, cutoff: i64, limit: i64) -> Result<Vec<us
             member_invitation::expires_at.lt(cutoff).and(
                 member_invitation::consumed_by_member_id
                     .is_not_null()
-                    .or(member_invitation::claim_matrix_user_id.is_null()),
+                    .or(member_invitation::claim_backend_user_id.is_null()),
             ),
         )
         .order((

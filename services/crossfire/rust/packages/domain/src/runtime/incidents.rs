@@ -2,7 +2,7 @@ use super::{port::IncidentRepository, values::*};
 use crate::{
     identity::Status,
     listener::HEARTBEAT_EXPIRY_MS,
-    matrix::MatrixAuthority,
+    messaging::MessagingAuthority,
     port::{AuthorizationRepository, UnitOfWork},
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
@@ -226,11 +226,11 @@ pub fn watch(
 
 pub async fn publish<
     A: crate::port::RepositoryAccess,
-    M: MatrixAuthority,
+    M: MessagingAuthority,
     C: crossfire_kernel::time::Clock,
 >(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     service_user: &str,
     clock: &C,
     stopped: impl Fn() -> bool,
@@ -268,11 +268,13 @@ where
         };
         let prepared = async {
             if previous.is_none() {
-                matrix.set_display_name(service_user, "crossfire").await?;
+                messaging
+                    .set_display_name(service_user, "crossfire")
+                    .await?;
             }
-            matrix
+            messaging
                 .owner_conversation(
-                    &owner.matrix_user_id,
+                    &owner.backend_user_id,
                     service_user,
                     previous.as_ref().map(|value| value.room_id.as_str()),
                     None,
@@ -320,13 +322,13 @@ where
             continue;
         }
         let transaction_id = format!("incident-{}-{}", notice.incident_id, notice.phase.code());
-        let sent = matrix
+        let sent = messaging
             .send_notice(
                 service_user,
                 &room,
                 &transaction_id,
                 &notice.body,
-                &owner.matrix_user_id,
+                &owner.backend_user_id,
             )
             .await;
         notice.next_attempt_at = clock.now()?.saturating_add(30_000);

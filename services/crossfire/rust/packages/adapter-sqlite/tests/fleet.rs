@@ -18,15 +18,15 @@ use crossfire_test_support::sqlite::PreparedDatabase;
 const NOW: i64 = 1_792_000_000_000;
 
 fn owner(store: &mut Store) -> std::result::Result<Actor, Box<dyn std::error::Error>> {
-    registration::initialize(store, "@owner:example.test", NOW)?;
+    registration::initialize(store, "@owner:example.test", "@owner:example.test", NOW)?;
     let principal = store
-        .principal_by_matrix_id("@owner:example.test")?
+        .principal_by_backend_user_id("@owner:example.test")?
         .ok_or("Missing owner")?;
     Ok(Actor {
         principal_id: principal.id,
         kind: PrincipalKind::Human,
         authentication: Some(Authentication::Native {
-            matrix_user_id: "@owner:example.test".to_owned(),
+            backend_user_id: "@owner:example.test".to_owned(),
         }),
     })
 }
@@ -51,7 +51,7 @@ fn fleet(store: &mut Store, actor: &Actor) -> Result<Fleet> {
 fn agent(store: &mut Store, actor: &Actor, fleet: &Fleet) -> Result<Principal> {
     let principal = Principal {
         id: identity::id(),
-        matrix_user_id: "@agent:example.test".to_owned(),
+        backend_user_id: "@agent:example.test".to_owned(),
         kind: PrincipalKind::Agent,
         status: Status::Active,
         revision: 0,
@@ -326,7 +326,7 @@ fn listener_reports_require_exact_controller_generation_and_keep_closed_runs_clo
         principal_id: principal.id.clone(),
         kind: PrincipalKind::Agent,
         authentication: Some(Authentication::Native {
-            matrix_user_id: principal.matrix_user_id,
+            backend_user_id: principal.backend_user_id,
         }),
     };
     let credential_id = identity::id();
@@ -464,9 +464,9 @@ fn listener_reports_require_exact_controller_generation_and_keep_closed_runs_clo
 #[tokio::test]
 async fn management_sessions_expire_revoke_and_keep_native_tokens_private()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
-    use crossfire_domain::{port::MatrixIdentity, session};
+    use crossfire_domain::{port::BackendUserIdentity, session};
     struct Matrix;
-    impl MatrixIdentity for Matrix {
+    impl BackendUserIdentity for Matrix {
         async fn identify(&self, _token: &Secret) -> Result<String> {
             Ok("@owner:example.test".to_owned())
         }

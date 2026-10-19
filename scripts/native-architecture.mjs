@@ -47,7 +47,7 @@ export function validateNativeGraph(nodes) {
       }
       if (node.layer !== 'packages') continue;
       if (node.role === 'domain') {
-        const primitive = node.language === 'rust' && !edge.manifest && ['serde_json', 'tokio'].includes(edge.library);
+        const primitive = node.language === 'rust' && !edge.manifest && ['serde', 'serde_json', 'tokio', 'tokio-util'].includes(edge.library);
         assert(primitive || dependency?.layer === 'packages' && ['kernel', 'domain', 'agent-core'].includes(dependency.role), 'Domain rules may depend only on declared pure library owners or explicit native value/concurrency primitives');
       }
       if (node.role === 'kernel') assert(!dependency, 'The kernel cannot depend on another product layer');
@@ -123,8 +123,8 @@ function main() {
   process.stdout.write(JSON.stringify({ status: 'passed', rustOwners: rust.length, csharpOwners: csharp.length, ...compareStructure(rust, csharp), scope: 'ownership and dependency structure; not capability completeness' }) + '\n');
 }
 export function verifyDomainPrimitives(source) {
-  assert(!/\b(?:tokio|std)\s*::\s*(?:fs|net|process|signal|io)\b/u.test(source), 'Domain concurrency primitives must not introduce concrete filesystem, transport or process operations');
-  for (const [, imports] of source.matchAll(/\buse\s+(?:tokio|std)\s*::([\s\S]*?);/gu)) assert(!/\b(?:fs|net|process|signal|io)\b/u.test(imports), 'Grouped domain imports must not introduce concrete filesystem, transport or process operations');
+  assert(!/\b(?:tokio|tokio_util|std)\s*::\s*(?:fs|net|process|signal|io)\b/u.test(source), 'Domain concurrency primitives must not introduce concrete filesystem, transport or process operations');
+  for (const [, imports] of source.matchAll(/\buse\s+(?:tokio|tokio_util|std)\s*::([\s\S]*?);/gu)) assert(!/\b(?:fs|net|process|signal|io)\b/u.test(imports), 'Grouped domain imports must not introduce concrete filesystem, transport or process operations');
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main();

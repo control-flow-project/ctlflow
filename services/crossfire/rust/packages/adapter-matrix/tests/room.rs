@@ -1,5 +1,8 @@
 mod support;
-use crossfire_domain::matrix::{AccessMode, Membership, RoomAccess, RoomAdmission, RoomPower};
+use crossfire_domain::{
+    messaging::{Membership, RoomAdmission},
+    room_access::values::{Access, Intent},
+};
 use crossfire_kernel::failure::ErrorCode;
 use crossfire_test_support::http::Fixture;
 use serde_json::{Value, json};
@@ -20,7 +23,7 @@ async fn native_facts_preserve_creator_authority_and_whole_unicode_text()
     let mut fixture = Fixture::open().await?;
     let authority = support::authority(&fixture)?;
     let (result, protocol) = tokio::join!(
-        authority.room("@owner:example.test", "!room:example.test"),
+        authority.room("@owner:example.test", "!room:example.test", None),
         async {
             support::login(&mut fixture, "@owner:example.test", "owner-token").await?;
             let call = fixture.next().await?;
@@ -35,11 +38,20 @@ async fn native_facts_preserve_creator_authority_and_whole_unicode_text()
     );
     protocol?;
     let facts = result?;
-    assert_eq!(facts.power, RoomPower::Creator);
+    assert_eq!(facts.access_fields[0].maximum, 9_007_199_254_740_991);
+    assert!(facts.can_invite);
     assert_eq!(facts.name, "x".repeat(254));
-    assert_eq!(facts.read_level, -1);
-    assert_eq!(facts.reply_level, 0);
-    assert_eq!(facts.change_power_level, 50);
+    assert_eq!(
+        facts.access_modes,
+        vec![Access::Read, Access::Reply, Access::Custom]
+    );
+    assert!(
+        facts
+            .permissions
+            .iter()
+            .any(|value| value.action == "m.room.power_levels" && value.allowed)
+    );
+    assert_eq!(facts.authority_revision.len(), 64);
     let (result, protocol) = tokio::join!(
         authority.membership(
             "@owner:example.test",
@@ -54,7 +66,13 @@ async fn native_facts_preserve_creator_authority_and_whole_unicode_text()
     );
     protocol?;
     let member = result?;
-    assert_eq!(member.power, RoomPower::Level(0));
+    assert_eq!(
+        member
+            .native_access
+            .as_ref()
+            .and_then(|value| value.get("powerLevel")),
+        Some(&json!(0))
+    );
     assert_eq!(member.display_name, "Analyst");
     Ok(())
 }
@@ -64,16 +82,17 @@ async fn native_read_access_is_written_joined_and_confirmed_before_success()
 -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = Fixture::open().await?;
     let authority = support::authority(&fixture)?;
-    let access = RoomAccess {
-        mode: AccessMode::Read,
-        power_level: -1,
+    let access = Intent {
+        access: Access::Read,
+        native_access: None,
+        muted: false,
     };
     let (result, protocol) = tokio::join!(
         authority.set_room_access(
             "@owner:example.test",
             "@agent:example.test",
             "!room:example.test",
-            access,
+            &access,
             Some(&RoomAdmission::Managed)
         ),
         async {
@@ -124,7 +143,13 @@ async fn native_read_access_is_written_joined_and_confirmed_before_success()
     protocol?;
     let member = result?;
     assert_eq!(member.membership, Membership::Join);
-    assert_eq!(member.power, RoomPower::Level(-1));
+    assert_eq!(
+        member
+            .native_access
+            .as_ref()
+            .and_then(|value| value.get("powerLevel")),
+        Some(&json!(-1))
+    );
     Ok(())
 }
 
@@ -133,16 +158,17 @@ async fn native_authority_rejects_nonmember_and_immutable_creator_restrictions()
 -> Result<(), Box<dyn std::error::Error>> {
     let mut fixture = Fixture::open().await?;
     let authority = support::authority(&fixture)?;
-    let access = RoomAccess {
-        mode: AccessMode::Read,
-        power_level: -1,
+    let access = Intent {
+        access: Access::Read,
+        native_access: None,
+        muted: false,
     };
     let (result, protocol) = tokio::join!(
         authority.set_room_access(
             "@owner:example.test",
             "@owner:example.test",
             "!room:example.test",
-            access,
+            &access,
             Some(&RoomAdmission::Managed)
         ),
         async {
@@ -157,7 +183,7 @@ async fn native_authority_rejects_nonmember_and_immutable_creator_restrictions()
         Some(ErrorCode::Forbidden)
     );
     let (result, protocol) = tokio::join!(
-        authority.room("@owner:example.test", "!room:example.test"),
+        authority.room("@owner:example.test", "!room:example.test", None),
         async {
             support::cached(&mut fixture, "@owner:example.test", "owner-token").await?;
             let mut events = state("join", 0);

@@ -14,7 +14,7 @@ public static class StatisticsAcceptance
         var flow = new TrafficFlow("!test:example.test", "@owner:example.test", "m.text", new(2, 1, 100, 40, 200, 60));
         var tokens = new TokenCounts(100, 20, null, 10, 5, 110);
         var batch = new StatisticsBatch(1, 10, 20, 0, [flow], [new("codex", "history", tokens)]);
-        Equal(Statistics.Digest(batch), "f3e19a90c73621c777875d2b0e4f56c1893e954d53c45089bdae2d44815867b5", "statistics checkpoint digest matches canonical Node JSON bytes");
+        Equal(Statistics.Digest(batch), "6ffd109fab486ccf45ddd035221aee745db11ec5d453151eb4ed855df8fa32d3", "statistics checkpoint digest matches canonical Node JSON bytes");
         Equal(StatisticsCommands.Record(context, fixture.AgentId, fixture.RunId, batch, now).IsSuccess, true, "bounded statistics interval persists");
         Equal(StatisticsCommands.Record(context, fixture.AgentId, fixture.RunId, batch, now).IsSuccess, true, "identical statistics receipt is idempotent");
         Equal(StatisticsCommands.Record(context, fixture.AgentId, fixture.RunId, batch with { Dropped = 1 }, now).Error.Code, "conflict", "same sequence cannot replace its summary");

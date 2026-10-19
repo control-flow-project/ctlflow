@@ -179,6 +179,29 @@ async fn invoke(
         .map(String::as_str)
         .unwrap_or("");
     let data = match selected.operation.id {
+        OperationId::Diagnostics => {
+            fields(input, &[])?;
+            let mut report = controller
+                .diagnostics(fleetd_contracts::diagnostics::query(query)?, stop)
+                .await?;
+            let failed = state.diagnostics.error()?.is_some();
+            report.add(
+                "controller.logging",
+                &fleetd_domain::diagnostics::Scope {
+                    fleet_id: None,
+                    instance_key: None,
+                },
+                if failed { "fail" } else { "pass" },
+                Some(report.checked_at),
+                if failed {
+                    "Controller logging has failed"
+                } else {
+                    "Controller logging is available"
+                },
+                failed.then_some("Check disk space and controller log permissions"),
+            );
+            fleetd_contracts::diagnostics::value(&report)
+        }
         OperationId::Status => {
             fields(input, &[])?;
             json!({"controller":wire::controller(&controller.identity),"startedAt":controller.started_at,"stopping":controller.stopping()?,"loggingRetentionDays":state.days,"loggingError":state.diagnostics.error()?})

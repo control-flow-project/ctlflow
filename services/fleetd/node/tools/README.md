@@ -39,28 +39,6 @@ fingerprints. Appended instances/files are allowed only while all earlier
 entries remain present and exact. Hash equality is not conversation-quality or
 paid-provider evidence. IDs, paths, digests and screenshots remain private.
 
-## Observation-journal conversion
-
-For the specifically supported pre-idle journal schema:
-
-```sh
-fleet daemon stop --root /absolute/private/controller
-node services/fleetd/dist/tools/main.js migrate-observations \
-  --root /absolute/private/controller --directory /absolute/private/fleet \
-  --backup /absolute/private/new-observation-backup \
-  --output /absolute/private/conversion-result.json
-```
-
-Verify a complete backup first. The new backup directory must be outside selected
-state. Exclusive controller/receiver ownership rejects live writers.
-Validate enrolled identities and every observation, durably back up exact original
-bytes, then atomically convert. Unknown old activity/history fields become null.
-
-Pending terminal output, timestamps, credentials, native histories and cursors
-are not discarded. Current files are no-ops; unknown schemas fail.
-Interrupted conversion can retry with verified originals and a new backup.
-The current runtime has no alternate old-schema reader.
-
 ## Explicit Pi provider acceptance
 
 This command sends actual model requests only with `--execute`.

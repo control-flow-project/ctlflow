@@ -11,29 +11,30 @@ import { createRegistry } from '@ctlflow/fleetd-storage/registry';
 import { instanceView } from '@ctlflow/fleetd-contracts/api';
 import { nativeOptions, type Configuration } from '@ctlflow/fleetd-domain/model';
 import { createExecution } from '@ctlflow/fleetd-adapter-execution/execution';
+import { connectMatrix } from '@ctlflow/crossfire-adapter-matrix/connection';
 import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 
 test('role coordination options are separate from native options and strictly validate modes, capabilities and selected identities', () => {
   const native = { name: 'Analyst', runtime: 'codex', runtime_options: { model: 'fixture', native_option: true } };
   assert(definition(native).ok);
-  const options = { wake_mode: 'selected', wake_senders: [{ matrix_user_id: '@owner:test', include_agents: true }], permissions: ['room.agent.invite'] };
+  const options = { wake_mode: 'selected', wake_senders: [{ backend_user_id: '@owner:test', include_agents: true }], permissions: ['room.agent.invite'] };
   const valid = definition({ ...native, coordination_options: options });
   assert(valid.ok); assert.deepEqual(valid.value.runtime_options, native.runtime_options);
   for (const invalid of [{ ...options, extra: true }, { ...options, wake_mode: 'agents' },
     { ...options, permissions: ['policy.manage'] }, { ...options, permissions: ['room.agent.invite', 'room.agent.invite'] },
-    { ...options, sender_matrix_ids: ['@person:test'] }, { ...options, permissions: undefined }, { ...options, wake_mode: 'owner-agents' },
+    { ...options, sender_backend_user_ids: ['@person:test'] }, { ...options, permissions: undefined }, { ...options, wake_mode: 'owner-agents' },
     { ...options, wake_mode: 'everyone' }, { ...options, wake_senders: undefined },
     { ...options, wake_senders: [options.wake_senders[0], options.wake_senders[0]] },
-    { ...options, wake_senders: [{ matrix_user_id: 'person', include_agents: true }] },
-    { ...options, wake_senders: [{ matrix_user_id: '@person:test' }] }]) {
+    { ...options, wake_senders: [{ backend_user_id: 'invalid\nidentity', include_agents: true }] },
+    { ...options, wake_senders: [{ backend_user_id: '@person:test' }] }]) {
     assert.equal(definition({ ...native, coordination_options: invalid }).ok, false);
   }
   const selected = parseToml('name = "Analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "fixture"\n'
     + '[coordination_options]\nwake_mode = "selected"\npermissions = []\n'
-    + '[[coordination_options.wake_senders]]\nmatrix_user_id = "@owner:test"\ninclude_agents = true\n'
-    + '[[coordination_options.wake_senders]]\nmatrix_user_id = "@peer:test"\ninclude_agents = false\n', definition);
+    + '[[coordination_options.wake_senders]]\nbackend_user_id = "@owner:test"\ninclude_agents = true\n'
+    + '[[coordination_options.wake_senders]]\nbackend_user_id = "@peer:test"\ninclude_agents = false\n', definition);
   assert(selected.ok); assert.deepEqual(selected.value.coordination_options!.wake_senders,
-    [{ matrix_user_id: '@owner:test', include_agents: true }, { matrix_user_id: '@peer:test', include_agents: false }]);
+    [{ backend_user_id: '@owner:test', include_agents: true }, { backend_user_id: '@peer:test', include_agents: false }]);
 });
 
 test('all instances inherit one complete role policy and changing it changes the deployed configuration digest', scope => {
@@ -48,11 +49,11 @@ test('all instances inherit one complete role policy and changing it changes the
   const initial = loadConfiguration(directory); assert(initial.ok);
   assert.deepEqual(initial.value.definitions.analyst!.coordinationPolicy, defaultCoordinationPolicy('@owner:test'));
   writeFileSync(join(role, 'agent.toml'), source + '[coordination_options]\nwake_mode = "selected"\npermissions = ["room.agent.invite"]\n'
-    + '[[coordination_options.wake_senders]]\nmatrix_user_id = "@owner:test"\ninclude_agents = true\n', { mode: 0o600 });
+    + '[[coordination_options.wake_senders]]\nbackend_user_id = "@owner:test"\ninclude_agents = true\n', { mode: 0o600 });
   const configured = loadConfiguration(directory); assert(configured.ok);
   assert.notEqual(configured.value.digest, initial.value.digest);
   assert.deepEqual(configured.value.definitions.analyst!.coordinationPolicy,
-    { wakeMode: 'selected', senders: [{ matrixUserId: '@owner:test', includeAgents: true }], permissions: ['room.agent.invite'] });
+    { wakeMode: 'selected', senders: [{ backendUserId: '@owner:test', includeAgents: true }], permissions: ['room.agent.invite'] });
   assert.deepEqual(configured.value.roster.instances.map(instance => configured.value.definitions[instance.definition]!.coordinationPolicy),
     [configured.value.definitions.analyst!.coordinationPolicy, configured.value.definitions.analyst!.coordinationPolicy]);
   assert.deepEqual(configured.value.definitions.analyst!.options, Object.assign(Object.create(null), { model: 'fixture' }));
@@ -109,7 +110,7 @@ test('native instance options share one role and replace only explicitly selecte
   const registry = createRegistry(join(directory, '.registry'));
   const written = registry.writeRoster(loaded.value, loaded.value.roster); assert(written.ok);
   assert.deepEqual(written.value.roster, loaded.value.roster);
-  const execution = createExecution({ codex: codexRuntime() }, directory, () => {});
+  const execution = createExecution({ codex: codexRuntime() }, connectMatrix, directory, () => {});
   assert(execution.validate(written.value).ok);
   for (const effort of ['low', 'medium', 'high', 'xhigh', 'max']) {
     const configured: Configuration = { ...written.value, roster: { ...written.value.roster, instances: [
@@ -124,7 +125,7 @@ test('native instance options share one role and replace only explicitly selecte
   const adapter = { ...codexRuntime(), inspect: async (input: { options: unknown }) => {
     inspected.push(input.options as Record<string, unknown>); return { ok: true as const, value: undefined };
   } };
-  assert((await createExecution({ codex: adapter }, directory, () => {}).inspect(written.value, new AbortController().signal)).ok);
+  assert((await createExecution({ codex: adapter }, connectMatrix, directory, () => {}).inspect(written.value, new AbortController().signal)).ok);
   assert.deepEqual(inspected, [baseline, selected]);
   writeFileSync(join(directory, 'runtime.toml'), source + '[instances.runtime_options]\nmodel_reasoning_effort="low"\n', { mode: 0o600 });
   const changed = loadConfiguration(directory); assert(changed.ok);

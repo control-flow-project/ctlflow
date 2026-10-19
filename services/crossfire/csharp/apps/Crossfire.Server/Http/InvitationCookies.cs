@@ -1,14 +1,13 @@
 using Crossfire.Contracts;
+using Crossfire.Domain;
 
 namespace Crossfire.Server.Http;
-
-public sealed record InvitationClaim(string Id, string Secret);
 
 public static class InvitationCookies
 {
     public const string Name = "__Host-crossfire-invitation";
 
-    public static InvitationClaim? Read(HttpRequest request)
+    public static MemberSignupClaim? Read(HttpRequest request)
     {
         var values = request.Headers.Cookie.ToString().Split(';').Select(value => value.Trim()).Where(value => value.StartsWith(Name + "=", StringComparison.Ordinal)).ToArray();
         if (values.Length != 1) return null;

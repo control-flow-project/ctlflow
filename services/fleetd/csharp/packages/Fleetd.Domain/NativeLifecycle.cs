@@ -14,12 +14,13 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
     private readonly Dictionary<string, NativeState> observations = new(StringComparer.Ordinal);
     private readonly HashSet<string> working = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> unsettled = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, long> workRevisions = new(StringComparer.Ordinal);
     private OwnedRuntimeConnection? native;
     private CancellationTokenRegistration nativeClosed;
     private ITimer? idleTimer;
     private Task? recovery, idleWork, closing;
     private string session, phase = "sleeping";
-    private long lastActivity, generation, workRevision;
+    private long lastActivity, generation;
     private int idleSeconds = 1800, activeCalls, closed;
     private bool activated, ready, recording, failedEpisode, inspectionUncertain;
     private Failure? initializationFailure;
@@ -52,7 +53,7 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
     private void Touch() { lock (gate) { lastActivity = Now; Schedule(); } }
     private void Emit(string state, string? message = null)
     {
-        NativeState[] events; lock (gate) events = contexts.Select(context => new NativeState(services.Runtime, context.SessionId, context.Context is "shared" or "control" ? null : context.Context, state, Now, observations.GetValueOrDefault(context.SessionId)?.Settings ?? services.Settings, message is null ? null : TextRules.TruncateUtf8(message, 4000))).ToArray();
+        NativeState[] events; lock (gate) events = contexts.Select(context => new NativeState(services.Runtime, context.SessionId, HistoryContext.Room(context.Context), state, Now, observations.GetValueOrDefault(context.SessionId)?.Settings ?? services.Settings, message is null ? null : TextRules.TruncateUtf8(message, 4000))).ToArray();
         foreach (var value in events) { lock (gate) observations[value.SessionId] = value; services.Hooks.Observe?.Invoke(value); }
     }
     private void Report(Failure error)
@@ -62,11 +63,12 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
     }
     private Result<Unit> CaptureInput(string context, string sessionId)
     {
-        lock (observationGate) { workRevision++; return services.Work.Capture([new(context, sessionId)]); }
+        lock (observationGate) { ReviseWork(context); return services.Work.Capture([new(context, sessionId)]); }
     }
+    private void ReviseWork(string context) => workRevisions[context] = checked(workRevisions.GetValueOrDefault(context) + 1);
     private async ValueTask<Result<bool>> InspectNative(OwnedRuntimeConnection connection)
     {
-        long revision; lock (observationGate) revision = workRevision;
+        Dictionary<string, long> revisions; lock (observationGate) revisions = new(workRevisions, StringComparer.Ordinal);
         var activity = await connection.Activity(); if (!activity.IsSuccess) return Result<bool>.Fail(activity.Error);
         var status = Result<bool>.Success(activity.Value.Busy);
         lock (observationGate)
@@ -74,10 +76,11 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
             InterruptedContext[] completed;
             lock (gate)
             {
-                if (!ready || !ReferenceEquals(native, connection) || connection.Lifetime.IsCancellationRequested || revision != workRevision) return status;
+                if (!ready || !ReferenceEquals(native, connection) || connection.Lifetime.IsCancellationRequested) return status;
                 var saved = contexts.ToDictionary(value => value.Context, value => value.SessionId, StringComparer.Ordinal);
                 var pending = unsettled.Values.ToHashSet(StringComparer.Ordinal);
-                completed = activity.Value.Contexts.Where(value => !value.Busy && !pending.Contains(value.Context) && saved.GetValueOrDefault(value.Context) == value.SessionId)
+                completed = activity.Value.Contexts.Where(value => !value.Busy && !pending.Contains(value.Context) && saved.GetValueOrDefault(value.Context) == value.SessionId
+                    && revisions.GetValueOrDefault(value.Context) == workRevisions.GetValueOrDefault(value.Context))
                     .Select(value => new InterruptedContext(value.Context, value.SessionId)).ToArray();
             }
             var cleared = services.Work.Clear(completed); if (!cleared.IsSuccess) return Result<bool>.Fail(cleared.Error);
@@ -103,7 +106,12 @@ public sealed partial class NativeLifecycle : RuntimeLifecycle, IAsyncDisposable
             }
             if (capture && value is NativeState observed)
             {
-                Result<Unit> stored = Results.Done(); if (active) { workRevision++; stored = services.Work.Capture([new(observed.RoomId ?? services.Primary, observed.SessionId)]); }
+                Result<Unit> stored = Results.Done();
+                if (active)
+                {
+                    var context = observed.RoomId is null ? services.Primary : HistoryContext.ForRoom(observed.RoomId);
+                    ReviseWork(context); stored = services.Work.Capture([new(context, observed.SessionId)]);
+                }
                 if (!stored.IsSuccess) failure = stored.Error;
             }
         }

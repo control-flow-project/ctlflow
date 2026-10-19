@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         store.transaction(|store| {
             let principal = Principal {
                 id: id.clone(),
-                matrix_user_id: format!("@rust-{id}:example.test"),
+                backend_user_id: format!("@rust-{id}:example.test"),
                 kind: PrincipalKind::Human,
                 status: Status::Active,
                 revision: 0,
@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let identity = store.schema_identity()?;
     let principal = store.principal(id)?;
     let data = json!({"application":identity.0,"version":identity.1,"id":principal.as_ref().map(|value| value.id.as_str()),
-        "matrixUserId":principal.as_ref().map(|value| value.matrix_user_id.as_str()),"createdAt":principal.as_ref().map(|value| value.created_at),
+        "backendUserId":principal.as_ref().map(|value| value.backend_user_id.as_str()),"createdAt":principal.as_ref().map(|value| value.created_at),
         "permissions":if principal.is_some() { store.permissions(id)?.into_iter().map(|permission| permission.code()).collect::<Vec<_>>() } else { Vec::new() }});
     println!("{data}");
     Ok(())

@@ -10,13 +10,13 @@ const instancePolicy = check.refine(check.object({ instanceKey: check.name, name
   senders: check.list(wakeSelection, 2000) }), entry => new Set(entry.senders.map(sender => sender.principalId)).size === entry.senders.length
     && (entry.mode !== 'everyone' || entry.senders.length === 0), 'Select unique identities; everyone requires no individual selections');
 export const fleetWakePlan = check.refine(check.object({ fleetId: check.identifier, fleetKey: check.name,
-  ownerMatrixId: check.matrixUserId, controllerName: check.text(100), instances: check.list(instancePolicy, 100, 1) }), plan =>
+  ownerBackendUserId: check.backendUserId, controllerName: check.text(100), instances: check.list(instancePolicy, 100, 1) }), plan =>
   new Set(plan.instances.map(entry => entry.instanceKey)).size === plan.instances.length
     && new Set(plan.instances.map(entry => entry.name)).size === plan.instances.length, 'Fleet instance keys and names must be unique');
 type Plan = check.Parsed<typeof fleetWakePlan>;
 type Policy = check.Parsed<typeof wakePolicy>;
 type PolicyChange = { instanceKey: string; name: string; agentId: string; before: Policy; after: Policy; desired: Plan['instances'][number]; changeRequired: boolean };
-export type FleetWakeReport = { fleetId: string; fleetKey: string; ownerMatrixId: string; controllerName: string;
+export type FleetWakeReport = { fleetId: string; fleetKey: string; ownerBackendUserId: string; controllerName: string;
   executed: boolean; changed: number; instances: PolicyChange[] };
 
 function sameIds(first: string[], second: string[]): boolean {
@@ -30,13 +30,13 @@ async function readRoster(human: Human, plan: Plan) {
   const current = await human.client.call(operations.fleet, { fleetId: plan.fleetId }, {});
   if (!current.ok) return current;
   const fleet = current.value.data;
-  if (fleet.fleetId !== plan.fleetId || fleet.fleetKey !== plan.fleetKey || fleet.owner.matrixUserId !== plan.ownerMatrixId
+  if (fleet.fleetId !== plan.fleetId || fleet.fleetKey !== plan.fleetKey || fleet.owner.backendUserId !== plan.ownerBackendUserId
     || fleet.controller.name !== plan.controllerName) return failure('conflict', 'Fleet differs from the exact supplied identity/owner/controller');
   const instances = await collectPages(query => human.client.call(operations.fleetAgents, { fleetId: plan.fleetId }, {}, query), entry => entry.agent.agentId);
   if (!instances.ok) return instances;
   if (instances.value.length !== plan.instances.length || instances.value.some(entry => !plan.instances.some(expected =>
     expected.instanceKey === entry.instanceKey && expected.name === entry.agent.name))) return failure('conflict', 'Fleet differs from the exact supplied roster');
-  if (instances.value.some(entry => entry.agent.owner.matrixUserId !== plan.ownerMatrixId || entry.agent.status !== 'active'
+  if (instances.value.some(entry => entry.agent.owner.backendUserId !== plan.ownerBackendUserId || entry.agent.status !== 'active'
     || entry.agent.owner.status !== 'active' || !entry.agent.allowedActions.includes('configure')
     || entry.agent.deployment?.fleetId !== plan.fleetId || entry.agent.deployment.instanceKey !== entry.instanceKey)) return failure('forbidden', 'Every planned agent must be active, owned by the expected owner, bound to this fleet and configurable');
   return success({ fleet, instances: instances.value });
@@ -68,7 +68,7 @@ export async function reviewFleetWake(origin: string, account: Credentials, inpu
   const checked = fleetWakePlan(input); if (!checked.ok) return checked;
   const plan = checked.value;
   return withHuman(origin, account, signal, async human => {
-    if (human.viewer.member.matrixUserId !== plan.ownerMatrixId && human.viewer.member.roleCode !== 'administrator') return failure('forbidden', 'Only the owner or administrator may configure this fleet');
+    if (human.viewer.member.backendUserId !== plan.ownerBackendUserId && human.viewer.member.roleCode !== 'administrator') return failure('forbidden', 'Only the owner or administrator may configure this fleet');
     const initial = await readRoster(human, plan); if (!initial.ok) return initial;
     const prepared = await prepare(human, plan); if (!prepared.ok) return prepared;
     const completed: string[] = [];
@@ -96,7 +96,7 @@ export async function reviewFleetWake(origin: string, account: Credentials, inpu
         || !matches(current.value.data, { ...change.desired, mode: change.after.mode,
           senders: change.after.senders.map(sender => ({ principalId: sender.identity.principalId, includeAgents: sender.includeAgents })) })) return partial({ code: 'conflict', message: 'Wake policy changed during verification' });
     }
-    return success({ fleetId: plan.fleetId, fleetKey: plan.fleetKey, ownerMatrixId: plan.ownerMatrixId,
+    return success({ fleetId: plan.fleetId, fleetKey: plan.fleetKey, ownerBackendUserId: plan.ownerBackendUserId,
       controllerName: plan.controllerName, executed: execute, changed: completed.length, instances: prepared.value });
   });
 }

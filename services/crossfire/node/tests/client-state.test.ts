@@ -54,11 +54,11 @@ test("private file operations reject leaf and ancestor links, public files and o
 });
 
 test("server and client account credentials share a strict bounded native contract", () => {
-  const input = { user_id: "@agent:example.org", access_token: "x".repeat(8192), device_id: "AGENT" };
+  const input = { userId: "agent", accessToken: "x".repeat(8192), native: { deviceId: "AGENT" } };
   assert.equal(account(input).ok, true);
-  assert.equal(account({ ...input, access_token: "x".repeat(8193) }).ok, false);
+  assert.equal(account({ ...input, accessToken: "x".repeat(8193) }).ok, false);
   assert.equal(account({ ...input, password: "not-a-client-field" }).ok, false);
-  assert.equal(account({ ...input, user_id: "agent" }).ok, false);
+  assert.equal(account({ ...input, userId: "agent\n" }).ok, false);
 });
 
 test('project privacy preserves subprocess failures and never treats them as a Git exit or creates credential storage', () => {

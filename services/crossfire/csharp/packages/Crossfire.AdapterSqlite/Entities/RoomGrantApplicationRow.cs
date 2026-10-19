@@ -8,8 +8,7 @@ public class RoomGrantApplicationRow
     public long? AppliedRevision { get; set; }
     public long? AppliedAccessRevision { get; set; }
     public string? Membership { get; set; }
-    public long? PowerLevel { get; set; }
-    public long Creator { get; set; }
+    public string? NativeAccess { get; set; }
     public long? LastAttemptAt { get; set; }
     public long? LastSuccessAt { get; set; }
     public long NextCheckAt { get; set; }

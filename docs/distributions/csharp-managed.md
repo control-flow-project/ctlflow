@@ -101,7 +101,7 @@ replace the controller with an npm executable on PATH.
 ```sh
 export PATH="/absolute/releases/csharp-managed/fleet:/absolute/releases/csharp-managed/fleetd:$PATH"
 fleet --help
-fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerMatrixId=%40member%3Aexample.test'
+fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerBackendUserId=%40member%3Aexample.test'
 fleet list
 ```
 

@@ -1,4 +1,5 @@
 using Crossfire.AdapterSqlite;
+using Crossfire.AdapterMatrix;
 using Crossfire.Domain;
 using Crossfire.Kernel;
 using Microsoft.EntityFrameworkCore;
@@ -25,11 +26,11 @@ public static class EnrollmentAcceptance
         {
             Equal(context.Database.CurrentTransaction is null, true, "native enrollment identity proof outside transaction");
             calls++;
-            return ValueTask.FromResult(token == "saved-agent-token" ? Result<string>.Success(agent.Principal.MatrixUserId) : Results.Fail<string>("unauthorized", "Invalid native identity"));
+            return ValueTask.FromResult(token == "saved-agent-token" ? Result<string>.Success(agent.Principal.BackendUserId) : Results.Fail<string>("unauthorized", "Invalid native identity"));
         });
-        var policy = new CoordinationPolicy("selected", [new(((NativeAuthentication)owner.Authentication!).MatrixUserId, true)], ["room.agent.invite"]);
+        var policy = new CoordinationPolicy("selected", [new(((NativeAuthentication)owner.Authentication!).BackendUserId, true)], ["room.agent.invite"]);
         var instance = new RosterInstance("test-agent", agent.Name, fixture.AgentId, policy, "saved-agent-token");
-        var roster = new EnrollmentRoster(((NativeAuthentication)owner.Authentication!).MatrixUserId, fixture.FleetKey, new("Native test", new Dictionary<string, string>()), [instance], credential);
+        var roster = new EnrollmentRoster(((NativeAuthentication)owner.Authentication!).BackendUserId, fixture.FleetKey, new("Native test", new Dictionary<string, string>()), [instance], credential);
         Equal((await EnrollmentAdmission.Preflight(ports, roster)).Value, 1, "matching saved roster preflight");
         Equal(calls, 1, "live identity proof uses native authority");
         var collision = roster with { FleetKey = "new-enrollment", ControllerCredential = null, Instances = [instance with { AgentId = null, AccessToken = null }] };
@@ -62,7 +63,8 @@ public static class EnrollmentAcceptance
         Equal(calls, previousCalls, "retirement review never logs in to deactivated native identity");
         Equal((await EnrollmentAdmission.Preflight(ports, roster with { Instances = [instance with { AccessToken = "wrong-token" }] })).Error.Code,
             "forbidden", "retirement is not permission to replace private identity proof");
-        Equal(IdentitySyntax.MatrixUser("@name\u0085:example.test"), true, "identity syntax does not add non-ECMAScript whitespace restrictions");
-        Equal(IdentitySyntax.MatrixUser("@name\ufeff:example.test"), false, "identity syntax excludes ECMAScript BOM whitespace");
+        Equal(IdentitySyntax.BackendIdentifier("@name\u0085:example.test"), true, "identity syntax does not add non-ECMAScript whitespace restrictions");
+        Equal(IdentitySyntax.BackendIdentifier("@name\ufeff:example.test"), true, "opaque backend identity does not impose native grammar");
+        Equal(MatrixSyntax.UserId("@name\ufeff:example.test"), false, "Matrix adapter excludes native BOM whitespace");
     }
 }

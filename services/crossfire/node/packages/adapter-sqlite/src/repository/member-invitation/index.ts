@@ -27,7 +27,7 @@ export function createMemberInvitationRepository(database: Database.Database): M
       expires_at: params.expiresAt,
       consumed_by_member_id: params.consumedByMemberId,
       revoked_at: params.revokedAt,
-      claim_matrix_user_id: params.claimMatrixUserId,
+      claim_backend_user_id: params.claimBackendUserId,
       claim_display_name: params.claimDisplayName,
       claim_fingerprint: params.claimFingerprint,
         }), value);
@@ -45,7 +45,7 @@ export function createMemberInvitationRepository(database: Database.Database): M
       expires_at: params.expiresAt,
       consumed_by_member_id: params.consumedByMemberId,
       revoked_at: params.revokedAt,
-      claim_matrix_user_id: params.claimMatrixUserId,
+      claim_backend_user_id: params.claimBackendUserId,
       claim_display_name: params.claimDisplayName,
       claim_fingerprint: params.claimFingerprint,
         }).where(row => row.id === params.id), value);

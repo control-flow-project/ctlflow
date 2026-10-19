@@ -11,12 +11,12 @@ public static class DomainAcceptance
     {
         var now = 1700000000000L;
         var principals = PolicyQueries.Ports(context, () => now);
-        Equal(PrincipalValues.Initialize(principals, "@administrator:example.test").IsSuccess, true, "first-party initialization");
-        var administrator = MemberQueries.ByMatrixId(context, "@administrator:example.test").Value!;
+        Equal(PrincipalValues.Initialize(principals, "@administrator:example.test", "administrator").IsSuccess, true, "first-party initialization");
+        var administrator = MemberQueries.ByBackendUserId(context, "@administrator:example.test").Value!;
         Equal(PolicyQueries.Find(context).Value?.FleetIdleTimeoutSeconds, 1800L, "canonical fleet sleep default");
-        Equal(PrincipalValues.Initialize(principals, administrator.MatrixUserId).IsSuccess, true, "repeatable initialization");
+        Equal(PrincipalValues.Initialize(principals, administrator.BackendUserId, "administrator").IsSuccess, true, "repeatable initialization");
         var ports = MemberCommands.Ports(context, () => now);
-        var admin = new Actor(administrator.Id, "human", new NativeAuthentication(administrator.MatrixUserId));
+        var admin = new Actor(administrator.Id, "human", new NativeAuthentication(administrator.BackendUserId));
         var owner = new Actor(ownerId, "human", new NativeAuthentication(matrixId));
         Equal(Members.List(ports, admin, 1, 10).Value.TotalItems >= 2, true, "administrator member listing");
         Equal(Members.Read(ports, owner, administrator.Id).Error.Code, "forbidden", "private membership authorization");
@@ -44,6 +44,7 @@ public static class DomainAcceptance
         AgentAcceptance.Verify(context, owner, admin, () => now);
         DecisionAcceptance.Verify(context, owner, admin, now);
         FleetAcceptance.Verify(context, owner, admin, now);
+        await MessagingSeparationAcceptance.Verify(context, owner, now);
         await RoomGrantAcceptance.Verify(context, owner, admin, now);
         await ReconciliationAcceptance.Verify(context, owner, now);
         await EnrollmentAcceptance.Verify(context, admin, now);

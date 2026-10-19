@@ -34,7 +34,7 @@ async fn invitations_use_incremental_sync_and_verify_current_author_and_native_e
     protocol?;
     let invitation = result?.ok_or("Missing verified invitation")?;
     assert_eq!(invitation.event_id, "$invitation");
-    assert_eq!(invitation.sender_matrix_id, "@owner:example.test");
+    assert_eq!(invitation.sender_backend_user_id, "@owner:example.test");
     assert!(invitation.direct);
     let (result, protocol) = tokio::join!(
         authority.invitation("@agent:example.test", "!room:example.test"),
