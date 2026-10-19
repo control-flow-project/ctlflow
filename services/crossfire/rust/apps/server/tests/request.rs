@@ -1,7 +1,8 @@
+use crossfire_adapter_http::query::Query;
 use crossfire_adapter_http::server::{Method, Request};
 use crossfire_contracts::operations::OperationId;
 use crossfire_kernel::failure::ErrorCode;
-use crossfire_server::request::{self, Query};
+use crossfire_server::request;
 
 #[test]
 fn well_formed_forbidden_paths_are_missing_without_weakening_encoding_checks()
@@ -36,7 +37,7 @@ fn well_formed_forbidden_paths_are_missing_without_weakening_encoding_checks()
 async fn unsafe_or_missing_public_assets_are_not_disclosed()
 -> Result<(), Box<dyn std::error::Error>> {
     use crossfire_adapter_filesystem::assets::Directory;
-    use crossfire_server::assets;
+    use crossfire_adapter_http::assets;
     use tokio_util::sync::CancellationToken;
     let root = tempfile::tempdir()?;
     std::fs::write(root.path().join("index.html"), b"public")?;

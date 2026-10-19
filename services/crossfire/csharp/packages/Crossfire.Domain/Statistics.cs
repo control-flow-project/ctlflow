@@ -6,10 +6,10 @@ namespace Crossfire.Domain;
 public sealed record TokenCounts(long Input, long CachedInput, long? CacheWriteInput, long Output, long? ReasoningOutput, long Total);
 public sealed record UsageSample(string Runtime, string SessionId, TokenCounts Tokens);
 public sealed record TrafficTotals(long Observed = 0, long Delivered = 0, long ContentBytes = 0, long DeliveredBytes = 0, long AttachmentBytes = 0, long LargestBytes = 0);
-public sealed record TrafficFlow(string RoomId, string SenderMatrixId, string MessageType, TrafficTotals Totals);
+public sealed record TrafficFlow(string RoomId, string SenderBackendUserId, string MessageType, TrafficTotals Totals);
 public sealed record StatisticsBatch(long Sequence, long StartedAt, long EndedAt, long Dropped, IReadOnlyList<TrafficFlow> Flows, IReadOnlyList<UsageSample> Usage);
 public sealed record AgentStatistics(string AgentId, TrafficTotals Totals, TokenCounts? Tokens);
-public sealed record StatisticsFlow(string AgentId, string RoomId, string SenderMatrixId, string MessageType, TrafficTotals Totals);
+public sealed record StatisticsFlow(string AgentId, string RoomId, string SenderBackendUserId, string MessageType, TrafficTotals Totals);
 public sealed record StatisticsSummary(long Intervals, long Dropped, long? FirstReportAt, long? LastReportAt, TrafficTotals Totals,
     IReadOnlyList<AgentStatistics> Agents, IReadOnlyList<StatisticsFlow> Flows, long TotalFlows, TokenCounts? Tokens);
 public sealed record StatisticsPorts(Func<string, string, StatisticsBatch, long, Result<Unit>> Record,
@@ -25,7 +25,7 @@ public static class Statistics
         foreach (var flow in value.Flows)
         {
             if (!first) output.Append(','); first = false;
-            output.Append("{\"roomId\":"); ProtocolJson.String(output, flow.RoomId); output.Append(",\"senderMatrixId\":"); ProtocolJson.String(output, flow.SenderMatrixId);
+            output.Append("{\"roomId\":"); ProtocolJson.String(output, flow.RoomId); output.Append(",\"senderBackendUserId\":"); ProtocolJson.String(output, flow.SenderBackendUserId);
             output.Append(",\"messageType\":"); ProtocolJson.String(output, flow.MessageType);
             output.Append(",\"observed\":").Append(flow.Totals.Observed).Append(",\"delivered\":").Append(flow.Totals.Delivered).Append(",\"contentBytes\":").Append(flow.Totals.ContentBytes)
                 .Append(",\"deliveredBytes\":").Append(flow.Totals.DeliveredBytes).Append(",\"attachmentBytes\":").Append(flow.Totals.AttachmentBytes).Append(",\"largestBytes\":").Append(flow.Totals.LargestBytes).Append('}');

@@ -11,7 +11,7 @@ export function mapMemberInvitation(row: Tables['member_invitation']): MemberInv
     expiresAt: row.expires_at,
     consumedByMemberId: row.consumed_by_member_id,
     revokedAt: row.revoked_at,
-    claimMatrixUserId: row.claim_matrix_user_id,
+    claimBackendUserId: row.claim_backend_user_id,
     claimDisplayName: row.claim_display_name,
     claimFingerprint: row.claim_fingerprint,
   };

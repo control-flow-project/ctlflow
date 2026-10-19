@@ -3,11 +3,11 @@ import type { RoomDetails } from '@ctlflow/crossfire-domain/room/read-room';
 import type { GrantPlanPreview } from '@ctlflow/crossfire-domain/room-access/grant-plan';
 export function grant(value: AgentRoomGrant) {
   return { agentId: value.agentId, roomId: value.roomId, generation: value.generation, authorizerId: value.authorizerId, addedById: value.addedById,
-    accessMode: value.accessMode, powerLevel: value.powerLevel, muted: value.muted, revision: value.revision, accessRevision: value.accessRevision, updatedAt: value.updatedAt };
+    accessMode: value.accessMode, nativeAccess: value.nativeAccess, muted: value.muted, revision: value.revision, accessRevision: value.accessRevision, updatedAt: value.updatedAt };
 }
 export function application(value: RoomGrantApplication) {
   return { observedGeneration: value.observedGeneration, appliedRevision: value.appliedRevision, appliedAccessRevision: value.appliedAccessRevision,
-    membership: value.membership, creator: value.creator, powerLevel: value.powerLevel, lastAttemptAt: value.lastAttemptAt, lastSuccessAt: value.lastSuccessAt,
+    membership: value.membership, nativeAccess: value.nativeAccess, lastAttemptAt: value.lastAttemptAt, lastSuccessAt: value.lastSuccessAt,
     errorCode: value.errorCode, errorMessage: value.errorMessage };
 }
 export function grantView(value: { agentId: string; revision: number; ownerConversation: boolean; grant: AgentRoomGrant | null; application: RoomGrantApplication | null; permissions: string[]; allowedActions: string[] }) {
@@ -17,8 +17,8 @@ export function grantView(value: { agentId: string; revision: number; ownerConve
 export function room(value: RoomDetails) {
   const facts = value.authority;
   return { roomId: value.roomId, name: value.name, topic: value.topic, alias: value.alias, authority: facts ? {
-    matrixUserId: facts.matrixUserId, powerLevel: facts.powerLevel, creator: facts.creator, creatorIds: facts.creatorIds, readLevel: facts.readLevel,
-    replyLevel: facts.replyLevel, inviteLevel: facts.inviteLevel, kickLevel: facts.kickLevel, changePowerLevel: facts.changePowerLevel, nativePermissions: facts.nativePermissions,
+    backendUserId: facts.backendUserId, canInvite: facts.canInvite, authorityRevision: facts.authorityRevision,
+    accessModes: facts.accessModes, accessFields: facts.accessFields, permissions: facts.permissions,
   } : null };
 }
 export function plan(value: GrantPlanPreview) {
@@ -27,6 +27,9 @@ export function plan(value: GrantPlanPreview) {
     changes: value.changes.map(change => ({ agentId: change.input.agentId, roomId: change.input.roomId,
       agentName: change.agentName, instanceKey: change.instanceKey, roomName: change.roomName, roomAlias: change.roomAlias,
       before: change.previous ? grant(change.previous) : null,
-      after: change.input.accessMode === 'none' ? null : { roomId: change.input.roomId, accessMode: change.input.accessMode, powerLevel: change.input.powerLevel, muted: change.input.muted },
-      changed: change.changed, authorizerId: change.authorizerId, nativePowerLevel: change.native?.powerLevel ?? null, nativeCreator: change.native?.creator ?? false })) };
+      after: change.input.accessMode === 'none' ? null : { roomId: change.input.roomId, accessMode: change.input.accessMode, nativeAccess: change.input.nativeAccess, muted: change.input.muted },
+      changed: change.changed, authorizerId: change.authorizerId, authority: change.native ? {
+        backendUserId: change.native.backendUserId, canInvite: change.native.canInvite, authorityRevision: change.native.authorityRevision,
+        accessModes: change.native.accessModes, accessFields: change.native.accessFields, permissions: change.native.permissions,
+      } : null })) };
 }

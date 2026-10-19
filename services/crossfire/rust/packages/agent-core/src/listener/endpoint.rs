@@ -1,10 +1,6 @@
 use super::*;
-use crate::{
-    history_queries,
-    matrix::{self, API, Request},
-    owner_authority, receive_pages,
-};
-use crossfire_contracts::operations::Method;
+use crate::{history_queries, owner_authority, receive_pages};
+use crossfire_domain::messaging_client::MessagingClient;
 use serde_json::Value;
 use std::pin::Pin;
 
@@ -18,7 +14,7 @@ pub trait ControlEndpoint: Send + Sync {
 impl<
     S: LocalState,
     C: Coordination,
-    M: Matrix,
+    M: MessagingClient + crossfire_domain::messaging_client::InvitationReader,
     N: Connection + TurnControl + Lifecycle + 'static,
     A: Acknowledgment,
     T: Clock + Clone + Send + Sync + 'static,
@@ -75,7 +71,7 @@ impl<
             }
             owner_authority::authorize(
                 self.resources.coordination.as_ref(),
-                self.resources.matrix.as_ref(),
+                self.resources.messaging.as_ref(),
                 &self.options.profile,
                 stop.clone(),
             )
@@ -93,20 +89,15 @@ impl<
                     "Agent or owner access is inactive",
                 ));
             }
-            let who = matrix::request(
-                self.resources.matrix.as_ref(),
-                &Request::new(Method::Get, format!("{API}/account/whoami")),
-                stop.clone(),
-            )
-            .await?;
-            if who["user_id"].as_str() != Some(self.options.profile.account.user_id.as_str()) {
+            let who = self.resources.messaging.identify(stop.clone()).await?;
+            if who != self.options.profile.account.user_id {
                 return Err(Failure::new(
                     ErrorCode::Forbidden,
-                    "Matrix authentication does not match this agent",
+                    "MessagingClient authentication does not match this agent",
                 ));
             }
             let joined =
-                receive_pages::joined(self.resources.matrix.as_ref(), stop.clone()).await?;
+                receive_pages::joined(self.resources.messaging.as_ref(), stop.clone()).await?;
             let rooms: Vec<_> = policy
                 .rooms
                 .iter()

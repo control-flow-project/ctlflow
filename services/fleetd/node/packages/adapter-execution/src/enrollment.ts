@@ -18,7 +18,7 @@ export async function prepareEnrollment(configuration: Configuration, controller
     const current = await authenticated.call(operations.fleet, { fleetId: binding.fleetId }, {});
     if (!current.ok) return current;
     if (current.value.data.fleetId !== binding.fleetId || current.value.data.fleetKey !== binding.fleetKey
-      || current.value.data.owner.matrixUserId !== binding.owner) return failure('conflict', 'Approved fleet authority differs from its saved identity');
+      || current.value.data.owner.backendUserId !== binding.owner) return failure('conflict', 'Approved fleet authority differs from its saved identity');
     const registered = await authenticated.call(operations.fleetAgents, { fleetId: binding.fleetId }, {}, new URLSearchParams({ page: '1', pageSize: '100' }));
     if (!registered.ok) return registered;
     const { data, meta } = registered.value;
@@ -29,8 +29,8 @@ export async function prepareEnrollment(configuration: Configuration, controller
       const expected = binding.identities.find(identity => identity.instanceKey === instance.key)!;
       const observed = data.find(item => item.instanceKey === instance.key)?.agent;
       if (!observed || observed.agentId !== expected.agentId || observed.name !== instance.name
-        || observed.matrixUserId !== expected.account.user_id || observed.deployment.fleetId !== binding.fleetId
-        || observed.deployment.instanceKey !== instance.key || observed.owner.matrixUserId !== binding.owner)
+        || observed.backendUserId !== expected.account.userId || observed.deployment.fleetId !== binding.fleetId
+        || observed.deployment.instanceKey !== instance.key || observed.owner.backendUserId !== binding.owner)
         return failure('conflict', 'Approved fleet instance differs from its saved identity: ' + instance.key);
       if (observed.status !== 'active' || observed.owner.status !== 'active') return failure('forbidden', 'Fleet resume requires active existing agent and owner accounts');
     }
@@ -39,10 +39,10 @@ export async function prepareEnrollment(configuration: Configuration, controller
   const instances = roster.instances.map(instance => {
     const existing = binding.identities.find(item => item.instanceKey === instance.key);
     return { instanceKey: instance.key, name: instance.name, coordinationPolicy: configuration.definitions[instance.definition]!.coordinationPolicy,
-      ...(existing ? { identity: { agentId: existing.agentId, accessToken: existing.account.access_token } } : {}) };
+      ...(existing ? { identity: { agentId: existing.agentId, accessToken: existing.account.accessToken } } : {}) };
   });
   const client = createClient({ origin: binding.server, signal });
-  const input = { ownerMatrixId: binding.owner, fleetKey: binding.fleetKey, controller, instances, ...(binding.controllerCredential ? { controllerCredential: binding.controllerCredential } : {}) };
+  const input = { ownerBackendUserId: binding.owner, fleetKey: binding.fleetKey, controller, instances, ...(binding.controllerCredential ? { controllerCredential: binding.controllerCredential } : {}) };
   const digest = createHash('sha256').update(JSON.stringify(input)).digest('hex');
   if (binding.request?.digest === digest) {
     const resumed = await client.call(operations.exchangeEnrollment, { enrollmentId: binding.request.enrollmentId }, { claimSecret: binding.request.claimSecret });
@@ -74,7 +74,7 @@ export async function prepareEnrollment(configuration: Configuration, controller
       waiting = true; approval({ url: introduced.value.data.approvalUrl, code: introduced.value.data.enrollment.enrollment.verificationCode });
     }
     if (exchanged.status === 'ready') {
-      if (!exchanged.fleet || exchanged.ownerMatrixId !== binding.owner) return failure('native', 'Enrollment does not match the approved fleet');
+      if (!exchanged.fleet || exchanged.ownerBackendUserId !== binding.owner) return failure('native', 'Enrollment does not match the approved fleet');
       binding.fleetId = exchanged.fleet.fleetId;
       binding.controllerCredential = exchanged.fleet.controllerCredential ?? binding.controllerCredential;
       if (!binding.controllerCredential) return failure('forbidden', 'This fleet controller has not been authorized');
@@ -82,7 +82,7 @@ export async function prepareEnrollment(configuration: Configuration, controller
         const requested = roster.instances.find(item => item.key === instance.instanceKey && item.name === instance.name);
         if (!requested) return failure('native', 'Unexpected enrollment identity');
         if (!instance.agentId || !instance.account) return failure('native', 'Approved identity is not ready');
-        const account = { user_id: instance.account.matrixUserId, access_token: instance.account.accessToken, device_id: instance.account.deviceId };
+        const account = instance.account;
         const existing = binding.identities.find(item => item.instanceKey === instance.instanceKey);
         if (existing && existing.agentId !== instance.agentId) return failure('conflict', 'An enrolled agent identity cannot be replaced');
         if (!existing) initializeHistory(configuration.directory, instance.agentId, null);

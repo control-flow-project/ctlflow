@@ -40,12 +40,12 @@ public sealed partial class AccountAuthority
 
     private async ValueTask<Result<Unit>> Remove(string id, CancellationToken cancellation)
     {
-        if (!Local(id) || id == configuration.ServiceMatrixId || id == "@conduit:" + configuration.ServerName)
+        if (!Local(id) || id == configuration.ServiceBackendUserId || id == "@conduit:" + configuration.ServerName)
             return Results.Fail<Unit>("forbidden", "Protected or invalid native account");
         var checkedAccount = await Deactivated(id, cancellation);
         if (!checkedAccount.IsSuccess) return Result<Unit>.Fail(checkedAccount.Error);
         if (checkedAccount.Value) return Results.Done();
-        var administrator = await AsUser(configuration.ServiceMatrixId, cancellation);
+        var administrator = await AsUser(configuration.ServiceBackendUserId, cancellation);
         if (!administrator.IsSuccess) return Result<Unit>.Fail(administrator.Error);
         var room = await MatrixJson.Ok(client, administrator.Value, "GET", MatrixJson.Api + "/directory/room/" + MatrixJson.Segment("#admins:" + configuration.ServerName), cancellation: cancellation);
         if (!room.IsSuccess) return Result<Unit>.Fail(room.Error);

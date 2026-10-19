@@ -16,7 +16,6 @@ public sealed class RegistryFiles
     public RegistryFiles(string root)
     {
         if (PrivateFiles.Exists(root)) PrivateFiles.ExistingDirectory(root, true); else PrivateFiles.Directory(root); this.root = root;
-        foreach (var name in new[] { "operations.json", "daemon.log" }) if (PrivateFiles.Exists(Path.Combine(root, name))) throw new InvalidDataException("Unsupported controller state: " + name + "; normal startup does not import obsolete files");
         operations = PrivateFiles.Directory(Path.Combine(root, "operations")); var setup = new SetupFiles(root);
         Port = new(Registrations, values => Save("fleets.json", values, FleetWire.Registration, 1048576), Desired, SaveDesired, Selections, SaveSelections, Pending, Operation, SaveOperation, Prune, directory => ConfigurationFiles.Load(directory), ConfigurationFiles.WriteRoster, setup.Prepare, setup.Complete, setup.Retry);
     }

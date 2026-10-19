@@ -1,3 +1,4 @@
+import { roomContext } from '@ctlflow/crossfire-kernel/history-context';
 import { join } from 'node:path';
 import { mkdtempSync, rmSync, lstatSync } from 'node:fs';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
@@ -67,8 +68,8 @@ export function piRuntime(binary = 'pi'): OwnedRuntimeAdapter {
         histories = piHistories({ ...input, options: parsed.value.options }, home, binary, stop);
         const owner = histories, unlock = release;
         const primary = await owner.open(input.listenerOptions?.historyMode === 'per-room' ? 'control' : 'shared');
-        return success({ ...primary, signal: owner.signal, attachment: null, attachments: async () => [], activity: owner.activity, inspect: async () => ({ busy: (await owner.activity()).busy }),
-          ...(input.listenerOptions?.historyMode === 'per-room' ? { conversation: owner.open } : {}), settle: owner.settle, acknowledge: owner.acknowledge,
+        return success({ ...primary, signal: owner.signal, attachment: null, attachments: async () => [], activity: owner.activity, provider: owner.provider, inspect: async () => ({ busy: (await owner.activity()).busy }),
+          ...(input.listenerOptions?.historyMode === 'per-room' ? { conversation: (room, admission) => owner.open(roomContext(room), admission) } : {}), settle: owner.settle, acknowledge: owner.acknowledge,
           turnControl: { activeTurn: owner.activeTurn, interrupt: owner.interrupt },
           close: async () => { try { await owner.close(); } finally { await unlock(); } } });
       } catch (error) { try { await histories?.close(); } finally { await release?.(); } return failed(error); }

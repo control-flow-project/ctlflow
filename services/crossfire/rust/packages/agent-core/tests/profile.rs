@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
 
 fn fixture() -> Value {
-    json!({"id":"00000000-0000-4000-8000-000000000000","workspace":"/workspace/owned","account":{"user_id":"@agent:local","access_token":"private-test-token","device_id":"NATIVE"},"settings":{"instance":"test","homeserver":"https://app.example","server_name":"local","owner":"@owner:local","max_upload_bytes":16777216}})
+    json!({"id":"00000000-0000-4000-8000-000000000000","workspace":"/workspace/owned","account":{"userId":"@agent:local","accessToken":"private-test-token","native":{"deviceId":"NATIVE"}},"settings":{"instance":"test","server":"https://app.example","backend":{"type":"matrix","parameters":{"origin":"https://app.example","serverName":"local"}},"owner":"@owner:local","maxUploadBytes":16777216}})
 }
 #[test]
 fn canonical_profiles_are_exact_private_and_preserve_native_settings()
@@ -28,7 +28,7 @@ fn canonical_profiles_are_exact_private_and_preserve_native_settings()
         assert!(profile::parse(&invalid).is_err());
     }
     let mut invalid = input.clone();
-    invalid["settings"]["homeserver"] = json!("http://foreign.example");
+    invalid["settings"]["server"] = json!("http://foreign.example");
     assert!(profile::parse(&invalid).is_err());
     invalid = input;
     invalid["legacy"] = json!(true);
@@ -48,7 +48,7 @@ impl Coordination for PolicyFixture {
 async fn effective_policy_cannot_be_retargeted_to_another_identity_or_owner()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let profile = profile::parse(&fixture())?;
-    let source = json!({"agentId":profile.id,"matrixUserId":profile.account.user_id,"ownerMatrixId":profile.settings.owner,"maxMessageBytes":65536,"fleetIdleTimeoutSeconds":1800,"status":"active","ownerStatus":"active","ownerConversation":null,"roomGrants":[{"roomId":"!room:local","accessMode":"reply","powerLevel":null,"muted":false}],"wakeMode":"selected","senderMatrixIds":[profile.settings.owner]});
+    let source = json!({"agentId":profile.id,"backendUserId":profile.account.user_id,"ownerBackendUserId":profile.settings.owner,"maxMessageBytes":65536,"fleetIdleTimeoutSeconds":1800,"status":"active","ownerStatus":"active","ownerConversation":null,"roomGrants":[{"roomId":"!room:local","accessMode":"reply","nativeAccess":null,"muted":false}],"wakeMode":"selected","senderBackendUserIds":[profile.settings.owner]});
     let policy = coordination::policy(
         &PolicyFixture(source.clone()),
         &profile,
@@ -58,7 +58,7 @@ async fn effective_policy_cannot_be_retargeted_to_another_identity_or_owner()
     assert!(policy.accepts("!room:local", "@owner:local"));
     assert!(policy.can_reply("!room:local"));
     let mut changed = source.clone();
-    changed["ownerMatrixId"] = json!("@different:local");
+    changed["ownerBackendUserId"] = json!("@different:local");
     assert_eq!(
         coordination::policy(&PolicyFixture(changed), &profile, CancellationToken::new())
             .await
@@ -68,7 +68,7 @@ async fn effective_policy_cannot_be_retargeted_to_another_identity_or_owner()
     );
     let mut changed = source;
     changed["status"] = json!("suspended");
-    changed["senderMatrixIds"] = json!([]);
+    changed["senderBackendUserIds"] = json!([]);
     let denied =
         coordination::policy(&PolicyFixture(changed), &profile, CancellationToken::new()).await?;
     assert!(!denied.accepts("!room:local", "@owner:local"));

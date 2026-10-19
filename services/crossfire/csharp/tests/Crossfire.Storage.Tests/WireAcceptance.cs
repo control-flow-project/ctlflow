@@ -51,7 +51,7 @@ public static class WireAcceptance
             { ["aa"] = "a", ["a-b"] = "b", ["zone"] = "India" }),
             [new("ocr-high", "ocr-high", null, new("selected", [new("@zoe:test", true), new("@Zoe:test", false), new("@é:test", true), new("@é:test", false)], ["z", "a"])),
              new("analysis-max", "analysis-max", "00000000-0000-0000-0000-000000000001", new("humans", [], []))]);
-        Equal(RosterValues.Digest(input), "699bbaa824716469cc81e8a2ea1cf14efa1043587abb2fab0ea8f0faca0559a4", "canonical enrollment bytes match Node Unicode and stable collation golden");
+        Equal(RosterValues.Digest(input), "5dd262e3a45b4a34c520056a20eadd1012a5ccca6345ba068dea73cc7f81f212", "canonical enrollment bytes match Node Unicode and stable collation golden");
         Equal(new Page<string>([], 1, 20, 0).TotalPages, 1L, "zero-item collection has one page");
         Equal(new Page<string>([], 1, 100, 9007199254740991).TotalPages, 90071992547410L, "pagination retains exact native integer range");
     }

@@ -27,11 +27,14 @@ fn unicode_and_plain_text_use_exact_wire_units() {
     assert!(check::plain_text(&json!("🚀"), 4).is_ok());
     assert!(check::plain_text(&json!("line\nnext\tline"), 100).is_ok());
     assert!(check::plain_text(&json!("bad\u{000b}"), 100).is_err());
-    assert!(check::matrix_user_id(&json!("@name:server.test")).is_ok());
-    assert!(check::matrix_user_id(&json!("@name\u{feff}:server.test")).is_err());
-    assert!(check::matrix_user_id(&json!("@name\u{0085}:server.test")).is_ok());
+    assert!(check::backend_user_id(&json!("@name:server.test")).is_ok());
+    assert!(check::backend_user_id(&json!("@name\u{feff}:server.test")).is_ok());
+    assert!(check::backend_user_id(&json!("@name\u{0085}:server.test")).is_ok());
     assert!(check::room_id(&json!("!opaque:server.test")).is_ok());
-    assert!(check::room_id(&json!("#alias:server.test")).is_err());
+    assert!(check::room_id(&json!("#alias:server.test")).is_ok());
+    assert!(check::backend_user_id(&json!("person/opaque")).is_ok());
+    assert!(check::room_id(&json!("__proto__")).is_ok());
+    assert!(check::room_id(&json!("bad\nroom")).is_err());
     assert!(serde_json::from_str::<serde_json::Value>(r#""\ud800""#).is_err());
     assert!(serde_json::from_str::<serde_json::Value>(r#"{"\udfff":true}"#).is_err());
     assert_eq!(crossfire_kernel::text::truncate_utf16("a🚀b", 2), "a");

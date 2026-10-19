@@ -9,13 +9,17 @@ use crossfire_domain::{
 };
 use crossfire_kernel::{Result, identity, secret::Secret, time::iso_timestamp};
 use serde_json::json;
-pub fn observations(context: &Context<'_>) -> Result<Reply> {
+pub fn observations(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let values = context.with(|repo, now| {
         observations::read(repo, context.actor()?, context.parameter("agentId")?, now)
     })?;
     reply::of(values.iter().map(wire::ObservationWire).collect::<Vec<_>>())
 }
-pub fn report(context: &Context<'_>) -> Result<Reply> {
+pub fn report(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let input = wire::observation(&context.input)?;
     context.with(|repo, now| {
         observations::report(
@@ -38,7 +42,9 @@ pub fn report(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(json!({"accepted":true}))
 }
-pub fn decisions(context: &Context<'_>) -> Result<Reply> {
+pub fn decisions(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let page = context.query.page()?;
     let status = context
         .query
@@ -68,7 +74,9 @@ pub fn decisions(context: &Context<'_>) -> Result<Reply> {
         })
     })
 }
-pub fn create_decision(context: &Context<'_>) -> Result<Reply> {
+pub fn create_decision(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let input = wire::decision(&context.input)?;
     let value = context.with(|repo, now| {
         decisions::create(
@@ -81,7 +89,9 @@ pub fn create_decision(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(wire::DecisionWire(&value))
 }
-pub fn decision(context: &Context<'_>) -> Result<Reply> {
+pub fn decision(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = context.with(|repo, now| {
         decisions::read(
             repo,
@@ -93,7 +103,9 @@ pub fn decision(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(wire::DecisionWire(&value))
 }
-pub fn answer(context: &Context<'_>) -> Result<Reply> {
+pub fn answer(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let answers = wire::answers(&context.input)?;
     context.with(|repo, now| {
         decisions::answer(
@@ -108,7 +120,9 @@ pub fn answer(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(json!({"accepted":true}))
 }
-pub fn poll(context: &Context<'_>) -> Result<Reply> {
+pub fn poll(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let (status, answers) = context.with(|repo, now| {
         decisions::poll(
             repo,
@@ -120,7 +134,9 @@ pub fn poll(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(json!({"status":status.code(),"answers":wire::AnswersWire(&answers)}))
 }
-pub fn receipt(context: &Context<'_>) -> Result<Reply> {
+pub fn receipt(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["status"], &[])?;
     let status = DecisionStatus::parse(check::choice(
         &value["status"],
@@ -138,7 +154,9 @@ pub fn receipt(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(json!({"recorded":recorded}))
 }
-pub fn listener_report(context: &Context<'_>) -> Result<Reply> {
+pub fn listener_report(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(
         &context.input,
         &[
@@ -187,12 +205,14 @@ pub fn listener_report(context: &Context<'_>) -> Result<Reply> {
         json!({"disconnect":value.disconnect,"currentRelease":value.current_release,"statisticsAccepted":value.statistics_accepted}),
     )
 }
-pub async fn notice(context: &Context<'_>) -> Result<Reply> {
+pub async fn notice(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["roomId"], &[])?;
     let room = check::room_id(&value["roomId"])?;
     let value = crossfire_domain::notice::request(
         &context.state.repository,
-        &context.state.matrix,
+        context.state.messaging.as_ref(),
         &identity::now,
         crossfire_domain::notice::Input {
             actor: context.actor()?,
@@ -205,7 +225,9 @@ pub async fn notice(context: &Context<'_>) -> Result<Reply> {
     reply::of(json!({"outcome":value}))
 }
 
-pub fn failure(context: &Context<'_>) -> Result<Reply> {
+pub fn failure(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(
         &context.input,
         &["episodeId", "agentId", "sessionId", "message"],

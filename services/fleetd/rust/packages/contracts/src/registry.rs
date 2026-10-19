@@ -174,7 +174,12 @@ pub fn work(value: &Value) -> Result<Vec<ResumeWork>> {
                 &[],
             )?;
             Ok(ResumeWork {
-                context: check::text(&value["context"], 1, 255)?.to_owned(),
+                context: check::text(
+                    &value["context"],
+                    1,
+                    crossfire_kernel::history_context::MAXIMUM_LENGTH,
+                )?
+                .to_owned(),
                 session_id: check::text(&value["sessionId"], 1, 200)?.to_owned(),
                 message_id: check::identifier(&value["messageId"])?.to_owned(),
                 checkpointed_at: check::integer(&value["checkpointedAt"], 0, MAX_TIMESTAMP)?,

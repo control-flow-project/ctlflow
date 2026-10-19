@@ -27,7 +27,7 @@ export function createSetup(ports: SetupPorts) {
     return success({ fleet, operation: null, status: active ? ready ? 'ready' : 'starting' : 'stopped' });
   }
   return function setup(input: SetupInput): Promise<Result<SetupResult>> {
-    const identity = JSON.stringify([input.workspace, input.configuration ?? null, input.descriptor.server, input.descriptor.ownerMatrixId]);
+    const identity = JSON.stringify([input.workspace, input.configuration ?? null, input.descriptor.server, input.descriptor.ownerBackendUserId]);
     const previous = pending.get(identity); if (previous) return previous;
     const running = (async (): Promise<Result<SetupResult>> => {
       if (ports.stopping()) return failure('unavailable', 'Controller is stopping');

@@ -1,10 +1,6 @@
 pub const APPLICATION_ID: i64 = 1129465426;
-pub const SCHEMA_VERSION: i64 = 18;
-pub const MIGRATIONS: &[&str] = &[
-    "20261014000000_initial_schema.mjs",
-    "20261014000001_initial_data.mjs",
-    "20261018000000_listener_activity_index.mjs",
-];
+pub const SCHEMA_VERSION: i64 = 1;
+pub const MIGRATIONS: &[&str] = &["00_initial.mjs"];
 
 mod identity;
 pub use identity::{

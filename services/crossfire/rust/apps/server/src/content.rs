@@ -1,4 +1,4 @@
-use crate::{request, security, state::State};
+use crate::{request, state::State};
 use bytes::Bytes;
 use crossfire_adapter_http::server::{self, Body, Incoming, Method, Request, Response, header};
 use crossfire_domain::{
@@ -48,7 +48,7 @@ fn location(path: &str) -> Option<(&str, &str)> {
     .then_some((key, file))
 }
 fn current(
-    state: &State,
+    state: &State<impl crossfire_domain::messaging::MessagingAuthority>,
     key: &str,
     path: &str,
     publication: &Publication,
@@ -68,8 +68,13 @@ fn current(
         ))
     }
 }
-pub async fn handle(state: Arc<State>, input: Request<Incoming>) -> Result<Response<Body>> {
-    if security::host(input.headers(), &state.configuration.content_origin).is_err() {
+pub async fn handle(
+    state: Arc<State<impl crossfire_domain::messaging::MessagingAuthority>>,
+    input: Request<Incoming>,
+) -> Result<Response<Body>> {
+    if crossfire_adapter_http::security::host(input.headers(), &state.configuration.content_origin)
+        .is_err()
+    {
         return response(421, server::empty());
     }
     if ![Method::GET, Method::HEAD, Method::OPTIONS].contains(input.method()) {

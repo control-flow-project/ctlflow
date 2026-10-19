@@ -8,7 +8,7 @@ export type AgentRecord = { principal: Principal; agent: Agent; name: string; ap
 export type DeploymentSummary = { agentId: string; fleetId: string; fleetKey: string; label: string; controllerName: string; reportedAt: number; instanceKey: string };
 export type DirectoryFilter = PageRequest & { agentIds?: string[]; ownerId?: string; statuses: Principal['status'][]; search: string; activity?: { mode: 'include' | 'exclude'; agentIds: string[] } };
 export type DirectoryRepository = {
-  principalByMatrixId(matrixUserId: string): Result<Principal | null>;
+  principalByBackendUserId(backendUserId: string): Result<Principal | null>;
   member(principalId: string): Result<MemberRecord | null>;
   agent(principalId: string): Result<AgentRecord | null>;
   agents(filter: DirectoryFilter): Result<Page<AgentRecord>>;

@@ -7,7 +7,7 @@ The guide verifies the active registered human and pins the exact public fleet
 release. Its JSON descriptor is at:
 
 ```text
-/onboarding/setup.json?ownerMatrixId=EXACT_MATRIX_ID
+/onboarding/setup.json?ownerBackendUserId=EXACT_MATRIX_ID
 ```
 
 The CLI checks the fixed path, exact origin/owner/version, strict schema and

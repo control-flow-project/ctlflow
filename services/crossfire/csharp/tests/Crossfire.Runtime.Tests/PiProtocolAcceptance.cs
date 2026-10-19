@@ -19,7 +19,7 @@ public static class PiProtocolAcceptance
         const input = createInterface({input:process.stdin});
         input.on('line', line => {
           const value = JSON.parse(line);
-          if (value.type === 'hold') { pending.set(value.id,value); emit({type:'fixture-held',id:value.id}); return; }
+          if (value.type === 'hold' || value.type === 'get_state' || value.type === 'get_available_models') { pending.set(value.id,value); emit({type:'fixture-held',id:value.id}); return; }
           if (value.type === 'release_all') { for (const held of pending.values()) reply(held); pending.clear(); if(value.id) reply(value); return; }
           if (value.type === 'mismatch') { emit({type:'response',id:value.id,command:'wrong-command',success:true,data:{}}); return; }
           if (value.type === 'malformed') { process.stdout.write('[]\n'); return; }
@@ -70,6 +70,20 @@ public static class PiProtocolAcceptance
                 await using var native = await Open(directory, Channel.CreateUnbounded<JsonElement>());
                 Equal((await native.Request(invalid, PiValues.Empty()).AsTask().WaitAsync(TimeSpan.FromSeconds(5))).IsSuccess, false, "invalid native Pi response releases the original waiter as failure");
                 Equal(native.Lifetime.IsCancellationRequested, true, "invalid Pi protocol cannot be silently treated as readiness");
+            }
+            foreach (var metadata in new[] { "get_state", "get_available_models" })
+            {
+                events = Channel.CreateUnbounded<JsonElement>(); clock = new();
+                await using var native = await Open(directory, events, clock);
+                using var cancelled = new CancellationTokenSource();
+                var waiting = native.Request(metadata, PiValues.Empty(), cancelled.Token).AsTask(); await Receive(events); cancelled.Cancel();
+                Equal((await waiting).IsSuccess, false, "Cancelled metadata inspection returns unknown");
+                clock.Advance(TimeSpan.FromSeconds(11)); Equal(native.Lifetime.IsCancellationRequested, false, "Cancelled diagnostic metadata cannot later terminate the native owner");
+                Equal((await native.Request("release_all", PiValues.Empty())).IsSuccess, true, "Late metadata responses do not corrupt the active session");
+                waiting = native.Request(metadata, PiValues.Empty()).AsTask(); await Receive(events); clock.Advance(TimeSpan.FromSeconds(11));
+                Equal((await waiting.WaitAsync(TimeSpan.FromSeconds(5))).IsSuccess, false, "Metadata timeout is bounded");
+                Equal(native.Lifetime.IsCancellationRequested, false, "Read-only metadata timeout does not terminate an agent");
+                Equal((await native.Request("release_all", PiValues.Empty())).IsSuccess, true, "Timed-out metadata leaves the same native process usable");
             }
             events = Channel.CreateUnbounded<JsonElement>(); clock = new();
             await using (var native = await Open(directory, events, clock))

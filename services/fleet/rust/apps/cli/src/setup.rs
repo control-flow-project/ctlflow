@@ -33,10 +33,12 @@ pub fn descriptor_url(address: &str) -> Result<(String, String, String)> {
         ));
     }
     let query = uri.query_pairs().collect::<Vec<_>>();
-    if query.len() != 1 || query[0].0 != "ownerMatrixId" {
-        return Err(invalid("Descriptor requires exactly one ownerMatrixId"));
+    if query.len() != 1 || query[0].0 != "ownerBackendUserId" {
+        return Err(invalid(
+            "Descriptor requires exactly one ownerBackendUserId",
+        ));
     }
-    let owner = check::matrix_user_id(&json!(query[0].1))?.to_owned();
+    let owner = check::backend_user_id(&json!(query[0].1))?.to_owned();
     Ok((
         server,
         owner,
@@ -60,7 +62,7 @@ fn configured_descriptor(file: &Path) -> Result<String> {
         serde_json::to_value(table).map_err(|_| invalid("Cannot decode fleet configuration"))?;
     let roster = configuration::roster(&value)?;
     Ok(format!(
-        "{}/onboarding/setup.json?ownerMatrixId={}",
+        "{}/onboarding/setup.json?ownerBackendUserId={}",
         roster.coordination.server,
         origin::segment(&roster.coordination.owner)
     ))
@@ -145,7 +147,7 @@ pub async fn run(args: &Arguments, stop: CancellationToken) -> Result<()> {
     let descriptor = descriptor(&address, stop.clone()).await?;
     connections::save_project(&project)?;
     output(
-        &json!({"status":"starting-controller","workspace":workspace,"controllerRoot":root,"server":descriptor["server"],"owner":descriptor["ownerMatrixId"],"conversation":"New fleet-managed agent; this coding session remains independent"}),
+        &json!({"status":"starting-controller","workspace":workspace,"controllerRoot":root,"server":descriptor["server"],"owner":descriptor["ownerBackendUserId"],"conversation":"New fleet-managed agent; this coding session remains independent"}),
     )?;
     let controller = launcher::launch(&root, None, stop.clone()).await?;
     settings.local_root = Some(root.clone());

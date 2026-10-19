@@ -1,8 +1,11 @@
+use crossfire_adapter_matrix::{
+    agent::Client,
+    protocol::{Protocol, Request, Response},
+};
 mod support;
 use crossfire_agent_core::{
     coordination::Coordination,
     local_state::LocalState,
-    matrix::{Matrix, Request, Response},
     profile,
     reset_history::{self, Options},
 };
@@ -38,16 +41,16 @@ impl Coordination for Network {
         input.path_parts()?;
         match input.operation {
             OperationId::DeliveryPolicy => Ok(
-                json!({"agentId":ID,"matrixUserId":"@agent:local","ownerMatrixId":"@owner:local","maxMessageBytes":65536,"fleetIdleTimeoutSeconds":1800,"status":"active","ownerStatus":"active","ownerConversation":null,"roomGrants":if self.allowed.load(Ordering::SeqCst){vec![json!({"roomId":"!room:local","accessMode":"reply","powerLevel":null,"muted":false})]}else{vec![]},"wakeMode":"selected","senderMatrixIds":["@owner:local"]}),
+                json!({"agentId":ID,"backendUserId":"@agent:local","ownerBackendUserId":"@owner:local","maxMessageBytes":65536,"fleetIdleTimeoutSeconds":1800,"status":"active","ownerStatus":"active","ownerConversation":null,"roomGrants":if self.allowed.load(Ordering::SeqCst){vec![json!({"roomId":"!room:local","accessMode":"reply","nativeAccess":null,"muted":false})]}else{vec![]},"wakeMode":"selected","senderBackendUserIds":["@owner:local"]}),
             ),
             OperationId::ResolvePrincipals => Ok(
-                json!([{"matrixUserId":"@owner:local","kind":"human","ownerMatrixId":null,"displayName":"Owner","ownerDisplayName":null}]),
+                json!([{"backendUserId":"@owner:local","kind":"human","ownerBackendUserId":null,"displayName":"Owner","ownerDisplayName":null}]),
             ),
             _ => Err(support::failure()),
         }
     }
 }
-impl Matrix for Network {
+impl Protocol for Network {
     async fn request(&self, input: &Request, _stop: CancellationToken) -> Result<Response> {
         let body = if input.path.ends_with("/joined_rooms") {
             json!({"joined_rooms":["!room:local"]})
@@ -80,7 +83,7 @@ impl Matrix for Network {
 }
 fn profile() -> Result<profile::Profile> {
     profile::parse(
-        &json!({"id":ID,"workspace":"/workspace/owned","account":{"user_id":"@agent:local","access_token":"private-test-token","device_id":"NATIVE"},"settings":{"instance":"test","homeserver":"https://app.example","server_name":"local","owner":"@owner:local","max_upload_bytes":16777216}}),
+        &json!({"id":ID,"workspace":"/workspace/owned","account":{"userId":"@agent:local","accessToken":"private-test-token","native":{"deviceId":"NATIVE"}},"settings":{"instance":"test","server":"https://app.example","backend":{"type":"matrix","parameters":{"origin":"https://app.example","serverName":"local"}},"owner":"@owner:local","maxUploadBytes":16777216}}),
     )
 }
 #[tokio::test]
@@ -99,7 +102,7 @@ async fn complete_reset_exports_are_private_attributed_and_interchangeable_json_
     };
     let exported = reset_history::export(
         &storage,
-        &network,
+        &Client::from_protocol(&network, "@agent:local")?,
         &network,
         &profile,
         &options,
@@ -134,7 +137,7 @@ async fn complete_reset_exports_are_private_attributed_and_interchangeable_json_
     let before = network.pages.load(Ordering::SeqCst);
     let repeated = reset_history::export(
         &storage,
-        &network,
+        &Client::from_protocol(&network, "@agent:local")?,
         &network,
         &profile,
         &options,
@@ -152,7 +155,7 @@ async fn complete_reset_exports_are_private_attributed_and_interchangeable_json_
     assert!(
         reset_history::export(
             &storage,
-            &network,
+            &Client::from_protocol(&network, "@agent:local")?,
             &network,
             &profile,
             &options,
@@ -184,7 +187,7 @@ async fn interrupted_exports_revalidate_access_before_resuming_or_resetting_any_
     assert!(
         reset_history::export(
             &storage,
-            &network,
+            &Client::from_protocol(&network, "@agent:local")?,
             &network,
             &profile,
             &options,
@@ -201,7 +204,7 @@ async fn interrupted_exports_revalidate_access_before_resuming_or_resetting_any_
     network.fail.store(false, Ordering::SeqCst);
     let error = reset_history::export(
         &storage,
-        &network,
+        &Client::from_protocol(&network, "@agent:local")?,
         &network,
         &profile,
         &options,
@@ -221,7 +224,7 @@ async fn interrupted_exports_revalidate_access_before_resuming_or_resetting_any_
     network.allowed.store(true, Ordering::SeqCst);
     reset_history::export(
         &storage,
-        &network,
+        &Client::from_protocol(&network, "@agent:local")?,
         &network,
         &profile,
         &options,

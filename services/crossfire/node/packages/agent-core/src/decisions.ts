@@ -1,19 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
-import { ownerNotice, ownerNoticeChunks } from './owner-notices.js';
 import { failure, failureError, success, type Result } from '@ctlflow/crossfire-kernel/result';
-import type { Json } from '@ctlflow/crossfire-contracts/json';
+import type { Json } from '@ctlflow/crossfire-kernel/json';
 import type { RuntimeDecision } from './runtime.js';
-import type { Clock, Matrix, LocalState } from './port.js';
+import type { Clock, MessagingClient, LocalState } from './port.js';
 import type { Coordination } from './coordination.js';
 import type { Settings } from '@ctlflow/crossfire-contracts/client';
-import { ownerConversationState, roomState, roomPowers } from '@ctlflow/crossfire-contracts/matrix-room';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 
 const journal = check.list(check.object({ id: check.identifier, native: check.text(1000),
   status: check.choice('pending', 'responded', 'cancelled') }), 4096);
-export function decisions(options: { clock: Clock; client: Matrix; coordination: Coordination; settings: Settings;
-  agent: string; matrixUserId: string; run: (signal: AbortSignal) => Promise<string>; storage: LocalState; file: string }, stop: AbortSignal) {
+export function decisions(options: { clock: Clock; client: MessagingClient; coordination: Coordination; settings: Settings;
+  agent: string; backendUserId: string; run: (signal: AbortSignal) => Promise<string>; storage: LocalState; file: string }, stop: AbortSignal) {
   let receipts: check.Parsed<typeof journal>;
   try {
     const loaded = journal(options.storage.exists(options.file) ? options.storage.read(options.file) : []);
@@ -50,22 +47,12 @@ export function decisions(options: { clock: Clock; client: Matrix; coordination:
   async function authorize(): Promise<Result<void>> {
     const delivery = await options.coordination.delivery(options.agent, stop);
     if (!delivery.ok) return delivery;
-    if (delivery.value.agentId !== options.agent || delivery.value.ownerMatrixId !== options.settings.owner
-      || delivery.value.matrixUserId !== options.matrixUserId || delivery.value.status !== 'active' || delivery.value.ownerStatus !== 'active') return failure('forbidden', 'Agent and owner must be active');
+    if (delivery.value.agentId !== options.agent || delivery.value.ownerBackendUserId !== options.settings.owner
+      || delivery.value.backendUserId !== options.backendUserId || delivery.value.status !== 'active' || delivery.value.ownerStatus !== 'active') return failure('forbidden', 'Agent and owner must be active');
     if (delivery.value.ownerConversation === null) return success(undefined);
     const grant = delivery.value.roomGrants.find(grant => grant.roomId === delivery.value.ownerConversation);
     if (!grant || grant.muted || grant.accessMode === 'read') return failure('forbidden', 'Owner conversation requires unmuted read and reply access');
-    let value: unknown;
-    try { value = await options.client.get<unknown>(API + '/rooms/' + segment(delivery.value.ownerConversation) + '/state'); }
-    catch (error) { return failure('unavailable', error instanceof Error ? error.message : 'Native owner conversation is unavailable'); }
-    const state = roomState(value);
-    if (!state.ok) return state;
-    const privateRoom = ownerConversationState(state.value, options.settings.owner, options.matrixUserId);
-    if (!privateRoom.ok) return privateRoom;
-    if ([options.settings.owner, options.matrixUserId].some(identity => !state.value.some(event => event.type === 'm.room.member'
-      && event.state_key === identity && event.content.membership === 'join'))) return failure('forbidden', 'Both participants must have joined the owner conversation');
-    const powers = roomPowers(state.value.find(event => event.type === 'm.room.power_levels')?.content ?? {}, options.matrixUserId);
-    return powers.ok && powers.value.ownerLevel >= powers.value.message ? success(undefined) : failure('forbidden', 'Agent cannot send the decision to its owner');
+    return options.client.verifyPrivateConversation(delivery.value.ownerConversation, options.settings.owner, options.backendUserId);
   }
   async function request(decision: RuntimeDecision, cancelled: AbortSignal): Promise<Result<Json>> {
     const signal = AbortSignal.any([stop, cancelled, ...(decision.expiresMs == null ? [] : [options.clock.deadline(decision.expiresMs)])]);
@@ -95,11 +82,11 @@ export function decisions(options: { clock: Clock; client: Matrix; coordination:
       const base = options.coordination.origin + '/manage/agents/' + options.agent + '/decisions/' + receipt.id;
       const links = questions.length === 1 ? questions[0]!.options.map(option => option.label + ': ' + base + '?choice=' + encodeURIComponent(option.id)).join('\n') : '';
       const prompts = questions.map(question => question.title + ': ' + question.prompt).join('\n\n');
-      const notices = ownerNoticeChunks(decision.action + ': review and answer at ' + base + '.'
+      const notices = options.client.noticeChunks(decision.action + ': review and answer at ' + base + '.'
           + '\n\n' + prompts
           + (links ? '\n\n' + links : '') + '\n\nLinks only open a review. Submit explicitly. '
           + (decision.blocking ? 'The native request is waiting.' : 'This request is nonblocking and may expire.'));
-      for (const [position, text] of notices.entries()) await options.client.put(API + '/rooms/' + segment(room.value.roomId) + '/send/m.room.message/' + receipt.id + '-' + position, ownerNotice(text));
+      for (const [position, text] of notices.entries()) await options.client.sendNotice(room.value.roomId, receipt.id + '-' + position, text);
       for (;;) {
         signal.throwIfAborted();
         const answer = await options.coordination.pollDecision(options.agent, receipt.id, signal);

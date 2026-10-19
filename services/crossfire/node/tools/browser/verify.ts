@@ -1,7 +1,6 @@
 import { chromium, expect } from '@playwright/test';
 import { join } from 'node:path';
 import { privateDir, writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
-import { nativeJson } from '@ctlflow/crossfire-adapter-matrix/http';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { decodeResponse } from '@ctlflow/crossfire-contracts/rest/envelope';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
@@ -37,27 +36,26 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
       const page = await context.newPage();
       page.on('pageerror', error => errors.push(error.name));
       await page.goto(origin + '/manage/');
-      await page.getByLabel('Matrix username', { exact: true }).fill(account.matrixUserId);
+      await page.getByLabel('Username', { exact: true }).fill(account.backendUserId);
       await page.getByLabel('Password', { exact: true }).fill(account.password);
       let native: unknown;
-      const loginUrl = origin + '/_matrix/client/v3/login';
+      const loginUrl = origin + operations.authenticateBackend.path;
       await page.route(loginUrl, async route => {
         const response = await route.fetch({ maxRedirects: 0 });
         native = await response.json();
-        if (response.status() === 200 && native && typeof native === 'object' && 'access_token' in native && typeof native.access_token === 'string'
-          && 'user_id' in native && native.user_id === account.matrixUserId) token = native.access_token;
+        const parsed = decodeResponse(native, operations.authenticateBackend.output, false);
+        if (response.status() === 200 && parsed.ok) token = parsed.value.data.accessToken;
         await route.fulfill({ response });
       });
-      const login = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/_matrix/client/v3/login');
+      const login = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === operations.authenticateBackend.path);
       await page.getByRole('button', { name: 'Sign in', exact: true }).click();
       const signedIn = await login;
       await page.unroute(loginUrl);
-      if (signedIn.status() !== 200 || !native || typeof native !== 'object' || !('access_token' in native) || typeof native.access_token !== 'string'
-        || !('user_id' in native) || native.user_id !== account.matrixUserId) return failure('unauthorized', 'Browser native login failed');
+      if (signedIn.status() !== 200 || !token) return failure('unauthorized', 'Browser backend login failed');
       await expect(page.locator('.shell .page-heading h1')).toBeVisible();
       const current = await context.request.get(origin + '/api/sessions/current');
       const viewer = decodeResponse(await current.json(), operations.currentSession.output, false);
-      if (current.status() !== 200 || !viewer.ok) return failure('native', 'Browser Crossfire session is invalid');
+      if (current.status() !== 200 || !viewer.ok || viewer.value.data.member.backendUserId !== account.backendUserId) return failure('native', 'Browser Crossfire session is invalid');
       csrf = viewer.value.data.csrfSecret;
       for (const viewport of managementViewports) {
         await page.setViewportSize(viewport);
@@ -108,9 +106,9 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
       await page.goto(origin + '/manage/connect');
       await page.getByText('Requirements & advanced configuration', { exact: true }).click();
       const link = await page.getByRole('link', { name: 'Read the full guide for your account →', exact: true }).getAttribute('href');
-      if (!link || new URL(link, origin).searchParams.get('ownerMatrixId') !== account.matrixUserId) return failure('native', 'Onboarding link does not identify the signed-in user');
+      if (!link || new URL(link, origin).searchParams.get('ownerBackendUserId') !== account.backendUserId) return failure('native', 'Onboarding link does not identify the signed-in user');
       if (errors.length) return failure('native', 'Management browser reported a page error');
-      return success({ origin, human: account.matrixUserId, managementRoutes: views.length * managementViewports.length, wakePickerViewports, screenshots: directory, modelCalls: 0 });
+      return success({ origin, human: account.backendUserId, managementRoutes: views.length * managementViewports.length, wakePickerViewports, screenshots: directory, modelCalls: 0 });
     } catch (error) {
       const message = browserFailureMessage(error, [account.password, human.nativeAccessToken, token, csrf]);
       writeJson(join(directory, 'failure.json'), { phase, message });
@@ -124,7 +122,7 @@ export async function verifyBrowser(origin: string, account: Credentials, execut
           if (ended.status() !== 200) throw new Error('Browser session logout failed');
         }
       } finally {
-        try { if (token) await nativeJson({ base: origin, token }, 'POST', '/_matrix/client/v3/logout', {}); }
+        try { if (token) { const ended = await human.inspectToken(token).close(); if (!ended.ok) throw new Error(ended.error.message); } }
         finally { await context.close(); await browser.close(); }
       }
     }

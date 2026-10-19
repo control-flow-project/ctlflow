@@ -33,8 +33,8 @@ public static class RoomGrantReads
             var permission = ports.Permissions(actor.PrincipalId, roomId); if (!permission.IsSuccess) return Result<GrantView>.Fail(permission.Error);
             if (inviter.Value is { AccessMode: not "none" } && permission.Value.Any(value => value.PermissionCode == "room.agent.invite" && value.Generation == inviter.Value.Generation))
             {
-                var native = await ports.Room(current.Value.MatrixUserId, roomId, cancellation); if (!native.IsSuccess) return Result<GrantView>.Fail(native.Error);
-                delegated = native.Value.Creator || native.Value.PowerLevel >= native.Value.InviteLevel; canRead = delegated;
+                var native = await ports.Room(current.Value.BackendUserId, roomId, cancellation); if (!native.IsSuccess) return Result<GrantView>.Fail(native.Error);
+                delegated = native.Value.CanInvite; canRead = delegated;
             }
         }
         if (!canRead) return Results.Fail<GrantView>("missing", "Room grant not found");

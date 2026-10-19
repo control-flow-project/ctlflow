@@ -15,6 +15,11 @@ import * as publication from '../publication.js';
 import { binaryInput } from './binary.js';
 import { PUBLICATION_LIMITS } from '@ctlflow/crossfire-domain/publication/values';
 export const operations = {
+  messagingBackend: operation({ method: 'GET', path: '/api/messaging-backend', auth: 'public', params: check.empty, query: query.none, input: check.empty,
+    output: res.messagingBackend, status: 200, collection: false, permissions: [], description: 'Configured messaging backend and public client entry points' }),
+  authenticateBackend: operation({ method: 'POST', path: '/api/backend-authentication', auth: 'public', params: check.empty, query: query.none,
+    input: check.object({ username: check.text(255), password: check.text(1024) }), output: check.object({ accessToken: check.text(8192) }),
+    status: 200, collection: false, permissions: [], description: 'Authenticate with the configured messaging backend' }),
   recordFleetNativeStop: operation({ method: 'PUT', path: '/api/fleets/{fleetId}/agents/{agentId}/native-stop', auth: 'fleet',
     params: check.object({ fleetId: check.identifier, agentId: check.identifier }), query: query.none,
     input: check.object({ connectionId: check.identifier, runId: check.identifier, receiptId: check.identifier }), output: res.recorded,

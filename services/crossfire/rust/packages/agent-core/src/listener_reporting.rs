@@ -10,7 +10,7 @@ use crossfire_contracts::{
 };
 use crossfire_domain::statistics::Usage;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, time::Clock};
-use serde_json::{Value, json};
+use serde_json::json;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{Mutex as AsyncMutex, watch};
 use tokio_util::sync::CancellationToken;
@@ -109,10 +109,10 @@ impl<C: Coordination, T: Clock + Send + Sync> Reporter<C, T> {
                 || {
                     event
                         .content
-                        .get("info")
-                        .and_then(|info| info.get("size"))
-                        .and_then(|value| check::integer(value, 0, check::SAFE_INTEGER).ok())
-                        .unwrap_or(0)
+                        .attachments
+                        .iter()
+                        .filter_map(|file| file.bytes)
+                        .fold(0_i64, i64::saturating_add)
                 },
                 |file| file.attachment_bytes,
             );
@@ -121,20 +121,17 @@ impl<C: Coordination, T: Clock + Send + Sync> Reporter<C, T> {
                     room_id: &event.room_id,
                     sender: &event.sender,
                     event_id: &event.event_id,
-                    message_type: event
-                        .content
-                        .get("msgtype")
-                        .and_then(Value::as_str)
-                        .unwrap_or("unknown"),
+                    message_type: event.content.kind.code(),
                     content_bytes: i64::try_from(bytes)
                         .map_err(|_| invalid("Message byte accounting overflow"))?,
                     attachment_bytes: attachments,
-                    room_message: event.kind == "m.room.message",
+                    room_message: event.kind
+                        == crossfire_domain::messaging_client::EventType::Message,
                     listener_notice: events::notice_content(&event.content),
                 },
                 delivered,
             );
-            if event.kind == "m.room.message" {
+            if event.kind == crossfire_domain::messaging_client::EventType::Message {
                 count += 1;
             }
         }

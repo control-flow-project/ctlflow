@@ -9,10 +9,10 @@ import type { RequestedFleetPolicy } from '../port/fleet-policy.js';
 
 export type VerifiedRoster = { ownerId: string; ownerRevision: number; existing: { instanceKey: string; agentId: string; name: string; revision: number; retired: boolean; operational: boolean }[];
   policies: { instanceKey: string; policy: RequestedFleetPolicy }[] };
-export async function verifyRoster(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'collection'>, input: EnrollmentRoster): Promise<Result<VerifiedRoster>> {
+export async function verifyRoster(services: Pick<Services, 'repositories' | 'directory' | 'messaging' | 'identity' | 'collection'>, input: EnrollmentRoster): Promise<Result<VerifiedRoster>> {
   const valid = validateRoster(input);
   if (!valid.ok) return valid;
-  const owner = services.directory.principalByMatrixId(input.ownerMatrixId);
+  const owner = services.directory.principalByBackendUserId(input.ownerBackendUserId);
   if (!owner.ok) return owner;
   if (!owner.value || owner.value.kind !== 'human' || owner.value.status !== 'active') return failure('forbidden', 'An active human owner is required');
   const fleet = services.repositories.fleet.find({ ownerId: owner.value.id, fleetKey: input.fleetKey });
@@ -41,8 +41,8 @@ export async function verifyRoster(services: Pick<Services, 'repositories' | 'di
       if (!credentials.value?.accessToken || credentials.value.accessToken !== item.identity.accessToken)
         return failure('forbidden', 'Retired identity requires its preserved private credentials and owner approval');
     } else {
-      const native = await services.matrix.identify(item.identity.accessToken); if (!native.ok) return native;
-      if (record.value.principal.matrixUserId !== native.value) return failure('forbidden', 'Native identity does not match this agent');
+      const native = await services.messaging.identify(item.identity.accessToken); if (!native.ok) return native;
+      if (record.value.principal.backendUserId !== native.value) return failure('forbidden', 'Native identity does not match this agent');
     }
     if (current.value && (current.value.fleetKey !== input.fleetKey || current.value.ownerId !== owner.value.id || current.value.instanceKey !== item.instanceKey))
       return failure('conflict', 'Agent already belongs to another fleet instance');
@@ -59,7 +59,7 @@ export async function verifyRoster(services: Pick<Services, 'repositories' | 'di
   return success({ ownerId: owner.value.id, ownerRevision: owner.value.revision, existing, policies });
 }
 
-export async function preflightEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'matrix' | 'identity' | 'collection'>, input: EnrollmentRoster) {
+export async function preflightEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'messaging' | 'identity' | 'collection'>, input: EnrollmentRoster) {
   const verified = await verifyRoster(services, input);
   if (!verified.ok) return verified;
   const admitted = admitRoster(services, input, verified.value);

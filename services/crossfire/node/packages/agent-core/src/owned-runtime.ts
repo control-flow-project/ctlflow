@@ -6,7 +6,11 @@ export type ListenerOptions = { historyMode?: 'shared' | 'per-room' };
 export type SavedRuntimeContext = { context: string; runtime: string; sessionId: string; workspace: string };
 export type NativeContextActivity = { context: string; sessionId: string; busy: boolean };
 export type NativeActivity = { busy: boolean; contexts: NativeContextActivity[] };
+export type ProviderState = 'present' | 'missing' | 'not-required' | 'unknown';
+export type NativeDiagnostic = { checkedAt: number; state: RuntimeObservation['state'] | 'unknown'; observedAt: number | null;
+  provider: ProviderState; providerObservedAt: number | null; pendingInput: boolean; pendingDecision: boolean };
 export type OwnedRuntimeConnection = RuntimeConnection & { attachment: RuntimeAttachment | null; turnControl: TurnControl;
+  provider: (signal: AbortSignal) => Promise<Result<ProviderState>>;
   activity: () => Promise<NativeActivity>;
   attachments: () => Promise<{ context: string; attachment: RuntimeAttachment }[]> };
 export type OwnedRuntimeInput = {

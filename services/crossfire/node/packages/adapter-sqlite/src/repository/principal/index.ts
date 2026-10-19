@@ -19,7 +19,7 @@ export function createPrincipalRepository(database: Database.Database): Principa
       return stored(() => {
         executeInsert(database, schema, (query, params) => query.insertInto('principal').values({
       id: params.id,
-      matrix_user_id: params.matrixUserId,
+      backend_user_id: params.backendUserId,
       kind: params.kind,
       status: params.status,
       revision: params.revision,
@@ -31,7 +31,7 @@ export function createPrincipalRepository(database: Database.Database): Principa
     update(value) {
       return stored(() => {
         const changed = executeUpdate(database, schema, (query, params) => query.update('principal').set({
-      matrix_user_id: params.matrixUserId,
+      backend_user_id: params.backendUserId,
       kind: params.kind,
       status: params.status,
       revision: params.revision,

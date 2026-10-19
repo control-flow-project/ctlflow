@@ -14,7 +14,11 @@ use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, time::iso_
 use futures_util::{StreamExt, stream};
 use std::{sync::Arc, time::Duration};
 
-fn record(state: &State, label: &str, error: &Failure) -> Result<()> {
+fn record(
+    state: &State<impl crossfire_domain::messaging::MessagingAuthority>,
+    label: &str,
+    error: &Failure,
+) -> Result<()> {
     state.diagnostics.write(
         identity::now()?,
         &format!(
@@ -23,7 +27,9 @@ fn record(state: &State, label: &str, error: &Failure) -> Result<()> {
         ),
     )
 }
-async fn reconcile(state: &State) -> Result<()> {
+async fn reconcile(
+    state: &State<impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<()> {
     state.repository.with(|repo| {
         let now = identity::now()?;
         repo.transaction(|repo| enrollment::expire::expire(repo, now))?;
@@ -41,14 +47,14 @@ async fn reconcile(state: &State) -> Result<()> {
             now,
         )
     })?;
-    signup::reclaim(&state.repository, &state.matrix, &identity::now).await?;
+    signup::reclaim(&state.repository, state.messaging.as_ref(), &identity::now).await?;
     let principals = state
         .repository
         .with(|repo| repo.due_principals(identity::now()?))?;
     let mut applying = stream::iter(principals.into_iter().map(|id| async move {
         principal::reconcile(
             &state.repository,
-            &state.matrix,
+            state.messaging.as_ref(),
             &state.room_operations,
             &identity::now,
             &IntentHash,
@@ -71,7 +77,7 @@ async fn reconcile(state: &State) -> Result<()> {
     let mut applying = stream::iter(rooms.into_iter().map(|(agent, room)| async move {
         room_access::reconcile::reconcile(
             &state.repository,
-            &state.matrix,
+            state.messaging.as_ref(),
             &state.room_operations,
             &identity::now,
             &agent,
@@ -97,9 +103,10 @@ async fn reconcile(state: &State) -> Result<()> {
         }
         if let Err(error) = notice::publish(
             &state.repository,
-            &state.matrix,
+            state.messaging.as_ref(),
             &identity::now,
             &pending.receiver_agent_id,
+            &pending.room_id,
             &pending.event_id,
         )
         .await
@@ -109,8 +116,8 @@ async fn reconcile(state: &State) -> Result<()> {
     }
     incidents::publish(
         &state.repository,
-        &state.matrix,
-        &state.configuration.service_matrix_id(),
+        state.messaging.as_ref(),
+        state.messaging.service_user_id(),
         &identity::now,
         || state.stop.is_cancelled(),
     )
@@ -118,7 +125,9 @@ async fn reconcile(state: &State) -> Result<()> {
     state.publications().maintain()?;
     Ok(())
 }
-async fn applications(state: Arc<State>) -> Result<()> {
+async fn applications(
+    state: Arc<State<impl crossfire_domain::messaging::MessagingAuthority>>,
+) -> Result<()> {
     let mut timer = tokio::time::interval(Duration::from_secs(5));
     timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
@@ -135,7 +144,9 @@ async fn applications(state: Arc<State>) -> Result<()> {
         }
     }
 }
-async fn maintenance(state: Arc<State>) -> Result<()> {
+async fn maintenance(
+    state: Arc<State<impl crossfire_domain::messaging::MessagingAuthority>>,
+) -> Result<()> {
     let mut retention = Retention::new(Some(state.configuration.logging_retention_days))?;
     let mut next = tokio::time::Instant::now();
     loop {
@@ -175,7 +186,9 @@ async fn maintenance(state: Arc<State>) -> Result<()> {
         next = tokio::time::Instant::now() + Duration::from_millis(delay as u64);
     }
 }
-pub async fn run(state: Arc<State>) -> Result<()> {
+pub async fn run(
+    state: Arc<State<impl crossfire_domain::messaging::MessagingAuthority>>,
+) -> Result<()> {
     tokio::try_join!(applications(Arc::clone(&state)), maintenance(state))?;
     Ok(())
 }

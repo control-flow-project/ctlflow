@@ -47,7 +47,7 @@ export function FleetSessions({ fleet, agent, refresh }: { fleet: FleetView; age
       expectedRevision: fleet.revision, confirmFreshHistory: kind === 'reset' };
     if (kind === 'start') { void submit(input); return; }
     confirmation.request({ title: kind === 'reset' ? 'Start with fresh history?' : 'Stop sessions?',
-      description: kind === 'reset' ? 'Start ' + subject + ' with fresh history. This stops the current sessions and replaces their model contexts. Old histories are archived; Matrix messages, identity, room access and configured parameters are retained.'
+      description: kind === 'reset' ? 'Start ' + subject + ' with fresh history. This stops the current sessions and replaces their model contexts. Old histories are archived; Chat messages, identity, room access and configured parameters are retained.'
         : 'Stop the sessions for ' + subject + '. Saved histories and the enabled-agent selection are retained. Resume sends interrupted work a continuation instruction; running commands themselves are terminated, not suspended. The fleet controller stays connected.',
       label: kind === 'reset' ? 'Start with fresh history' : agent ? 'Stop session' : 'Stop sessions', danger: true, execute: () => submit(input) });
   }

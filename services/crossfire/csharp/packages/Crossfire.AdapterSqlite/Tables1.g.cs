@@ -89,7 +89,7 @@ public sealed partial class CrossfireDbContext
             entity.Property(value => value.InvitationEventId).HasColumnName("invitation_event_id").HasColumnType("TEXT").ValueGeneratedNever();
             entity.Property(value => value.AdmissionKind).HasColumnName("admission_kind").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.AccessMode).HasColumnName("access_mode").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
-            entity.Property(value => value.PowerLevel).HasColumnName("power_level").HasColumnType("INTEGER").ValueGeneratedNever();
+            entity.Property(value => value.NativeAccess).HasColumnName("native_access").HasColumnType("TEXT").ValueGeneratedNever();
             entity.Property(value => value.Muted).HasColumnName("muted").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.Revision).HasColumnName("revision").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.AccessRevision).HasColumnName("access_revision").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();
@@ -117,8 +117,7 @@ public sealed partial class CrossfireDbContext
             entity.Property(value => value.AppliedRevision).HasColumnName("applied_revision").HasColumnType("INTEGER").ValueGeneratedNever();
             entity.Property(value => value.AppliedAccessRevision).HasColumnName("applied_access_revision").HasColumnType("INTEGER").ValueGeneratedNever();
             entity.Property(value => value.Membership).HasColumnName("membership").HasColumnType("TEXT").ValueGeneratedNever();
-            entity.Property(value => value.PowerLevel).HasColumnName("power_level").HasColumnType("INTEGER").ValueGeneratedNever();
-            entity.Property(value => value.Creator).HasColumnName("creator").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();
+            entity.Property(value => value.NativeAccess).HasColumnName("native_access").HasColumnType("TEXT").ValueGeneratedNever();
             entity.Property(value => value.LastAttemptAt).HasColumnName("last_attempt_at").HasColumnType("INTEGER").ValueGeneratedNever();
             entity.Property(value => value.LastSuccessAt).HasColumnName("last_success_at").HasColumnType("INTEGER").ValueGeneratedNever();
             entity.Property(value => value.NextCheckAt).HasColumnName("next_check_at").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();

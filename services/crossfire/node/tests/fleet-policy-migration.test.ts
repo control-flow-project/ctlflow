@@ -12,10 +12,10 @@ import { migrationChange, migrationQuery } from './support/migration-data.js';
 function policyStore() {
   const database = openTestStore(':memory:'), repositories = createRepositories(database);
   for (const id of ['owner', 'other']) {
-    value(repositories.principal.insert({ id, matrixUserId: '@' + id + ':test', kind: 'human', status: 'active', revision: 3, createdAt: 1 }));
+    value(repositories.principal.insert({ id, backendUserId: '@' + id + ':test', kind: 'human', status: 'active', revision: 3, createdAt: 1 }));
     value(repositories.member.insert({ principalId: id, principalKind: 'human', displayName: id }));
   }
-  value(repositories.principal.insert({ id: 'ada', matrixUserId: '@ada:test', kind: 'agent', status: 'active', revision: 7, createdAt: 1 }));
+  value(repositories.principal.insert({ id: 'ada', backendUserId: '@ada:test', kind: 'agent', status: 'active', revision: 7, createdAt: 1 }));
   value(repositories.agent.insert({ principalId: 'ada', principalKind: 'agent', ownerId: 'owner', wakeMode: 'selected' }));
   value(repositories.agentCredential.insert({ agentId: 'ada', provisioningPassword: 'private-password', accessToken: 'private-token', updatedAt: 10 }));
   value(repositories.agentName.insert({ name: 'ada', agentId: 'ada', requestId: null, instanceKey: null }));
@@ -24,7 +24,7 @@ function policyStore() {
   value(repositories.fleetInstance.insert({ ownerId: 'owner', fleetKey: 'agreements', instanceKey: 'ada', agentId: 'ada', retiredAt: null }));
   value(repositories.fleetCredential.insert({ id: 'controller', fleetId: 'fleet', secretHash: 'private-controller-hash', revokedAt: null, createdAt: 10 }));
   value(repositories.agentRoomGrant.insert({ agentId: 'ada', roomId: '!matter:test', generation: 'generation', authorizerId: 'owner', addedById: 'owner',
-    admissionKind: 'managed', invitationEventId: null, accessMode: 'reply', powerLevel: null, muted: false, revision: 3, accessRevision: 1, updatedAt: 10 }));
+    admissionKind: 'managed', invitationEventId: null, accessMode: 'reply', nativeAccess: null, muted: false, revision: 3, accessRevision: 1, updatedAt: 10 }));
   value(repositories.agentRoomPermission.insert({ agentId: 'ada', roomId: '!matter:test', generation: 'generation',
     permissionCode: 'room.agent.invite', grantScope: 'agent_room', grantedByMemberId: 'owner', grantedAt: 10 }));
   return database;
@@ -41,7 +41,7 @@ test('normalized requested and approved policies enforce principal, catalog, own
       senders: ['other', 'owner'].map(principalId => ({ principalId, includeAgents: false })), permissions: ['room.agent.invite' as const], expectedAgentRevision: 7 };
     value(repositories.fleetPolicy.insertRequested(key, requested));
     assert.deepEqual(value(repositories.fleetPolicy.requested(key.requestId)), [
-      { ...requested, instanceKey: 'ada', matrixSenders: ['@other:test', '@owner:test'].map(matrixUserId => ({ matrixUserId, includeAgents: false })) },
+      { ...requested, instanceKey: 'ada', backendSenders: ['@other:test', '@owner:test'].map(backendUserId => ({ backendUserId, includeAgents: false })) },
     ]);
     assert.equal(repositories.fleetPolicy.approve({ agentId: 'ada', approvedByMemberId: 'other', approvedAt: 1, permissions: [] }).ok, false);
     value(repositories.fleetPolicy.approve({ agentId: 'ada', approvedByMemberId: 'owner', approvedAt: 10, permissions: ['room.agent.invite'] }));

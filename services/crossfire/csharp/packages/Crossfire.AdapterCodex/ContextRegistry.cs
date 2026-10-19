@@ -1,3 +1,4 @@
+using Crossfire.Domain;
 using System.Text;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
@@ -9,21 +10,17 @@ namespace Crossfire.AdapterCodex;
 
 public sealed record ContextBinding(string Context, string SessionId);
 public sealed record ContextRegistryState(string Mode, IReadOnlyList<ContextBinding> Bindings);
-public sealed record ContextMigrationTarget(string? Target, string? Session, bool Instructions);
 
 public static class ContextRegistry
 {
     public const string FileName = "crossfire-context-registry.json";
-    public const string Migration = "crossfire-migrations/context-registry/manifest.json";
     public static string Mode(NativeHistoryMode mode) => mode switch { NativeHistoryMode.Shared => "shared", NativeHistoryMode.PerRoom => "per-room", _ => throw new ArgumentException("Unknown native history mode") };
     public static string Receipt(string home, string context) => Path.Combine(home, FileName + "." + Identity.Hash(context) + ".receipt");
-    public static bool ValidContext(string value) => value is "shared" or "control" || Validation.RoomId(value);
-    public static bool ObsoleteFile(string name) => name is "crossfire-session.json" or "crossfire-contexts.json"
-        || name.StartsWith("crossfire-session.json.", StringComparison.Ordinal) || name.StartsWith("crossfire-contexts.json.", StringComparison.Ordinal);
+    public static bool ValidContext(string value) => HistoryContext.Valid(value);
     private static Result<ContextBinding> Binding(JsonElement input)
     {
         if (!Validation.Fields(input, ["context", "sessionId"]).IsSuccess) return Results.Fail<ContextBinding>("invalid", "Invalid native history binding");
-        var context = Validation.Text(input.GetProperty("context"), 255); var session = Validation.Text(input.GetProperty("sessionId"), 100);
+        var context = Validation.Text(input.GetProperty("context"), HistoryContext.MaximumLength); var session = Validation.Text(input.GetProperty("sessionId"), 100);
         return context.IsSuccess && ValidContext(context.Value) && session.IsSuccess && Validation.Identifier(session.Value)
             ? Result<ContextBinding>.Success(new(context.Value, session.Value)) : Results.Fail<ContextBinding>("invalid", "Invalid native history context or session identity");
     }
@@ -42,46 +39,12 @@ public static class ContextRegistry
         try
         {
             PrivateFiles.ExistingDirectory(home, true);
-            if (Directory.EnumerateFileSystemEntries(home).Any(path => ObsoleteFile(Path.GetFileName(path))))
-                return Results.Fail<ContextRegistryState>("invalid", "Native context metadata requires explicit fleetd --migrate-contexts before resume");
-            var marker = Path.Combine(home, Migration);
-            if (PrivateFiles.Exists(marker))
-            {
-                using var migration = JsonDocument.Parse(PrivateFiles.Read(marker, 33554432));
-                if (!ValidMigration(migration.RootElement, true)) return Results.Fail<ContextRegistryState>("invalid", "Native context migration is incomplete or invalid; repeat fleetd --migrate-contexts before resume");
-            }
             var file = Path.Combine(home, FileName);
             if (!PrivateFiles.Exists(file)) return Result<ContextRegistryState>.Success(new("shared", []));
             using var document = JsonDocument.Parse(PrivateFiles.Read(file, 33554432)); return Decode(document.RootElement);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
         { return Results.Fail<ContextRegistryState>("invalid", "Cannot read the exact private native context registry"); }
-    }
-    public static IReadOnlyDictionary<string, ContextMigrationTarget> MigrationFiles(ContextRegistryState registry)
-    {
-        var expected = new Dictionary<string, ContextMigrationTarget>(StringComparer.Ordinal) { ["crossfire-session.json"] = new(null, null, false), ["crossfire-contexts.json"] = new(null, null, false) };
-        foreach (var binding in registry.Bindings)
-        {
-            var suffix = Identity.Hash(binding.Context) + ".receipt"; var original = binding.Context == "shared" ? "crossfire-session.json.receipt" : "crossfire-contexts.json." + suffix;
-            foreach (var extension in new[] { "", ".instructions" })
-            { expected[original + extension] = new(FileName + "." + suffix + extension, binding.SessionId, extension.Length != 0); expected[original + extension + ".lock"] = new(null, null, false); }
-        }
-        return expected;
-    }
-    public static bool ValidMigration(JsonElement value, bool completed)
-    {
-        if (!Validation.Fields(value, ["phase", "registry", "files"]).IsSuccess || CodexJson.String(value, "phase") is not ("prepared" or "complete") || completed && CodexJson.String(value, "phase") != "complete") return false;
-        var registry = Decode(value.GetProperty("registry")); if (!registry.IsSuccess) return false; var expected = MigrationFiles(registry.Value);
-        var files = value.GetProperty("files"); if (files.ValueKind != JsonValueKind.Array || files.GetArrayLength() > 8010) return false;
-        var names = new HashSet<string>(StringComparer.Ordinal); var targets = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var file in files.EnumerateArray())
-        {
-            if (!Validation.Fields(file, ["name", "digest", "target"]).IsSuccess) return false;
-            var name = Validation.Text(file.GetProperty("name"), 200); var digest = Validation.Text(file.GetProperty("digest"), 64, 64); var target = Validation.NullableText(file.GetProperty("target"), 200);
-            if (!name.IsSuccess || !digest.IsSuccess || digest.Value.Any(character => character is not (>= '0' and <= '9' or >= 'a' and <= 'f')) || !target.IsSuccess
-                || !names.Add(name.Value) || !expected.TryGetValue(name.Value, out var planned) || planned.Target != target.Value || target.Value is not null && !targets.Add(target.Value)) return false;
-        }
-        return true;
     }
     public static Result<Unit> Write(string home, ContextRegistryState state)
     {

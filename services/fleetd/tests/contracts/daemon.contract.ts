@@ -17,8 +17,8 @@ import type { Parser } from '@ctlflow/crossfire-contracts/schema/validation';
 import { lastUser, messageContracts } from './messages.contract.js';
 import { paginationContracts } from '@ctlflow/crossfire-test-support/contract-pagination';
 import { readAuthentication } from '@ctlflow/fleetd-storage/authentication';
+import { roomContext } from '@ctlflow/crossfire-kernel/history-context';
 import { authenticationContracts } from './authentication.contract.js';
-import { storageContracts } from './storage.contract.js';
 
 type Declaration = { method: string; path: string; status: number; collection: boolean; output: Parser<unknown> };
 export async function daemonContracts(scope: TestContext, platform: ContractPlatform, selected: ContractTarget, runtime: 'codex' | 'pi'): Promise<void> {
@@ -32,15 +32,14 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   }
   await observe(async () => { assert.equal(daemon.alive(), true, daemon.errors()); try { return (await raw('/api/status')).status === 200; } catch { return false; } }, 'Private daemon must start');
   await authenticationContracts(scope, socket, authenticationFile);
-  await storageContracts(scope, selected, directory, environment);
   await paginationContracts(scope, query => raw('/api/fleets' + query));
   cleanup(scope, async () => { try { await call(operations.operate, {}, { operationId: randomUUID(), action: 'stop', target: { kind: 'daemon' }, expectedRevision: 0 }); } catch { await daemon.close(); } });
   const role = join(fleetDirectory, 'agents/analyst'); mkdirSync(role, { recursive: true, mode: 0o700 });
   const effort = runtime === 'codex' ? 'model_reasoning_effort' : 'thinking_level'; const defaults = runtime === 'codex' ? 'sandbox_mode = "read-only"\napproval_policy = "never"\nfeatures = { default_mode_request_user_input = true }\n' : 'provider = "fixture"\nmodel = "fixture-model"\n';
   writeFileSync(join(role, 'agent.toml'), 'name = "Contract analyst"\nruntime = ' + JSON.stringify(runtime) + '\n[runtime_options]\n' + defaults + effort + ' = "medium"\n', { mode: 0o600 }); writeFileSync(join(role, 'AGENTS.md'), 'Only obey the authorized shared contract fixture. Use explicit tools for room replies.\n', { mode: 0o600 });
-  const runtimeSource = 'fleet = "shared-' + runtime + '"\n[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(platform.origin) + '\nowner = ' + JSON.stringify(platform.owner.matrixUserId) + '\n[[instances]]\nkey = "analyst"\nname = "shared-analyst-' + runtime + '"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/analyst"\n[instances.runtime_options]\n' + effort + ' = "high"\n';
+  const runtimeSource = 'fleet = "shared-' + runtime + '"\n[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(platform.origin) + '\nowner = ' + JSON.stringify(platform.owner.backendUserId) + '\n[[instances]]\nkey = "analyst"\nname = "shared-analyst-' + runtime + '"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/analyst"\n[instances.runtime_options]\n' + effort + ' = "high"\n';
   writeFileSync(join(fleetDirectory, 'runtime.toml'), runtimeSource, { mode: 0o600 });
-  let fleetId = '', revision = 0, saved: unknown, agentId = '', matrixUserId = '', token = '';
+  let fleetId = '', revision = 0, saved: unknown, agentId = '', backendUserId = '', token = '';
   async function delivery(enabled: boolean): Promise<void> {
     const fleet = record((await call(operations.fleet, { fleetId })).data);
     await call(operations.changeFleetDelivery, { fleetId }, { expectedRevision: integer(record(fleet.connection).revision), enabled });
@@ -82,6 +81,31 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     revision = integer(current.revision);
     assert.equal(provider.requests.length, 0);
   });
+  await scope.test('diagnostics collect scoped findings without native startup, configuration writes or leaking private state', async () => {
+    const before = readFileSync(join(root, 'fleets.json')), authentication = readFileSync(authenticationFile);
+    const report = record((await call(operations.diagnostics)).data), checks = list(report.checks).map(record);
+    assert.deepEqual(checks.map(check => check.id).sort(), ['controller.connection', 'controller.lifecycle', 'controller.logging']);
+    assert(checks.every(check => check.status === 'pass'));
+    const scoped = record((await call(operations.diagnostics, {}, undefined, '?fleetId=' + fleetId)).data);
+    const agentChecks = list(scoped.checks).map(record).filter(check => record(check.scope).instanceKey === 'analyst');
+    assert.equal(agentChecks.length, 7);
+    assert.equal(agentChecks.find(check => check.id === 'agent.activation')?.message, 'Agent is not selected for activation');
+    assert.equal(agentChecks.find(check => check.id === 'agent.provider')?.status, 'not-applicable');
+    assert.equal(agentChecks.find(check => check.id === 'agent.native')?.message, 'Native state: stopped');
+    assert.equal(record(scoped.scope).fleetId, fleetId);
+    await call(operations.diagnostics, {}, undefined, '?fleetId=' + fleetId + '&instanceKey=analyst');
+    for (const query of ['?fleetId=invalid', '?instanceKey=analyst', '?fleetId=' + fleetId + '&fleetId=' + fleetId, '?fleetId=' + fleetId + '&instanceKey=analyst&instanceKey=analyst', '?unknown=1'])
+      contractError(await raw('/api/diagnostics' + query), 400, 'invalid');
+    contractError(await raw('/api/diagnostics?fleetId=' + randomUUID()), 404, 'missing');
+    contractError(await raw('/api/diagnostics?fleetId=' + fleetId + '&instanceKey=absent'), 404, 'missing');
+    contractError(await raw('/api/diagnostics', 'GET', undefined, { Authorization: 'Bearer guessed' }), 401, 'unauthorized');
+    assert.deepEqual(readFileSync(join(root, 'fleets.json')), before);
+    assert.deepEqual(readFileSync(authenticationFile), authentication);
+    assert.equal(existsSync(join(role, 'workarea')), false);
+    assert.equal(provider.requests.length, 0);
+    const serialized = JSON.stringify(scoped);
+    for (const secret of [home, fleetDirectory, readAuthentication(authenticationFile)]) assert(!serialized.includes(secret), 'Diagnostics omit paths and credentials');
+  });
   await scope.test('stopped roster mutations are revision-qualified, bounded and preserve authored roles', async () => {
     const authored = readFileSync(join(role, 'AGENTS.md'));
     const reviewer = join(fleetDirectory, 'agents/reviewer'); mkdirSync(reviewer, { mode: 0o700 });
@@ -109,7 +133,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   });
   await scope.test('every daemon operation rejects unknown query fields before effects', async () => {
     const before = readFileSync(join(root, 'fleets.json')), current = record((await call(operations.fleet, { fleetId })).data);
-    const response = await contractHttp(platform.origin, 'GET', '/onboarding/setup.json?ownerMatrixId=' + encodeURIComponent(platform.owner.matrixUserId), undefined, { Cookie: platform.owner.cookie });
+    const response = await contractHttp(platform.origin, 'GET', '/onboarding/setup.json?ownerBackendUserId=' + encodeURIComponent(platform.owner.backendUserId), undefined, { Cookie: platform.owner.cookie });
     assert.equal(response.status, 200); const descriptor = record(response.body), expectedRevision = integer(current.revision);
     const inputs: Record<string, unknown> = {
       setup: { descriptor, workspace: fleetDirectory, configuration: join(fleetDirectory, 'runtime.toml') },
@@ -157,7 +181,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   await scope.test('enroll, validate exact settings and start without model housekeeping', async () => {
     await operate('start'); await observe(async () => record(record((await call(operations.fleet, { fleetId })).data).connection).connected === true, 'Fleet lease must become ready');
     const contexts = await call(operations.contexts, { fleetId, instanceKey: 'analyst' }); saved = contexts.data; assert.equal(list(saved).length, 1); assert.equal(record(list(saved)[0]).runtime, runtime); assert.equal(provider.requests.length, 0);
-    const binding = JSON.parse(readFileSync(join(fleetDirectory, '.fleet/binding.json'), 'utf8')) as unknown; const identity = record(list(record(binding).identities)[0]); agentId = text(identity.agentId); const account = record(identity.account); matrixUserId = text(account.user_id); token = text(account.access_token);
+    const binding = JSON.parse(readFileSync(join(fleetDirectory, '.fleet/binding.json'), 'utf8')) as unknown; const identity = record(list(record(binding).identities)[0]); agentId = text(identity.agentId); const account = record(identity.account); backendUserId = text(account.userId); token = text(account.accessToken);
     await observe(async () => {
       const result = await contractHttp(platform.origin, 'GET', '/api/agents/' + agentId + '/runtime-observations', undefined, { Cookie: platform.owner.cookie, Origin: platform.origin }); if (result.status !== 200) return false; const rows = list(record(result.body).data); if (!rows.length) return false; return list(record(rows[0]).settings).some(value => record(value).name === effort && record(value).effective === 'high');
     }, 'Reported effective native effort must be the instance override');
@@ -178,6 +202,19 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     for (const query of ['?unknown=1', '?context=shared&context=shared']) contractError(await raw(path + query), 400, 'invalid');
     assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
     assert.equal(provider.requests.length, count);
+  });
+  await scope.test('diagnostics inspect the existing provider without refresh, inference, or native history changes', async () => {
+    const count = provider.requests.length, before = publications(), binding = readFileSync(join(fleetDirectory, '.fleet/binding.json'));
+    const report = record((await call(operations.diagnostics, {}, undefined, '?fleetId=' + fleetId + '&instanceKey=analyst')).data);
+    const checks = list(report.checks).map(record), native = checks.find(check => check.id === 'agent.native'), providerCheck = checks.find(check => check.id === 'agent.provider');
+    assert(native && providerCheck);
+    assert.equal(native.status, 'pass'); assert.equal(native.message, 'Native state: idle');
+    assert.equal(providerCheck.status, runtime === 'pi' ? 'pass' : 'not-applicable');
+    assert.equal(typeof providerCheck.observedAt, 'number');
+    assert.equal(provider.requests.length, count, 'Provider metadata inspection never invokes the model');
+    assert.deepEqual(publications(), before);
+    assert.deepEqual(readFileSync(join(fleetDirectory, '.fleet/binding.json')), binding);
+    assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
   });
   await scope.test('an idle controller killed without shutdown restores the desired selection and exact history', async () => {
     const authentication = readFileSync(authenticationFile), count = provider.requests.length;
@@ -206,7 +243,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
     assert.equal(provider.requests.length, count, 'A network outage must not create housekeeping model work');
   });
-  await scope.test('real native chat, steering and bounded history contracts', child => messageContracts(child, { platform, fleetDirectory, agent: { id: agentId, matrixUserId, token }, provider,
+  await scope.test('real native chat, steering and bounded history contracts', child => messageContracts(child, { platform, fleetDirectory, agent: { id: agentId, backendUserId, token }, provider,
     idle,
     delivery }));
   await scope.test('an actual native question waits for explicit owner submission and returns only to its original history', async () => {
@@ -250,7 +287,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     assert(outputs.some(value => (value.type === 'function_call_output' || value.role === 'tool')
       && JSON.stringify(value.output ?? value.content).includes(choice)), 'The selected answer reaches the native tool output, not just the preceding question text');
   });
-  await scope.test('paused delivery retains pending owner decisions and reports new native questions without admitting chat', async () => {
+  await scope.test('paused delivery retains pending owner decisions and reports new native questions without admitting chat', async child => {
     const requests = provider.requests.length, base = '/api/agents/' + agentId + '/runtime-decisions';
     const headers = { Cookie: platform.owner.cookie, Origin: platform.origin, 'X-Crossfire-CSRF': platform.owner.csrf };
     async function decision(path: string, method = 'GET', body?: unknown) {
@@ -285,6 +322,11 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     try {
       await delivery(false);
       assert.equal(record(await decision(base + '/' + text(original.id))).status, 'pending', 'Pausing chat must not expire a running native decision');
+      const diagnosis = record((await call(operations.diagnostics, {}, undefined, '?fleetId=' + fleetId + '&instanceKey=analyst')).data);
+      const checks = list(diagnosis.checks).map(record);
+      assert.equal(checks.find(check => check.id === 'agent.listener')?.message, 'Listener delivery is deliberately paused');
+      assert(checks.every(check => check.status !== 'fail'), 'Paused delivery and an owner decision are not native failures');
+      assert.equal(provider.requests.length, requests + 1, 'Read-only diagnosis does not answer or continue the pending question');
       question(second); await answer(original, first);
       const next = await pending(text(original.id));
       assert.equal(next.sessionId, original.sessionId); assert.equal(next.runId, original.runId, 'Pausing delivery preserves reporting ownership');
@@ -293,6 +335,13 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       assert.equal(record(list(record((await call(operations.fleet, { fleetId })).data).instances)[0]).listenerActive, false);
       assert.equal(provider.requests.length, requests + 3, 'Only the two native tool continuations run while chat is paused');
       assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
+    } catch (error) {
+      try {
+        const listeners = await contractHttp(platform.origin, 'GET', '/api/agents/' + agentId + '/listener-runs', undefined, headers);
+        child.diagnostic(JSON.stringify({ decision: await decision(base + '/' + text(original.id)), listeners: listeners.body,
+          fleet: (await raw('/api/fleets/' + fleetId)).body, errors: daemon.errors().slice(-4096) }).slice(0, 12288));
+      } catch (diagnosticError) { child.diagnostic(String(diagnosticError).slice(0, 1024)); }
+      throw error;
     } finally { await delivery(true); }
   });
   await scope.test('repeated crashes during held native responses resume the same history and unfinished request', async child => {
@@ -302,6 +351,15 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     await call(operations.createFleetMessage, { fleetId }, { messageId: randomUUID(), body: marker });
     await observe(() => provider.held() !== undefined, 'Fleet broadcast reaches the actual native engine');
     assert(lastUser(provider.requests.at(-1)).includes(marker));
+    const requestsBeforeDiagnosis = provider.requests.length;
+    let nativeCheck: Record<string, unknown> | undefined;
+    await observe(async () => {
+      const diagnostic = record((await call(operations.diagnostics, {}, undefined, '?fleetId=' + fleetId + '&instanceKey=analyst')).data);
+      nativeCheck = list(diagnostic.checks).map(record).find(check => check.id === 'agent.native');
+      return nativeCheck?.message === 'Native state: working';
+    }, 'The actual working notification reaches the read-only diagnostic snapshot');
+    assert.equal(nativeCheck?.status, 'pass'); assert.equal(nativeCheck?.message, 'Native state: working');
+    assert.equal(provider.requests.length, requestsBeforeDiagnosis, 'Diagnosing working agents cannot interrupt or submit work');
     const checkpoint = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/resume-work.json');
     try {
       for (let restart = 0; restart < 2; restart++) {
@@ -365,8 +423,8 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       }
       const rooms: string[] = [];
       for (const name of ['Completed room', 'Unfinished room']) {
-        const room = text((await matrix('POST', '/createRoom', { name, invite: [matrixUserId] })).room_id); rooms.push(room);
-        await observe(async () => Object.hasOwn(record((await matrix('GET', '/rooms/' + encodeURIComponent(room) + '/joined_members')).joined), matrixUserId),
+        const room = text((await matrix('POST', '/createRoom', { name, invite: [backendUserId] })).room_id); rooms.push(room);
+        await observe(async () => Object.hasOwn(record((await matrix('GET', '/rooms/' + encodeURIComponent(room) + '/joined_members')).joined), backendUserId),
           'The same listener accepts an authorized per-room invitation', 90000);
       }
       const send = (room: string, body: string) => matrix('PUT', '/rooms/' + encodeURIComponent(room) + '/send/m.room.message/' + randomUUID(), { msgtype: 'm.text', body });
@@ -377,7 +435,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       let completedSession = '';
       await observe(async () => {
         const contexts = list((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data).map(record);
-        completedSession = text(contexts.find(value => value.context === rooms[0])?.sessionId ?? '');
+        completedSession = text(contexts.find(value => value.context === roomContext(rooms[0]!))?.sessionId ?? '');
         const response = await contractHttp(platform.origin, 'GET', '/api/agents/' + agentId + '/runtime-observations', undefined, { Cookie: platform.owner.cookie, Origin: platform.origin });
         return response.status === 200 && list(record(response.body).data).map(record).some(value => value.sessionId === completedSession && value.state === 'idle');
       }, 'The completed room reaches observed native idle');
@@ -386,12 +444,12 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       provider.hold(); await send(rooms[1]!, unfinished);
       await observe(() => provider.held() !== undefined && lastUser(provider.requests.at(-1)).includes(unfinished), 'Another room has actual unfinished native work');
       const histories = (await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data;
-      assert.deepEqual(list(histories).map(record).map(value => value.context).sort(), ['control', ...rooms].sort());
+      assert.deepEqual(list(histories).map(record).map(value => value.context).sort(), ['control', ...rooms.map(roomContext)].sort());
       const previousResponse = provider.held()!;
       await operate('stop');
       await observe(() => previousResponse.destroyed, 'Stop closes the exact native writer for the unfinished room');
       const checkpoint = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/resume-work.json');
-      assert.deepEqual(list(JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown).map(record).map(value => value.context), [rooms[1]],
+      assert.deepEqual(list(JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown).map(record).map(value => value.context), [roomContext(rooms[1]!)],
         'A completed room cannot receive synthetic restart work because another room is busy');
       const beforeResume = provider.requests.length;
       provider.hold(); const resuming = operate('start');
@@ -403,7 +461,14 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       try { await observe(idle, 'Per-room resume settles to native idle'); }
       catch (error) {
         try {
-          scope.diagnostic(JSON.stringify({ nativeInspection, work: JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, journals: publications() }).slice(0, 8192));
+          const cursors = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/cursors.json');
+          const producers = ['.chat-publication', '.steering-publication'].map(suffix => {
+            if (!existsSync(cursors + suffix)) return { kind: suffix, steps: null };
+            const plan = record(JSON.parse(readFileSync(cursors + suffix, 'utf8')) as unknown);
+            return { kind: suffix, steps: list(plan.steps).map(record).map(({ id, room, session, status }) => ({ id, room, session, status })) };
+          });
+          const nativeRequests = provider.requests.slice(-4).map(request => ({ lastUser: lastUser(request).slice(-600) }));
+          scope.diagnostic(JSON.stringify({ nativeInspection, work: JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, journals: publications(), producers, nativeRequests }).slice(0, 8192));
         } catch (diagnosticError) { scope.diagnostic(String(diagnosticError).slice(0, 1024)); }
         throw error;
       }
@@ -462,7 +527,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   });
   await scope.test('setup reuses stopped identities and unregistration retains authored roles and native histories', async () => {
     const requests = provider.requests.length;
-    const response = await contractHttp(platform.origin, 'GET', '/onboarding/setup.json?ownerMatrixId=' + encodeURIComponent(platform.owner.matrixUserId), undefined, { Cookie: platform.owner.cookie });
+    const response = await contractHttp(platform.origin, 'GET', '/onboarding/setup.json?ownerBackendUserId=' + encodeURIComponent(platform.owner.backendUserId), undefined, { Cookie: platform.owner.cookie });
     assert.equal(response.status, 200);
     const input = { descriptor: response.body, workspace: fleetDirectory, configuration: join(fleetDirectory, 'runtime.toml') };
     for (let repeated = 0; repeated < 2; repeated++) {

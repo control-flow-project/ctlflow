@@ -86,13 +86,35 @@ pub(super) async fn run(
             "native mention eligibility and cooldown use actual event metadata",
         )?;
         if key == "directed" {
-            notice::publish(repository, matrix, clock, &actor.principal_id, event).await?;
+            notice::publish(repository, matrix, clock, &actor.principal_id, group, event).await?;
             let sent = repository
-                .with(|repo| repo.wake_notice(&actor.principal_id, event))?
+                .with(|repo| repo.wake_notice(&actor.principal_id, group, event))?
                 .ok_or("Sent notice")?;
             checks.require(
                 sent.state == notice::State::Sent,
                 "unauthorized wake mention receives a native room notice",
+            )?;
+            let mut sibling = sent.clone();
+            sibling.room_id = format!("{group}-other");
+            sibling.state = notice::State::Pending;
+            sibling.sent_at = None;
+            sibling.native_event_id = None;
+            sibling.next_attempt_at = Some(sent.reserved_at);
+            repository.with(|repo| repo.save_wake_notice(&sibling, true))?;
+            checks.require(
+                repository
+                    .with(|repo| repo.wake_notice(&actor.principal_id, &sibling.room_id, event))?
+                    .is_some_and(|value| value.state == notice::State::Pending),
+                "room-scoped event lookup selects the requested notice",
+            )?;
+            sibling.state = notice::State::Denied;
+            sibling.next_attempt_at = None;
+            repository.with(|repo| repo.save_wake_notice(&sibling, false))?;
+            checks.require(
+                repository
+                    .with(|repo| repo.wake_notice(&actor.principal_id, group, event))?
+                    .is_some_and(|value| value.state == notice::State::Sent),
+                "updating another room cannot change the original notice",
             )?;
             let id = sent
                 .native_event_id
@@ -100,17 +122,17 @@ pub(super) async fn run(
                 .ok_or("Native notice event")?;
             let message = matrix.event(user, group, id).await?;
             checks.require(
-                message.control && message.message_type.as_deref() == Some("m.notice"),
+                message.control && message.message_type.as_deref() == Some("notice"),
                 "notice is marked as control output and never becomes an agent input",
             )?;
             checks.require(
                 message.mentions == vec![outsider.to_owned()],
                 "notice directs metadata to the source person",
             )?;
-            notice::publish(repository, matrix, clock, &actor.principal_id, event).await?;
+            notice::publish(repository, matrix, clock, &actor.principal_id, group, event).await?;
             checks.require(
                 repository
-                    .with(|repo| repo.wake_notice(&actor.principal_id, event))?
+                    .with(|repo| repo.wake_notice(&actor.principal_id, group, event))?
                     .ok_or("Repeat notice")?
                     .native_event_id
                     .as_deref()

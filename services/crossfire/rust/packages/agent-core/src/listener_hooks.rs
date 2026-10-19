@@ -4,10 +4,10 @@ use crate::{
     events::invalid,
     listener_reporting::Reporter,
     local_state::LocalState,
-    matrix::Matrix,
     owner_observation::Observer,
     runtime::{Decision, Hooks, Lifecycle, ObservationEvent},
 };
+use crossfire_domain::messaging_client::MessagingClient;
 use crossfire_domain::statistics::Usage;
 use crossfire_kernel::{Failure, Result, time::Clock};
 use serde_json::Value;
@@ -27,7 +27,9 @@ pub struct ListenerHooks<S, C, M, T> {
     failure: Mutex<Option<Failure>>,
     lifecycle: Mutex<Option<Weak<dyn Lifecycle>>>,
 }
-impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> ListenerHooks<S, C, M, T> {
+impl<S: LocalState, C: Coordination, M: MessagingClient, T: Clock + Send + Sync>
+    ListenerHooks<S, C, M, T>
+{
     pub fn new(
         broker: Arc<Broker<S, C, M, T>>,
         observer: Arc<Observer<S, C, M, T>>,
@@ -76,7 +78,7 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Listener
         Ok(())
     }
 }
-impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Hooks
+impl<S: LocalState, C: Coordination, M: MessagingClient, T: Clock + Send + Sync> Hooks
     for ListenerHooks<S, C, M, T>
 {
     async fn request_decision(

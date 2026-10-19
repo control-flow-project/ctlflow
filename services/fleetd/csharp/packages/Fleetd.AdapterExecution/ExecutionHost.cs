@@ -4,6 +4,7 @@ using Crossfire.AdapterFilesystem;
 using Crossfire.AdapterHttp;
 using Crossfire.AgentCore;
 using Crossfire.Contracts;
+using MessagingConnector = Crossfire.Domain.MessagingConnector;
 using Crossfire.Kernel;
 using Fleetd.Domain;
 using Fleetd.Storage;
@@ -14,6 +15,7 @@ public sealed partial class ExecutionHost : IAsyncDisposable
 {
     private sealed record Connection(FleetBinding Binding, FleetConnection Control, FleetReports Reports);
     private readonly IReadOnlyDictionary<string, OwnedRuntimeAdapter> adapters;
+    private readonly MessagingConnector messaging;
     private readonly string artifacts;
     private readonly Action<string> log;
     private readonly TimeProvider clock;
@@ -23,9 +25,9 @@ public sealed partial class ExecutionHost : IAsyncDisposable
     private Task<ListenerHost>? listenerHost;
     private Task? closing;
     public FleetExecution Port { get; }
-    public ExecutionHost(IReadOnlyDictionary<string, OwnedRuntimeAdapter> adapters, string artifacts, Action<string> log, TimeProvider clock)
+    public ExecutionHost(IReadOnlyDictionary<string, OwnedRuntimeAdapter> adapters, MessagingConnector messaging, string artifacts, Action<string> log, TimeProvider clock)
     {
-        this.adapters = adapters; this.artifacts = artifacts; this.log = log; this.clock = clock;
+        this.adapters = adapters; this.messaging = messaging; this.artifacts = artifacts; this.log = log; this.clock = clock;
         Port = new(Connect, Status, Delivery, Message, Disconnect, Validate, Inspect, Test, Prepare, Start, Contexts, ConfirmStopped, Reset, Remove, Archive, Update);
     }
     private Coordination Client(string server, string? token) => CoordinationTransport.Create(http, server, token);
@@ -79,7 +81,8 @@ public sealed partial class ExecutionHost : IAsyncDisposable
     {
         var inspected = await Inspect(configuration, [instance], cancellation); if (!inspected.IsSuccess) return inspected; var loaded = BindingFiles.Load(configuration); if (!loaded.IsSuccess) return Result<Unit>.Fail(loaded.Error); var identity = loaded.Value.Identities.FirstOrDefault(identity => identity.InstanceKey == instance.Key); if (identity is null) return Results.Fail<Unit>("missing", "Instance has no enrolled identity");
         var local = AgentProjects.Paths(PrivateFiles.Directory(Path.Combine(configuration.Directory, instance.Workarea)), instance.Key); var profile = AgentProfiles.Parse(AgentIO.Read(AgentState.Port, local.Profile)); if (!profile.IsSuccess) return Result<Unit>.Fail(profile.Error);
-        return await InstanceReset.Run(configuration, instance, identity.AgentId, id, adapters[configuration.Definitions[instance.Definition].Runtime], CoordinationTransport.Matrix(http, profile.Value), Client(loaded.Value.Server, identity.Account.AccessToken), clock, cancellation);
+        var connected = messaging(profile.Value.Settings.Backend, profile.Value.Account); if (!connected.IsSuccess) return Result<Unit>.Fail(connected.Error);
+        return await InstanceReset.Run(configuration, instance, identity.AgentId, id, adapters[configuration.Definitions[instance.Definition].Runtime], connected.Value.Client, Client(loaded.Value.Server, identity.Account.AccessToken), clock, cancellation);
     });
     private ValueTask<Result<Unit>> Update(FleetConfiguration configuration, FleetInstance instance, string releaseDirectory, CancellationToken cancellation) => AgentIO.Boundary(() =>
     {

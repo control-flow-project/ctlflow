@@ -63,7 +63,7 @@ export function createCollectionRepository(database: Database.Database): Collect
     },
     noticeHistory(input) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('wake_notice')
-        .where(row => row.receiver_agent_id === params.receiverAgentId && row.sender_matrix_id === params.senderMatrixId && (row.status === 'pending' || row.reserved_at > params.since)).orderBy(row => row.reserved_at), input).map(mapWakeNotice)));
+        .where(row => row.receiver_agent_id === params.receiverAgentId && row.sender_backend_user_id === params.senderBackendUserId && (row.status === 'pending' || row.reserved_at > params.since)).orderBy(row => row.reserved_at), input).map(mapWakeNotice)));
     },
     duePrincipals(input) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('principal_application')
@@ -87,7 +87,7 @@ export function createCollectionRepository(database: Database.Database): Collect
     },
     claimedInvitations(input) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('member_invitation')
-        .where(row => row.consumed_by_member_id === null && row.claim_matrix_user_id !== null && (row.revoked_at !== null || row.expires_at <= params.now)).orderBy(row => row.expires_at), input).map(mapMemberInvitation)));
+        .where(row => row.consumed_by_member_id === null && row.claim_backend_user_id !== null && (row.revoked_at !== null || row.expires_at <= params.now)).orderBy(row => row.expires_at), input).map(mapMemberInvitation)));
     },
     rolePermissions(input) {
       return stored(() => success(executeSelect(database, schema, (query, params) => query.from('role_permission')
@@ -173,10 +173,10 @@ export function createCollectionRepository(database: Database.Database): Collect
       return stored(() => { executeDelete(database, schema, (query, params) => query.deleteFrom('member_session')
         .where(row => row.expires_at <= params.now), { now }); return success(undefined); });
     },
-    invitationByClaim(matrixUserId) {
+    invitationByClaim(backendUserId) {
       return stored(() => {
         const row = executeSelect(database, schema, (query, params) => query.from('member_invitation')
-          .where(row => row.claim_matrix_user_id === params.matrixUserId).firstOrDefault(), { matrixUserId });
+          .where(row => row.claim_backend_user_id === params.backendUserId).firstOrDefault(), { backendUserId });
         return success(row ? mapMemberInvitation(row) : null);
       });
     },

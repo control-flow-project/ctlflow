@@ -24,13 +24,13 @@ pub fn resolve(
         .iter()
         .map(|selected| {
             let sender = repo
-                .principal_by_matrix_id(&selected.matrix_user_id)?
+                .principal_by_backend_user_id(&selected.backend_user_id)?
                 .ok_or_else(|| {
                     Failure::new(
                         ErrorCode::Invalid,
                         format!(
                             "Selected identity is not registered: {}",
-                            selected.matrix_user_id
+                            selected.backend_user_id
                         ),
                     )
                 })?;

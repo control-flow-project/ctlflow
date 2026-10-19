@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct Room {
     pub muted: bool,
     pub access: Access,
-    pub power: Option<i64>,
+    pub native_access: Option<serde_json::Map<String, serde_json::Value>>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Policy {
@@ -49,7 +49,7 @@ pub fn rooms(grants: &[Grant]) -> BTreeMap<String, Room> {
                 Room {
                     muted: grant.intent.muted,
                     access: grant.intent.access,
-                    power: grant.intent.power,
+                    native_access: grant.intent.native_access.clone(),
                 },
             )
         })

@@ -28,7 +28,7 @@ public static class ApiAuthentication
             if (endpoint.Operation.Authentication == "human" || !bearer.IsSuccess)
                 return Results.Fail<ApiContext>("unauthorized", "This operation requires the correct authentication kind");
             if (endpoint.Operation.Authentication == "fleet") return FleetAuthority.Authenticate(FleetCommands.Ports(database, state.Now), bearer.Value).Map(controller => context with { Controller = controller });
-            var actor = await NativeActors.Agent(new(context.Authorization, id => MemberQueries.ByMatrixId(database, id), state.Matrix.Identify), bearer.Value, http.RequestAborted);
+            var actor = await NativeActors.Agent(new(context.Authorization, id => MemberQueries.ByBackendUserId(database, id), state.Messaging.Identify), bearer.Value, http.RequestAborted);
             return actor.Map(identity => context with { Identity = identity });
         }
         if (endpoint.Operation.Authentication == "agent") return Results.Fail<ApiContext>("unauthorized", "Agent bearer authentication is required");

@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { createServer } from 'node:http';
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +16,7 @@ const temporaryRoot = join(service, '.temp'); mkdirSync(temporaryRoot, { recursi
 const directory = mkdtempSync(join(temporaryRoot, 'csharp-core-'));
 const publish = join(directory, 'native');
 const events = [];
+const disposers = [];
 let timeZones;
 
 async function command(binary, arguments_, label, workingDirectory = root) {
@@ -31,6 +33,11 @@ async function command(binary, arguments_, label, workingDirectory = root) {
 
 try {
   timeZones = prepareTimeZones(directory);
+  const { secureRouter } = await import('../../node/packages/test-support/dist/tls.js');
+  const backend = await secureRouter({ after: operation => disposers.push(operation) }, createServer((request, response) => {
+    response.writeHead(200, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ host: request.headers.host }));
+  }));
+  process.env.CROSSFIRE_TLS_TEST_ORIGIN = backend.origin;
   await command(process.execPath, ['services/crossfire/scripts/generate-sqlite-model.mjs', '--check'], 'canonical model drift check');
   await command(process.execPath, ['services/crossfire/scripts/generate-rest-catalog.mjs', '--check'], 'canonical REST catalog drift check');
   await command(process.execPath, ['services/fleetd/scripts/generate-rest-catalog.mjs', '--check'], 'canonical daemon REST catalog drift check');
@@ -66,11 +73,13 @@ try {
   await command(process.execPath, [join(service, 'csharp/tests/matrix-parity.mjs'), join(publish, 'Crossfire.Storage.Tests'),
     join(root, project, 'bin/Release/net11.0/Crossfire.Storage.Tests.dll'), dotnet], 'managed and NativeAOT actual Conduit authority', service);
   await command(process.execPath, ['services/crossfire/csharp/tests/sqlite-parity.mjs', join(publish, 'Crossfire.Storage.Tests'),
-    join(root, project, 'bin/Release/net11.0/Crossfire.Storage.Tests.dll'), dotnet], 'same-file SQLite parity and forward migration');
+    join(root, project, 'bin/Release/net11.0/Crossfire.Storage.Tests.dll'), dotnet], 'same-file SQLite interchange');
   await command(process.execPath, ['services/crossfire/csharp/tests/schema-parity.mjs', join(publish, 'Crossfire.Storage.Tests'),
-    join(root, project, 'bin/Release/net11.0/Crossfire.Storage.Tests.dll'), dotnet], 'deployed schema 13/14 parity and rollback');
+    join(root, project, 'bin/Release/net11.0/Crossfire.Storage.Tests.dll'), dotnet], 'current schema constraints, validation and backup parity');
   console.log(JSON.stringify({ scope: 'implemented C# core, not full product parity', status: 'passed', resources, events }));
 } finally {
+  delete process.env.CROSSFIRE_TLS_TEST_ORIGIN;
+  for (const dispose of disposers.toReversed()) await dispose();
   writeFileSync(join(temporaryRoot, 'csharp-core-summary.json'), JSON.stringify({ resources, events }, null, 2) + '\n', { mode: 0o600 });
   rmSync(directory, { recursive: true });
 }

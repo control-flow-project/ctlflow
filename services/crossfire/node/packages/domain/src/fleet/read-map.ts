@@ -5,7 +5,7 @@ import type { PrincipalSummary } from '../port/discovery.js';
 import type { AgentRecord } from '../port/directory.js';
 import type { AgentRoomGrant, RoomGrantApplication } from '../room-access/types.js';
 import { readActivity, type AgentActivity } from '../listener/activity.js';
-import { wakeSenderMatrixIds } from '../wake/resolve-policy.js';
+import { wakeSenderBackendUserIds } from '../wake/resolve-policy.js';
 import { readFleet, type FleetDetails } from './read-fleet.js';
 import { readRoom } from '../room/read-room.js';
 import type { WakeSelection } from '../wake/types.js';
@@ -16,7 +16,7 @@ export type FleetMapRoom = { roomId: string; name: string | null; alias: string 
 export type FleetMapSource = { sourceId: string; mode: AgentRecord['agent']['wakeMode']; senders: WakeSelection[]; eligiblePrincipalIds: string[] };
 export type FleetMap = { fleet: FleetDetails; capturedAt: number; agents: FleetMapAgent[]; rooms: FleetMapRoom[];
   connections: FleetMapConnection[]; sources: FleetMapSource[]; principals: PrincipalSummary[] };
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'roomGrantRead' | 'listenerRead' | 'matrix' | 'clock' | 'identity' | 'runtime'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'discovery' | 'roomGrantRead' | 'listenerRead' | 'messaging' | 'clock' | 'identity' | 'runtime'>;
 
 function roomConnections(grants: AgentRoomGrant[], applications: RoomGrantApplication[]): FleetMapConnection[] {
   const byKey = new Map<string, FleetMapConnection>();
@@ -58,7 +58,7 @@ export async function readFleetMap(services: Dependencies, actor: Actor, fleetId
   for (const entry of selected.value) {
     const senders = selectedByAgent.get(entry.agentId) ?? []; senders.push(entry); selectedByAgent.set(entry.agentId, senders);
   }
-  const activeByMatrixId = new Map(active.value.map(value => [value.principal.matrixUserId, value.principal.id]));
+  const activeByBackendUserId = new Map(active.value.map(value => [value.principal.backendUserId, value.principal.id]));
   const sources = new Map<string, FleetMapSource>(), sourceByAgent = new Map<string, string>();
   const principalIds = new Set<string>();
   for (const record of records.value.items) {
@@ -68,7 +68,7 @@ export async function readFleetMap(services: Dependencies, actor: Actor, fleetId
     const sourceId = services.identity.hash(record.agent.wakeMode + '\0' + JSON.stringify(selections));
     const source = sources.get(sourceId) ?? { sourceId, mode: record.agent.wakeMode, senders: selections, eligiblePrincipalIds: [] };
     const eligible = new Set(source.eligiblePrincipalIds);
-    for (const matrixId of wakeSenderMatrixIds(record, active.value, senders)) eligible.add(activeByMatrixId.get(matrixId)!);
+    for (const backendId of wakeSenderBackendUserIds(record, active.value, senders)) eligible.add(activeByBackendUserId.get(backendId)!);
     source.eligiblePrincipalIds = [...eligible].sort(); sources.set(sourceId, source); sourceByAgent.set(record.principal.id, sourceId);
     for (const id of [...source.senders.map(sender => sender.principalId), ...source.eligiblePrincipalIds]) principalIds.add(id);
   }

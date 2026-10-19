@@ -10,7 +10,7 @@ import { enrollmentCapacity } from './capacity.js';
 import { applyCoordinationPolicy } from '../fleet/policy.js';
 import { applyEnrolledName } from './rename.js';
 
-export function decideEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'identity' | 'clock' | 'instance' | 'runtime'>,
+export function decideEnrollment(services: Pick<Services, 'repositories' | 'directory' | 'collection' | 'unitOfWork' | 'identity' | 'clock' | 'messaging' | 'runtime'>,
   actor: Actor, enrollmentId: string, input: { expectedRevision: number; decision: 'approve' | 'reject'; verificationCode: string }, requestId: string) {
   return services.unitOfWork.run(() => {
     const expired = expireEnrollments(services);
@@ -57,7 +57,7 @@ export function decideEnrollment(services: Pick<Services, 'repositories' | 'dire
           if (!name.ok) return name;
           if (!name.value || name.value.requestId !== request.id || name.value.instanceKey !== item.instanceKey) return failure('conflict', 'Name collision: ' + item.requestedName);
           agentId = services.identity.id();
-          const principal = registerPrincipal(services, { id: agentId, matrixUserId: '@agent-' + agentId + ':' + services.instance.serverName,
+          const principal = registerPrincipal(services, { id: agentId, backendUserId: services.messaging.agentUserId(agentId),
             kind: 'agent', status: 'active', revision: 0, createdAt: now }, 'agent', request.ownerId);
           if (!principal.ok) return principal;
           const agent = services.repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId: request.ownerId, wakeMode: 'selected' });

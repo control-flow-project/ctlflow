@@ -21,13 +21,77 @@ use serde_json::{Value, json};
 use support::{NOW, Scenario};
 
 const ROOM: &str = "!room:example.test";
+#[test]
+fn generic_room_authority_and_storage_preserve_opaque_backend_roles()
+-> Result<(), Box<dyn std::error::Error>> {
+    let mut scenario = Scenario::create()?;
+    let native = json!({"roles":["reviewer"],"scope":{"project":"credit"}})
+        .as_object()
+        .ok_or("access object")?
+        .clone();
+    let intent = Intent {
+        access: Access::Custom,
+        native_access: Some(native.clone()),
+        muted: false,
+    };
+    let change = Change {
+        agent_id: scenario.agent.principal_id.clone(),
+        room_id: "control".to_owned(),
+        expected_revision: 0,
+        expected_generation: None,
+        intent: intent.clone(),
+    };
+    let (proof, _, _) = crossfire_domain::room_access::authority::prepare(
+        &mut scenario.store,
+        &scenario.owner,
+        &change,
+        None,
+        NOW,
+    )?;
+    crossfire_domain::room_access::authority::recheck(
+        &mut scenario.store,
+        &scenario.owner,
+        &proof,
+        NOW,
+    )?;
+    assert_eq!(proof.input.intent, intent);
+    let grant = Grant {
+        agent_id: change.agent_id.clone(),
+        room_id: change.room_id.clone(),
+        generation: identity::id(),
+        authorizer_id: scenario.owner.principal_id.clone(),
+        added_by_id: scenario.owner.principal_id.clone(),
+        invitation_event_id: None,
+        admission: Admission::Managed,
+        intent,
+        revision: 0,
+        access_revision: 0,
+        updated_at: NOW,
+    };
+    scenario.store.save_room_grant(&grant, true)?;
+    let mut applied = Application::pending(&change.agent_id, &change.room_id, NOW);
+    applied.native_access = Some(native);
+    applied.membership = Some(crossfire_domain::messaging::Membership::Join);
+    scenario.store.save_room_application(&applied, true)?;
+    assert_eq!(
+        scenario.store.room_grant(&change.agent_id, "control")?,
+        Some(grant)
+    );
+    assert_eq!(
+        scenario
+            .store
+            .room_application(&change.agent_id, "control")?,
+        Some(applied)
+    );
+    Ok(())
+}
 fn authority(fixture: &Fixture) -> crossfire_kernel::Result<Authority> {
     Authority::new(Configuration {
         origin: fixture.origin.clone(),
         server_name: "example.test".to_owned(),
         jwt_secret: Secret::new("key".to_owned()),
         registration_secret: Secret::new("key".to_owned()),
-        service_matrix_id: "@service:example.test".to_owned(),
+        service_backend_user_id: "@service:example.test".to_owned(),
     })
 }
 fn state() -> Value {
@@ -71,7 +135,7 @@ fn input(agent: &str, revision: i64, generation: Option<String>, access: Access)
         expected_generation: generation,
         intent: Intent {
             access,
-            power: None,
+            native_access: None,
             muted: false,
         },
     }
@@ -83,7 +147,7 @@ fn second_agent(
 ) -> crossfire_kernel::Result<Actor> {
     let principal = Principal {
         id: identity::id(),
-        matrix_user_id: "@target:example.test".to_owned(),
+        backend_user_id: "@target:example.test".to_owned(),
         kind: PrincipalKind::Agent,
         status: Status::Active,
         revision: 0,
@@ -117,7 +181,7 @@ fn second_agent(
         principal_id: principal.id,
         kind: PrincipalKind::Agent,
         authentication: Some(Authentication::Native {
-            matrix_user_id: principal.matrix_user_id,
+            backend_user_id: principal.backend_user_id,
         }),
     })
 }
@@ -134,7 +198,7 @@ async fn owner_grants_and_delegation_have_exact_generations_and_full_audit_prove
     let clock = || Ok(NOW);
     let service = Service {
         repository: &repository,
-        matrix: &matrix,
+        messaging: &matrix,
         clock: &clock,
     };
     let request = input(&scenario.agent.principal_id, 0, None, Access::Reply);
@@ -267,7 +331,7 @@ async fn invited_agents_can_remove_their_own_additions_but_cannot_grant_themselv
     let clock = || Ok(NOW);
     let service = Service {
         repository: &repository,
-        matrix: &matrix,
+        messaging: &matrix,
         clock: &clock,
     };
     let owner_request = input(&scenario.agent.principal_id, 0, None, Access::Reply);
@@ -356,7 +420,7 @@ async fn authority_changes_during_native_room_reads_roll_back_without_holding_th
     let clock = || Ok(NOW);
     let service = Service {
         repository: &repository,
-        matrix: &matrix,
+        messaging: &matrix,
         clock: &clock,
     };
     let request = input(&scenario.agent.principal_id, 0, None, Access::Reply);
@@ -396,7 +460,7 @@ async fn authority_changes_during_native_room_reads_roll_back_without_holding_th
 #[tokio::test]
 async fn native_reconciliation_preserves_a_manual_departure_instead_of_silently_joining_again()
 -> Result<(), Box<dyn std::error::Error>> {
-    use crossfire_adapter_matrix::room_operations::Operations;
+    use crossfire_adapter_runtime::room_operations::Operations;
     use crossfire_domain::room_access::reconcile;
     let mut scenario = Scenario::create()?;
     let _guest = scenario.add_human("@guest:example.test")?;
@@ -408,7 +472,7 @@ async fn native_reconciliation_preserves_a_manual_departure_instead_of_silently_
     let clock = || Ok(NOW);
     let service = Service {
         repository: &repository,
-        matrix: &matrix,
+        messaging: &matrix,
         clock: &clock,
     };
     let request = input(&scenario.agent.principal_id, 0, None, Access::Reply);
@@ -425,7 +489,7 @@ async fn native_reconciliation_preserves_a_manual_departure_instead_of_silently_
         application.observed_generation = Some(grant.generation.clone());
         application.applied_access_revision = Some(grant.access_revision);
         application.last_success_at = Some(NOW);
-        application.membership = Some(crossfire_domain::matrix::Membership::Join);
+        application.membership = Some(crossfire_domain::messaging::Membership::Join);
         repo.save_room_application(&application, false)
     })?;
     let mut left = state();
@@ -460,7 +524,7 @@ async fn native_reconciliation_preserves_a_manual_departure_instead_of_silently_
         .ok_or("Observed application")?;
     assert_eq!(
         application.membership,
-        Some(crossfire_domain::matrix::Membership::Leave)
+        Some(crossfire_domain::messaging::Membership::Leave)
     );
     assert_eq!(application.error_code, None);
     assert_eq!(application.observed_generation, Some(grant.generation));
@@ -488,7 +552,7 @@ async fn private_owner_rooms_cannot_be_removed_muted_or_delegated_even_by_the_ow
                     admission: Admission::Managed,
                     intent: Intent {
                         access: Access::Reply,
-                        power: None,
+                        native_access: None,
                         muted: false,
                     },
                     revision: 0,
@@ -510,7 +574,7 @@ async fn private_owner_rooms_cannot_be_removed_muted_or_delegated_even_by_the_ow
     let clock = || Ok(NOW);
     let service = Service {
         repository: &repository,
-        matrix: &matrix,
+        messaging: &matrix,
         clock: &clock,
     };
     let request = input(&scenario.agent.principal_id, 0, None, Access::None);

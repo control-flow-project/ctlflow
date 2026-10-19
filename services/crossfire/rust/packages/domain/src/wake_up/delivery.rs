@@ -30,8 +30,8 @@ fn command(
         message: rule.message.clone(),
         scheduled_at: delivery.scheduled_at,
         session_id: delivery.session_id.clone(),
-        owner_matrix_id: owner.matrix_user_id,
-        authorizer_matrix_id: authorizer.matrix_user_id,
+        owner_backend_user_id: owner.backend_user_id,
+        authorizer_backend_user_id: authorizer.backend_user_id,
     })
 }
 

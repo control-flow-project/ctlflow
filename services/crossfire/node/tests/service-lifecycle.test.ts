@@ -25,7 +25,7 @@ test("native authority shutdown aborts reads and serialized provisioning without
   assert(address && typeof address === "object");
   const native = authority({ serverName: "tests.localhost",
     matrixOrigin: "http://127.0.0.1:" + address.port,
-    registrationSecret: secret(), jwtSecret: secret(), serviceMatrixId: '@crossfire-shutdown:tests.localhost' });
+    registrationSecret: secret(), jwtSecret: secret(), serviceBackendUserId: '@crossfire-shutdown:tests.localhost' });
   const reads = [native.identify("bounded-test-credential"), native.asUser("@admin:tests.localhost"),
     native.profileName("@agent:tests.localhost")];
   const provisioning = [native.provision("@agent:tests.localhost", secret()), native.provision("@agent:tests.localhost", secret())];
@@ -59,9 +59,9 @@ test("private service starts with real native bootstrap and shuts down idempoten
   const [port, contentPort] = ports as [number, number];
   mkdirSync(join(process.cwd(), ".temp"), { recursive: true });
   const directory = mkdtempSync(join(process.cwd(), ".temp/service-lifecycle-"));
-  const config: Config = { instance: "lifecycle", serverName: "architecture.localhost",
-    publicOrigin: "http://127.0.0.1:" + port, contentOrigin: 'http://localhost:' + contentPort, matrixOrigin: native.base,
-    administrator: "@admin:architecture.localhost", registrationSecret: native.registrationToken, jwtSecret };
+  const config: Config = { instance: "lifecycle", publicOrigin: "http://127.0.0.1:" + port, contentOrigin: 'http://localhost:' + contentPort,
+    messaging: { type: 'matrix', parameters: { serverName: 'architecture.localhost', origin: native.base, registrationSecret: native.registrationToken, jwtSecret } },
+    administrator: "@admin:architecture.localhost" };
   writeJson(join(directory, "config.json"), config);
   writeJson(join(directory, "bootstrap.json"), { servicePassword: secret(), administratorPassword: secret() });
   const output = join(directory, "release");
@@ -80,6 +80,6 @@ test("private service starts with real native bootstrap and shuts down idempoten
   await Promise.all([service.close(), service.close()]);
   assert.equal(service.server.listening, false);
   assert.equal(service.contentServer.listening, false);
-  assert.equal((await service.application.services.matrix.identify("closed")).ok, false);
+  assert.equal((await service.application.services.messaging.identify("closed")).ok, false);
   assert.throws(() => service.application.services.repositories.instancePolicy.find({ id: 'instance' }), /database connection is not open/);
 });

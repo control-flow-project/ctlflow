@@ -10,6 +10,8 @@ public static class InstanceRoutes
 {
     public static IReadOnlyList<ApiEndpoint> Endpoints() =>
     [
+        new("messagingBackend", (context, parameters, input) => Replies.Ready(Result<ApiReply>.Success(new(MessagingJson.Description(context.State.Messaging.Describe(context.State.Configuration.PublicOrigin)))))),
+        new("authenticateBackend", AuthenticateBackend),
         new("release", (context, parameters, input) => Replies.Ready(Result<ApiReply>.Success(new(context.State.Release.Manifest)))),
         new("health", (context, parameters, input) => Replies.Ready(Result<ApiReply>.Success(new(JsonValues.Object(writer =>
         {
@@ -25,6 +27,15 @@ public static class InstanceRoutes
         new("policy", (context, parameters, input) => Replies.Ready(Replies.Of(Policies.Read(PolicyCommands.Ports(context.Database, context.State.Now), context.Actor).Map(View)))),
         new("changePolicy", Change)
     ];
+
+    private static async ValueTask<Result<ApiReply>> AuthenticateBackend(ApiContext context, IReadOnlyDictionary<string, string> parameters, JsonElement input)
+    {
+        if (context.Http.Request.Headers.Origin != context.State.Configuration.PublicOrigin) return Results.Fail<ApiReply>("forbidden", "Invalid request origin");
+        if (!Validation.Fields(input, ["username", "password"]).IsSuccess) return Results.Fail<ApiReply>("invalid", "Invalid messaging sign-in");
+        var username = Validation.Text(input.GetProperty("username"), 255); var password = Validation.Text(input.GetProperty("password"), 1024);
+        if (!username.IsSuccess || !password.IsSuccess) return Results.Fail<ApiReply>("invalid", "Invalid messaging sign-in");
+        return Replies.Of((await context.State.Messaging.Authenticate(username.Value, password.Value, context.Http.RequestAborted)).Map(token => WireJson.Object(writer => writer.WriteString("accessToken", token))));
+    }
 
     public static JsonElement View(InstancePolicy value) => JsonValues.Object(writer =>
     {

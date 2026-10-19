@@ -11,17 +11,17 @@ import { changeInstancePolicy } from '@ctlflow/crossfire-domain/policy/change-po
 import { preflight as preflightRequest } from '@ctlflow/crossfire-contracts/schema/request';
 import { applicationFixture, secret, value } from './support/application.js';
 
-function introduction(ownerMatrixId: string, count: number, prefix: string) {
-  return { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId, fleetKey: 'team-' + prefix,
+function introduction(ownerBackendUserId: string, count: number, prefix: string) {
+  return { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId, fleetKey: 'team-' + prefix,
     controller: { name: prefix + '-controller' },
-    instances: Array.from({ length: count }, (_, index) => ({ instanceKey: prefix + '-' + index, name: prefix + '-' + index, coordinationPolicy: defaultCoordinationPolicy(ownerMatrixId) })) };
+    instances: Array.from({ length: count }, (_, index) => ({ instanceKey: prefix + '-' + index, name: prefix + '-' + index, coordinationPolicy: defaultCoordinationPolicy(ownerBackendUserId) })) };
 }
 
 test('concurrent introductions reject all colliding names and leave no partial roster', async scope => {
   const { services, admin } = await applicationFixture(scope);
-  const first = introduction(admin.member.principal.matrixUserId, 2, 'shared');
-  const second = { ...introduction(admin.member.principal.matrixUserId, 3, 'later'),
-    instances: [...first.instances, introduction(admin.member.principal.matrixUserId, 1, 'unique').instances[0]!] };
+  const first = introduction(admin.member.principal.backendUserId, 2, 'shared');
+  const second = { ...introduction(admin.member.principal.backendUserId, 3, 'later'),
+    instances: [...first.instances, introduction(admin.member.principal.backendUserId, 1, 'unique').instances[0]!] };
   const outcomes = await Promise.all([introduceEnrollment(services, first), introduceEnrollment(services, second)]);
   assert(outcomes[0]!.ok); assert(!outcomes[1]!.ok);
   assert.equal(outcomes[1]!.error.code, 'name_collision');
@@ -40,9 +40,9 @@ test('administrator default capacity is 100 while member owners retain the confi
   assert.equal(policy.maxOwnerAgents, 10);
   assert.equal(value(enrollmentCapacity(services, admin.actor.principalId)).ownerLimit, 100);
   assert.equal(value(enrollmentCapacity(services, owner.actor.principalId)).ownerLimit, 10);
-  value(await preflightEnrollment(services, introduction(admin.member.principal.matrixUserId, 100, 'admin')));
-  value(await preflightEnrollment(services, introduction(owner.member.principal.matrixUserId, 10, 'member')));
-  const refused = await preflightEnrollment(services, introduction(owner.member.principal.matrixUserId, 11, 'excess'));
+  value(await preflightEnrollment(services, introduction(admin.member.principal.backendUserId, 100, 'admin')));
+  value(await preflightEnrollment(services, introduction(owner.member.principal.backendUserId, 10, 'member')));
+  const refused = await preflightEnrollment(services, introduction(owner.member.principal.backendUserId, 11, 'excess'));
   assert(!refused.ok);
   assert.equal(refused.error.code, 'capacity');
   assert.match(refused.error.message, /11 new agents; owner capacity is 0\/10 and instance capacity is 0\/100/u);
@@ -51,7 +51,7 @@ test('administrator default capacity is 100 while member owners retain the confi
 
 test('twenty administrators agents share one approved request without policy overrides or room grants', async scope => {
   const { services, admin } = await applicationFixture(scope);
-  const request = introduction(admin.member.principal.matrixUserId, 20, 'agreement');
+  const request = introduction(admin.member.principal.backendUserId, 20, 'agreement');
   value(await preflightEnrollment(services, request));
   const receipt = value(await introduceEnrollment(services, request));
   assert.equal(receipt.instances.filter(item => item.outcome === 'claimed').length, 20);
@@ -73,7 +73,7 @@ test('twenty administrators agents share one approved request without policy ove
 
 test('member introduction rejects an oversized entire roster without reserving names or capacity', async scope => {
   const { services, member } = await applicationFixture(scope);
-  const owner = await member('owner'), request = introduction(owner.member.principal.matrixUserId, 11, 'member');
+  const owner = await member('owner'), request = introduction(owner.member.principal.backendUserId, 11, 'member');
   const refused = await introduceEnrollment(services, request);
   assert(!refused.ok); assert.equal(refused.error.code, 'capacity');
   assert.equal(value(services.repositories.enrollmentRequest.find({ id: request.enrollmentId })), null);
@@ -85,15 +85,15 @@ test('member introduction rejects an oversized entire roster without reserving n
 test('administrator reservations still consume the instance cap and cannot race another owner', async scope => {
   const { services, admin, member } = await applicationFixture(scope);
   const owner = await member('owner');
-  const request = introduction(admin.member.principal.matrixUserId, 100, 'admin');
+  const request = introduction(admin.member.principal.backendUserId, 100, 'admin');
   const receipt = value(await introduceEnrollment(services, request));
   assert.equal(receipt.instances.filter(item => item.outcome === 'claimed').length, 100);
-  for (const identity of [admin.member.principal.matrixUserId, owner.member.principal.matrixUserId]) {
+  for (const identity of [admin.member.principal.backendUserId, owner.member.principal.backendUserId]) {
     const refused = await preflightEnrollment(services, introduction(identity, 1, 'blocked'));
     assert(!refused.ok);
     assert.equal(refused.error.code, 'capacity');
   }
-  const other = await introduceEnrollment(services, introduction(owner.member.principal.matrixUserId, 1, 'other'));
+  const other = await introduceEnrollment(services, introduction(owner.member.principal.backendUserId, 1, 'other'));
   assert(!other.ok); assert.equal(other.error.code, 'capacity');
   assert.equal(value(services.collection.pendingIdentityCount()), 100);
   value(decideEnrollment(services, admin.actor, request.enrollmentId,
@@ -105,7 +105,7 @@ test('approval re-resolves a demoted owner role and retains the pending request 
   const { services, admin, member } = await applicationFixture(scope);
   const owner = await member('owner');
   value(changeMember(services, admin.actor, owner.actor.principalId, { expectedRevision: 0, roleCode: 'administrator' }, randomUUID()));
-  const request = introduction(owner.member.principal.matrixUserId, 20, 'promoted');
+  const request = introduction(owner.member.principal.backendUserId, 20, 'promoted');
   value(await preflightEnrollment(services, request));
   const receipt = value(await introduceEnrollment(services, request));
   value(changeMember(services, admin.actor, owner.actor.principalId, { expectedRevision: 1, roleCode: 'member' }, randomUUID()));
@@ -125,7 +125,7 @@ test('administrator capacity tracks configured instance capacity rather than a c
   value(changeInstancePolicy(services, admin.actor, { ...settings, expectedRevision: revision, maxAgents: 40, maxOwnerAgents: 3 }, randomUUID()));
   assert.equal(value(enrollmentCapacity(services, admin.actor.principalId)).ownerLimit, 40);
   assert.equal(value(enrollmentCapacity(services, owner.actor.principalId)).ownerLimit, 3);
-  const forgedInput = { ...introduction(owner.member.principal.matrixUserId, 20, 'forged'), ownerRole: 'administrator' };
+  const forgedInput = { ...introduction(owner.member.principal.backendUserId, 20, 'forged'), ownerRole: 'administrator' };
   assert.equal(preflightRequest(forgedInput).ok, false);
   const forged = await preflightEnrollment(services, forgedInput);
   assert(!forged.ok);

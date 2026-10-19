@@ -5,7 +5,7 @@ public class ListenerStatFlowRow
     public string RunId { get; set; } = "";
     public long BucketAt { get; set; }
     public string RoomId { get; set; } = "";
-    public string SenderMatrixId { get; set; } = "";
+    public string SenderBackendUserId { get; set; } = "";
     public string MessageType { get; set; } = "";
     public long Observed { get; set; }
     public long Delivered { get; set; }

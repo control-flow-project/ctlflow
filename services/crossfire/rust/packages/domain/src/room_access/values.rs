@@ -1,5 +1,6 @@
-use crate::matrix::{Membership, RoomFacts};
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+use crate::messaging::{Membership, RoomFacts};
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Access {
     None,
     Read,
@@ -24,7 +25,7 @@ pub enum Admission {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Intent {
     pub access: Access,
-    pub power: Option<i64>,
+    pub native_access: Option<serde_json::Map<String, serde_json::Value>>,
     pub muted: bool,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,8 +58,7 @@ pub struct Application {
     pub applied_revision: Option<i64>,
     pub applied_access_revision: Option<i64>,
     pub membership: Option<Membership>,
-    pub creator: bool,
-    pub power: Option<i64>,
+    pub native_access: Option<serde_json::Map<String, serde_json::Value>>,
     pub last_attempt_at: Option<i64>,
     pub last_success_at: Option<i64>,
     pub next_check_at: i64,
@@ -74,8 +74,7 @@ impl Application {
             applied_revision: None,
             applied_access_revision: None,
             membership: None,
-            creator: false,
-            power: None,
+            native_access: None,
             last_attempt_at: None,
             last_success_at: None,
             next_check_at: now,

@@ -158,7 +158,7 @@ export type ListenerRunRepository = {
   update(value: ListenerRun): Result<void>;
 };
 
-export type WakeNoticeKey = { receiverAgentId: string; eventId: string };
+export type WakeNoticeKey = { receiverAgentId: string; roomId: string; eventId: string };
 export type WakeNoticeRepository = {
   find(key: WakeNoticeKey): Result<WakeNotice | null>;
   insert(value: WakeNotice): Result<void>;

@@ -6,7 +6,7 @@ pub fn summary(value: &Summary) -> Value {
 }
 pub fn command(value: &Command) -> Value {
     json!({"messageId":value.message.id,"fleetId":value.message.fleet_id,"body":value.message.body,"createdAt":value.message.created_at,"expiresAt":value.message.expires_at,
-        "sender":{"kind":if value.sender_matrix_id.is_some(){"human"}else{"controller"},"matrixUserId":value.sender_matrix_id},"agentIds":value.agent_ids})
+        "sender":{"kind":if value.sender_backend_user_id.is_some(){"human"}else{"controller"},"backendUserId":value.sender_backend_user_id},"agentIds":value.agent_ids})
 }
 pub fn snapshot(value: &Snapshot) -> Value {
     let mut result = crate::views::control(&value.control);

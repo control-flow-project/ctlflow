@@ -223,7 +223,7 @@ checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
 name = "crossfire-adapter-codex"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-adapter-filesystem",
  "crossfire-adapter-process",
@@ -247,7 +247,7 @@ dependencies = [
 
 [[package]]
 name = "crossfire-adapter-crossfire"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-adapter-filesystem",
  "crossfire-adapter-http",
@@ -266,7 +266,7 @@ dependencies = [
 
 [[package]]
 name = "crossfire-adapter-filesystem"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "chrono",
  "crossfire-agent-core",
@@ -287,11 +287,12 @@ dependencies = [
 
 [[package]]
 name = "crossfire-adapter-http"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "bytes",
  "crossfire-adapter-filesystem",
  "crossfire-contracts",
+ "crossfire-domain",
  "crossfire-kernel",
  "futures-util",
  "http-body-util",
@@ -309,21 +310,23 @@ dependencies = [
 
 [[package]]
 name = "crossfire-adapter-matrix"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "base64 0.22.1",
  "crossfire-adapter-filesystem",
  "crossfire-adapter-http",
- "crossfire-agent-core",
+ "crossfire-adapter-process",
  "crossfire-contracts",
  "crossfire-domain",
  "crossfire-kernel",
  "crossfire-test-support",
  "hmac",
+ "hyper",
  "reqwest",
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "tokio",
  "tokio-util",
  "url",
@@ -332,7 +335,7 @@ dependencies = [
 
 [[package]]
 name = "crossfire-adapter-pi"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "base64 0.22.1",
  "crossfire-adapter-filesystem",
@@ -354,7 +357,7 @@ dependencies = [
 
 [[package]]
 name = "crossfire-adapter-process"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "async-io",
  "crossfire-adapter-filesystem",
@@ -367,7 +370,7 @@ dependencies = [
 
 [[package]]
 name = "crossfire-adapter-runtime"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-adapter-filesystem",
  "crossfire-agent-core",
@@ -384,7 +387,7 @@ dependencies = [
 
 [[package]]
 name = "crossfire-adapter-schedule"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "chrono",
  "crossfire-adapter-filesystem",
@@ -397,7 +400,7 @@ dependencies = [
 
 [[package]]
 name = "crossfire-adapter-sqlite"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-adapter-filesystem",
  "crossfire-adapter-http",
@@ -421,7 +424,7 @@ dependencies = [
 
 [[package]]
 name = "crossfire-adapter-toml"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-kernel",
  "toml",
@@ -429,8 +432,9 @@ dependencies = [
 
 [[package]]
 name = "crossfire-agent-core"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
+ "crossfire-adapter-matrix",
  "crossfire-contracts",
  "crossfire-domain",
  "crossfire-kernel",
@@ -443,7 +447,7 @@ dependencies = [
 
 [[package]]
 name = "crossfire-contracts"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-domain",
  "crossfire-kernel",
@@ -456,14 +460,17 @@ dependencies = [
 
 [[package]]
 name = "crossfire-domain"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-kernel",
+ "serde",
+ "serde_json",
+ "tokio-util",
 ]
 
 [[package]]
 name = "crossfire-kernel"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "base64 0.22.1",
  "rustix",
@@ -476,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "crossfire-server"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -484,6 +491,7 @@ dependencies = [
  "crossfire-adapter-http",
  "crossfire-adapter-matrix",
  "crossfire-adapter-process",
+ "crossfire-adapter-runtime",
  "crossfire-adapter-schedule",
  "crossfire-adapter-sqlite",
  "crossfire-contracts",
@@ -505,7 +513,7 @@ dependencies = [
 
 [[package]]
 name = "crossfire-test-support"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-adapter-filesystem",
  "crossfire-domain",
@@ -713,7 +721,7 @@ checksum = "aedcfb3409746eddb02b9e19ebda1c3394f759a152e48ee875a0844d1b955484"
 
 [[package]]
 name = "fleet-cli"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-adapter-codex",
  "crossfire-adapter-filesystem",
@@ -739,7 +747,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-daemon-client"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-adapter-filesystem",
  "crossfire-adapter-http",
@@ -755,7 +763,7 @@ dependencies = [
 
 [[package]]
 name = "fleet-ssh-transport"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-adapter-filesystem",
  "crossfire-adapter-process",
@@ -769,13 +777,12 @@ dependencies = [
 
 [[package]]
 name = "fleetd-adapter-execution"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-adapter-codex",
  "crossfire-adapter-crossfire",
  "crossfire-adapter-filesystem",
  "crossfire-adapter-http",
- "crossfire-adapter-matrix",
  "crossfire-adapter-pi",
  "crossfire-adapter-process",
  "crossfire-adapter-runtime",
@@ -795,7 +802,7 @@ dependencies = [
 
 [[package]]
 name = "fleetd-contracts"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-agent-core",
  "crossfire-contracts",
@@ -808,11 +815,12 @@ dependencies = [
 
 [[package]]
 name = "fleetd-daemon"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-adapter-codex",
  "crossfire-adapter-filesystem",
  "crossfire-adapter-http",
+ "crossfire-adapter-matrix",
  "crossfire-adapter-pi",
  "crossfire-adapter-process",
  "crossfire-agent-core",
@@ -832,7 +840,7 @@ dependencies = [
 
 [[package]]
 name = "fleetd-domain"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-agent-core",
  "crossfire-domain",
@@ -844,7 +852,7 @@ dependencies = [
 
 [[package]]
 name = "fleetd-storage"
-version = "0.1.22"
+version = "0.1.23"
 dependencies = [
  "crossfire-adapter-codex",
  "crossfire-adapter-filesystem",

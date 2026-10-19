@@ -15,7 +15,7 @@ function directory() { mkdirSync('.temp', { recursive: true }); return mkdtempSy
 test('private normalized state survives reopen and transaction failures preserve exact data', () => {
   const path = join(directory(), 'private/management.sqlite');
   let database = openTestStore(path), repositories = createRepositories(database);
-  const principal = { id: 'owner', matrixUserId: '@owner:test', kind: 'human' as const, status: 'active' as const, revision: 0, createdAt: 1 };
+  const principal = { id: 'owner', backendUserId: '@owner:test', kind: 'human' as const, status: 'active' as const, revision: 0, createdAt: 1 };
   value(repositories.principal.insert(principal));
   const unit = createUnitOfWork(database);
   assert.equal(unit.run(() => { value(repositories.principal.update({ ...principal, status: 'suspended' })); return failure('conflict', 'rollback'); }).ok, false);

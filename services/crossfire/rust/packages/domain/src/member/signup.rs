@@ -1,7 +1,7 @@
 use super::invitation::{Invitation, InvitationRepository};
 use crate::{
     identity::{Member, Principal, PrincipalKind, Role, Status},
-    matrix::{Account, MatrixAuthority},
+    messaging::{Account, MessagingAuthority},
     port::{
         Audit, AuditActor, AuthorizationRepository, CoreRepository, RepositoryAccess, UnitOfWork,
     },
@@ -14,15 +14,11 @@ pub struct Details {
     pub username: String,
     pub password: Secret,
     pub display_name: String,
-    pub device_id: String,
+    pub native: serde_json::Map<String, serde_json::Value>,
 }
 pub struct Claim {
     pub id: String,
     pub secret: Secret,
-}
-pub struct Instance<'a> {
-    pub server_name: &'a str,
-    pub service_matrix_id: &'a str,
 }
 pub struct Accepted {
     pub member_id: String,
@@ -32,50 +28,26 @@ pub trait Fingerprint {
     fn fingerprint(
         &self,
         claim: &Secret,
-        matrix_user_id: &str,
+        backend_user_id: &str,
         password: &Secret,
         display_name: &str,
     ) -> Result<String>;
 }
-fn username(value: &str) -> bool {
-    (1..=100).contains(&value.len())
-        && value
-            .bytes()
-            .next()
-            .is_some_and(|value| value.is_ascii_lowercase() || value.is_ascii_digit())
-        && value.bytes().all(|value| {
-            value.is_ascii_lowercase() || value.is_ascii_digit() || b"._=-".contains(&value)
-        })
-}
-fn native_identity(instance: Instance<'_>, details: &Details, open: bool) -> Result<String> {
-    if !username(&details.username)
-        || open && details.username.starts_with("agent-")
-        || !(12..=1024).contains(&details.password.expose().encode_utf16().count())
-        || details.display_name.is_empty()
+fn validate_details(details: &Details) -> Result<()> {
+    if details.display_name.is_empty()
         || details.display_name.encode_utf16().count() > 100
         || details
             .display_name
             .chars()
             .any(|value| value <= '\u{1f}' || value == '\u{7f}')
-        || open && (details.device_id.is_empty() || details.device_id.encode_utf16().count() > 100)
+        || !crate::backend_data::valid(&details.native)
     {
         return Err(Failure::new(
             ErrorCode::Invalid,
-            if open {
-                "Choose a valid username and a password of at least 12 characters"
-            } else {
-                "Invalid human account details"
-            },
+            "Invalid human account details",
         ));
     }
-    let user = format!("@{}:{}", details.username, instance.server_name);
-    if user == instance.service_matrix_id || details.username == "conduit" {
-        return Err(Failure::new(
-            ErrorCode::Forbidden,
-            "Reserved native identity",
-        ));
-    }
-    Ok(user)
+    Ok(())
 }
 fn usable(
     invitation: Option<Invitation>,
@@ -111,12 +83,11 @@ fn audit(id: &str, request: &str, action: &str, now: i64) -> Audit {
 pub struct InvitationInput<'a> {
     pub claim: &'a Claim,
     pub details: &'a Details,
-    pub instance: Instance<'a>,
     pub request_id: &'a str,
 }
-pub async fn accept<A: RepositoryAccess, M: MatrixAuthority, C: Clock>(
+pub async fn accept<A: RepositoryAccess, M: MessagingAuthority, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     clock: &C,
     hasher: &impl Fingerprint,
     input: InvitationInput<'_>,
@@ -124,7 +95,12 @@ pub async fn accept<A: RepositoryAccess, M: MatrixAuthority, C: Clock>(
 where
     A::Repository: InvitationRepository,
 {
-    let user = native_identity(input.instance, input.details, false)?;
+    validate_details(input.details)?;
+    let user = messaging.registration_user_id(
+        &input.details.username,
+        &input.details.password,
+        &input.details.native,
+    )?;
     let fingerprint = hasher.fingerprint(
         &input.claim.secret,
         &user,
@@ -146,12 +122,12 @@ where
                 "Invitation was consumed with different account details",
             ));
         }
-        let account = matrix
-            .provision(&user, &input.details.password, &input.details.device_id)
+        let account = messaging
+            .provision(&user, &input.details.password, &input.details.native)
             .await?;
         return Ok(Accepted { member_id, account });
     }
-    if initial.claim_matrix_user_id.is_none() && matrix.exists(&user).await? {
+    if initial.claim_backend_user_id.is_none() && messaging.exists(&user).await? {
         return Err(Failure::new(
             ErrorCode::Conflict,
             "Native username is already registered",
@@ -171,7 +147,7 @@ where
                     "Invitation is no longer usable",
                 ));
             }
-            if current.claim_matrix_user_id.is_some() {
+            if current.claim_backend_user_id.is_some() {
                 return if current.claim_fingerprint.as_ref() == Some(&fingerprint) {
                     Ok(())
                 } else {
@@ -181,7 +157,7 @@ where
                     ))
                 };
             }
-            if repo.principal_by_matrix_id(&user)?.is_some()
+            if repo.principal_by_backend_user_id(&user)?.is_some()
                 || repo.invitation_by_claim(&user)?.is_some()
             {
                 return Err(Failure::new(
@@ -189,14 +165,14 @@ where
                     "Identity is already reserved or registered",
                 ));
             }
-            current.claim_matrix_user_id = Some(user.clone());
+            current.claim_backend_user_id = Some(user.clone());
             current.claim_display_name = Some(input.details.display_name.clone());
             current.claim_fingerprint = Some(fingerprint.clone());
             repo.save_member_invitation(&current, false)
         })
     })?;
-    let account = matrix
-        .provision(&user, &input.details.password, &input.details.device_id)
+    let account = messaging
+        .provision(&user, &input.details.password, &input.details.native)
         .await?;
     repository.with(|repo| {
         repo.transaction(|repo| {
@@ -222,7 +198,7 @@ where
                 repo,
                 &Principal {
                     id: member_id.clone(),
-                    matrix_user_id: user,
+                    backend_user_id: user,
                     kind: PrincipalKind::Human,
                     status: Status::Active,
                     revision: 0,
@@ -250,19 +226,23 @@ where
 }
 pub struct OpenInput<'a> {
     pub details: &'a Details,
-    pub instance: Instance<'a>,
     pub request_id: &'a str,
 }
-pub async fn register<A: RepositoryAccess, M: MatrixAuthority, C: Clock>(
+pub async fn register<A: RepositoryAccess, M: MessagingAuthority, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     clock: &C,
     input: OpenInput<'_>,
 ) -> Result<Account>
 where
     A::Repository: InvitationRepository,
 {
-    let user = native_identity(input.instance, input.details, true)?;
+    validate_details(input.details)?;
+    let user = messaging.registration_user_id(
+        &input.details.username,
+        &input.details.password,
+        &input.details.native,
+    )?;
     if repository
         .with(|repo| repo.policy())?
         .is_none_or(|policy| policy.signup_mode != "open")
@@ -272,14 +252,14 @@ where
             "An invitation link is required to create an account",
         ));
     }
-    if matrix.exists(&user).await? {
+    if messaging.exists(&user).await? {
         return Err(Failure::new(
             ErrorCode::Conflict,
             "This username is already registered",
         ));
     }
-    let account = matrix
-        .provision(&user, &input.details.password, &input.details.device_id)
+    let account = messaging
+        .provision(&user, &input.details.password, &input.details.native)
         .await?;
     let result = repository.with(|repo| {
         repo.transaction(|repo| {
@@ -292,7 +272,7 @@ where
                     "Open signup was disabled during registration",
                 ));
             }
-            if repo.principal_by_matrix_id(&user)?.is_some() {
+            if repo.principal_by_backend_user_id(&user)?.is_some() {
                 return Err(Failure::new(
                     ErrorCode::Conflict,
                     "This account is already registered",
@@ -304,7 +284,7 @@ where
                 repo,
                 &Principal {
                     id: id.clone(),
-                    matrix_user_id: user.clone(),
+                    backend_user_id: user.clone(),
                     kind: PrincipalKind::Human,
                     status: Status::Active,
                     revision: 0,
@@ -324,7 +304,7 @@ where
     match result {
         Ok(()) => Ok(account),
         Err(error) => {
-            matrix.discard(&user).await.map_err(|_| {
+            messaging.discard(&user).await.map_err(|_| {
                 Failure::new(
                     ErrorCode::Native,
                     "Registration could not finish; native account cleanup failed",
@@ -334,17 +314,17 @@ where
         }
     }
 }
-pub async fn reclaim<A: RepositoryAccess, M: MatrixAuthority, C: Clock>(
+pub async fn reclaim<A: RepositoryAccess, M: MessagingAuthority, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     clock: &C,
 ) -> Result<()>
 where
     A::Repository: InvitationRepository,
 {
     for claim in repository.with(|repo| repo.abandoned_invitation_claims(clock.now()?))? {
-        if let Some(user) = &claim.claim_matrix_user_id {
-            if matrix.discard(user).await.is_err() {
+        if let Some(user) = &claim.claim_backend_user_id {
+            if messaging.discard(user).await.is_err() {
                 continue;
             }
             repository.with(|repo| {
@@ -355,7 +335,7 @@ where
                                 && current.claim_fingerprint == claim.claim_fingerprint
                         })
                     {
-                        current.claim_matrix_user_id = None;
+                        current.claim_backend_user_id = None;
                         current.claim_display_name = None;
                         current.claim_fingerprint = None;
                         repo.save_member_invitation(&current, false)?;

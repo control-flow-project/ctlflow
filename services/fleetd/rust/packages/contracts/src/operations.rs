@@ -8,6 +8,7 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperationId {
+    Diagnostics,
     Setup,
     Status,
     Fleets,
@@ -29,6 +30,18 @@ pub enum OperationId {
     Operation,
 }
 pub const OPERATIONS: &[Operation<OperationId>] = &[
+    Operation {
+        id: OperationId::Diagnostics,
+        name: "diagnostics",
+        method: Method::Get,
+        path: "/api/diagnostics",
+        auth: Authentication::Controller,
+        status: 200,
+        collection: false,
+        request_bytes: 1048576,
+        binary: false,
+        permissions: &[],
+    },
     Operation {
         id: OperationId::Setup,
         name: "setup",
@@ -277,6 +290,7 @@ impl Key for OperationId {
         match self {
             Self::Fleets | Self::Agents => &["page", "pageSize"],
             Self::Attachment => &["context"],
+            Self::Diagnostics => &["fleetId", "instanceKey"],
             Self::Operation => &["wait"],
             _ => &[],
         }

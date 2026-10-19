@@ -1,7 +1,7 @@
 import { historyRequest } from '@ctlflow/crossfire-agent-core/history-query';
 import { listenerRequest } from '@ctlflow/crossfire-adapter-crossfire/listener-client';
 import { integerOption } from '@ctlflow/crossfire-contracts/limits';
-import { option, type Arguments } from '@ctlflow/crossfire-adapter-matrix/commands';
+import { option, type Arguments } from '@ctlflow/crossfire-kernel/arguments';
 import type { paths } from '@ctlflow/crossfire-adapter-filesystem/project';
 import { emitText } from './output.js';
 

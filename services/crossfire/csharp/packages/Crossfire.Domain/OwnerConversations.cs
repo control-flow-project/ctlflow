@@ -21,7 +21,7 @@ public static class OwnerConversations
 
     private static async ValueTask<Result<string>> Apply(OwnerConversationPorts ports, string agentId, RoomInvitation? invitation, CancellationToken cancellation)
     {
-        var grants = ports.Reconciliation.Grants; var matrix = ports.Reconciliation.Matrix;
+        var grants = ports.Reconciliation.Grants; var messaging = ports.Reconciliation.Messaging;
         var target = grants.Authorization.AgentView(agentId);
         if (!target.IsSuccess) return Result<string>.Fail(target.Error);
         var previous = ports.Find(agentId);
@@ -30,21 +30,21 @@ public static class OwnerConversations
         var identity = target.Value;
         if (identity.Principal.Status != "active" || identity.Owner.Status != "active") return Results.Fail<string>("forbidden", "Agent and owner must be active");
         if (identity.Application.AppliedStatus != "active" || identity.Application.ErrorCode is not null) return Results.Fail<string>("unavailable", "The native agent account is not ready");
-        if (invitation is not null && (!invitation.Direct || invitation.SenderMatrixId != identity.Owner.MatrixUserId
+        if (invitation is not null && (!invitation.Direct || invitation.SenderBackendUserId != identity.Owner.BackendUserId
             || previous.Value is not null && previous.Value.RoomId != invitation.RoomId))
             return Results.Fail<string>("conflict", "The invitation does not identify this agent’s private owner conversation");
-        var checkedInvitation = await VerifyInvitation(matrix, identity, invitation, cancellation);
+        var checkedInvitation = await VerifyInvitation(messaging, identity, invitation, cancellation);
         if (!checkedInvitation.IsSuccess) return Result<string>.Fail(checkedInvitation.Error);
         string roomId;
         if (invitation is not null)
         {
-            var verified = await matrix.VerifyOwnerConversation(identity.Owner.MatrixUserId, identity.Principal.MatrixUserId, invitation.RoomId, cancellation);
+            var verified = await messaging.VerifyOwnerConversation(identity.Owner.BackendUserId, identity.Principal.BackendUserId, invitation.RoomId, cancellation);
             if (!verified.IsSuccess) return Result<string>.Fail(verified.Error);
             roomId = invitation.RoomId;
         }
         else
         {
-            var native = await matrix.OwnerConversation(identity.Owner.MatrixUserId, identity.Principal.MatrixUserId, previous.Value?.RoomId, null, cancellation);
+            var native = await messaging.OwnerConversation(identity.Owner.BackendUserId, identity.Principal.BackendUserId, previous.Value?.RoomId, null, cancellation);
             if (!native.IsSuccess) return Result<string>.Fail(native.Error);
             roomId = native.Value;
         }
@@ -52,11 +52,11 @@ public static class OwnerConversations
             return Results.Fail<string>("conflict", "The native owner conversation changed");
         var grant = grants.Find(agentId, roomId);
         if (!grant.IsSuccess) return Result<string>.Fail(grant.Error);
-        var actor = new Actor(identity.Owner.Id, "human", new NativeAuthentication(identity.Owner.MatrixUserId));
+        var actor = new Actor(identity.Owner.Id, "human", new NativeAuthentication(identity.Owner.BackendUserId));
         var proof = await RoomGrantAuthorization.Authorize(grants, actor,
             new(agentId, roomId, identity.Principal.Revision, grant.Value?.Generation, "reply", null, false), invitation, cancellation);
         if (!proof.IsSuccess) return Result<string>.Fail(proof.Error);
-        checkedInvitation = await VerifyInvitation(matrix, identity, invitation, cancellation);
+        checkedInvitation = await VerifyInvitation(messaging, identity, invitation, cancellation);
         if (!checkedInvitation.IsSuccess) return Result<string>.Fail(checkedInvitation.Error);
         var saved = grants.Transaction.Run(() => Commit(ports, actor, identity, previous.Value, proof.Value));
         if (!saved.IsSuccess) return Result<string>.Fail(saved.Error);
@@ -66,7 +66,7 @@ public static class OwnerConversations
         if (!observation.IsSuccess) return Result<string>.Fail(observation.Error);
         if (observation.Value?.Membership != "join" || observation.Value.ErrorCode is not null)
             return Results.Fail<string>("unavailable", observation.Value?.ErrorMessage ?? "Owner conversation read and reply is not ready");
-        var marked = await matrix.OwnerConversation(identity.Owner.MatrixUserId, identity.Principal.MatrixUserId, roomId, null, cancellation);
+        var marked = await messaging.OwnerConversation(identity.Owner.BackendUserId, identity.Principal.BackendUserId, roomId, null, cancellation);
         if (!marked.IsSuccess) return Result<string>.Fail(marked.Error);
         if (marked.Value != roomId) return Results.Fail<string>("conflict", "The native owner conversation changed");
         return grants.Transaction.Run(() =>
@@ -84,12 +84,12 @@ public static class OwnerConversations
         });
     }
 
-    private static async ValueTask<Result<Unit>> VerifyInvitation(MatrixPorts matrix, AgentView identity, RoomInvitation? invitation, CancellationToken cancellation)
+    private static async ValueTask<Result<Unit>> VerifyInvitation(MessagingPorts messaging, AgentView identity, RoomInvitation? invitation, CancellationToken cancellation)
     {
         if (invitation is null) return Results.Done();
-        var current = await matrix.Invitation(identity.Principal.MatrixUserId, invitation.RoomId, cancellation);
+        var current = await messaging.Invitation(identity.Principal.BackendUserId, invitation.RoomId, cancellation);
         if (!current.IsSuccess) return Result<Unit>.Fail(current.Error);
-        return current.Value is null || !current.Value.Direct || current.Value.EventId != invitation.EventId || current.Value.SenderMatrixId != invitation.SenderMatrixId
+        return current.Value is null || !current.Value.Direct || current.Value.EventId != invitation.EventId || current.Value.SenderBackendUserId != invitation.SenderBackendUserId
             ? Results.Fail<Unit>("conflict", "The owner DM invitation was withdrawn or replaced") : Results.Done();
     }
 

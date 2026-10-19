@@ -1,12 +1,11 @@
 use super::*;
-use crate::{
-    coordination, events, origins, receive_pages, source_control, source_events, steering,
-};
+use crate::{coordination, origins, receive_pages, source_control, source_events, steering};
+use crossfire_domain::messaging_client::MessagingClient;
 
 impl<
     S: LocalState,
     C: Coordination,
-    M: Matrix,
+    M: MessagingClient + crossfire_domain::messaging_client::InvitationReader,
     N: Connection + TurnControl + Lifecycle + 'static,
     A: Acknowledgment,
     T: Clock + Clone + Send + Sync + 'static,
@@ -78,7 +77,7 @@ impl<
             return Ok(());
         }
         let event = origins::enrich(
-            self.resources.matrix.as_ref(),
+            self.resources.messaging.as_ref(),
             &self.options.profile.account.user_id,
             vec![event],
             stop.clone(),
@@ -87,14 +86,16 @@ impl<
         .pop()
         .ok_or_else(|| invalid("Received event is missing"))?;
         let native = steering::source(&event)?;
-        let candidate = crossfire_contracts::matrix_event::mentions_agent(
+        let candidate = crossfire_contracts::notices::mentions_agent(
             &native,
             &self.options.profile.account.user_id,
         ) || event.sender == self.options.profile.settings.owner
-            && event.content["body"]
-                .as_str()
+            && event
+                .content
+                .body
+                .as_deref()
                 .is_some_and(|body| body.trim() == "!!")
-            || event.origin.kind == events::Kind::Dm;
+            || event.origin.kind == crossfire_domain::messaging_client::OriginKind::Dm;
         if candidate {
             self.refresh(stop.clone()).await?;
         }
@@ -103,7 +104,7 @@ impl<
             return Ok(());
         }
         if !policy.senders.contains(&event.sender)
-            && crossfire_contracts::matrix_event::mentions_agent(
+            && crossfire_contracts::notices::mentions_agent(
                 &native,
                 &self.options.profile.account.user_id,
             )
@@ -111,7 +112,7 @@ impl<
             self.maintenance.notice(&event)?;
         }
         if !steering::authorized(
-            self.resources.matrix.as_ref(),
+            self.resources.messaging.as_ref(),
             self.resources.coordination.as_ref(),
             &self.options.profile,
             &event,
@@ -122,7 +123,7 @@ impl<
         {
             if self.controls.paused()?
                 && event.sender == self.options.profile.settings.owner
-                && event.content["msgtype"] == "m.text"
+                && event.content.kind == crossfire_domain::messaging_client::MessageKind::Text
                 && !native.edited
                 && !native.control
             {
@@ -143,7 +144,7 @@ impl<
             .controls
             .interrupt(
                 source_control::Interrupt {
-                    matrix: self.resources.matrix.as_ref(),
+                    messaging: self.resources.messaging.as_ref(),
                     coordination: self.resources.coordination.as_ref(),
                     native: self.native.as_ref(),
                     notices: &self.receipts,
@@ -177,21 +178,21 @@ impl<
             let scope = control.generation.child_token();
             let acquisition = async {
                 let sync = receive_pages::sync(
-                    self.resources.matrix.as_ref(),
+                    self.resources.messaging.as_ref(),
                     since.as_deref(),
                     self.options
                         .poll_ms
-                        .min(self.options.reconcile_ms as u64 / 2) as u32,
+                        .min(self.options.reconcile_ms as u64 / 2),
                     scope.clone(),
                 )
                 .await?;
-                let mut sync = source_events::parse(sync)?;
+                let mut sync = sync;
                 self.state
                     .lock()
                     .map_err(|_| invalid("Receiver ownership failed"))?
                     .controlling = true;
                 let joined =
-                    receive_pages::joined(self.resources.matrix.as_ref(), scope.clone()).await?;
+                    receive_pages::joined(self.resources.messaging.as_ref(), scope.clone()).await?;
                 let previous = self
                     .state
                     .lock()
@@ -209,16 +210,7 @@ impl<
                     self.refresh(scope.clone()).await?;
                 }
                 let mut reset: BTreeSet<_> = previous.difference(&joined).cloned().collect();
-                reset.extend(
-                    source_events::membership_resets(
-                        self.resources.matrix.as_ref(),
-                        &sync,
-                        since.as_deref(),
-                        &self.options.profile.account.user_id,
-                        scope.clone(),
-                    )
-                    .await?,
-                );
+                reset.extend(sync.reset_rooms.iter().cloned());
                 if !reset.is_empty() {
                     self.cancel_delivery().await?;
                     source_events::reset_rooms(
@@ -233,18 +225,18 @@ impl<
                     &self.options.file,
                     &joined,
                 )?;
-                if !sync.invited.is_empty() || !sync.left.is_empty() {
+                if !sync.invitations.is_empty() || !sync.departed_rooms.is_empty() {
                     self.maintenance.observe()?;
                 }
-                let next = sync.next.clone();
-                sync.joined.retain(|room, _| {
+                let next = sync.cursor.clone();
+                sync.rooms.retain(|room, _| {
                     previous.contains(room) && joined.contains(room) && !reset.contains(room)
                 });
                 source_events::incremental(
-                    self.resources.matrix.as_ref(),
+                    self.resources.messaging.as_ref(),
                     sync,
                     since.as_deref(),
-                    "m.room.message",
+                    crossfire_domain::messaging_client::EventType::Message,
                     scope.clone(),
                     |event| self.source(event, scope.clone()),
                 )

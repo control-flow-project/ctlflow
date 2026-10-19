@@ -30,7 +30,7 @@ struct FlowRow {
     run_id: String,
     bucket_at: i64,
     room_id: String,
-    sender_matrix_id: String,
+    sender_backend_user_id: String,
     message_type: String,
     observed: i64,
     delivered: i64,
@@ -147,7 +147,7 @@ fn record_flow(store: &mut Store, run_id: &str, bucket_at: i64, flow: &Flow) -> 
                 .eq(run_id)
                 .and(listener_stat_flow::bucket_at.eq(bucket_at))
                 .and(listener_stat_flow::room_id.eq(&flow.room_id))
-                .and(listener_stat_flow::sender_matrix_id.eq(&flow.sender_matrix_id))
+                .and(listener_stat_flow::sender_backend_user_id.eq(&flow.sender_backend_user_id))
                 .and(listener_stat_flow::message_type.eq(&flow.message_type)),
         )
         .select(FlowRow::as_select())
@@ -164,7 +164,7 @@ fn record_flow(store: &mut Store, run_id: &str, bucket_at: i64, flow: &Flow) -> 
         run_id: run_id.to_owned(),
         bucket_at,
         room_id: flow.room_id.clone(),
-        sender_matrix_id: flow.sender_matrix_id.clone(),
+        sender_backend_user_id: flow.sender_backend_user_id.clone(),
         message_type: flow.message_type.clone(),
         observed: counts.observed,
         delivered: counts.delivered,
@@ -179,7 +179,7 @@ fn record_flow(store: &mut Store, run_id: &str, bucket_at: i64, flow: &Flow) -> 
             listener_stat_flow::run_id,
             listener_stat_flow::bucket_at,
             listener_stat_flow::room_id,
-            listener_stat_flow::sender_matrix_id,
+            listener_stat_flow::sender_backend_user_id,
             listener_stat_flow::message_type,
         ))
         .do_update()

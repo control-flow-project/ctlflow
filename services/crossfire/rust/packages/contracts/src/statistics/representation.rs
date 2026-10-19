@@ -27,7 +27,7 @@ impl Serialize for FlowWire<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
         let mut value = serializer.serialize_struct("Flow", 9)?;
         value.serialize_field("roomId", &self.0.room_id)?;
-        value.serialize_field("senderMatrixId", &self.0.sender_matrix_id)?;
+        value.serialize_field("senderBackendUserId", &self.0.sender_backend_user_id)?;
         value.serialize_field("messageType", &self.0.message_type)?;
         value.serialize_field("observed", &self.0.totals.observed)?;
         value.serialize_field("delivered", &self.0.totals.delivered)?;

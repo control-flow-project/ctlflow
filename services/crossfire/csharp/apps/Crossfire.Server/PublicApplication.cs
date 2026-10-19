@@ -12,13 +12,11 @@ public static class PublicApplication
         [".svg"] = "image/svg+xml", [".png"] = "image/png", [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".webp"] = "image/webp", [".ico"] = "image/x-icon",
         [".woff"] = "font/woff", [".woff2"] = "font/woff2", [".ttf"] = "font/ttf", [".wasm"] = "application/wasm", [".mp3"] = "audio/mpeg", [".ogg"] = "audio/ogg"
     };
-    public static WebApplication Build(ApiState state, string listen, string web, string element, MatrixProxy matrix, Action wake)
+    public static WebApplication Build(ApiState state, string listen, string web, MessagingHttpFactory messaging, MessagingPublicRoutes backend, Action wake)
     {
         ApiApplication.Initialize(state);
         using (AssetFiles.Open(web, "index.html")) { }
-        using (AssetFiles.Open(element, "index.html")) { }
-        var presentation = ElementPresentation.Read(element, state.Configuration.PublicOrigin);
-        var api = ApiPipeline.Create(state, ApiApplication.Endpoints(), wake, presentation);
+        var api = ApiPipeline.Create(state, ApiApplication.Endpoints(), wake, messaging);
         var builder = WebApplication.CreateSlimBuilder(); builder.Logging.ClearProviders(); builder.WebHost.UseUrls(listen);
         builder.WebHost.ConfigureKestrel(options =>
         {
@@ -38,20 +36,12 @@ public static class PublicApplication
                     http.Response.Headers.CacheControl = "no-store"; return;
                 }
                 var path = target.Value.Path;
-                if (Managed(path, http.Request.Method, state.Configuration.PublicOrigin)) { await api(http); return; }
-                if (path.StartsWith("/_matrix/", StringComparison.Ordinal)) { await matrix.Forward(http, state.Configuration.MatrixOrigin, host, target.Value.Raw); return; }
-                if (http.Request.Method is not ("GET" or "HEAD")) { http.Response.StatusCode = 405; return; }
-                http.Response.Headers["Referrer-Policy"] = "no-referrer"; http.Response.Headers.XFrameOptions = "DENY";
-                if (path == "/.well-known/matrix/client")
-                {
-                    var body = JsonValues.Object(writer => { writer.WriteStartObject("m.homeserver"); writer.WriteString("base_url", state.Configuration.PublicOrigin); writer.WriteEndObject(); });
-                    await PlatformRoutes.Json(http, body); return;
-                }
+                if (path.StartsWith("/api/", StringComparison.Ordinal) || path.StartsWith("/onboarding/", StringComparison.Ordinal)) { await api(http); return; }
                 var management = path == "/manage" || path.StartsWith("/manage/", StringComparison.Ordinal);
                 if (management) http.Response.Headers.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
-                else if (path is "/usercontent/" or "/usercontent/index.html") { http.Response.Headers.Remove("X-Frame-Options"); http.Response.Headers.ContentSecurityPolicy = "frame-ancestors 'self'"; }
                 var asset = management ? path.StartsWith("/manage/assets/", StringComparison.Ordinal) ? path[8..] : "/index.html" : path;
-                await Static(http, management ? web : element, asset);
+                if (management) { if (http.Request.Method is not ("GET" or "HEAD")) { http.Response.StatusCode = 405; return; } await Static(http, web, asset); }
+                else await backend(http, path, target.Value.Raw, api, Static);
             }
             catch (OperationCanceledException) when (http.RequestAborted.IsCancellationRequested) { }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)
@@ -59,11 +49,6 @@ public static class PublicApplication
         });
         return application;
     }
-
-    private static bool Managed(string path, string method, string origin)
-        => path.StartsWith("/api/", StringComparison.Ordinal) || path.StartsWith("/onboarding/", StringComparison.Ordinal) || path == "/config.json"
-            || path == "/config." + new Uri(origin).Host + ".json" || path == RegistrationTransport.RegisterPath || path == RegistrationTransport.FallbackPath
-            || MatrixRoutes.Handles(path, method);
 
     private static async Task Static(HttpContext http, string root, string path)
     {

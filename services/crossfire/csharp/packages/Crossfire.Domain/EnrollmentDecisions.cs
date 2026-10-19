@@ -71,7 +71,7 @@ public static class EnrollmentDecisions
             if (name.Value is null || name.Value.RequestId != request.Id || name.Value.InstanceKey != item.InstanceKey)
                 return Results.Fail<Unit>("conflict", "Name collision: " + item.RequestedName);
             var agentId = Identity.Identifier(); var now = ports.Admission.Fleet.Authorization.Now();
-            var registered = ports.Register(new(agentId, "@agent-" + agentId + ":" + ports.ServerName, "agent", "active", 0, now), "agent", request.OwnerId);
+            var registered = ports.Register(new(agentId, ports.Messaging.AgentUserId(agentId), "agent", "active", 0, now), "agent", request.OwnerId);
             if (!registered.IsSuccess) return registered;
             var agent = ports.RegisterAgent(new(agentId, "agent", request.OwnerId, "selected"), new(agentId, Identity.Secret(), null, now));
             if (!agent.IsSuccess) return agent;

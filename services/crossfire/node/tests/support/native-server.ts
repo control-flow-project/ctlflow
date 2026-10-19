@@ -8,7 +8,8 @@ import { nativeApplication } from './native-application.js';
 import { createHttpServer } from '../../apps/server/src/http/create-server.js';
 import { createWorker } from '../../apps/server/src/worker.js';
 import { publicRouter } from '../../apps/server/src/router.js';
-import type { ElementPresentation } from '../../apps/server/src/element-configuration.js';
+import type { ElementPresentation } from '@ctlflow/crossfire-adapter-matrix/web/element-configuration';
+import { matrixPublicRoutes } from '@ctlflow/crossfire-adapter-matrix/web/router';
 import { secureRouter } from '@ctlflow/crossfire-test-support/tls';
 export async function nativeServer(scope: TestContext, release: Release, presentation: ElementPresentation = {}, element?: string) {
   const fixture = await nativeApplication(scope), worker = createWorker(fixture.services, fixture.application.diagnostics);
@@ -19,7 +20,8 @@ export async function nativeServer(scope: TestContext, release: Release, present
     service: server, web: join(process.cwd(), 'dist/web'), element: element ?? join(process.cwd(), 'dist/web') };
   cleanup(scope, async () => { await worker.stop(); server.closeAllConnections();
     await new Promise<void>(resolve => server.close(() => resolve())); });
-  const { server: router, origin } = await secureRouter(scope, publicRouter(routes));
-  routes.publicOrigin = origin; fixture.application.config.publicOrigin = origin; fixture.services.instance.publicOrigin = origin;
+  const publicRoutes = { publicOrigin: routes.publicOrigin, service: server, web: routes.web, backend: matrixPublicRoutes(routes) };
+  const { server: router, origin } = await secureRouter(scope, publicRouter(publicRoutes));
+  publicRoutes.publicOrigin = origin; routes.publicOrigin = origin; fixture.application.config.publicOrigin = origin; fixture.services.instance.publicOrigin = origin;
   return { ...fixture, origin, worker, router, server };
 }

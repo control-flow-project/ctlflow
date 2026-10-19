@@ -5,7 +5,7 @@ import { changeRoomGrant } from './change-grant.js';
 import { reconcileRoomGrant } from './reconcile-grant.js';
 import { ensureOwnerConversation } from '../owner-conversation/ensure.js';
 
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'matrix' | 'unitOfWork' | 'roomOperations' | 'runtime'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'identity' | 'clock' | 'messaging' | 'unitOfWork' | 'roomOperations' | 'runtime'>;
 
 export async function acceptRoomInvitation(services: Dependencies, receiver: Actor, agentId: string, roomId: string, requestId: string) {
   const permitted = authorize(services, receiver, 'room-invitation.accept.self');
@@ -14,17 +14,17 @@ export async function acceptRoomInvitation(services: Dependencies, receiver: Act
   const target = services.directory.agent(agentId);
   if (!target.ok) return target;
   if (!target.value) return failure('missing', 'Invited agent not found');
-  const invitation = await services.matrix.invitation(target.value.principal.matrixUserId, roomId);
+  const invitation = await services.messaging.invitation(target.value.principal.backendUserId, roomId);
   if (!invitation.ok) return invitation;
   if (!invitation.value) return success({ accepted: false });
   const bound = services.repositories.ownerConversation.find({ agentId });
   if (!bound.ok) return bound;
-  if (invitation.value.direct && invitation.value.senderMatrixId === target.value.owner.matrixUserId
+  if (invitation.value.direct && invitation.value.senderBackendUserId === target.value.owner.backendUserId
     && (!bound.value || bound.value.roomId === roomId)) {
     const conversation = await ensureOwnerConversation(services, agentId, invitation.value);
     return conversation.ok ? success({ accepted: true }) : conversation;
   }
-  const sender = services.directory.principalByMatrixId(invitation.value.senderMatrixId);
+  const sender = services.directory.principalByBackendUserId(invitation.value.senderBackendUserId);
   if (!sender.ok) return sender;
   if (!sender.value) return failure('forbidden', 'The inviter is not a registered Crossfire identity');
   const grant = services.repositories.agentRoomGrant.find({ agentId, roomId });
@@ -33,9 +33,9 @@ export async function acceptRoomInvitation(services: Dependencies, receiver: Act
     if (grant.value.accessMode === 'none') return failure('forbidden', 'This invitation was already withdrawn');
   } else {
     const inviter: Actor = { principalId: sender.value.id, kind: sender.value.kind,
-      authentication: { kind: 'native', matrixUserId: invitation.value.senderMatrixId } };
+      authentication: { kind: 'native', backendUserId: invitation.value.senderBackendUserId } };
     const changed = await changeRoomGrant(services, inviter, { agentId, roomId, expectedRevision: target.value.principal.revision,
-      expectedGeneration: grant.value?.generation ?? null, accessMode: 'reply', powerLevel: null, muted: false }, requestId, invitation.value);
+      expectedGeneration: grant.value?.generation ?? null, accessMode: 'reply', nativeAccess: null, muted: false }, requestId, invitation.value);
     if (!changed.ok) return changed;
   }
   const applied = await reconcileRoomGrant(services, agentId, roomId);
@@ -46,7 +46,7 @@ export async function acceptRoomInvitation(services: Dependencies, receiver: Act
     : observation.value.errorCode === 'forbidden' ? 'forbidden' : 'native', observation.value.errorMessage ?? 'Native invitation remains pending');
   const accepted = observation.value?.membership === 'join';
   if (accepted && invitation.value.direct) {
-    const marked = await services.matrix.markDirect(target.value.principal.matrixUserId, invitation.value.senderMatrixId, roomId);
+    const marked = await services.messaging.markDirect(target.value.principal.backendUserId, invitation.value.senderBackendUserId, roomId);
     if (!marked.ok) return marked;
   }
   return success({ accepted });

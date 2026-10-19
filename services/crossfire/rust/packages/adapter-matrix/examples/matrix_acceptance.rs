@@ -2,8 +2,9 @@ use crossfire_adapter_http::NativeHttp;
 use crossfire_adapter_matrix::account::{Authority, Configuration};
 use crossfire_contracts::origin::segment;
 use crossfire_domain::{
-    matrix::{AccessMode, Membership, RoomAccess, RoomAdmission, RoomPower},
-    port::MatrixIdentity,
+    messaging::{Membership, RoomAdmission},
+    port::BackendUserIdentity,
+    room_access::values::{Access, Intent},
 };
 use crossfire_kernel::secret::Secret;
 use reqwest::Method;
@@ -55,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         server_name: input.server_name,
         jwt_secret: Secret::new(input.jwt_secret),
         registration_secret: Secret::new(input.registration_secret),
-        service_matrix_id: input.owner.clone(),
+        service_backend_user_id: input.owner.clone(),
     })?;
     let cancellation = CancellationToken::new();
     let http = NativeHttp::new(&input.origin, cancellation.clone())?;
@@ -71,7 +72,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let password = Secret::new("native-acceptance-private-password-at-least-32-bytes".to_owned());
     let account = matrix
-        .provision(&input.agent, &password, "RUST_NATIVE_ACCEPTANCE")
+        .provision(
+            &input.agent,
+            &password,
+            &serde_json::Map::from_iter([("deviceId".to_owned(), json!("RUST_NATIVE_ACCEPTANCE"))]),
+        )
         .await?;
     checks.require(
         account.user_id == input.agent,
@@ -86,7 +91,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "native existence is observed after registration",
     )?;
     let repeated = matrix
-        .provision(&input.agent, &password, "RUST_NATIVE_ACCEPTANCE")
+        .provision(
+            &input.agent,
+            &password,
+            &serde_json::Map::from_iter([("deviceId".to_owned(), json!("RUST_NATIVE_ACCEPTANCE"))]),
+        )
         .await?;
     checks.require(
         repeated.user_id == input.agent,
@@ -97,7 +106,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .provision(
                 &input.agent,
                 &Secret::new("incorrect-password-with-32-characters".to_owned()),
-                "RUST_NATIVE_ACCEPTANCE",
+                &serde_json::Map::from_iter([(
+                    "deviceId".to_owned(),
+                    json!("RUST_NATIVE_ACCEPTANCE"),
+                )]),
             )
             .await
             .is_err(),
@@ -158,7 +170,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     let notice = matrix.event(&input.owner, &room, &event).await?;
     checks.require(
-        notice.sender_matrix_id == input.agent
+        notice.sender_backend_user_id == input.agent
             && notice.body.as_deref() == Some("Private owner notice"),
         "native event content and authorship survive",
     )?;
@@ -218,7 +230,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?
         .ok_or("Missing native invitation")?;
     checks.require(
-        invitation.sender_matrix_id == input.owner && invitation.room_id == group,
+        invitation.sender_backend_user_id == input.owner && invitation.room_id == group,
         "invitation authority is observed natively",
     )?;
     let access = matrix
@@ -226,18 +238,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &input.owner,
             &input.agent,
             &group,
-            RoomAccess {
-                mode: AccessMode::Reply,
-                power_level: 0,
+            &Intent {
+                access: Access::Reply,
+                native_access: None,
+                muted: false,
             },
             Some(&RoomAdmission::Invitation {
                 event_id: invitation.event_id,
-                sender_matrix_id: input.owner.clone(),
+                sender_backend_user_id: input.owner.clone(),
             }),
         )
         .await?;
     checks.require(
-        access.membership == Membership::Join && access.power == RoomPower::Level(0),
+        access.membership == Membership::Join
+            && access
+                .native_access
+                .as_ref()
+                .and_then(|value| value.get("powerLevel"))
+                == Some(&json!(0)),
         "the exact invitation joins the agent at its requested authority",
     )?;
     checks.require(
@@ -245,7 +263,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "native joined-room state reflects the grant",
     )?;
     checks.require(
-        matrix.room(&input.agent, &group).await?.room_id == group,
+        matrix.room(&input.agent, &group, None).await?.room_id == group,
         "room facts refer to the immutable native room ID",
     )?;
     matrix.leave(&input.agent, &group).await?;

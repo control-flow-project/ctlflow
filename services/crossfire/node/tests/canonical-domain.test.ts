@@ -27,16 +27,16 @@ test('one enrollment pipeline preserves identity, name reservations, ownership a
   const fixture = await applicationFixture(scope);
   const { services, admin } = fixture;
   const other = await fixture.member('other');
-  const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: admin.member.principal.matrixUserId,
-    fleetKey: 'research', controller: { name: 'desktop', metadata: { zone: 'local' } }, instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }, { instanceKey: 'second', name: 'second', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }] };
+  const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: admin.member.principal.backendUserId,
+    fleetKey: 'research', controller: { name: 'desktop', metadata: { zone: 'local' } }, instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.backendUserId) }, { instanceKey: 'second', name: 'second', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.backendUserId) }] };
   value(await preflightEnrollment(services, input));
   const introduced = value(await introduceEnrollment(services, input));
   assert.deepEqual(value(await introduceEnrollment(services, input)), introduced);
   assert.equal(value(services.collection.pendingEnrollmentCount()), 1);
   assert.equal(value(services.repositories.fleet.find({ ownerId: admin.actor.principalId, fleetKey: 'research' })), null, 'An anonymous roster does not reserve a fleet');
-  assert.equal((await preflightEnrollment(services, { ...input, ownerMatrixId: other.member.principal.matrixUserId })).ok, false);
+  assert.equal((await preflightEnrollment(services, { ...input, ownerBackendUserId: other.member.principal.backendUserId })).ok, false);
   const late = await introduceEnrollment(services, { ...input, enrollmentId: randomUUID(), claimSecret: secret(),
-    instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }, { instanceKey: 'third', name: 'third', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId) }] });
+    instances: [{ instanceKey: 'first', name: 'first', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.backendUserId) }, { instanceKey: 'third', name: 'third', coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.backendUserId) }] });
   assert(!late.ok); assert.equal(late.error.code, 'name_collision'); assert.match(late.error.message, /first/u);
   assert.equal(value(services.collection.pendingEnrollmentCount()), 1);
   assert.equal(value(services.repositories.agentName.find({ name: 'third' })), null);
@@ -48,7 +48,7 @@ test('one enrollment pipeline preserves identity, name reservations, ownership a
   assert.equal(ready.status, 'ready');
   assert.equal(exchangeEnrollment(services, input.enrollmentId, secret()).ok, false);
   const restored = { ...input, controllerCredential: ready.fleet!.controllerCredential!, enrollmentId: randomUUID(), claimSecret: secret(),
-    instances: ready.instances.map(item => ({ instanceKey: item.instanceKey, name: item.name, coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.matrixUserId), identity: { agentId: item.agentId!, accessToken: item.account!.accessToken } })) };
+    instances: ready.instances.map(item => ({ instanceKey: item.instanceKey, name: item.name, coordinationPolicy: defaultCoordinationPolicy(admin.member.principal.backendUserId), identity: { agentId: item.agentId!, accessToken: item.account!.accessToken } })) };
   value(await preflightEnrollment(services, restored));
   assert.equal(value(await introduceEnrollment(services, restored)).request.status, 'approved');
   assert.equal(value(services.directory.activeAgentCount()), 2);
@@ -61,12 +61,12 @@ test('room invitation capabilities cross owners but never transfer provenance or
   const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
   const other = await fixture.member('other');
   const inviter = await fixture.agent(admin.actor, 'inviter'), target = await fixture.agent(other.actor, 'target'), stranger = await fixture.agent(admin.actor, 'stranger');
-  const room = value(await native.createRoom(admin.member.principal.matrixUserId, 'Coordination')).roomId;
+  const room = value(await native.createRoom(admin.member.principal.backendUserId, 'Coordination')).roomId;
   async function grant(agentId: string) {
     const record = value(services.directory.agent(agentId))!;
     const previous = value(services.repositories.agentRoomGrant.find({ agentId, roomId: room }));
     return { agentId, roomId: room, expectedRevision: record.principal.revision, expectedGeneration: previous?.generation ?? null,
-      accessMode: 'reply' as const, powerLevel: null, muted: false };
+      accessMode: 'reply' as const, nativeAccess: null, muted: false };
   }
   value(await changeRoomGrant(services, admin.actor, await grant(inviter.id), randomUUID()));
   value(await reconcileRoomGrant(services, inviter.id, room));
@@ -76,7 +76,7 @@ test('room invitation capabilities cross owners but never transfer provenance or
     expectedRevision: value(services.directory.agent(inviter.id))!.principal.revision, expectedGeneration: parent.generation, permissions: ['room.agent.invite'] }, randomUUID()));
   value(await changeRoomGrant(services, inviter.actor, await grant(target.id), randomUUID()));
   value(await reconcileRoomGrant(services, target.id, room));
-  assert.equal(native.rooms.get(room)!.members.get(target.matrixUserId)?.membership, 'join');
+  assert.equal(native.rooms.get(room)!.members.get(target.backendUserId)?.membership, 'join');
   const assigned = value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId: room }))!;
   assert.equal(assigned.addedById, inviter.id);
   assert.equal(assigned.authorizerId, inviter.id);
@@ -88,7 +88,7 @@ test('room invitation capabilities cross owners but never transfer provenance or
   assert.equal(duplicate.grant?.addedById, inviter.id, 'Duplicate assignment does not seize the provenance');
   value(await changeRoomGrant(services, inviter.actor, { ...await grant(target.id), accessMode: 'none' }, randomUUID()));
   value(await reconcileRoomGrant(services, target.id, room));
-  assert.equal(native.rooms.get(room)!.members.get(target.matrixUserId)?.membership, 'leave');
+  assert.equal(native.rooms.get(room)!.members.get(target.backendUserId)?.membership, 'leave');
   const generation = assigned.generation;
   value(await changeRoomGrant(services, admin.actor, await grant(target.id), randomUUID()));
   assert.notEqual(value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId: room }))!.generation, generation);
@@ -97,11 +97,11 @@ test('room invitation capabilities cross owners but never transfer provenance or
 
 test('bulk room review is complete, revision-bound and atomic', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
-  const { fleet, instances } = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId, 2);
+  const { fleet, instances } = await mapFleet(services, admin.actor, admin.member.principal.backendUserId, 2);
   const fleetId = fleet.id, agents = instances.map(instance => { assert(instance.agentId); return { id: instance.agentId }; });
-  const roomId = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Team')).roomId;
+  const roomId = value(await fixture.native.createRoom(admin.member.principal.backendUserId, 'Team')).roomId;
   const plan = { fleetId, agents: instances.map(instance => ({ instanceKey: instance.instanceKey,
-    grants: [{ roomId, accessMode: 'reply' as const, powerLevel: null, muted: false }] })) };
+    grants: [{ roomId, accessMode: 'reply' as const, nativeAccess: null, muted: false }] })) };
   const preview = value(await previewGrantPlan(services, admin.actor, plan));
   value(changeAgent(services, admin.actor, agents[1]!.id, { expectedRevision: value(services.directory.agent(agents[1]!.id))!.principal.revision, status: 'active' }, randomUUID()));
   assert.equal((await applyGrantPlan(services, admin.actor, { plan, digest: preview.digest, snapshots: preview.snapshots }, randomUUID())).ok, false);
@@ -114,14 +114,14 @@ test('bulk room review is complete, revision-bound and atomic', async scope => {
 test('selected wake and explicit blocked mentions use durable sender cooldown without model involvement', async scope => {
   const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
   const outsider = await fixture.member('outsider'), receiver = await fixture.agent(admin.actor, 'receiver');
-  const roomIds = [value(await native.createRoom(admin.member.principal.matrixUserId, 'First')).roomId,
-    value(await native.createRoom(admin.member.principal.matrixUserId, 'Second')).roomId];
+  const roomIds = [value(await native.createRoom(admin.member.principal.backendUserId, 'First')).roomId,
+    value(await native.createRoom(admin.member.principal.backendUserId, 'Second')).roomId];
   for (const roomId of roomIds) value(await changeRoomGrant(services, admin.actor, { agentId: receiver.id, roomId,
-    expectedRevision: value(services.directory.agent(receiver.id))!.principal.revision, expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID()));
-  function event(roomId: string, mentions = [receiver.matrixUserId]) {
+    expectedRevision: value(services.directory.agent(receiver.id))!.principal.revision, expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false }, randomUUID()));
+  function event(roomId: string, mentions = [receiver.backendUserId]) {
     const eventId = '$' + randomUUID();
-    native.events.set(eventId, { eventId, roomId, senderMatrixId: outsider.member.principal.matrixUserId, type: 'm.room.message',
-      messageType: 'm.text', body: 'Hello', mentions, edited: false, control: false });
+    native.events.set(eventId, { eventId, roomId, senderBackendUserId: outsider.member.principal.backendUserId, type: "message",
+      messageType: "text", body: 'Hello', mentions, edited: false, control: false });
     return eventId;
   }
   const ignored = event(roomIds[0]!, []);
@@ -130,19 +130,26 @@ test('selected wake and explicit blocked mentions use durable sender cooldown wi
   assert.equal(value(await requestWakeNotice(services, receiver.actor, receiver.id, roomIds[0]!, first)).outcome, 'pending');
   assert.equal(value(await requestWakeNotice(services, receiver.actor, receiver.id, roomIds[1]!, event(roomIds[1]!))).outcome, 'rate-limited');
   native.setNoticeFailure(failure('native', 'Lost response'));
-  value(await publishWakeNotice(services, receiver.id, first));
+  value(await publishWakeNotice(services, receiver.id, roomIds[0]!, first));
   fixture.advance(600_001);
   native.setNoticeFailure(failure('forbidden', 'Access unavailable after uncertain response'));
-  value(await publishWakeNotice(services, receiver.id, first));
-  assert.equal(value(services.repositories.wakeNotice.find({ receiverAgentId: receiver.id, eventId: first }))?.status, 'pending', 'Uncertain delivery keeps the original transaction and pair reservation');
+  value(await publishWakeNotice(services, receiver.id, roomIds[0]!, first));
+  assert.equal(value(services.repositories.wakeNotice.find({ receiverAgentId: receiver.id, roomId: roomIds[0]!, eventId: first }))?.status, 'pending', 'Uncertain delivery keeps the original transaction and pair reservation');
   native.setNoticeFailure(null);
-  value(await publishWakeNotice(services, receiver.id, first));
+  value(await publishWakeNotice(services, receiver.id, roomIds[0]!, first));
   assert.equal(native.notices.size, 1);
   const copy = [...native.notices.values()][0]!.body;
-  assert(copy.includes(outsider.member.principal.matrixUserId) && copy.includes(admin.member.member.displayName) && copy.includes(admin.member.principal.matrixUserId));
+  assert(copy.includes(outsider.member.principal.backendUserId) && copy.includes(admin.member.member.displayName) && copy.includes(admin.member.principal.backendUserId));
+  const original = native.events.get(first)!;
+  native.events.set(first, { ...original, roomId: roomIds[1]! });
+  assert.equal(value(await requestWakeNotice(services, receiver.actor, receiver.id, roomIds[1]!, first)).outcome, 'pending', 'Event identity is local to its room');
+  value(await publishWakeNotice(services, receiver.id, roomIds[1]!, first));
+  assert.equal(native.notices.size, 2, 'Room-scoped notice transactions cannot collide');
+  assert.equal(value(services.repositories.wakeNotice.find({ receiverAgentId: receiver.id, roomId: roomIds[0]!, eventId: first }))?.roomId, roomIds[0]);
+  assert.equal(value(services.repositories.wakeNotice.find({ receiverAgentId: receiver.id, roomId: roomIds[1]!, eventId: first }))?.roomId, roomIds[1]);
   value(changeWakePolicy(services, admin.actor, receiver.id, { expectedRevision: value(services.directory.agent(receiver.id))!.principal.revision,
     mode: 'selected', senders: [outsider.actor.principalId].map(principalId => ({ principalId, includeAgents: false })) }, randomUUID()));
-  assert.deepEqual(value(deliveryPolicy(services, receiver.actor, receiver.id)).wake.senders, [outsider.member.principal.matrixUserId]);
+  assert.deepEqual(value(deliveryPolicy(services, receiver.actor, receiver.id)).wake.senders, [outsider.member.principal.backendUserId]);
   assert.equal(value(await requestWakeNotice(services, receiver.actor, receiver.id, roomIds[0]!, event(roomIds[0]!))).outcome, 'not-applicable');
 });
 

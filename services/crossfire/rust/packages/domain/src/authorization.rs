@@ -19,8 +19,8 @@ pub fn active_actor(
                 "An active registered identity is required",
             )
         })?;
-    if let Some(Authentication::Native { matrix_user_id }) = &actor.authentication
-        && matrix_user_id != &principal.matrix_user_id
+    if let Some(Authentication::Native { backend_user_id }) = &actor.authentication
+        && backend_user_id != &principal.backend_user_id
     {
         return Err(Failure::new(
             ErrorCode::Unauthorized,

@@ -12,10 +12,9 @@ public sealed record EnrollmentIntroduction(string EnrollmentId, string ClaimSec
 public sealed record EnrollmentDecision(long ExpectedRevision, string Decision, string VerificationCode);
 public sealed record EnrollmentDecisionResult(string EnrollmentId, string Status, long Revision);
 public sealed record AgentCredential(string AgentId, string ProvisioningPassword, string? AccessToken, long UpdatedAt);
-public sealed record ExchangedAccount(string MatrixUserId, string AccessToken, string DeviceId);
-public sealed record ExchangedInstance(string InstanceKey, string Name, string AgentId, string Status, string? ErrorCode, ExchangedAccount? Account);
+public sealed record ExchangedInstance(string InstanceKey, string Name, string AgentId, string Status, string? ErrorCode, BackendAccount? Account);
 public sealed record ExchangedFleet(string FleetId, string? ControllerCredential);
-public sealed record EnrollmentExchange(string Status, string OwnerMatrixId, ExchangedFleet? Fleet, IReadOnlyList<ExchangedInstance> Instances);
+public sealed record EnrollmentExchange(string Status, string OwnerBackendUserId, ExchangedFleet? Fleet, IReadOnlyList<ExchangedInstance> Instances);
 public sealed record EnrollmentPorts(EnrollmentAdmissionPorts Admission, UnitOfWork Transaction, RoomGrantPorts Rooms, WakePorts Wake,
     Func<string, Result<EnrollmentRequest?>> Find, Func<string, Result<IReadOnlyList<EnrollmentItem>>> Items,
     Func<string, Result<IReadOnlyList<EnrollmentPolicy>>> Policies, Func<long, Result<IReadOnlyList<EnrollmentRequest>>> Expired,
@@ -30,4 +29,4 @@ public sealed record EnrollmentPorts(EnrollmentAdmissionPorts Admission, UnitOfW
     Func<FleetCredential, Result<Unit>> SaveFleetCredential,
     Func<string, IReadOnlyDictionary<string, string>, Result<Unit>> SaveFleetMetadata,
     Func<string, RoomPolicy, Result<Unit>> ApprovePolicy,
-    Func<string, Result<IReadOnlyList<WakeSender>>> WakeSenders, string ServerName);
+    Func<string, Result<IReadOnlyList<WakeSender>>> WakeSenders, MessagingPorts Messaging);

@@ -7,9 +7,11 @@ import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { once } from 'node:events';
 import { WebSocketServer } from 'ws';
-import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { API } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { writeJson, readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
-import type { Account, Event, Settings } from '@ctlflow/crossfire-contracts/client';
+import type { Account, Settings } from '@ctlflow/crossfire-contracts/client';
+import type { MatrixEvent as Event } from '@ctlflow/crossfire-adapter-matrix/values';
+import { connectMatrix } from '@ctlflow/crossfire-adapter-matrix/connection';
 import { resumeFixture } from './codex-runtime.js';
 import type { RuntimeHooks } from '@ctlflow/crossfire-agent-core/runtime';
 import { builtRelease } from './release.js';
@@ -184,13 +186,12 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   const controller = createListenerControl(async () => {}, () => CONTROLLER);
   controller.update({ connected: true, active: true, input: null });
   cleanup(t, controller.close);
-  const settings: Settings = { instance: 'test', server_name: 'test.localhost',
-    homeserver: '', owner: OBSERVER, max_upload_bytes: 1024 };
-  const account: Account = { user_id: SELF, access_token: 'fixture-only', device_id: 'fixture' };
+  const settings: Settings = { instance: 'test', server: '', backend: { type: 'matrix', parameters: { origin: '', serverName: 'test.localhost' } }, owner: OBSERVER, maxUploadBytes: 1024 };
+  const account: Account = { userId: SELF, accessToken: 'fixture-only', native: { deviceId: 'fixture' } };
   const identities = new Map<string, PrincipalIdentity>([
-    [OBSERVER, { matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null }],
-    [SELF, { matrixUserId: SELF, kind: 'agent', ownerMatrixId: OBSERVER, displayName: null, ownerDisplayName: null }],
-    ['@agent-holmes:test.localhost', { matrixUserId: '@agent-holmes:test.localhost', kind: 'agent', ownerMatrixId: OBSERVER, displayName: null, ownerDisplayName: null }],
+    [OBSERVER, { backendUserId: OBSERVER, kind: 'human', ownerBackendUserId: null, displayName: null, ownerDisplayName: null }],
+    [SELF, { backendUserId: SELF, kind: 'agent', ownerBackendUserId: OBSERVER, displayName: null, ownerDisplayName: null }],
+    ['@agent-holmes:test.localhost', { backendUserId: '@agent-holmes:test.localhost', kind: 'agent', ownerBackendUserId: OBSERVER, displayName: null, ownerDisplayName: null }],
   ]);
   const rooms = new Map<string, Event[]>([[ROOM, []], [OWNER_DM, []]]);
   const joined = new Set([ROOM, OWNER_DM]);
@@ -216,6 +217,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   let maximumWaiters = 0;
   let revision = 0;
   let pageOverride: unknown;
+  let syncOverride: unknown;
   function wake(): void { revision++; for (const waiter of [...waiters]) waiter(); }
   function send(response: ServerResponse, body: unknown, status = 200): void {
     response.writeHead(status, { 'Content-Type': 'application/json' });
@@ -224,7 +226,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   function api(response: ServerResponse, data: unknown): void { send(response, { data, meta: { requestId: AGENT_ID } }); }
   const server = createServer(async (request, response) => {
     if (serveArtifact(publication.release, request.method ?? 'GET', request.url ?? '', response)) return;
-    if (request.url !== '/api/releases/current' && request.headers.authorization !== 'Bearer ' + account.access_token) {
+    if (request.url !== '/api/releases/current' && request.headers.authorization !== 'Bearer ' + account.accessToken) {
       send(response, { errcode: 'M_UNAUTHORIZED' }, 401); return;
     }
     const url = new URL(request.url!, 'http://127.0.0.1');
@@ -240,8 +242,8 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
     if (path === '/api/releases/current') {
       api(response, reporting.current);
     } else if (path === '/api/principal-resolutions' && request.method === 'POST') {
-      const input = body as { matrixUserIds: string[] };
-      api(response, input.matrixUserIds.map(matrixUserId => identities.get(matrixUserId) ?? { matrixUserId, kind: 'unknown', ownerMatrixId: null, displayName: null, ownerDisplayName: null }));
+      const input = body as { backendUserIds: string[] };
+      api(response, input.backendUserIds.map(backendUserId => identities.get(backendUserId) ?? { backendUserId, kind: 'unknown', ownerBackendUserId: null, displayName: null, ownerDisplayName: null }));
     } else if (path === '/api/agents/' + AGENT_ID + '/runtime-decisions' && request.method === 'POST') {
       const decision = body as { id: string; questions: { id: string }[] };
       const stored = { ...decision, agentId: AGENT_ID, createdAt: Date.now(), status: 'pending', answers: [] };
@@ -256,17 +258,17 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
       if (!decision) { send(response, { error: { code: 'missing', message: 'Decision not found' }, meta: { requestId: AGENT_ID } }, 404); return; }
       decision.status = (body as { status: string }).status; decision.answers = []; api(response, { accepted: true });
     } else if (path === '/api/agents/' + AGENT_ID + '/delivery-policy') {
-      api(response, { agentId: AGENT_ID, ownerMatrixId: OBSERVER, matrixUserId: SELF, ...access, maxMessageBytes: 65536,
+      api(response, { agentId: AGENT_ID, ownerBackendUserId: OBSERVER, backendUserId: SELF, ...access, maxMessageBytes: 65536,
         fleetIdleTimeoutSeconds: 1800, wakeMode: waking.policy,
         ownerConversation: joined.has(OWNER_DM) ? OWNER_DM : null,
-        senderMatrixIds: access.status === 'active' && access.ownerStatus === 'active' ? waking.senders : [],
-        roomGrants: [...joined].map(room => ({ roomId: room, accessMode: accessModes.get(room) ?? 'reply', powerLevel: null, muted: muted.has(room) })) });
+        senderBackendUserIds: access.status === 'active' && access.ownerStatus === 'active' ? waking.senders : [],
+        roomGrants: [...joined].map(room => ({ roomId: room, accessMode: accessModes.get(room) ?? 'reply', nativeAccess: null, muted: muted.has(room) })) });
     } else if (path === '/api/agents/' + AGENT_ID + '/owner-conversation' && request.method === 'POST') {
       if (!joined.has(OWNER_DM)) { joined.add(OWNER_DM); wake(); }
       api(response, { roomId: OWNER_DM });
     } else if (path === '/api/agents/' + AGENT_ID) {
-      api(response, { agentId: AGENT_ID, matrixUserId: SELF, name: 'watson', displayName: 'Watson (Human)',
-        owner: { memberId: AGENT_ID, matrixUserId: OBSERVER, displayName: 'Human', status: access.ownerStatus },
+      api(response, { agentId: AGENT_ID, backendUserId: SELF, name: 'watson', displayName: 'Watson (Human)',
+        owner: { memberId: AGENT_ID, backendUserId: OBSERVER, displayName: 'Human', status: access.ownerStatus },
         status: access.status, revision: 0, createdAt: 1,
         application: { appliedRevision: 0, appliedStatus: 'active', nativeDisplayName: 'Watson (Human)',
           lastAttemptAt: 1, lastSuccessAt: 1, errorCode: null, errorMessage: null },
@@ -292,6 +294,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
     } else if (path === API + '/joined_rooms') {
       send(response, { joined_rooms: [...joined] });
     } else if (path === API + '/sync') {
+      if (syncOverride !== undefined) { send(response, syncOverride); return; }
       if (syncUpdates.hung) return;
       let cancelTimer: (() => void) | undefined;
       const complete = () => {
@@ -367,10 +370,11 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   cleanup(t, () => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
   const address = server.address(); assert(address && typeof address === 'object');
-  settings.homeserver = `http://127.0.0.1:${address.port}`;
+  settings.server = `http://127.0.0.1:${address.port}`;
+  settings.backend.parameters.origin = settings.server;
   const cursorFile = join(workspace, '.crossfire/state/watson/cursors.json');
   writeJson(join(workspace, '.crossfire/profiles/watson.json'), { settings, account, id: AGENT_ID, workspace });
-  return { log: (_message: string) => {}, binding: 'fixture', host, control: controller.connection, clock, coordination: createCoordination({ origin: settings.homeserver, token: account.access_token }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities, decisions,
+  return { ...connectMatrix(settings.backend, account), log: (_message: string) => {}, binding: 'fixture', host, control: controller.connection, clock, coordination: createCoordination({ origin: settings.server, token: account.accessToken }), settings, account, id: AGENT_ID, release, workspace, cursorFile, requests, rooms, joined, invites, missingObserver, extraMembers, muted, accessModes, access, waking, syncUpdates, failures, identities, decisions,
     answerDecision(id: string, optionId = '0', text: string | null = null) {
       const decision = decisions.get(id)!; decision.status = 'answered';
       decision.answers = decision.questions.map(question => ({ questionId: question.id, optionId: text === null ? optionId : null, text }));
@@ -386,6 +390,7 @@ export async function matrixFixture(t: TestContext, workspace: string, clock: Cl
       return { entered: () => entered, release };
     },
     overridePage: (page: unknown) => { pageOverride = page; },
+    overrideSync: (sync: unknown) => { syncOverride = sync; },
     subscribe: (room: string) => { joined.add(room); writeJson(cursorFile, { ...(existsSync(cursorFile) ? readJson<Record<string, string>>(cursorFile) : {}), [room]: '0' }); },
     add: (room: string, ...events: Event[]) => {
       for (const event of events) { eventPositions.set(event.event_id, ++revision); }

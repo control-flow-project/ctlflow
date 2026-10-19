@@ -17,7 +17,7 @@ struct Row {
     expires_at: i64,
     consumed_by_member_id: Option<String>,
     revoked_at: Option<i64>,
-    claim_matrix_user_id: Option<String>,
+    claim_backend_user_id: Option<String>,
     claim_display_name: Option<String>,
     claim_fingerprint: Option<String>,
 }
@@ -33,7 +33,7 @@ impl From<&Invitation> for Row {
             expires_at: value.expires_at,
             consumed_by_member_id: value.consumed_by_member_id.clone(),
             revoked_at: value.revoked_at,
-            claim_matrix_user_id: value.claim_matrix_user_id.clone(),
+            claim_backend_user_id: value.claim_backend_user_id.clone(),
             claim_display_name: value.claim_display_name.clone(),
             claim_fingerprint: value.claim_fingerprint.clone(),
         }
@@ -58,7 +58,7 @@ impl TryFrom<Row> for Invitation {
             expires_at: value.expires_at,
             consumed_by_member_id: value.consumed_by_member_id,
             revoked_at: value.revoked_at,
-            claim_matrix_user_id: value.claim_matrix_user_id,
+            claim_backend_user_id: value.claim_backend_user_id,
             claim_display_name: value.claim_display_name,
             claim_fingerprint: value.claim_fingerprint,
         })
@@ -135,7 +135,7 @@ impl InvitationRepository for Store {
     }
     fn invitation_by_claim(&mut self, user: &str) -> Result<Option<Invitation>> {
         invitation::table
-            .filter(invitation::claim_matrix_user_id.eq(user))
+            .filter(invitation::claim_backend_user_id.eq(user))
             .select(Row::as_select())
             .first::<Row>(self.database.connection())
             .optional()
@@ -146,7 +146,7 @@ impl InvitationRepository for Store {
     fn abandoned_invitation_claims(&mut self, now: i64) -> Result<Vec<Invitation>> {
         invitation::table
             .filter(
-                invitation::claim_matrix_user_id
+                invitation::claim_backend_user_id
                     .is_not_null()
                     .and(invitation::consumed_by_member_id.is_null())
                     .and(

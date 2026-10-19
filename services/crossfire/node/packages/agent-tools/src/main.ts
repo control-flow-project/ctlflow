@@ -1,14 +1,13 @@
 import { parseArgs } from 'node:util';
 import { join } from 'node:path';
 import { existsSync, readdirSync, realpathSync } from 'node:fs';
-import { matrix } from '@ctlflow/crossfire-adapter-matrix/http';
-import { operations, option, selectOperation, executeOperation, operationOptions, type Arguments } from '@ctlflow/crossfire-adapter-matrix/commands';
+import { option, type Arguments } from '@ctlflow/crossfire-kernel/arguments';
+import type { MessagingTools } from '@ctlflow/crossfire-domain/port/messaging-tools';
 import { paths, readProfile } from '@ctlflow/crossfire-adapter-filesystem/project';
 import { acquireProcessLock } from '@ctlflow/crossfire-adapter-filesystem/lock';
 import { listenerRequest } from '@ctlflow/crossfire-adapter-crossfire/listener-client';
 import { profileName } from '@ctlflow/crossfire-contracts/client';
 import { outputBytes } from '@ctlflow/crossfire-contracts/limits';
-import { inbox, projectMessages, type Sync } from '@ctlflow/crossfire-agent-core/receive';
 import { emit } from './output.js';
 import { readHistory } from './history.js';
 import { roomOptions, runRoomCommand } from './room-access.js';
@@ -33,34 +32,30 @@ function selectedProfile(workspace: string, requested?: string): string {
   throw new Error(names.length ? 'Select a saved identity with --profile: ' + names.join(', ') : 'No enrolled identity here. Use fleet setup from the management setup guide.');
 }
 
-export async function main(arguments_: string[]): Promise<void> {
+export async function main(arguments_: string[], backends: readonly MessagingTools[]): Promise<void> {
   if (!['linux', 'darwin'].includes(process.platform) || Number(process.versions.node.split('.')[0]) < 26) throw new Error('Crossfire tools require Linux or macOS and Node.js 26+: https://nodejs.org/en/download');
   const options: Record<string, { type: 'string' | 'boolean'; multiple?: boolean }> = { help: { type: 'boolean' } };
-  for (const name of [...globals, ...Object.values(agentOptions).flat(), ...Object.values(roomOptions).flat(), ...Object.values(reportOptions).flat(), ...operations.flatMap(operation => operationOptions(operation))]) options[name] = { type: 'string', multiple: true };
+  for (const name of [...globals, ...Object.values(agentOptions).flat(), ...Object.values(roomOptions).flat(), ...Object.values(reportOptions).flat(), ...backends.flatMap(backend => backend.options)]) options[name] = { type: 'string', multiple: true };
   const parsed = parseArgs({ args: arguments_, allowPositionals: true, options });
   const values = parsed.values as Arguments;
   const [group, command] = parsed.positionals;
   if (parsed.positionals.length > 2) throw new Error('Expected one namespace and one command');
   const maximum = outputBytes(option(values, 'max-output-bytes'));
+  const backend = backends.find(candidate => candidate.id === group);
   if (values.help) {
-    if (group === 'matrix' && command) {
-      const operation = selectOperation(command);
-      emit({ ...operation, cli_options: operationOptions(operation) }, maximum);
-    }
-    else if (group === 'matrix') emit({ namespace: 'matrix', schema: 'v1.12', operations: operations.map(operation => ({ command: operation.command, access: operation.access })) }, maximum);
+    if (backend) emit(backend.help(command), maximum);
     else emit({ usage: 'node "$CROSSFIRE_PROJECT/.crossfire/client.mjs" [--project DIRECTORY] [--profile NAME] agent status|test|read|history|directory', agent: agentOptions, room: roomOptions,
-      matrix: 'Native Matrix operation IDs converted to kebab-case; use matrix COMMAND --help.',
+      messaging: backends.map(candidate => ({ namespace: candidate.id, description: candidate.description })),
       report: 'report publish --directory DIRECTORY --title TITLE uploads public static reports. Anyone with the link can read them.',
       output: '64 KiB default; finite --max-output-bytes 1024..98304',
       lifecycle: 'fleetd owns enrollment, the shared receiver and native sessions. These tools never start or replace them.' }, maximum);
     return;
   }
-  if (group !== 'agent' && group !== 'matrix' && group !== 'room' && group !== 'report') throw new Error('Use agent, room, report or matrix');
+  if (group !== 'agent' && group !== 'room' && group !== 'report' && !backend) throw new Error('Use agent, room, report or a configured messaging namespace');
   if (!command) throw new Error('Supply a command');
-  const operation = group === 'matrix' ? selectOperation(command) : undefined;
   const commands: Record<string, readonly string[]> = group === 'room' ? roomOptions : group === 'report' ? reportOptions : agentOptions;
-  if (!operation && !Object.hasOwn(commands, command)) throw new Error('Unknown command; use --help. Native lifecycle belongs to fleet.');
-  const allowed = new Set([...globals, ...(operation ? operationOptions(operation) : commands[command]!)]);
+  if (!backend && !Object.hasOwn(commands, command)) throw new Error('Unknown command; use --help. Native lifecycle belongs to fleet.');
+  const allowed = new Set([...globals, ...(backend ? backend.commandOptions(command) : commands[command]!)]);
   for (const name of Object.keys(values)) if (!allowed.has(name)) throw new Error('Unsupported option --' + name);
   const project = option(values, 'project') ?? process.env.CROSSFIRE_PROJECT;
   if (!project) throw new Error('Use the controller-provided CROSSFIRE_PROJECT or explicit --project private state directory');
@@ -88,15 +83,8 @@ export async function main(arguments_: string[]): Promise<void> {
     if (!result.ok) throw new Error(result.error.code + ': ' + result.error.message);
     emit(result.value, maximum); return;
   }
-  if (!operation) throw new Error('Unknown Matrix operation');
-  const view = option(values, 'view');
-  if (view && !['messages', 'inbox'].includes(view)) throw new Error('Unknown output view');
-  if (view === 'inbox' && operation.id !== 'sync') throw new Error('--view inbox requires matrix sync');
-  if (view && option(values, 'output-file')) throw new Error('File output preserves the native response; do not combine it with --view');
-  const unlock = ['setReadMarker', 'postReceipt'].includes(operation.id) ? await acquireProcessLock(join(destination.state, 'receiver')) : undefined;
-  try {
-    const client = matrix({ base: selected.settings.homeserver, token: selected.account.access_token });
-    const result = await executeOperation(client, selected.settings, selected.account, operation, values);
-    emit(view === 'inbox' ? inbox(result as Sync) : view === 'messages' ? projectMessages(result) : result, maximum);
-  } finally { await unlock?.(); }
+  if (!backend || selected.settings.backend.type !== backend.id) throw new Error('The selected profile does not use this messaging backend');
+  emit(await backend.execute({ configuration: selected.settings.backend, account: selected.account, instance: selected.settings.instance,
+    owner: selected.settings.owner, server: selected.settings.server, maxUploadBytes: selected.settings.maxUploadBytes, stateDirectory: destination.state,
+    lock: () => acquireProcessLock(join(destination.state, 'receiver')) }, command, values), maximum);
 }

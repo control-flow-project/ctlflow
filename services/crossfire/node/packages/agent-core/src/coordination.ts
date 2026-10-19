@@ -16,7 +16,7 @@ export type Coordination = {
   delivery(agentId: string, signal?: AbortSignal): Promise<Result<DeliveryPolicy>>;
   ownerConversation(agentId: string, signal?: AbortSignal): Promise<Result<{ roomId: string }>>;
   acceptInvitation(agentId: string, roomId: string, signal?: AbortSignal): Promise<Result<{ accepted: boolean }>>;
-  identities(matrixUserIds: readonly string[], signal?: AbortSignal): Promise<Result<PrincipalIdentity[]>>;
+  identities(backendUserIds: readonly string[], signal?: AbortSignal): Promise<Result<PrincipalIdentity[]>>;
   report(agentId: string, runId: string, input: { release: string; messagesDelivered: number; stopped: boolean; controller: ControllerBinding; statistics: StatisticsBatch | null }, signal?: AbortSignal): Promise<Result<{ disconnect: boolean; currentRelease: string; statisticsAccepted: boolean }>>;
   notice(agentId: string, roomId: string, eventId: string, signal?: AbortSignal): Promise<Result<{ outcome: string }>>;
   wakeMetadata(agentId: string, attachment: WakeAttachment, signal?: AbortSignal): Promise<Result<{ now: number; nextDueAt: number | null }>>;

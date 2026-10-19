@@ -5,7 +5,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, unlinkSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
-import { collect } from '@ctlflow/crossfire-adapter-matrix/http';
+import { collect } from '@ctlflow/crossfire-kernel/collect';
 import type { HistoryQueries } from '@ctlflow/crossfire-agent-core/history-query';
 import type { ListenerTest } from '@ctlflow/crossfire-agent-core/diagnostic';
 import { failure } from '@ctlflow/crossfire-kernel/result';

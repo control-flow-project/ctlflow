@@ -19,12 +19,12 @@ public sealed partial class AccountAuthority
             return Results.Fail<Dictionary<string, string[]>>("native", "Native direct-message account data is unavailable");
         foreach (var property in response.Body.EnumerateObject())
         {
-            if (!Validation.UserId(property.Name) || property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 1000)
+            if (!MatrixSyntax.UserId(property.Name) || property.Value.ValueKind != JsonValueKind.Array || property.Value.GetArrayLength() > 1000)
                 return Results.Fail<Dictionary<string, string[]>>("native", "Invalid native direct-message account data");
             var identifiers = new List<string>();
             foreach (var item in property.Value.EnumerateArray())
             {
-                if (item.ValueKind != JsonValueKind.String || !Validation.RoomId(item.GetString()!))
+                if (item.ValueKind != JsonValueKind.String || !MatrixSyntax.RoomId(item.GetString()!))
                     return Results.Fail<Dictionary<string, string[]>>("native", "Invalid native direct-message account data");
                 identifiers.Add(item.GetString()!);
             }
@@ -55,7 +55,7 @@ public sealed partial class AccountAuthority
 
     public async ValueTask<Result<Unit>> VerifyOwnerConversation(string owner, string agent, string roomId, CancellationToken cancellation = default)
     {
-        if (!Validation.UserId(owner) || !Validation.UserId(agent) || !Validation.RoomId(roomId) || owner == agent)
+        if (!MatrixSyntax.UserId(owner) || !MatrixSyntax.UserId(agent) || !MatrixSyntax.RoomId(roomId) || owner == agent)
             return Results.Fail<Unit>("invalid", "Invalid owner conversation identities");
         var state = await State(owner, roomId, cancellation);
         return state.IsSuccess ? RoomState.OwnerConversation(state.Value, owner, agent) : Result<Unit>.Fail(state.Error);
@@ -66,7 +66,7 @@ public sealed partial class AccountAuthority
 
     private async ValueTask<Result<string>> EnsureOwnerConversation(string owner, string agent, string? selectedRoom, string? previousName, CancellationToken cancellation)
     {
-        if (!Local(owner) || !Local(agent) || owner == agent || selectedRoom is not null && !Validation.RoomId(selectedRoom))
+        if (!Local(owner) || !Local(agent) || owner == agent || selectedRoom is not null && !MatrixSyntax.RoomId(selectedRoom))
             return Results.Fail<string>("invalid", "Invalid owner conversation identities");
         var ownerAccount = await AsUser(owner, cancellation); var agentAccount = await AsUser(agent, cancellation);
         if (!ownerAccount.IsSuccess) return Result<string>.Fail(ownerAccount.Error);
@@ -118,7 +118,7 @@ public sealed partial class AccountAuthority
                 }
                 else return Results.Fail<string>("native", "Native owner conversation recovery was not confirmed");
             }
-            if (room is null || !Validation.RoomId(room)) return Results.Fail<string>("native", "Native owner conversation recovery was not confirmed");
+            if (room is null || !MatrixSyntax.RoomId(room)) return Results.Fail<string>("native", "Native owner conversation recovery was not confirmed");
         }
         var privateRoom = await VerifyOwnerConversation(owner, agent, room, cancellation);
         if (!privateRoom.IsSuccess) return Result<string>.Fail(privateRoom.Error);

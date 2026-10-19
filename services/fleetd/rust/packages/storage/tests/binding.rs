@@ -40,7 +40,7 @@ fn fleet_bindings_use_the_shared_private_directory_and_preserve_exact_identity_c
         account: Account {
             user_id: "@agent:local".to_owned(),
             access_token: Secret::new("agent-private".to_owned()),
-            device_id: "DEVICE".to_owned(),
+            native: serde_json::from_value(serde_json::json!({"deviceId":"DEVICE"}))?,
         },
     });
     selected.request = Some(Claim {

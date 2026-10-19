@@ -1,12 +1,7 @@
-use super::{
-    authority::requested_power, operations::RoomOperations, port::RoomRepository, values::*,
-};
+use super::{operations::RoomOperations, port::RoomRepository, values::*};
 use crate::{
     identity::{AgentView, Principal, PrincipalKind, Status},
-    matrix::{
-        AccessMode, MatrixAuthority, Membership, RoomAccess, RoomAdmission, RoomMembership,
-        RoomPower,
-    },
+    messaging::{Membership, MessagingAuthority, RoomAdmission, RoomMembership},
     port::{
         AgentRepository, AuthorizationRepository, CoreRepository, RepositoryAccess, UnitOfWork,
     },
@@ -27,31 +22,26 @@ struct Outcome {
 }
 fn departed(snapshot: &Snapshot, observed: &Option<RoomMembership>) -> RoomMembership {
     RoomMembership {
-        matrix_user_id: snapshot.agent.principal.matrix_user_id.clone(),
+        backend_user_id: snapshot.agent.principal.backend_user_id.clone(),
         display_name: String::new(),
         membership: Membership::Leave,
-        power: if snapshot.application.creator
-            || observed
-                .as_ref()
-                .is_some_and(|value| value.power == RoomPower::Creator)
-        {
-            RoomPower::Creator
-        } else {
-            RoomPower::Level(0)
-        },
+        native_access: observed
+            .as_ref()
+            .and_then(|value| value.native_access.clone())
+            .or_else(|| snapshot.application.native_access.clone()),
     }
 }
-async fn remove<A: RepositoryAccess, M: MatrixAuthority>(
+async fn remove<A: RepositoryAccess, M: MessagingAuthority>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     snapshot: &Snapshot,
     observed: &mut Option<RoomMembership>,
 ) -> Result<()>
 where
     A::Repository: RoomRepository,
 {
-    let user = &snapshot.agent.principal.matrix_user_id;
-    let rooms = match matrix.joined(user).await {
+    let user = &snapshot.agent.principal.backend_user_id;
+    let rooms = match messaging.joined(user).await {
         Ok(rooms) => rooms,
         Err(error) => {
             if (snapshot.agent.principal.status == Status::Revoked
@@ -67,21 +57,21 @@ where
         }
     };
     if rooms.contains(&snapshot.grant.room_id) {
-        matrix.leave(user, &snapshot.grant.room_id).await?;
+        messaging.leave(user, &snapshot.grant.room_id).await?;
     } else if let Some(event) = &snapshot.grant.invitation_event_id
-        && matrix
+        && messaging
             .invitation(user, &snapshot.grant.room_id)
             .await?
             .is_some_and(|invitation| &invitation.event_id == event)
     {
-        matrix.leave(user, &snapshot.grant.room_id).await?;
+        messaging.leave(user, &snapshot.grant.room_id).await?;
     }
     *observed = Some(departed(snapshot, observed));
     Ok(())
 }
-async fn apply<A: RepositoryAccess, M: MatrixAuthority>(
+async fn apply<A: RepositoryAccess, M: MessagingAuthority>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     snapshot: &Snapshot,
 ) -> Outcome
 where
@@ -95,13 +85,13 @@ where
             || agent.principal.status != Status::Active
             || agent.owner.status != Status::Active
         {
-            return remove(repository, matrix, snapshot, &mut observed).await;
+            return remove(repository, messaging, snapshot, &mut observed).await;
         }
         if snapshot.repair_owner {
-            let verified = matrix
+            let verified = messaging
                 .owner_conversation(
-                    &agent.owner.matrix_user_id,
-                    &agent.principal.matrix_user_id,
+                    &agent.owner.backend_user_id,
+                    &agent.principal.backend_user_id,
                     Some(&grant.room_id),
                     None,
                 )
@@ -118,7 +108,7 @@ where
             .as_ref()
             .filter(|authorizer| authorizer.status == Status::Active)
         else {
-            remove(repository, matrix, snapshot, &mut observed).await?;
+            remove(repository, messaging, snapshot, &mut observed).await?;
             return Err(Failure::new(
                 ErrorCode::Forbidden,
                 "The grant authorizer is no longer active",
@@ -140,27 +130,17 @@ where
                 )
             })?;
             if !permitted {
-                remove(repository, matrix, snapshot, &mut observed).await?;
+                remove(repository, messaging, snapshot, &mut observed).await?;
                 return Err(Failure::new(
                     ErrorCode::Forbidden,
                     "The inviting agent no longer has delegation for this room",
                 ));
             }
         }
-        let facts = match matrix
-            .room(&authorizer.matrix_user_id, &grant.room_id)
-            .await
-        {
-            Ok(facts) => facts,
-            Err(error) => {
-                remove(repository, matrix, snapshot, &mut observed).await?;
-                return Err(error);
-            }
-        };
-        let native = matrix
+        let native = messaging
             .membership(
-                &authorizer.matrix_user_id,
-                &agent.principal.matrix_user_id,
+                &authorizer.backend_user_id,
+                &agent.principal.backend_user_id,
                 &grant.room_id,
             )
             .await?;
@@ -171,23 +151,6 @@ where
         if !command && native.membership != Membership::Join {
             return Ok(());
         }
-        let mut intent = grant.intent.clone();
-        if intent.access == Access::Custom
-            && let RoomPower::Level(level) = facts.power
-        {
-            intent.power = intent.power.map(|power| power.min(level));
-        }
-        let requested = match requested_power(&facts, &intent) {
-            Ok(power) => power,
-            Err(error) => {
-                remove(repository, matrix, snapshot, &mut observed).await?;
-                return Err(error);
-            }
-        };
-        let power_level = match (command, native.power) {
-            (false, RoomPower::Level(power)) => requested.min(power),
-            _ => requested,
-        };
         let admission = if command {
             Some(match grant.admission {
                 Admission::Managed => RoomAdmission::Managed,
@@ -198,36 +161,25 @@ where
                             "An invitation grant requires its exact native event",
                         )
                     })?,
-                    sender_matrix_id: authorizer.matrix_user_id.clone(),
+                    sender_backend_user_id: authorizer.backend_user_id.clone(),
                 },
             })
         } else {
             None
         };
-        let mode = match intent.access {
-            Access::Read => AccessMode::Read,
-            Access::Reply => AccessMode::Reply,
-            Access::Custom => AccessMode::Custom,
-            Access::None => {
-                return Err(Failure::new(
-                    ErrorCode::Conflict,
-                    "No-access grants cannot join a native room",
-                ));
-            }
-        };
-        let changed = match matrix
+        let changed = match messaging
             .set_room_access(
-                &authorizer.matrix_user_id,
-                &agent.principal.matrix_user_id,
+                &authorizer.backend_user_id,
+                &agent.principal.backend_user_id,
                 &grant.room_id,
-                RoomAccess { mode, power_level },
+                &grant.intent,
                 admission.as_ref(),
             )
             .await
         {
             Ok(changed) => changed,
             Err(error) => {
-                remove(repository, matrix, snapshot, &mut observed).await?;
+                remove(repository, messaging, snapshot, &mut observed).await?;
                 return Err(error);
             }
         };
@@ -237,9 +189,9 @@ where
     .await;
     Outcome { result, observed }
 }
-pub async fn reconcile<A: RepositoryAccess, M: MatrixAuthority, O: RoomOperations, C: Clock>(
+pub async fn reconcile<A: RepositoryAccess, M: MessagingAuthority, O: RoomOperations, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     operations: &O,
     clock: &C,
     agent: &str,
@@ -291,7 +243,7 @@ where
             repair_owner,
         })
     })?;
-    let outcome = apply(repository, matrix, &snapshot).await;
+    let outcome = apply(repository, messaging, &snapshot).await;
     repository.with(|repo| {
         repo.transaction(|repo| {
             let current = repo.room_grant(agent, room)?;
@@ -344,11 +296,7 @@ where
                 })?;
             if let Some(observed) = outcome.observed {
                 value.membership = Some(observed.membership);
-                value.creator = observed.power == RoomPower::Creator;
-                value.power = match observed.power {
-                    RoomPower::Creator => None,
-                    RoomPower::Level(power) => Some(power),
-                };
+                value.native_access = observed.native_access;
             }
             match outcome.result {
                 Ok(()) => {

@@ -13,7 +13,7 @@ public sealed class OwnerObservation : IAsyncDisposable
     private readonly LocalState storage;
     private readonly string file;
     private readonly AgentProfile profile;
-    private readonly AgentMatrix matrix;
+    private readonly MessagingClient messaging;
     private readonly Coordination coordination;
     private readonly TimeProvider clock;
     private readonly NativeHistoryMode mode;
@@ -35,9 +35,9 @@ public sealed class OwnerObservation : IAsyncDisposable
     private long typingGeneration;
     private Task? running, closing;
     private bool clearTyping;
-    public OwnerObservation(LocalState storage, string file, AgentProfile profile, AgentMatrix matrix, Coordination coordination, TimeProvider clock, NativeHistoryMode mode, Func<int> maximum, Func<NativeSessionState?> native, Action<Failure> failed, CancellationToken stop)
+    public OwnerObservation(LocalState storage, string file, AgentProfile profile, MessagingClient messaging, Coordination coordination, TimeProvider clock, NativeHistoryMode mode, Func<int> maximum, Func<NativeSessionState?> native, Action<Failure> failed, CancellationToken stop)
     {
-        this.storage = storage; this.file = file; this.profile = profile; this.matrix = matrix; this.coordination = coordination; this.clock = clock; this.mode = mode; this.maximum = maximum; this.native = native; this.failed = failed;
+        this.storage = storage; this.file = file; this.profile = profile; this.messaging = messaging; this.coordination = coordination; this.clock = clock; this.mode = mode; this.maximum = maximum; this.native = native; this.failed = failed;
         if (storage.Exists(file))
         {
             var journal = AgentIO.Read(storage, file, MaximumJournal); if (!Validation.Fields(journal, ["output", "observations"]).IsSuccess || journal.GetProperty("output").ValueKind != JsonValueKind.Array || journal.GetProperty("observations").ValueKind != JsonValueKind.Array) throw new InvalidDataException("Invalid owner observation journal; retained state requires owner inspection");
@@ -45,7 +45,7 @@ public sealed class OwnerObservation : IAsyncDisposable
             {
                 if (!Validation.Fields(value, ["id", "text", "sources", "streamId", "sealed"]).IsSuccess) throw new InvalidDataException("Invalid owner observation journal");
                 var id = WireJson.Text(value, "id"); var text = WireJson.Text(value, "text"); var stream = Validation.NullableText(value.GetProperty("streamId")); var chunks = Validation.List(value.GetProperty("sources"), source => Validation.Text(source), int.MaxValue, 1); var sealedValue = Validation.Boolean(value.GetProperty("sealed"));
-                if (id is null || text is null || !OwnerNotices.Fits(text) || !stream.IsSuccess || !chunks.IsSuccess || !sealedValue.IsSuccess) throw new InvalidDataException("Invalid owner observation journal");
+                if (id is null || text is null || !messaging.NoticeFits(text) || !stream.IsSuccess || !chunks.IsSuccess || !sealedValue.IsSuccess) throw new InvalidDataException("Invalid owner observation journal");
                 output.Add(new(id, text, chunks.Value, stream.Value, sealedValue.Value)); foreach (var source in chunks.Value) sources.Add(source);
             }
             foreach (var value in journal.GetProperty("observations").EnumerateArray()) { var parsed = AgentWire.Observation(value); if (!parsed.IsSuccess) throw new InvalidDataException(parsed.Error.Message); observations.Add(parsed.Value); latest[parsed.Value.SessionId] = parsed.Value; if (parsed.Value.LastActivityAt is { } time) lastActivity = Math.Max(lastActivity ?? 0, time); }
@@ -63,7 +63,7 @@ public sealed class OwnerObservation : IAsyncDisposable
     {
         lock (gate)
         {
-            var position = 0; foreach (var part in OwnerNotices.Chunks(text)) { var id = Identity.Hash(WireJson.Compact(WireJson.Array(writer => { writer.WriteStringValue("listener-notice"); writer.WriteStringValue(identity); writer.WriteNumberValue(position++); }))); if (sources.Add(id)) output.Add(new(id, part, [id], null, true)); } Save();
+            var position = 0; foreach (var part in messaging.NoticeChunks(text)) { var id = Identity.Hash(WireJson.Compact(WireJson.Array(writer => { writer.WriteStringValue("listener-notice"); writer.WriteStringValue(identity); writer.WriteNumberValue(position++); }))); if (sources.Add(id)) output.Add(new(id, part, [id], null, true)); } Save();
         }
         signal.Wake();
     }
@@ -83,10 +83,10 @@ public sealed class OwnerObservation : IAsyncDisposable
             else if (value is NativeOutput text)
             {
                 lastActivity = Now; var position = 0; var stream = text.StreamId is null ? null : WireJson.Compact(WireJson.Array(writer => { writer.WriteStringValue(text.SessionId); writer.WriteStringValue(text.StreamId); }));
-                foreach (var part in OwnerNotices.Chunks(text.Text))
+                foreach (var part in messaging.NoticeChunks(text.Text))
                 {
                     var id = Identity.Hash(WireJson.Compact(WireJson.Array(writer => { writer.WriteStringValue(text.SessionId); writer.WriteStringValue(text.Id); writer.WriteNumberValue(position++); }))); if (!sources.Add(id)) continue;
-                    var previous = output.LastOrDefault(); if (stream is not null && previous?.StreamId == stream && !previous.Sealed && OwnerNotices.Fits(previous.Text + part)) output[^1] = previous with { Text = previous.Text + part, Sources = [..previous.Sources, id] }; else output.Add(new(id, part, [id], stream, false));
+                    var previous = output.LastOrDefault(); if (stream is not null && previous?.StreamId == stream && !previous.Sealed && messaging.NoticeFits(previous.Text + part)) output[^1] = previous with { Text = previous.Text + part, Sources = [..previous.Sources, id] }; else output.Add(new(id, part, [id], stream, false));
                 }
             }
             Save();
@@ -134,8 +134,8 @@ public sealed class OwnerObservation : IAsyncDisposable
             for (;;)
             {
                 Output? item; lock (gate) { if (run is null || output.Count == 0) break; item = output[0]; if (!item.Sealed) { item = item with { Sealed = true }; output[0] = item; Save(); } }
-                var room = await OwnerAuthority.Conversation(coordination, matrix, profile, scope.Token); if (!room.IsSuccess) return Result<Unit>.Fail(room.Error);
-                var response = await AgentIO.Request(matrix, new("PUT", AgentWire.Room(room.Value) + "/send/m.room.message/observation-" + item.Id, OwnerNotices.Content(item.Text)), scope.Token); if (!response.IsSuccess) return Result<Unit>.Fail(response.Error);
+                var room = await OwnerAuthority.Conversation(coordination, messaging, profile, scope.Token); if (!room.IsSuccess) return Result<Unit>.Fail(room.Error);
+                var response = await messaging.SendNotice(room.Value, "observation-" + item.Id, item.Text, scope.Token); if (!response.IsSuccess) return Result<Unit>.Fail(response.Error);
                 lock (gate) { if (!ReferenceEquals(output.FirstOrDefault(), item)) throw new InvalidOperationException("Owner output changed during publication"); output.RemoveAt(0); foreach (var source in item.Sources) sources.Remove(source); Save(); }
             }
             return Results.Done();
@@ -145,7 +145,7 @@ public sealed class OwnerObservation : IAsyncDisposable
     private async ValueTask<Result<Unit>> Typing(string room, bool enabled, CancellationToken cancellation)
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10), clock); using var scope = CancellationTokenSource.CreateLinkedTokenSource(cancellation, deadline.Token);
-        return (await AgentIO.Request(matrix, new("PUT", AgentWire.Room(room) + "/typing/" + AgentWire.Segment(profile.Account.UserId), WireJson.Object(writer => { writer.WriteBoolean("typing", enabled); if (enabled) writer.WriteNumber("timeout", 30000); })), scope.Token)).Map(_ => default(Unit));
+        return await messaging.Thinking(room, profile.Account.UserId, enabled, 30000, scope.Token);
     }
     public async ValueTask<Result<Unit>> Delivered(string room, string session)
     {

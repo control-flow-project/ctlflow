@@ -21,13 +21,13 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-pub type ControllerOwner = Controller<Registry, Host, Clock>;
+pub type ControllerOwner =
+    Controller<Registry, Host<crossfire_adapter_matrix::agent::Connector>, Clock>;
 pub struct Input {
     pub root: PathBuf,
     pub name: Option<String>,
     pub artifacts: PathBuf,
     pub background: bool,
-    pub migrate: bool,
 }
 fn invalid(message: &str) -> Failure {
     Failure::new(ErrorCode::Invalid, message)
@@ -35,13 +35,11 @@ fn invalid(message: &str) -> Failure {
 pub fn arguments(values: &[String]) -> Result<Input> {
     let mut arguments = BTreeMap::new();
     let mut background = false;
-    let mut migrate = false;
     let mut index = 0;
     while index < values.len() {
         let key = &values[index];
         match key.as_str() {
             "--background" if !background => background = true,
-            "--migrate-contexts" if !migrate => migrate = true,
             "--root" | "--name" | "--artifacts" if index + 1 < values.len() => {
                 index += 1;
                 if arguments
@@ -53,7 +51,7 @@ pub fn arguments(values: &[String]) -> Result<Input> {
             }
             _ => {
                 return Err(invalid(
-                    "fleetd --root ABSOLUTE_DIRECTORY [--name NAME] [--artifacts RELEASE_DIRECTORY] [--background] [--migrate-contexts]",
+                    "fleetd --root ABSOLUTE_DIRECTORY [--name NAME] [--artifacts RELEASE_DIRECTORY] [--background]",
                 ));
             }
         }
@@ -77,11 +75,6 @@ pub fn arguments(values: &[String]) -> Result<Input> {
             return Err(invalid("Controller name is empty"));
         }
     }
-    if migrate && (background || name.is_some() || arguments.contains_key("--artifacts")) {
-        return Err(invalid(
-            "Context migration requires only --root and --migrate-contexts",
-        ));
-    }
     let artifacts = match arguments.get("--artifacts") {
         Some(directory) => PathBuf::from(directory),
         None => std::env::current_exe()
@@ -98,7 +91,6 @@ pub fn arguments(values: &[String]) -> Result<Input> {
         name,
         artifacts,
         background,
-        migrate,
     })
 }
 pub async fn signals(stop: CancellationToken) -> Result<()> {
@@ -158,9 +150,6 @@ pub async fn run(input: Input, stop: CancellationToken) -> Result<()> {
         }
     };
     let registry = Arc::new(Registry::open(&input.root)?);
-    if input.migrate {
-        return crate::migration::run(&input.root, registry.as_ref()).await;
-    }
     let configured = private
         .read_optional("config.json", 65536)?
         .map(|bytes| {
@@ -203,6 +192,7 @@ pub async fn run(input: Input, stop: CancellationToken) -> Result<()> {
     let foreground = !input.background;
     let execution = Arc::new(Host::new(
         adapters,
+        crossfire_adapter_matrix::agent::Connector,
         input.artifacts,
         Arc::new(move |message| {
             if foreground {

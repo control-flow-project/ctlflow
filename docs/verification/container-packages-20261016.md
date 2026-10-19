@@ -1,5 +1,9 @@
 # Container package verification — 2026-10-16
 
+Historical results for that revision. Its schema numbers and migration scenarios
+do not describe the current initial schema or current acceptance requirements.
+Use the current specification and shared contract guide for present behavior.
+
 ## Scope
 
 Crossfire now builds independently transferable Node, managed C# and NativeAOT

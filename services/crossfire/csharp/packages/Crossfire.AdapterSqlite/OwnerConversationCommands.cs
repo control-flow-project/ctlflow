@@ -16,8 +16,8 @@ public static class OwnerConversationCommands
         context.SaveChanges(); return Results.Done();
     }
 
-    public static OwnerConversationPorts Ports(CrossfireDbContext context, Func<long> now, MatrixPorts matrix, RoomOperation operation)
-        => new(new(RoomGrantCommands.Ports(context, now, matrix.Room), matrix, () => PolicyQueries.Find(context),
+    public static OwnerConversationPorts Ports(CrossfireDbContext context, Func<long> now, MessagingPorts messaging, RoomOperation operation)
+        => new(new(RoomGrantCommands.Ports(context, now, messaging), messaging, () => PolicyQueries.Find(context),
                 id => PrincipalApplicationCommands.Find(context, id), operation),
             id => Find(context, id), value => Insert(context, value));
 }

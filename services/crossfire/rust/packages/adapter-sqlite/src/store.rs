@@ -2,12 +2,13 @@ use crate::{config::DatabaseConfig, db::Database, schema};
 use crossfire_domain::port::UnitOfWork;
 use crossfire_kernel::Result;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
-pub struct SharedStore(Mutex<Store>);
+#[derive(Clone)]
+pub struct SharedStore(Arc<Mutex<Store>>);
 impl SharedStore {
     pub fn new(store: Store) -> Self {
-        Self(Mutex::new(store))
+        Self(Arc::new(Mutex::new(store)))
     }
 }
 impl crossfire_domain::port::RepositoryAccess for SharedStore {

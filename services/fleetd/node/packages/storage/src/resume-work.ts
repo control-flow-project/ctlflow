@@ -1,3 +1,4 @@
+import { MAX_HISTORY_CONTEXT } from '@ctlflow/crossfire-kernel/history-context';
 import { lstatSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -6,7 +7,7 @@ import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { ResumeWork, ResumeWorkStore } from '@ctlflow/fleetd-domain/resume-work';
 
-const context = { context: check.text(255), sessionId: check.text(200) };
+const context = { context: check.text(MAX_HISTORY_CONTEXT), sessionId: check.text(200) };
 const pending = check.list(check.object({ ...context, messageId: check.identifier, checkpointedAt: check.integer(0, 8640000000000000) }), 2002);
 const captured = check.refine(check.list(check.object(context), 2002), values => new Set(values.map(value => value.context)).size === values.length, 'Duplicate interrupted native history');
 const maximum = 2 * 1024 * 1024;

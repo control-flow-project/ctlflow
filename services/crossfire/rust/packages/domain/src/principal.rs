@@ -2,7 +2,7 @@ use crate::{
     identity::{
         AgentCredential, Application, Principal, PrincipalKind, Status, agent_display_name,
     },
-    matrix::MatrixAuthority,
+    messaging::MessagingAuthority,
     port::{
         AgentRepository, AuthorizationRepository, CoreRepository, CredentialRepository,
         RepositoryAccess, UnitOfWork,
@@ -14,7 +14,7 @@ use crate::{
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, secret::Secret, time::Clock};
 
 pub trait IntentHash {
-    fn hash(&self, matrix_id: &str, status: Status, display_name: &str) -> Result<String>;
+    fn hash(&self, backend_user_id: &str, status: Status, display_name: &str) -> Result<String>;
 }
 pub trait PrincipalRepository: RoomRepository + CredentialRepository {
     fn due_principals(&mut self, now: i64) -> Result<Vec<String>>;
@@ -29,9 +29,9 @@ struct Snapshot {
     intent_hash: String,
     next_check_at: i64,
 }
-async fn apply<A: RepositoryAccess, M: MatrixAuthority>(
+async fn apply<A: RepositoryAccess, M: MessagingAuthority>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     snapshot: &Snapshot,
     token: &mut Option<Secret>,
 ) -> Result<()>
@@ -40,38 +40,38 @@ where
 {
     let principal = &snapshot.principal;
     if snapshot.status == Status::Revoked {
-        let present = matrix.exists(&principal.matrix_user_id).await?;
+        let present = messaging.exists(&principal.backend_user_id).await?;
         *token = None;
         return if present {
-            matrix.deactivate(&principal.matrix_user_id).await
+            messaging.deactivate(&principal.backend_user_id).await
         } else {
             Ok(())
         };
     }
     if let Some(credential) = &snapshot.credential {
         let valid = if let Some(token) = &token {
-            matrix
+            messaging
                 .identify(token)
                 .await
                 .ok()
-                .is_some_and(|user| user == principal.matrix_user_id)
+                .is_some_and(|user| user == principal.backend_user_id)
         } else {
             false
         };
         if !valid {
             *token = Some(
-                matrix
+                messaging
                     .provision(
-                        &principal.matrix_user_id,
+                        &principal.backend_user_id,
                         &credential.provisioning_password,
-                        "CROSSFIRE_AGENT",
+                        &serde_json::Map::new(),
                     )
                     .await?
                     .access_token,
             );
         }
     }
-    let joined = matrix.joined(&principal.matrix_user_id).await?;
+    let joined = messaging.joined(&principal.backend_user_id).await?;
     let permitted = if principal.kind == PrincipalKind::Agent {
         repository.with(|repo| repo.room_grants(&principal.id))?
     } else {
@@ -84,12 +84,12 @@ where
                     .iter()
                     .any(|grant| grant.room_id == room && grant.intent.access != Access::None)
         {
-            matrix.leave(&principal.matrix_user_id, &room).await?;
+            messaging.leave(&principal.backend_user_id, &room).await?;
         }
     }
     if snapshot.application.applied_intent_hash.as_ref() != Some(&snapshot.intent_hash) {
-        matrix
-            .set_display_name(&principal.matrix_user_id, &snapshot.display_name)
+        messaging
+            .set_display_name(&principal.backend_user_id, &snapshot.display_name)
             .await?;
         if principal.kind == PrincipalKind::Agent
             && snapshot.application.native_display_name.as_ref() != Some(&snapshot.display_name)
@@ -97,10 +97,10 @@ where
             && let Some(conversation) =
                 repository.with(|repo| repo.owner_conversation(&principal.id))?
         {
-            let room = matrix
+            let room = messaging
                 .owner_conversation(
-                    &owner.matrix_user_id,
-                    &principal.matrix_user_id,
+                    &owner.backend_user_id,
+                    &principal.backend_user_id,
                     Some(&conversation.room_id),
                     snapshot.application.native_display_name.as_deref(),
                 )
@@ -115,9 +115,9 @@ where
     }
     Ok(())
 }
-pub async fn reconcile<A: RepositoryAccess, M: MatrixAuthority, O: RoomOperations, C: Clock>(
+pub async fn reconcile<A: RepositoryAccess, M: MessagingAuthority, O: RoomOperations, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     operations: &O,
     clock: &C,
     hasher: &impl IntentHash,
@@ -174,7 +174,7 @@ where
                     .ok_or_else(|| Failure::new(ErrorCode::Missing, "Member not found"))?;
                 (member.member.display_name, None, None)
             };
-            let intent_hash = hasher.hash(&principal.matrix_user_id, status, &display_name)?;
+            let intent_hash = hasher.hash(&principal.backend_user_id, status, &display_name)?;
             let next_check_at = clock
                 .now()?
                 .checked_add(policy.reconcile_seconds.checked_mul(1000).ok_or_else(|| {
@@ -204,7 +204,7 @@ where
             .credential
             .as_ref()
             .and_then(|credential| credential.access_token.clone());
-        let result = apply(repository, matrix, &snapshot, &mut token).await;
+        let result = apply(repository, messaging, &snapshot, &mut token).await;
         repository.with(|repo| {
             repo.transaction(|repo| {
                 repo.principal(id)?
@@ -265,7 +265,7 @@ where
         repo.owner_conversation(id)
     })?;
     if let Some(bound) = bound {
-        rooms::reconcile(repository, matrix, operations, clock, id, &bound.room_id).await?;
+        rooms::reconcile(repository, messaging, operations, clock, id, &bound.room_id).await?;
     }
     Ok(())
 }

@@ -12,7 +12,7 @@ fn listener_policy_separates_wake_read_reply_and_shared_or_room_history_without_
                 "!read:example.test".to_owned(),
                 Room {
                     access: Access::Read,
-                    power: None,
+                    native_access: None,
                     muted: false,
                 },
             ),
@@ -20,7 +20,7 @@ fn listener_policy_separates_wake_read_reply_and_shared_or_room_history_without_
                 "!reply:example.test".to_owned(),
                 Room {
                     access: Access::Reply,
-                    power: None,
+                    native_access: None,
                     muted: false,
                 },
             ),

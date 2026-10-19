@@ -1,3 +1,4 @@
+import { messageEvent } from '@ctlflow/crossfire-adapter-matrix/events';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import test from 'node:test';
@@ -16,21 +17,21 @@ import { withClock } from './test-support/clock.js';
 test('delivery batches carry one verified entry per emitted sender, with exact byte accounting and no self-chat metadata', async scope => {
   const fixture = await matrixFixture(scope, temporary(scope));
   const peer = '@agent-holmes:test.localhost', foreign = '@agent-foreign:test.localhost', unknown = '@agent-lookalike:remote.test';
-  fixture.identities.set(foreign, { matrixUserId: foreign, kind: 'agent', ownerMatrixId: '@other:test.localhost', displayName: null, ownerDisplayName: null });
+  fixture.identities.set(foreign, { backendUserId: foreign, kind: 'agent', ownerBackendUserId: '@other:test.localhost', displayName: null, ownerDisplayName: null });
   const events = [message('$self', SELF), message('$owner', OBSERVER), message('$peer', peer), message('$foreign', foreign),
-    message('$unknown', unknown), message('$again', peer)].map(event => eventView(event, ROOM));
+    message('$unknown', unknown), message('$again', peer)].map(event => eventView(messageEvent(event, ROOM), ROOM));
   const identities = await resolveSenders(fixture.coordination, events.slice(1), new AbortController().signal);
   const artifacts = messageArtifacts(localState, fixture.cursorFile + '.messages', Date.now);
   const batches = chatBatches(deliveryEvents(events, SELF), fixture.settings, identities, 65536, 'shared', artifacts);
   assert.equal(batches.length, 1);
   const data = JSON.parse(batches[0]!.text.split('\n').slice(1).join('\n'));
-  assert.deepEqual(data.senders, { [OBSERVER]: { kind: 'human', display_name: null, relationship: 'owner' },
-    [peer]: { kind: 'agent', owner: OBSERVER, display_name: null, owner_display_name: null, relationship: 'owners-agent' },
-    [foreign]: { kind: 'agent', owner: '@other:test.localhost', display_name: null, owner_display_name: null, relationship: 'other-owners-agent' },
-    [unknown]: { kind: 'unknown', display_name: null, relationship: 'unknown' } });
-  assert.deepEqual(data.events.map((event: { event_id: string }) => event.event_id), ['$owner', '$peer', '$foreign', '$unknown', '$again']);
+  assert.deepEqual(data.senders, { [OBSERVER]: { kind: 'human', displayName: null, relationship: 'owner' },
+    [peer]: { kind: 'agent', owner: OBSERVER, displayName: null, ownerDisplayName: null, relationship: 'owners-agent' },
+    [foreign]: { kind: 'agent', owner: '@other:test.localhost', displayName: null, ownerDisplayName: null, relationship: 'other-owners-agent' },
+    [unknown]: { kind: 'unknown', displayName: null, relationship: 'unknown' } });
+  assert.deepEqual(data.events.map((event: { eventId: string }) => event.eventId), ['$owner', '$peer', '$foreign', '$unknown', '$again']);
   assert.equal(fixture.requests.filter(request => request.path === '/api/principal-resolutions').length, 1);
-  const large = Array.from({ length: 3 }, (_, index) => eventView(message('$large-' + index, index === 0 ? OBSERVER : peer, 'x'.repeat(500)), ROOM));
+  const large = Array.from({ length: 3 }, (_, index) => eventView(messageEvent(message('$large-' + index, index === 0 ? OBSERVER : peer, 'x'.repeat(500)), ROOM), ROOM));
   const divided = chatBatches(large, fixture.settings, identities, 2200, 'shared', artifacts);
   assert.equal(divided.length, 1);
   for (const batch of divided) {
@@ -45,10 +46,10 @@ test('delivery batches carry one verified entry per emitted sender, with exact b
 
 test('sender resolution rejects partial, substituted, duplicate and inconsistent metadata without inferred ownership', async scope => {
   const fixture = await matrixFixture(scope, temporary(scope));
-  const events = [eventView(message('$owner', OBSERVER), ROOM)];
-  const invalid: PrincipalIdentity[][] = [[], [{ matrixUserId: '@other:test.localhost', kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null }],
-    [{ matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: OBSERVER, displayName: null, ownerDisplayName: null }],
-    [{ matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null }, { matrixUserId: OBSERVER, kind: 'human', ownerMatrixId: null, displayName: null, ownerDisplayName: null }]];
+  const events = [eventView(messageEvent(message('$owner', OBSERVER), ROOM), ROOM)];
+  const invalid: PrincipalIdentity[][] = [[], [{ backendUserId: '@other:test.localhost', kind: 'human', ownerBackendUserId: null, displayName: null, ownerDisplayName: null }],
+    [{ backendUserId: OBSERVER, kind: 'human', ownerBackendUserId: OBSERVER, displayName: null, ownerDisplayName: null }],
+    [{ backendUserId: OBSERVER, kind: 'human', ownerBackendUserId: null, displayName: null, ownerDisplayName: null }, { backendUserId: OBSERVER, kind: 'human', ownerBackendUserId: null, displayName: null, ownerDisplayName: null }]];
   for (const response of invalid) {
     await assert.rejects(resolveSenders({ ...fixture.coordination, identities: async () => success(response) }, events, new AbortController().signal));
   }
@@ -80,7 +81,7 @@ test('sender resolution retains its exact request while the independent receiver
   await until(() => native.requests().some(request => request.method === 'turn/start'));
   const input = native.requests().find(request => request.method === 'turn/start')!.params!.input as { text: string }[];
   const data = JSON.parse(input[0]!.text.split('\n').slice(1).join('\n'));
-  assert.deepEqual(data.senders, { [OBSERVER]: { kind: 'human', display_name: null, relationship: 'owner' } });
+  assert.deepEqual(data.senders, { [OBSERVER]: { kind: 'human', displayName: null, relationship: 'owner' } });
 });
 
 test('idle and blocked traffic perform no sender lookups; authorized delivery includes buffered verified ownership', withClock(async (scope, clock) => {
@@ -100,9 +101,9 @@ test('idle and blocked traffic perform no sender lookups; authorized delivery in
   await clock.observe(() => native.requests().some(request => request.method === 'turn/start'));
   const input = native.requests().find(request => request.method === 'turn/start')!.params!.input as { text: string }[];
   const data = JSON.parse(input[0]!.text.split('\n').slice(1).join('\n'));
-  assert.deepEqual(data.senders, { '@agent-holmes:test.localhost': { kind: 'agent', owner: OBSERVER, display_name: null, owner_display_name: null, relationship: 'owners-agent' },
-    [OBSERVER]: { kind: 'human', display_name: null, relationship: 'owner' } });
-  assert.deepEqual(data.events.map((event: { event_id: string }) => event.event_id), ['$peer', '$owner']);
+  assert.deepEqual(data.senders, { '@agent-holmes:test.localhost': { kind: 'agent', owner: OBSERVER, displayName: null, ownerDisplayName: null, relationship: 'owners-agent' },
+    [OBSERVER]: { kind: 'human', displayName: null, relationship: 'owner' } });
+  assert.deepEqual(data.events.map((event: { eventId: string }) => event.eventId), ['$peer', '$owner']);
   const resolutions = fixture.requests.filter(request => request.path === '/api/principal-resolutions');
   assert.equal(resolutions.length, 1, JSON.stringify(resolutions.map(request => request.body)));
 }));

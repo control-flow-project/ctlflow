@@ -1,15 +1,15 @@
 use crossfire_adapter_http::NativeHttp;
 use crossfire_adapter_matrix::account::{Authority, Configuration};
-use crossfire_adapter_matrix::room_operations::Operations;
+use crossfire_adapter_runtime::room_operations::Operations;
 use crossfire_adapter_sqlite::store::{SharedStore, Store};
 use crossfire_contracts::{enrollment::Digest, identity::IntentHash};
 use crossfire_domain::{
     enrollment::{decide, exchange, introduce, values::*},
     identity::{Actor, Authentication, PrincipalKind, Status},
-    matrix::Membership,
+    messaging::Membership,
     port::{
-        AgentRepository, AuthorizationRepository, CoreRepository, CredentialRepository,
-        MatrixIdentity, RepositoryAccess,
+        AgentRepository, AuthorizationRepository, BackendUserIdentity, CoreRepository,
+        CredentialRepository, RepositoryAccess,
     },
     principal, registration,
     room_access::{
@@ -66,16 +66,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let prepared = PreparedDatabase::copy()?;
     let mut store = Store::open(prepared.path())?;
     let now = identity::now()?;
-    registration::initialize(&mut store, &input.owner, now)?;
+    registration::initialize(&mut store, &input.owner, "rust-owner", now)?;
     eprintln!("Native acceptance: initialized prepared management state");
     let owner = Actor {
         principal_id: store
-            .principal_by_matrix_id(&input.owner)?
+            .principal_by_backend_user_id(&input.owner)?
             .ok_or("Owner")?
             .id,
         kind: PrincipalKind::Human,
         authentication: Some(Authentication::Native {
-            matrix_user_id: input.owner.clone(),
+            backend_user_id: input.owner.clone(),
         }),
     };
     let repository = SharedStore::new(store);
@@ -86,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         server_name: input.server_name.clone(),
         jwt_secret: Secret::new(input.jwt_secret),
         registration_secret: Secret::new(input.registration_secret),
-        service_matrix_id: input.owner.clone(),
+        service_backend_user_id: input.owner.clone(),
     })?;
     let cancellation = CancellationToken::new();
     let http = NativeHttp::new(&input.origin, cancellation.clone())?;
@@ -97,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         enrollment_id: identity::id(),
         claim_secret: identity::secret()?,
         roster: Roster {
-            owner_matrix_id: input.owner.clone(),
+            owner_backend_user_id: input.owner.clone(),
             fleet_key: "native-fleet".to_owned(),
             controller: Controller {
                 name: "Native acceptance controller".to_owned(),
@@ -138,7 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &input_roster.enrollment_id,
             &decision,
             "native-approval",
-            &input.server_name,
+            &matrix,
             now + 2,
         )
     })?;
@@ -148,6 +148,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &input_roster.enrollment_id,
             &input_roster.claim_secret,
             now + 3,
+            &matrix,
         )
     })?;
     checks.require(
@@ -164,6 +165,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &input_roster.enrollment_id,
             &input_roster.claim_secret,
             clock.now()?,
+            &matrix,
         )
     })?;
     let account = ready.instances[0]
@@ -175,15 +177,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "real Conduit account reconciliation becomes ready",
     )?;
     checks.require(
-        crossfire_domain::port::MatrixIdentity::identify(&matrix, &account.access_token).await?
-            == account.matrix_user_id,
+        crossfire_domain::port::BackendUserIdentity::identify(&matrix, &account.access_token)
+            .await?
+            == account.user_id,
         "exchanged token belongs to the exact native agent",
     )?;
     checks.require(
-        matrix
-            .profile_name(&account.matrix_user_id)
-            .await?
-            .as_deref()
+        matrix.profile_name(&account.user_id).await?.as_deref()
             == Some("native-specialist (rust-owner)"),
         "native display name uses role and owner identity",
     )?;
@@ -195,7 +195,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         principal_id: agent.clone(),
         kind: PrincipalKind::Agent,
         authentication: Some(Authentication::Native {
-            matrix_user_id: account.matrix_user_id.clone(),
+            backend_user_id: account.user_id.clone(),
         }),
     };
     checks.require(
@@ -214,7 +214,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "repeating private conversation creation preserves its exact native room",
     )?;
     matrix
-        .verify_owner_conversation(&input.owner, &account.matrix_user_id, &private)
+        .verify_owner_conversation(&input.owner, &account.user_id, &private)
         .await?;
     checks.require(
         repository
@@ -236,7 +236,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("Created native room")?
         .to_owned();
     matrix
-        .invite(&input.owner, &group, &account.matrix_user_id)
+        .invite(&input.owner, &group, &account.user_id)
         .await?;
     checks.require(
         invitation::accept(
@@ -256,7 +256,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     checks.require(
         matrix
-            .membership(&input.owner, &account.matrix_user_id, &group)
+            .membership(&input.owner, &account.user_id, &group)
             .await?
             .membership
             == Membership::Join,
@@ -300,7 +300,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             clock: &clock,
             actor: &actor,
             group: &group,
-            user: &account.matrix_user_id,
+            user: &account.user_id,
             owner: &input.owner,
             outsider: &input.outsider,
         },
@@ -312,7 +312,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("Agent")?;
     let service = Service {
         repository: &repository,
-        matrix: &matrix,
+        messaging: &matrix,
         clock: &clock,
     };
     let removed = service
@@ -325,7 +325,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 expected_generation: Some(grant.generation.clone()),
                 intent: Intent {
                     access: Access::None,
-                    power: None,
+                    native_access: None,
                     muted: false,
                 },
             },
@@ -343,10 +343,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
     checks.require(
-        !matrix
-            .joined(&account.matrix_user_id)
-            .await?
-            .contains(&group),
+        !matrix.joined(&account.user_id).await?.contains(&group),
         "revoked native room access leaves the room",
     )?;
     checks.require(
@@ -404,16 +401,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 verification_code: reviewed.request.verification_code,
             },
             "native-rename",
-            &input.server_name,
+            &matrix,
             clock.now()?,
         )
     })?;
     principal::reconcile(&repository, &matrix, &operations, &clock, &hasher, &agent).await?;
     checks.require(
-        matrix
-            .profile_name(&account.matrix_user_id)
-            .await?
-            .as_deref()
+        matrix.profile_name(&account.user_id).await?.as_deref()
             == Some("native-renamed-high (rust-owner)"),
         "approved rename changes the actual native profile",
     )?;
@@ -469,6 +463,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &input_roster.enrollment_id,
             &input_roster.claim_secret,
             clock.now()?,
+            &matrix,
         )
         .is_err(),
         "revoked agent accounts cannot be exchanged",
@@ -479,7 +474,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     checks.require(
         matrix
-            .verify_owner_conversation(&input.outsider, &account.matrix_user_id, &private)
+            .verify_owner_conversation(&input.outsider, &account.user_id, &private)
             .await
             .is_err(),
         "unrelated users cannot adopt the private owner conversation",
@@ -492,16 +487,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .is_some_and(|error| error.code == crossfire_kernel::failure::ErrorCode::Unauthorized),
         "revoked native token cannot identify the agent",
     )?;
-    signup::run(
-        &repository,
-        &matrix,
-        &owner,
-        &input.server_name,
-        &input.owner,
-        &clock,
-        &mut checks,
-    )
-    .await?;
+    signup::run(&repository, &matrix, &owner, &clock, &mut checks).await?;
     matrix.close();
     operations.close();
     cancellation.cancel();

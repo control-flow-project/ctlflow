@@ -6,7 +6,9 @@ use crossfire_contracts::publication as wire;
 use crossfire_domain::publication::{read, values::Query};
 use crossfire_kernel::Result;
 use serde_json::json;
-pub fn create(context: &Context<'_>) -> Result<Reply> {
+pub fn create(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let input = wire::creation(&context.input)?;
     let value =
         context
@@ -15,7 +17,9 @@ pub fn create(context: &Context<'_>) -> Result<Reply> {
             .create(context.actor()?, &input, &context.request_id)?;
     reply::of(wire::details(&value))
 }
-pub fn list(context: &Context<'_>) -> Result<Reply> {
+pub fn list(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let page = context.query.page()?;
     let query = Query {
         page: page.page,
@@ -45,7 +49,9 @@ pub fn list(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::page(values, |value| Ok(wire::summary(value)))
 }
-pub fn read(context: &Context<'_>) -> Result<Reply> {
+pub fn read(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = context.with(|repo, now| {
         read::details(
             repo,
@@ -62,7 +68,9 @@ pub fn read(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::of(wire::details(&value))
 }
-pub async fn commit(context: &Context<'_>) -> Result<Reply> {
+pub async fn commit(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let revision = wire::mutation(&context.input)?;
     let value = context
         .state
@@ -76,7 +84,9 @@ pub async fn commit(context: &Context<'_>) -> Result<Reply> {
         .await?;
     reply::of(wire::details(&value))
 }
-pub fn delete(context: &Context<'_>) -> Result<Reply> {
+pub fn delete(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let revision = wire::mutation(&context.input)?;
     context.state.publications().delete(
         context.actor()?,

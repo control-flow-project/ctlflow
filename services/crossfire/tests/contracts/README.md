@@ -27,6 +27,7 @@ through the controller and installed CLI scenarios.
 | Room-scoped recovery | fleetd/tests/contracts/daemon.contract.ts | Actual Codex/Pi room histories, one completed room and another unfinished room; stop/resume retains exact histories and does not restart completed work or mix room input |
 | Upstream recovery | fleetd/tests/contracts/daemon.contract.ts | The actual server stops and restarts; the controller remains observable, closes unavailable delivery and reconnects without replacing histories or calling a model |
 | Controller operations | fleetd/tests/contracts/daemon.contract.ts | Declaration coverage, unknown-query/body refusal, roster CRUD, revision fences, idempotent operation replay, explicit update and stopped setup/unregistration |
+| Read-only diagnostics | fleetd/tests/contracts/daemon.contract.ts, fleet/tests/contracts/cli.contract.ts | Scoped authenticated reports, unchanged stop/history/configuration, inert provider checks, working state, absent credentials/controller and identical cross-target CLI access |
 | CLI and SSH | fleet/tests/contracts/cli.contract.ts | Both native engines; installed setup, per-agent/fleet start/stop/reset/update, replay, delivery, broadcast, daemon restart and host-key refusal |
 | Controller authentication | fleetd/tests/contracts/authentication.contract.ts | Mandatory bearer for every daemon operation, duplicate/wrong/missing key refusal, private initialization and browser-header denial |
 | Data interchange | server.contract.ts | Every selected implementation reopens the same SQLite file |

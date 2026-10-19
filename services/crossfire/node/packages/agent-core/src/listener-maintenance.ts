@@ -1,6 +1,7 @@
 import type { Coordination } from './coordination.js';
 import type { Clock, LocalState } from './port.js';
-import type { ReceivedEvent, Sync } from './receive.js';
+import type { ReceivedEvent } from './receive.js';
+import type { MessageFeed } from '@ctlflow/crossfire-domain/port/messaging-client';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 
 export function listenerMaintenance(options: { clock: Clock; interval: number; storage: LocalState; file: string; agentId: string; coordination: Coordination;
@@ -19,14 +20,14 @@ export function listenerMaintenance(options: { clock: Clock; interval: number; s
   }
   let requested = 0, checked = -1, lastCheck = -Infinity;
   return {
-    observe(sync: Sync): void {
-      if (Object.keys(sync.rooms?.invite ?? {}).length || Object.keys(sync.rooms?.leave ?? {}).length) requested++;
+    observe(sync: MessageFeed): void {
+      if (sync.invitations.length || sync.departedRooms.length) requested++;
     },
     notice(event: ReceivedEvent): void {
-      const identity = JSON.stringify([event.room_id, event.event_id]);
+      const identity = JSON.stringify([event.roomId, event.eventId]);
       if (notices.has(identity)) return;
       if (notices.size >= 10000) throw Object.assign(new Error('Pending blocked-mention notices exceed the bounded ordinary queue'), { code: 'unavailable' });
-      notices.set(identity, { room: event.room_id, event: event.event_id });
+      notices.set(identity, { room: event.roomId, event: event.eventId });
       save();
     },
     pending: () => notices.size > 0 || requested !== checked || options.clock.now() - lastCheck >= options.interval

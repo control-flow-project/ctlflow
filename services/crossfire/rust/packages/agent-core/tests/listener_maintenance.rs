@@ -1,8 +1,11 @@
+use crossfire_adapter_matrix::{
+    agent::Client,
+    protocol::{Protocol, Request, Response},
+};
 mod support;
 use crossfire_agent_core::{
     coordination::Coordination,
     listener_maintenance::{Maintenance, Options},
-    matrix::{Matrix, Request, Response},
 };
 use crossfire_contracts::{call::Call, operations::OperationId};
 use crossfire_kernel::Result;
@@ -23,12 +26,12 @@ impl Coordination for Network {
         Ok(json!({"accepted":true}))
     }
 }
-impl Matrix for Network {
+impl Protocol for Network {
     async fn request(&self, input: &Request, _stop: CancellationToken) -> Result<Response> {
         assert_eq!(input.path, "/_matrix/client/v3/sync");
         Ok(Response {
             status: 200,
-            body: json!({"rooms":{"invite":{"!invited:local":{}}}}),
+            body: json!({"next_batch":"invitation-cursor","rooms":{"invite":{"!invited:local":{"invite_state":{"events":[{"type":"m.room.member","state_key":"@agent:local","sender":"@owner:local","content":{"membership":"invite"}}]}}}}}),
         })
     }
 }
@@ -49,12 +52,18 @@ async fn invitation_uses_the_canonical_body_not_an_undeclared_path_parameter()
     )?;
     assert!(
         maintenance
-            .publish(network.as_ref(), CancellationToken::new())
+            .publish(
+                &Client::from_protocol(network.clone(), "@agent:local")?,
+                CancellationToken::new()
+            )
             .await?
     );
     assert!(
         !maintenance
-            .publish(network.as_ref(), CancellationToken::new())
+            .publish(
+                &Client::from_protocol(network.clone(), "@agent:local")?,
+                CancellationToken::new()
+            )
             .await?
     );
     assert_eq!(network.0.lock().map_err(|_| support::failure())?.len(), 1);

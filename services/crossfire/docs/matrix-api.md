@@ -85,6 +85,6 @@ Current source owners are under `node/packages/adapter-matrix/`;
 request safety is not a second protocol schema.
 
 - [Operation catalog](../node/packages/adapter-matrix/src/operations.json)
-- [Matrix specification license](../node/packages/agent-tools/assets/matrix-spec-LICENSE.txt)
+- [Matrix specification license](../node/packages/agent-tools/assets/messaging-LICENSE.txt)
 - [History and reset](history.md)
 - [Runtime interruption](runtime.md)

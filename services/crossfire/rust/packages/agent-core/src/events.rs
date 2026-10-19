@@ -1,24 +1,10 @@
 use crossfire_contracts::validation as check;
+use crossfire_domain::messaging_client::{
+    EventType, MessageContent, MessageEvent, MessageKind, OriginKind, RoomOrigin,
+};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, time::iso_timestamp};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum Kind {
-    Unknown,
-    Dm,
-    Room,
-}
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct Origin {
-    pub kind: Kind,
-    #[serde(deserialize_with = "crossfire_kernel::data::required_option")]
-    pub name: Option<String>,
-    #[serde(deserialize_with = "crossfire_kernel::data::required_option")]
-    pub alias: Option<String>,
-}
+use serde_json::json;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ContentFile {
@@ -29,19 +15,19 @@ pub struct ContentFile {
     pub attachment_bytes: i64,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Event {
     pub room_id: String,
-    pub origin: Origin,
+    pub origin: RoomOrigin,
     pub event_id: String,
     pub sender: String,
     #[serde(rename = "type")]
-    pub kind: String,
-    pub content: Value,
+    pub kind: EventType,
+    pub content: MessageContent,
     #[serde(deserialize_with = "crossfire_kernel::data::required_option")]
     pub timestamp: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub state_key: Option<String>,
+    #[serde(deserialize_with = "crossfire_kernel::data::required_option")]
+    pub subject_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub omitted: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -50,95 +36,73 @@ pub struct Event {
 pub fn invalid(message: &str) -> Failure {
     Failure::new(ErrorCode::Invalid, message)
 }
-pub fn notice(value: &Value) -> bool {
-    value.get("type").and_then(Value::as_str) == Some("m.room.message")
-        && notice_content(&value["content"])
+pub fn notice(value: &MessageEvent) -> bool {
+    value.event_type == EventType::Message && notice_content(&value.content)
 }
-pub fn notice_content(value: &Value) -> bool {
-    value.get("msgtype").and_then(Value::as_str) == Some("m.notice")
-        && value
-            .get("org.crossfire.listener_notice")
-            .and_then(Value::as_bool)
-            == Some(true)
+pub fn notice_content(value: &MessageContent) -> bool {
+    value.kind == MessageKind::Notice && value.control
 }
-pub fn view(value: &Value, room: &str) -> Result<Event> {
+pub fn view(value: &MessageEvent, room: &str) -> Result<Event> {
     take(value.clone(), room)
 }
-pub fn take(mut value: Value, room: &str) -> Result<Event> {
-    let field = |name: &str| {
-        value
-            .get(name)
-            .ok_or_else(|| invalid("Missing native event field"))
-    };
-    let event_id = check::event_id(field("event_id")?)?;
-    let sender = check::matrix_user_id(field("sender")?)?.to_owned();
-    let kind = check::text(field("type")?, 1, 255)?.to_owned();
-    let timestamp = value
-        .get("origin_server_ts")
-        .map(|value| {
-            iso_timestamp(check::integer(
-                value,
-                -crossfire_kernel::time::MAX_TIMESTAMP,
-                crossfire_kernel::time::MAX_TIMESTAMP,
-            )?)
-        })
-        .transpose()?;
-    let state_key = value
-        .get("state_key")
-        .map(|value| {
-            value
-                .as_str()
-                .map(str::to_owned)
-                .ok_or_else(|| invalid("Invalid state key"))
-        })
-        .transpose()?;
-    let mut content = match value
-        .as_object_mut()
-        .and_then(|fields| fields.remove("content"))
-    {
-        Some(Value::Object(content)) => content,
-        _ => return Err(invalid("Invalid native event content")),
-    };
-    let omitted = if content.get("body").is_some_and(Value::is_string)
-        && content.remove("formatted_body").is_some()
-    {
-        Some(vec!["content.formatted_body".to_owned()])
-    } else {
-        None
-    };
+pub fn take(value: MessageEvent, room: &str) -> Result<Event> {
+    if value.room_id != room {
+        return Err(invalid("Message belongs to another room"));
+    }
     let result = Event {
-        room_id: check::room_id(&json!(room))?,
-        origin: Origin {
-            kind: Kind::Unknown,
+        room_id: room.to_owned(),
+        origin: RoomOrigin {
+            kind: OriginKind::Unknown,
             name: None,
             alias: None,
         },
-        event_id,
-        sender,
-        kind,
-        content: Value::Object(content),
-        timestamp,
-        state_key,
-        omitted,
+        event_id: value.event_id,
+        sender: value.sender,
+        kind: value.event_type,
+        content: value.content,
+        timestamp: value.sent_at.map(iso_timestamp).transpose()?,
+        subject_id: value.subject_id,
+        omitted: value.omitted,
         content_file: None,
     };
     result.validate()?;
     Ok(result)
 }
+pub fn validate_content(content: &MessageContent) -> Result<()> {
+    if content.mentions.len() > 2000 || content.attachments.len() > 1000 {
+        return Err(invalid("Excessive message metadata"));
+    }
+    for identity in &content.mentions {
+        check::backend_user_id(&json!(identity))?;
+    }
+    for file in &content.attachments {
+        check::text(&json!(file.id), 1, 4096)?;
+        if let Some(name) = &file.name {
+            check::text(&json!(name), 0, 4096)?;
+        }
+        if let Some(media_type) = &file.media_type {
+            check::text(&json!(media_type), 1, 255)?;
+        }
+        if let Some(bytes) = file.bytes {
+            check::integer(&json!(bytes), 0, check::SAFE_INTEGER)?;
+        }
+    }
+    Ok(())
+}
 impl Event {
     pub fn validate(&self) -> Result<()> {
         check::room_id(&json!(self.room_id))?;
         check::event_id(&json!(self.event_id))?;
-        check::matrix_user_id(&json!(self.sender))?;
-        check::text(&json!(self.kind), 1, 255)?;
-        if !self.content.is_object() {
-            return Err(invalid("Invalid retained event content"));
+        check::backend_user_id(&json!(self.sender))?;
+        validate_content(&self.content)?;
+        if let Some(subject) = &self.subject_id {
+            check::text(&json!(subject), 0, 255)?;
         }
         if let Some(name) = &self.origin.name {
             check::plain_text(&json!(name), 16000)?;
         }
         if let Some(alias) = &self.origin.alias {
-            check::text(&json!(alias), 1, 4096)?;
+            check::text(&json!(alias), 1, 255)?;
         }
         if let Some(timestamp) = &self.timestamp {
             validate_timestamp(timestamp)?;
@@ -148,7 +112,7 @@ impl Event {
                 return Err(invalid("Excessive omitted fields"));
             }
             for field in omitted {
-                check::text(&json!(field), 1, 4096)?;
+                check::text(&json!(field), 1, 255)?;
             }
         }
         if let Some(file) = &self.content_file {

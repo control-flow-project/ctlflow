@@ -14,7 +14,7 @@ public sealed class ChatPublication
     private const int MaximumJournal = 134217728;
     private readonly LocalState storage;
     private readonly string file;
-    private readonly AgentSettings settings;
+    private readonly ClientSettings settings;
     private readonly RuntimeConnection runtime;
     private readonly NativeHistoryMode mode;
     private readonly Func<int> maximum;
@@ -26,7 +26,7 @@ public sealed class ChatPublication
     private readonly Action<IReadOnlyList<ReceivedEvent>> traffic;
     private Plan? plan;
     private int operating;
-    public ChatPublication(LocalState storage, string file, AgentSettings settings, RuntimeConnection runtime, NativeHistoryMode mode, Func<int> maximum, MessageArtifacts artifacts,
+    public ChatPublication(LocalState storage, string file, ClientSettings settings, RuntimeConnection runtime, NativeHistoryMode mode, Func<int> maximum, MessageArtifacts artifacts,
         Func<ReceivedEvent, bool> admit, Func<string, string, ValueTask<Result<Unit>>> delivered, Action<int> count, Action<IReadOnlyList<ReceivedEvent>> traffic, InputPriority? priority = null)
     {
         this.storage = storage; this.file = file; this.settings = settings; this.runtime = runtime; this.mode = mode; this.maximum = maximum; this.artifacts = artifacts; this.admit = admit; this.delivered = delivered; this.count = count; this.traffic = traffic; this.priority = priority;
@@ -67,7 +67,7 @@ public sealed class ChatPublication
     private List<Step> Steps(IReadOnlyList<ReceivedEvent> events, IReadOnlyList<PrincipalIdentity> identities, IReadOnlyList<ReceivedEvent> records)
     {
         var positions = records.Select((value, index) => (value.RoomId, value.EventId, Index: index)).ToDictionary(value => (value.RoomId, value.EventId), value => value.Index);
-        return ChatBatches.Prepare(events, settings, identities.ToDictionary(value => value.MatrixUserId, StringComparer.Ordinal), maximum(), mode, artifacts)
+        return ChatBatches.Prepare(events, settings, identities.ToDictionary(value => value.BackendUserId, StringComparer.Ordinal), maximum(), mode, artifacts)
             .Select(batch => new Step(batch.Events.Select(value => positions[(value.RoomId, value.EventId)]).ToArray(), batch.Text, batch.MessageId, batch.Room, null, "prepared")).ToList();
     }
     public Result<Unit> Prepare(ReadBatch batch, IReadOnlyList<ReceivedEvent> events, IReadOnlyDictionary<string, PrincipalIdentity> identities)
@@ -97,7 +97,7 @@ public sealed class ChatPublication
             var step = plan.Steps[index]; if (step.Status != "publishing") continue; var selected = await Target(step, cancellation); if (!selected.IsSuccess) return Result<PublicationOutcome?>.Fail(selected.Error);
             if (selected.Value.SessionId != step.Session) return Results.Fail<PublicationOutcome?>("conflict", "Original pending history is unavailable; input was not retargeted");
             var received = await selected.Value.Recover(step.Text, step.Id, cancellation); if (!received.IsSuccess) return Result<PublicationOutcome?>.Fail(received.Error);
-            plan.Steps[index] = step with { Status = received.Value ? "delivered" : "prepared" }; Save(); if (received.Value) { var events = StepEvents(step); count(events.Count(value => value.Type == "m.room.message")); traffic(events); }
+            plan.Steps[index] = step with { Status = received.Value ? "delivered" : "prepared" }; Save(); if (received.Value) { var events = StepEvents(step); count(events.Count(value => value.Type == "message")); traffic(events); }
         }
         return Result<PublicationOutcome?>.Success(Outcome(allowed));
     });
@@ -114,14 +114,14 @@ public sealed class ChatPublication
             if (step.Status == "publishing")
             {
                 var received = await target.Recover(step.Text, step.Id, cancellation); if (!received.IsSuccess) return Result<PublicationOutcome?>.Fail(received.Error);
-                if (received.Value) { plan.Steps[index] = step with { Status = "delivered" }; Save(); count(events.Count(value => value.Type == "m.room.message")); traffic(events); continue; }
+                if (received.Value) { plan.Steps[index] = step with { Status = "delivered" }; Save(); count(events.Count(value => value.Type == "message")); traffic(events); continue; }
             }
             remaining = events.Where(value => allowed.Contains(value.RoomId) && admit(value)).ToArray(); if (remaining.Length != events.Count) { Replace(index, step, remaining); index--; continue; }
             if (priority is not null) { var settled = await target.Settle(cancellation); if (!settled.IsSuccess) return Result<PublicationOutcome?>.Fail(settled.Error); }
             step = step with { Session = target.SessionId, Status = "publishing" }; plan.Steps[index] = step; Save();
             var published = await target.Deliver(step.Text, step.Id, cancellation, priority); if (!published.IsSuccess) return Result<PublicationOutcome?>.Fail(published.Error);
-            plan.Steps[index] = step with { Status = "delivered" }; Save(); count(events.Count(value => value.Type == "m.room.message")); traffic(events);
-            var room = events.LastOrDefault(value => value.Type == "m.room.message")?.RoomId; if (room is not null) { var noted = await delivered(room, target.SessionId); if (!noted.IsSuccess) return Result<PublicationOutcome?>.Fail(noted.Error); }
+            plan.Steps[index] = step with { Status = "delivered" }; Save(); count(events.Count(value => value.Type == "message")); traffic(events);
+            var room = events.LastOrDefault(value => value.Type == "message")?.RoomId; if (room is not null) { var noted = await delivered(room, target.SessionId); if (!noted.IsSuccess) return Result<PublicationOutcome?>.Fail(noted.Error); }
         }
         return Result<PublicationOutcome?>.Success(Outcome(allowed));
     });

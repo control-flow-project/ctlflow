@@ -1,7 +1,7 @@
 use crate::{
     authorization::authorize,
     identity::{Actor, Status},
-    matrix::MatrixAuthority,
+    messaging::MessagingAuthority,
     permission::Permission,
     port::{AgentRepository, DiscoveryRepository, RepositoryAccess, UnitOfWork},
     room_access::{port::RoomRepository, values::Access},
@@ -28,7 +28,7 @@ impl State {
 pub struct Notice {
     pub receiver_agent_id: String,
     pub event_id: String,
-    pub sender_matrix_id: String,
+    pub sender_backend_user_id: String,
     pub room_id: String,
     pub reserved_at: i64,
     pub message_body: String,
@@ -39,7 +39,7 @@ pub struct Notice {
     pub last_error: Option<String>,
 }
 pub trait NoticeRepository: RoomRepository + DiscoveryRepository {
-    fn wake_notice(&mut self, agent: &str, event: &str) -> Result<Option<Notice>>;
+    fn wake_notice(&mut self, agent: &str, room: &str, event: &str) -> Result<Option<Notice>>;
     fn recent_notice(&mut self, agent: &str, sender: &str, since: i64) -> Result<bool>;
     fn save_wake_notice(&mut self, notice: &Notice, insert: bool) -> Result<()>;
     fn due_wake_notices(&mut self, now: i64) -> Result<Vec<Notice>>;
@@ -50,9 +50,9 @@ pub struct Input<'a> {
     pub room: &'a str,
     pub event: &'a str,
 }
-pub async fn request<A: RepositoryAccess, M: MatrixAuthority, C: Clock>(
+pub async fn request<A: RepositoryAccess, M: MessagingAuthority, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     clock: &C,
     input: Input<'_>,
 ) -> Result<&'static str>
@@ -75,8 +75,8 @@ where
         repo.agent_view(input.receiver)?
             .ok_or_else(|| Failure::new(ErrorCode::Missing, "Receiving agent not found"))
     })?;
-    let event = matrix
-        .event(&target.principal.matrix_user_id, input.room, input.event)
+    let event = messaging
+        .event(&target.principal.backend_user_id, input.room, input.event)
         .await?;
     repository.with(|repo| {
         repo.transaction(|repo| {
@@ -85,17 +85,17 @@ where
             let target = repo
                 .agent_view(input.receiver)?
                 .ok_or_else(|| Failure::new(ErrorCode::Missing, "Receiving agent not found"))?;
-            if let Some(previous) = repo.wake_notice(input.receiver, input.event)? {
+            if let Some(previous) = repo.wake_notice(input.receiver, input.room, input.event)? {
                 return Ok(previous.state.as_str());
             }
             if event.event_id != input.event
                 || event.room_id != input.room
-                || event.event_type != "m.room.message"
-                || event.message_type.as_deref() != Some("m.text")
+                || event.event_type != "message"
+                || event.message_type.as_deref() != Some("text")
                 || event.edited
                 || event.control
-                || event.sender_matrix_id == target.principal.matrix_user_id
-                || !event.mentions.contains(&target.principal.matrix_user_id)
+                || event.sender_backend_user_id == target.principal.backend_user_id
+                || !event.mentions.contains(&target.principal.backend_user_id)
             {
                 return Ok("not-applicable");
             }
@@ -107,12 +107,12 @@ where
             {
                 return Ok("not-permitted");
             }
-            if wake::resolve(repo, &target.agent)?.contains(&event.sender_matrix_id) {
+            if wake::resolve(repo, &target.agent)?.contains(&event.sender_backend_user_id) {
                 return Ok("not-applicable");
             }
             if repo.recent_notice(
                 input.receiver,
-                &event.sender_matrix_id,
+                &event.sender_backend_user_id,
                 now.saturating_sub(COOLDOWN_MS),
             )? {
                 return Ok("rate-limited");
@@ -122,15 +122,15 @@ where
             })?;
             let body = format!(
                 "{}, {name} won’t wake under its current rules. {} ({}) can change them.",
-                event.sender_matrix_id,
+                event.sender_backend_user_id,
                 target.owner_member.display_name,
-                target.owner.matrix_user_id
+                target.owner.backend_user_id
             );
             repo.save_wake_notice(
                 &Notice {
                     receiver_agent_id: input.receiver.to_owned(),
                     event_id: input.event.to_owned(),
-                    sender_matrix_id: event.sender_matrix_id,
+                    sender_backend_user_id: event.sender_backend_user_id,
                     room_id: input.room.to_owned(),
                     reserved_at: now,
                     message_body: body,
@@ -146,18 +146,19 @@ where
         })
     })
 }
-pub async fn publish<A: RepositoryAccess, M: MatrixAuthority, C: Clock>(
+pub async fn publish<A: RepositoryAccess, M: MessagingAuthority, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     clock: &C,
     agent: &str,
+    room: &str,
     event: &str,
 ) -> Result<()>
 where
     A::Repository: NoticeRepository,
 {
     let Some(notice) = repository
-        .with(|repo| repo.wake_notice(agent, event))?
+        .with(|repo| repo.wake_notice(agent, room, event))?
         .filter(|notice| notice.state == State::Pending)
     else {
         return Ok(());
@@ -184,7 +185,7 @@ where
                 "The receiver no longer permits a room notice",
             )
         })?;
-        if wake::resolve(repo, &target.agent)?.contains(&notice.sender_matrix_id)
+        if wake::resolve(repo, &target.agent)?.contains(&notice.sender_backend_user_id)
             && notice.last_error.is_none()
         {
             return Err(Failure::new(
@@ -192,17 +193,17 @@ where
                 "The sender now has wake authority",
             ));
         }
-        Ok(target.principal.matrix_user_id)
+        Ok(target.principal.backend_user_id)
     });
     let result = match recipient {
         Ok(user) => {
-            matrix
+            messaging
                 .send_notice(
                     &user,
                     &notice.room_id,
-                    &identity::hash(&format!("wake-notice:{agent}:{event}")),
+                    &identity::hash(&["wake-notice", agent, room, event].join("\0")),
                     &notice.message_body,
-                    &notice.sender_matrix_id,
+                    &notice.sender_backend_user_id,
                 )
                 .await
         }
@@ -211,7 +212,7 @@ where
     repository.with(|repo| {
         repo.transaction(|repo| {
             let Some(mut current) = repo
-                .wake_notice(agent, event)?
+                .wake_notice(agent, room, event)?
                 .filter(|notice| notice.state == State::Pending)
             else {
                 return Ok(());

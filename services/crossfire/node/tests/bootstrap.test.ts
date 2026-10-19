@@ -2,11 +2,12 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { conduitFixture } from "../scripts/architecture-proof/conduit-fixture.js";
-import { bootstrap } from "../apps/server/src/bootstrap.js";
+import { bootstrap } from "@ctlflow/crossfire-adapter-matrix/bootstrap";
 import { authority } from "@ctlflow/crossfire-adapter-matrix/account/authority";
 import { secret } from "./support/application.js";
-import { serviceUser } from '../apps/server/src/config.js';
-import { API } from '@ctlflow/crossfire-contracts/matrix';
+import { serviceUser } from '@ctlflow/crossfire-adapter-matrix/config';
+import { matrixSettings } from './support/matrix-config.js';
+import { API } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { nativeOk, nativeRequest } from '@ctlflow/crossfire-adapter-matrix/http';
 import type { Config } from "../apps/server/src/config.js";
 import type { Result } from "@ctlflow/crossfire-kernel/result";
@@ -19,11 +20,13 @@ function value<T>(result: Result<T>): T {
 test("private service bootstrap survives a human password change without resetting or adopting native authority", { timeout: 120_000 }, async scope => {
   const jwtSecret = secret();
   const fixture = await conduitFixture(scope, { jwtSecret });
-  const config: Config = { instance: "bootstrap", serverName: "architecture.localhost", publicOrigin: "http://127.0.0.1",
-    contentOrigin: 'http://localhost', matrixOrigin: fixture.base, administrator: "@admin:architecture.localhost", registrationSecret: fixture.registrationToken, jwtSecret };
+  const config: Config = { instance: "bootstrap", publicOrigin: "http://127.0.0.1", contentOrigin: 'http://localhost',
+    messaging: { type: 'matrix', parameters: { serverName: 'architecture.localhost', origin: fixture.base, registrationSecret: fixture.registrationToken, jwtSecret } },
+    administrator: "@admin:architecture.localhost" };
   const credentials = { servicePassword: secret(), administratorPassword: secret() };
-  value(await bootstrap(config, credentials));
-  const native = authority({ ...config, serviceMatrixId: serviceUser(config) });
+  const configuration = { ...matrixSettings(config), instance: config.instance, administrator: config.administrator };
+  value(await bootstrap(configuration, credentials));
+  const native = authority({ ...configuration, serviceBackendUserId: serviceUser(config.instance, configuration) });
   cleanup(scope, () => native.close());
   const human = value(await native.provision(config.administrator, credentials.administratorPassword, "CROSSFIRE_HUMAN"));
   const client = { base: fixture.base, token: human.access_token };
@@ -37,7 +40,7 @@ test("private service bootstrap survives a human password change without resetti
       identifier: { type: "m.id.user", user: human.user_id }, password: credentials.administratorPassword } }));
   const devices = value(await nativeOk(client, "GET", API + "/devices")).devices;
   assert(Array.isArray(devices));
-  value(await bootstrap(config, credentials));
+  value(await bootstrap(configuration, credentials));
   const after = value(await nativeOk(client, "GET", API + "/devices")).devices;
   assert(Array.isArray(after));
   const ids = (entries: typeof devices) => entries.map(device => {
@@ -50,5 +53,5 @@ test("private service bootstrap survives a human password change without resetti
   }));
   assert.equal(old.status, 403);
   assert.equal(value(await native.identify(value(await native.provision(human.user_id, password, "CROSSFIRE_HUMAN")).access_token)), human.user_id);
-  assert.equal((await bootstrap({ ...config, instance: "unrelated" }, credentials)).ok, false);
+  assert.equal((await bootstrap({ ...configuration, instance: "unrelated" }, credentials)).ok, false);
 });

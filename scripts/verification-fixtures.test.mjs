@@ -4,12 +4,12 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { verificationFixtures } from './verification-fixtures.mjs';
 
-test('verification uses a short private directory independent of checkout and ambient temporary roots', () => {
+test('verification uses a short private var-tmp directory independent of checkout and ambient temporary roots', () => {
   const previous = process.env.TMPDIR;
   process.env.TMPDIR = '/nonexistent/' + 'long-checkout-name-'.repeat(20);
   const fixtures = verificationFixtures();
   try {
-    assert.match(fixtures.directory, /^\/tmp\/cf-[A-Za-z0-9]+$/u);
+    assert.match(fixtures.directory, /^\/var\/tmp\/cf-[A-Za-z0-9]+$/u);
     assert.equal(statSync(fixtures.directory).mode & 0o777, 0o700);
     for (const key of ['TMPDIR', 'TMP', 'TEMP']) assert.equal(process.env[key], fixtures.directory);
     const controller = join(fixtures.directory, 'fleet-public-install-123456/controller');

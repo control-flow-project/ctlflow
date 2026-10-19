@@ -12,6 +12,7 @@ import { success } from '@ctlflow/crossfire-kernel/result';
 test('delivery revisions close input until the matching snapshot without replacing authenticated reporting', async scope => {
   const fleetId = randomUUID(), agentId = randomUUID(), held = new Set<ServerResponse>(), errors: unknown[] = [];
   let revision = 0, enabled = true, initialized = false;
+  let holdReceipt = true, receiptEntered = false;
   const view = () => ({ fleetId, revision, deliveryEnabled: enabled, connection: { status: 'online', lastSeenAt: Date.now() } });
   function reply(response: ServerResponse, snapshot = false): void {
     response.writeHead(200, { 'Content-Type': 'application/json' });
@@ -24,6 +25,12 @@ test('delivery revisions close input until the matching snapshot without replaci
       if (request.method === 'PUT') {
         const chunks: Buffer[] = []; for await (const chunk of request) chunks.push(Buffer.from(chunk));
         const body: unknown = JSON.parse(Buffer.concat(chunks).toString());
+        if (url.pathname.endsWith('/deliveries/' + agentId)) {
+          assert(operations.acknowledgeFleetMessage.input(body).ok);
+          receiptEntered = true;
+          if (!holdReceipt) { response.writeHead(200, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ data: { recorded: true }, meta: { requestId: randomUUID() } })); }
+          return;
+        }
         if (url.pathname.endsWith('/delivery')) {
           const parsed = operations.changeFleetDelivery.input(body); assert(parsed.ok);
           assert.equal(parsed.value.expectedRevision, revision); enabled = parsed.value.enabled; revision++;
@@ -44,10 +51,17 @@ test('delivery revisions close input until the matching snapshot without replaci
   const listener = connection.listener(agentId);
   await until(() => listener.control.current().active && held.size > 0);
   const original = listener.control.current();
+  const messageId = 'fleet-' + randomUUID() + '-' + agentId;
+  const receipt = assert.rejects(listener.control.acknowledge(messageId, 'delivered', null, original.signal));
+  await until(() => receiptEntered);
   const paused = await connection.delivery({ expectedRevision: 0, enabled: false }); assert(paused.ok);
+  await receipt;
   assert.equal(listener.control.current().connected, true); assert.equal(listener.control.current().active, false);
   assert.equal(original.connection.aborted, false); assert.equal(original.signal.aborted, true);
   assert.equal(listener.control.current().connection, original.connection);
+  holdReceipt = false;
+  await listener.control.acknowledge(messageId, 'delivered', null, scope.signal);
+  assert.equal(original.connection.aborted, false, 'A cancelled message receipt cannot disconnect authenticated reporting');
   const resumed = await connection.delivery({ expectedRevision: 1, enabled: true }); assert(resumed.ok);
   assert.equal(listener.control.current().connected, true); assert.equal(original.connection.aborted, false);
   assert.equal(listener.control.current().active, false, 'New input still requires the current delivery revision');

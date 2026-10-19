@@ -1,3 +1,4 @@
+using Crossfire.Domain;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AgentCore;
@@ -21,7 +22,7 @@ public sealed class ResumeFiles
             if (!PrivateFiles.Exists(file)) return Result<IReadOnlyList<ResumeWork>>.Success([]); var parsed = Validation.List(WireJson.Parse(PrivateFiles.Read(file, 2097152)), value =>
             {
                 if (!Validation.Fields(value, ["context", "sessionId", "messageId", "checkpointedAt"]).IsSuccess) return Results.Fail<ResumeWork>("invalid", "Invalid interrupted-work checkpoint");
-                var context = Validation.Text(value.GetProperty("context"), 255); var session = Validation.Text(value.GetProperty("sessionId"), 200); var id = WireJson.Text(value, "messageId"); var at = Validation.Integer(value.GetProperty("checkpointedAt"), 0, 8640000000000000);
+                var context = Validation.Text(value.GetProperty("context"), HistoryContext.MaximumLength); var session = Validation.Text(value.GetProperty("sessionId"), 200); var id = WireJson.Text(value, "messageId"); var at = Validation.Integer(value.GetProperty("checkpointedAt"), 0, 8640000000000000);
                 return context.IsSuccess && session.IsSuccess && id is not null && Validation.Identifier(id) && at.IsSuccess ? Result<ResumeWork>.Success(new(context.Value, session.Value, id, at.Value)) : Results.Fail<ResumeWork>("invalid", "Invalid interrupted-work evidence");
             }, 2002); return parsed.IsSuccess && (parsed.Value.Select(value => value.Context).Distinct().Count() != parsed.Value.Count || parsed.Value.Select(value => value.MessageId).Distinct().Count() != parsed.Value.Count) ? Results.Fail<IReadOnlyList<ResumeWork>>("invalid", "Duplicate interrupted native history") : parsed;
         }

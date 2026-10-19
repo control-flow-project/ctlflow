@@ -12,6 +12,9 @@ replace it or establish another set of externally observable expectations.
 The shared native question flow includes upstream reconnection, pending decisions
 across delivery pause and new native questions while chat admission remains
 paused. Answers must reach the exact original native tool request and history.
+Read-only diagnostics must not start, resume, interrupt or answer native work.
+Invitation cases verify owner-invited agents, same-owner/cross-owner collaborators,
+native authority, explicit delegation and removal limited to one's own additions.
 
 ## Targets
 
@@ -58,8 +61,8 @@ product deadlines or the finite target/overall test timeouts.
 
 The operator/package matrix is distributed across those workers: each selected
 operator runs every backend package once. Four target workers therefore verify
-all 16 ordered operator/backend pairs, not 64 duplicate executions. Each worker
-asserts its operator identity and records the backend identities after successful
+all 16 ordered operator/implementation pairs, not 64 duplicate executions. Each worker
+asserts its operator identity and records the implementation identities after successful
 image, readiness and API checks. No unique pair or behavioral assertion is
 omitted; each worker still runs the complete other container/recovery scenarios.
 
@@ -81,10 +84,11 @@ omitted; each worker still runs the complete other container/recovery scenarios.
 | CLI/transport | Both native engines; exact daemon ownership handoff, noninteractive setup, per-agent/fleet resume/reset/update, messages, delivery, restart and strict SSH host verification |
 | CLI/controller interoperability | Every selected CLI reads every selected controller through the same private authenticated API; all 16 ordered four-target pairs run |
 | Containers | Actual images/operators, Element room/media, same-file backend changes, concurrent starts and owned orphan recovery |
-| Data | Knex initialization, historical conversion, rollback, unsupported-schema rejection and same-file access |
+| Data | One current Knex initial schema, constraints, transaction rollback, verified backups and same-file access |
 
 - [Scenario inventory](../../services/crossfire/tests/contracts/README.md)
 - [Cross-runtime performance and offline reports](performance.md)
+- [Messaging separation and diagnostics verification](20261019-messaging-separation-diagnostics.md)
 
 An operation response check is not proof of every possible business-state
 combination. Internal suites cover additional failure injection and state
@@ -118,6 +122,11 @@ Tests own and dispose separate directories, SQLite/RocksDB stores, native homes,
 browser contexts, sockets and exact container IDs. Inactive generated assets are
 removed after their last use. No production state or shared image is a cleanup
 target.
+
+The combined coordinator uses short private `/var/tmp/cf-` directories so Unix
+socket paths do not grow with the checkout path. This also avoids the local
+inode-constrained `/tmp` tmpfs. Keep adequate free bytes and inodes on the fixture
+filesystem; a failed resource allocation is a failed gate, not a passing retry.
 
 - [Resource limits and development commands](../development.md)
 - [Current issue correction record](20261015-outside-review-fixes.md)

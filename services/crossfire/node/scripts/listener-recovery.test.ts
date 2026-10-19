@@ -34,10 +34,10 @@ test("one bounded reconciliation receiver recovers missed notifications and impo
   await clock.until(() => readJson<Record<string, string>>(matrix.cursorFile)[ROOM] === "4");
   const ids = starts().flatMap(request => {
     const input = request.params!.input as { text: string }[];
-    const batch = JSON.parse(input[0]!.text.slice(input[0]!.text.indexOf("\n") + 1)) as { events: { event_id: string; state_key?: string }[] };
+    const batch = JSON.parse(input[0]!.text.slice(input[0]!.text.indexOf("\n") + 1)) as { events: { eventId: string; subjectId: string | null }[] };
     assert(batch.events.length > 0 && batch.events.length <= 2);
-    for (const event of batch.events.filter(event => event.event_id !== "$missed")) assert.equal(event.state_key, "");
-    return batch.events.map(event => event.event_id);
+    for (const event of batch.events.filter(event => event.eventId !== "$missed")) assert.equal(event.subjectId, "");
+    return batch.events.map(event => event.eventId);
   });
   assert.deepEqual(ids, ["$missed", "$rename", "$topic"]);
   assert.equal(starts().length, 3);

@@ -39,7 +39,7 @@ export async function resourceContracts(scope: TestContext, fixture: ContractSta
     const session = await fixture.data(operations.currentSession, {}, undefined, member); assert.equal(record(session.member).displayName, 'Resource member É');
     await fixture.operation(operations.endSession, {}, {}, member); contractError(await fixture.raw('/api/sessions/current', 'GET', undefined, fixture.headers(member)), 401, 'unauthorized');
     const enrollment = await fixture.data(operations.enrollment, { enrollmentId: agent.enrollmentId }); assert.equal(record(enrollment.enrollment).status, 'approved');
-    await fixture.operation(operations.preflight, {}, { ownerMatrixId: fixture.owner.matrixUserId, fleetKey: 'availability-only', controller: { name: 'Availability only' }, instances: [{ instanceKey: 'available-name', name: 'available-name', coordinationPolicy: { wakeMode: 'selected', senders: [], permissions: [] } }] });
+    await fixture.operation(operations.preflight, {}, { ownerBackendUserId: fixture.owner.backendUserId, fleetKey: 'availability-only', controller: { name: 'Availability only' }, instances: [{ instanceKey: 'available-name', name: 'available-name', coordinationPolicy: { wakeMode: 'selected', senders: [], permissions: [] } }] });
     const policy = await fixture.data(operations.policy), { revision, ...values } = policy;
     await fixture.operation(operations.changePolicy, {}, { expectedRevision: integer(revision), ...values }); await fixture.operation(operations.audit);
   });
@@ -101,7 +101,7 @@ export async function resourceContracts(scope: TestContext, fixture: ContractSta
   const created = await contractHttp(fixture.native.base, 'POST', '/_matrix/client/v3/createRoom', { name: 'Resource contracts' }, nativeHeaders); assert.equal(created.status, 200); const roomId = text(record(created.body).room_id), roomParams = { ...params, roomId };
   await scope.test('room plans, desired access, native application, delegation and provenance-only removal', async () => {
     await fixture.operation(operations.rooms); await fixture.operation(operations.room, { roomId });
-    const plan = { fleetId: agent.fleetId, agents: [{ instanceKey: agent.name, grants: [{ roomId, accessMode: 'reply', powerLevel: null, muted: false }] }] };
+    const plan = { fleetId: agent.fleetId, agents: [{ instanceKey: agent.name, grants: [{ roomId, accessMode: 'reply', nativeAccess: null, muted: false }] }] };
     const preview = await fixture.data(operations.previewGrants, {}, { plan }); assert.equal(list(preview.changes).length, 1);
     await fixture.operation(operations.applyGrants, {}, { plan, digest: preview.digest, snapshots: preview.snapshots });
     await observe(async () => { const view = await fixture.data(operations.grant, roomParams); return view.application !== null && record(view.application).membership === 'join'; }, 'Room plan must actually join the native room');
@@ -110,14 +110,14 @@ export async function resourceContracts(scope: TestContext, fixture: ContractSta
     assert.deepEqual((await fixture.data(operations.grantPermissions, roomParams)).permissions, ['room.agent.invite']);
     const helper = await fixture.agent('resource-helper'), helperParams = { agentId: helper.id, roomId };
     const helperView = await fixture.data(operations.agent, { agentId: helper.id });
-    const invitation = await fixture.data(operations.setGrant, helperParams, { expectedRevision: integer(helperView.revision), expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, agent.token);
+    const invitation = await fixture.data(operations.setGrant, helperParams, { expectedRevision: integer(helperView.revision), expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false }, agent.token);
     assert.equal(record(invitation.grant).addedById, agent.id);
     await fixture.operation(operations.removeGrant, helperParams, { expectedRevision: integer(invitation.revision), expectedGeneration: text(record(invitation.grant).generation) }, agent.token);
     view = await fixture.data(operations.grant, roomParams); grant = record(view.grant);
-    const adjusted = await fixture.data(operations.setGrant, roomParams, { expectedRevision: integer(view.revision), expectedGeneration: text(grant.generation), accessMode: 'reply', powerLevel: null, muted: true }); assert.equal(record(adjusted.grant).muted, true);
-    await fixture.operation(operations.setGrant, roomParams, { expectedRevision: integer(adjusted.revision), expectedGeneration: text(record(adjusted.grant).generation), accessMode: 'reply', powerLevel: null, muted: false });
+    const adjusted = await fixture.data(operations.setGrant, roomParams, { expectedRevision: integer(view.revision), expectedGeneration: text(grant.generation), accessMode: 'reply', nativeAccess: null, muted: true }); assert.equal(record(adjusted.grant).muted, true);
+    await fixture.operation(operations.setGrant, roomParams, { expectedRevision: integer(adjusted.revision), expectedGeneration: text(record(adjusted.grant).generation), accessMode: 'reply', nativeAccess: null, muted: false });
     const policy = await fixture.data(operations.wakePolicy, params); await fixture.operation(operations.changeWakePolicy, params, { expectedRevision: integer(policy.revision), mode: 'selected', senders: [] });
-    const sent = await contractHttp(fixture.native.base, 'PUT', '/_matrix/client/v3/rooms/' + encodeURIComponent(roomId) + '/send/m.room.message/' + randomUUID(), { msgtype: 'm.text', body: 'Explicitly addressed', 'm.mentions': { user_ids: [agent.matrixUserId] } }, nativeHeaders); assert.equal(sent.status, 200);
+    const sent = await contractHttp(fixture.native.base, 'PUT', '/_matrix/client/v3/rooms/' + encodeURIComponent(roomId) + '/send/m.room.message/' + randomUUID(), { msgtype: 'm.text', body: 'Explicitly addressed', 'm.mentions': { user_ids: [agent.backendUserId] } }, nativeHeaders); assert.equal(sent.status, 200);
     await fixture.operation(operations.wakeNotice, { ...params, eventId: text(record(sent.body).event_id) }, { roomId }, agent.token);
     await fixture.operation(operations.listenerRuns, params);
   });
@@ -131,6 +131,58 @@ export async function resourceContracts(scope: TestContext, fixture: ContractSta
     assert.equal((await fixture.data(operations.validateWake, deliveryParams, undefined, agent.token, '?runId=' + runId + '&sessionId=' + sessionId)).eligible, true);
     await fixture.operation(operations.acknowledgeWake, deliveryParams, { runId, sessionId }, agent.token);
     const rule = await fixture.data(operations.wakeRule, { ruleId }); await fixture.operation(operations.deleteWakeRule, { ruleId }, { expectedRevision: integer(rule.revision) });
+  });
+  await scope.test('owner-invited agents can add and remove collaborators only with delegated and native room authority', async () => {
+    const coordinator = await fixture.agent('invitation-coordinator'), partner = await fixture.member('invitation-partner');
+    const invited = await contractHttp(fixture.native.base, 'POST', '/_matrix/client/v3/createRoom',
+      { name: 'Invitation authority', preset: 'private_chat', invite: [coordinator.backendUserId], power_level_content_override: { invite: 0 } }, nativeHeaders);
+    assert.equal(invited.status, 200);
+    const collaborationRoom = text(record(invited.body).room_id), coordinatorRoom = { agentId: coordinator.id, roomId: collaborationRoom };
+    const grantPath = (agentId: string) => operations.grant.path.replace('{agentId}', agentId).replace('{roomId}', encodeURIComponent(collaborationRoom));
+    await fixture.operation(operations.acceptRoomInvitation, { agentId: coordinator.id }, { roomId: collaborationRoom }, coordinator.token);
+    const permissions = await fixture.data(operations.grantPermissions, coordinatorRoom);
+    assert.deepEqual(permissions.permissions, ['room.agent.invite'], 'Approved fleet delegation applies to human-invited rooms');
+    const wake = await fixture.data(operations.wakePolicy, { agentId: coordinator.id });
+    await fixture.operation(operations.changeWakePolicy, { agentId: coordinator.id }, { expectedRevision: integer(wake.revision), mode: 'selected', senders: [] });
+    for (const [label, owner] of [['same', fixture.owner], ['cross', partner]] as const) {
+      const helper = await fixture.agent('invitation-' + label + '-helper', owner), target = { agentId: helper.id, roomId: collaborationRoom };
+      let view = await fixture.data(operations.grant, target, undefined, coordinator.token);
+      assert.deepEqual(view.allowedActions, ['set'], 'Chat wake policy does not replace room authority');
+      view = await fixture.data(operations.setGrant, target,
+        { expectedRevision: integer(view.revision), expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false }, coordinator.token);
+      assert.equal(record(view.grant).addedById, coordinator.id);
+      await observe(async () => {
+        const current = await fixture.data(operations.grant, target, undefined, coordinator.token);
+        return current.application !== null && record(current.application).membership === 'join';
+      }, 'An authorized collaborator actually joins its native room');
+      const nativePath = '/_matrix/client/v3/rooms/' + encodeURIComponent(collaborationRoom) + '/state/m.room.power_levels';
+      const powers = await contractHttp(fixture.native.base, 'GET', nativePath, undefined, nativeHeaders);
+      assert.equal(powers.status, 200);
+      assert.equal((await contractHttp(fixture.native.base, 'PUT', nativePath, { ...record(powers.body), invite: 50 }, nativeHeaders)).status, 200);
+      contractError(await fixture.raw(grantPath(helper.id), 'GET', undefined,
+        { Authorization: 'Bearer ' + coordinator.token }), 404, 'missing');
+      assert.equal((await contractHttp(fixture.native.base, 'PUT', nativePath, { ...record(powers.body), invite: 0 }, nativeHeaders)).status, 200);
+      let delegation = await fixture.data(operations.grant, coordinatorRoom);
+      delegation = await fixture.data(operations.setGrantPermissions, coordinatorRoom,
+        { expectedRevision: integer(delegation.revision), expectedGeneration: text(record(delegation.grant).generation), permissions: [] });
+      contractError(await fixture.raw(grantPath(helper.id), 'GET', undefined,
+        { Authorization: 'Bearer ' + coordinator.token }), 404, 'missing');
+      await fixture.operation(operations.setGrantPermissions, coordinatorRoom,
+        { expectedRevision: integer(delegation.revision), expectedGeneration: text(record(delegation.grant).generation), permissions: ['room.agent.invite'] });
+      view = await fixture.data(operations.grant, target, undefined, coordinator.token);
+      assert.deepEqual(view.allowedActions, ['set', 'remove']);
+      await fixture.operation(operations.removeGrant, target,
+        { expectedRevision: integer(view.revision), expectedGeneration: text(record(view.grant).generation) }, coordinator.token);
+      await observe(async () => record((await fixture.data(operations.grant, target, undefined, owner)).application).membership === 'leave',
+        'An agent can remove the collaborator it added');
+    }
+    const existing = { agentId: agent.id, roomId: collaborationRoom }, previous = await fixture.data(operations.grant, existing);
+    await fixture.operation(operations.setGrant, existing,
+      { expectedRevision: integer(previous.revision), expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false });
+    const protectedGrant = await fixture.data(operations.grant, existing, undefined, coordinator.token);
+    assert.deepEqual(protectedGrant.allowedActions, [], 'An agent cannot take over a human-added collaborator');
+    contractError(await fixture.raw(grantPath(agent.id), 'DELETE',
+      { expectedRevision: integer(protectedGrant.revision), expectedGeneration: text(record(protectedGrant.grant).generation) }, { Authorization: 'Bearer ' + coordinator.token }), 403, 'forbidden');
   });
   await scope.test('controller operations, public projections, delivery revisions and retirement use exact receipts', async () => {
     await fixture.operation(operations.fleets); await fixture.operation(operations.fleetMap, fleetParams); await fixture.operation(operations.fleetStatistics, fleetParams);

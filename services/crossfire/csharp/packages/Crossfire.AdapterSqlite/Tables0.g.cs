@@ -12,7 +12,7 @@ public sealed partial class CrossfireDbContext
             entity.ToTable("principal");
             entity.HasKey(value => value.Id);
             entity.Property(value => value.Id).HasColumnName("id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
-            entity.Property(value => value.MatrixUserId).HasColumnName("matrix_user_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
+            entity.Property(value => value.BackendUserId).HasColumnName("backend_user_id").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.Kind).HasColumnName("kind").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.Status).HasColumnName("status").HasColumnType("TEXT").ValueGeneratedNever().IsRequired();
             entity.Property(value => value.Revision).HasColumnName("revision").HasColumnType("INTEGER").ValueGeneratedNever().IsRequired();

@@ -50,9 +50,9 @@ impl Authority {
     }
 
     async fn remove_account(&self, id: &str) -> Result<()> {
-        if validation::matrix_user_id(&json!(id)).is_err()
+        if crate::syntax::user_id(&json!(id)).is_err()
             || !id.ends_with(&format!(":{}", self.configuration.server_name))
-            || id == self.configuration.service_matrix_id
+            || id == self.configuration.service_backend_user_id
             || id == format!("@conduit:{}", self.configuration.server_name)
         {
             return Err(Failure::new(
@@ -63,7 +63,9 @@ impl Authority {
         if self.deactivated(id).await? {
             return Ok(());
         }
-        let admin = self.as_user(&self.configuration.service_matrix_id).await?;
+        let admin = self
+            .as_user(&self.configuration.service_backend_user_id)
+            .await?;
         let room = self
             .http
             .ok(
@@ -77,7 +79,7 @@ impl Authority {
             )
             .await?;
         let room =
-            validation::room_id(room.get("room_id").unwrap_or(&Value::Null)).map_err(|_| {
+            crate::syntax::room_id(room.get("room_id").unwrap_or(&Value::Null)).map_err(|_| {
                 Failure::new(
                     ErrorCode::Native,
                     "Native administration room is unavailable",

@@ -409,7 +409,7 @@ async fn real_pi_per_room_histories_stay_distinct_reset_is_explicit_and_live_own
             CancellationToken::new(),
         )
         .await?;
-    let first = connection.conversation("!first:example", None).await?;
+    let first = connection.conversation("control", None).await?;
     let second = connection.conversation("!second:example", None).await?;
     assert_ne!(first.session_id(), second.session_id());
     assert_ne!(first.session_id(), connection.session_id());

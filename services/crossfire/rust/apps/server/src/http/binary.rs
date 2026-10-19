@@ -1,4 +1,3 @@
-use crate::security;
 use crossfire_adapter_http::server::{HeaderMap, Incoming};
 use crossfire_domain::publication::port::BinarySource;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
@@ -11,18 +10,21 @@ pub struct Input {
 }
 impl Input {
     pub fn new(headers: &HeaderMap, source: Incoming, maximum: usize) -> Result<Self> {
-        if security::single(headers, "content-type")? != Some("application/octet-stream") {
+        if crossfire_adapter_http::security::single(headers, "content-type")?
+            != Some("application/octet-stream")
+        {
             return Err(Failure::new(
                 ErrorCode::Invalid,
                 "Expected application/octet-stream",
             ));
         }
-        let value = security::single(headers, "content-length")?.ok_or_else(|| {
-            Failure::new(
-                ErrorCode::Invalid,
-                "An exact Content-Length is required for binary input",
-            )
-        })?;
+        let value = crossfire_adapter_http::security::single(headers, "content-length")?
+            .ok_or_else(|| {
+                Failure::new(
+                    ErrorCode::Invalid,
+                    "An exact Content-Length is required for binary input",
+                )
+            })?;
         if value.is_empty()
             || value.len() > 16
             || !value.bytes().all(|value| value.is_ascii_digit())

@@ -110,7 +110,7 @@ test('a real native owner approval permits an intentional verified-client Matrix
   const arguments_ = [process.execPath, client, '--project', workspace, '--profile', 'watson', 'matrix', 'send-message',
     '--room-id', ROOM, '--event-type', 'm.room.message', '--txn-id', 'native-reply', '--body', JSON.stringify(body)];
   provider.tool('exec_command', { cmd: arguments_.map(argument => "'" + argument.replaceAll("'", "'\\''") + "'").join(' '),
-    sandbox_permissions: 'require_escalated', justification: 'May the isolated fixture send its exact Matrix reply?', yield_time_ms: 1000 });
+    sandbox_permissions: 'require_escalated', justification: 'May the isolated fixture send its exact Matrix reply?', yield_time_ms: 10000 });
   fixture.add(ROOM, message('$intentional-native-reply', OBSERVER, 'Reply through the verified project-local client'));
   await until(() => fixture.rooms.get(OWNER_DM)!.some(event => String(event.content.body).includes('review and answer')) || disconnected !== undefined);
   assert.equal(disconnected, undefined, String(disconnected));
@@ -118,8 +118,8 @@ test('a real native owner approval permits an intentional verified-client Matrix
   await until(async () => fixture.rooms.get(ROOM)!.some(event => event.sender === SELF && event.content.body === body.body)
     || provider.requests.some(request => JSON.stringify(request).includes('function_call_output')) && !(await runtime!.inspect()).busy,
   'Native Matrix reply did not complete');
-  assert(fixture.rooms.get(ROOM)!.some(event => event.sender === SELF && event.content.body === body.body),
-    JSON.stringify(provider.requests));
+  assert.equal(fixture.rooms.get(ROOM)!.some(event => event.sender === SELF && event.content.body === body.body), true,
+    'The approved verified-client command must publish its exact reply before the inert provider completes');
   await until(async () => !(await runtime!.inspect()).busy);
   assert.equal(disconnected, undefined);
   assert(provider.requests.every(request => !JSON.stringify(request).includes('$approved-native-reply')));

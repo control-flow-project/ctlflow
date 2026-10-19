@@ -5,14 +5,14 @@ export type SteeringStage = 'received' | 'interrupted' | 'already-idle' | 'accep
 export function steeringReceipts(now: () => number, notice: (id: string, text: string) => void) {
   const received = new Map<string, number>();
   const publish = (event: ReceivedEvent, stage: SteeringStage, detail?: string): void => {
-    const key = JSON.stringify([event.room_id, event.event_id]);
+    const key = JSON.stringify([event.roomId, event.eventId]);
     const at = now();
     const first = received.get(key) ?? (stage === 'received' ? at : null);
     if (stage === 'received') received.set(key, first ?? at);
     const sent = event.timestamp === null ? null : Date.parse(event.timestamp);
     const label = { received: 'Mention received', interrupted: 'Captured turn interrupted', 'already-idle': 'Already idle — no turn interrupted',
       accepted: 'Native input accepted', superseded: 'Steering superseded — retained as unread context', failed: 'Steering failed — native acceptance not confirmed' }[stage];
-    const text = label + '\n' + JSON.stringify({ eventId: event.event_id, source: event.origin, roomId: event.room_id,
+    const text = label + '\n' + JSON.stringify({ eventId: event.eventId, source: event.origin, roomId: event.roomId,
       sender: event.sender, sentAt: event.timestamp, receivedAt: first === null ? null : new Date(first).toISOString(), stageAt: new Date(at).toISOString(),
       sinceReceiptMs: first === null ? null : Math.max(0, at - first), sinceSentMs: sent === null ? null : Math.max(0, at - sent),
       ...(stage === 'received' ? { message: truncateUtf16(String(event.content.body), 3000) } : {}), ...(detail ? { detail: truncateUtf16(detail, 3000) } : {}) });
@@ -23,6 +23,6 @@ export function steeringReceipts(now: () => number, notice: (id: string, text: s
     received.delete(JSON.stringify([room, event]));
     notice(JSON.stringify(['steering', JSON.stringify([room, event]), 'superseded']),
       'Steering superseded by a newer mention. Confirmed input remains in native history; unconfirmed input remains unread.\n'
-      + JSON.stringify({ roomId: room, eventId: event, replacedBy: replacement.event_id, stageAt: new Date(now()).toISOString() }));
+      + JSON.stringify({ roomId: room, eventId: event, replacedBy: replacement.eventId, stageAt: new Date(now()).toISOString() }));
   } };
 }

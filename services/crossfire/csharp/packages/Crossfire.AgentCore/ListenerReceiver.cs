@@ -5,7 +5,7 @@ using Crossfire.Kernel;
 
 namespace Crossfire.AgentCore;
 
-public sealed record ListenerOptions(AgentProfile Profile, LocalState Storage, AgentMatrix Matrix, Coordination Coordination, ListenerControl Control,
+public sealed record ListenerOptions(AgentProfile Profile, LocalState Storage, MessagingClient Messaging, Coordination Coordination, ListenerControl Control,
     ListenerBudget Budget, TimeProvider Clock, string CursorFile, string Release, Func<RuntimeHooks, CancellationToken, ValueTask<Result<RuntimeConnection>>> Runtime,
     Func<CancellationToken, ValueTask<Result<IReadOnlyList<string>>>> Invitations, Action<string> Log,
     NativeHistoryMode HistoryMode = NativeHistoryMode.Shared, string? Room = null, int Limit = 100, int PollMs = 1000, int DebounceMs = 1000, int ReconcileMs = 30000,
@@ -87,8 +87,8 @@ public sealed partial class ListenerReceiver
     {
         await options.Control.WaitForActivation(lifetime.Token); var release = Take(await options.Coordination.Call(new("release", new Dictionary<string, string>()), lifetime.Token));
         if (WireJson.Text(release, "release") is not { } available || !ReleaseValues.Identity(available) || !ReleaseValues.Identity(options.Release)) throw new ReceiverFailure(new("invalid", "Crossfire software release identity is invalid"));
-        observer = new(Storage, File + ".observation", options.Profile, options.Matrix, options.Coordination, options.Clock, options.HistoryMode, () => Volatile.Read(ref maximum), () => destination?.Lifecycle?.Current(), Fail, lifetime.Token);
-        approval = new(options.Profile, options.Coordination, options.Matrix, Storage, File + ".decisions", options.Clock, activity.Ready, lifetime.Token);
+        observer = new(Storage, File + ".observation", options.Profile, options.Messaging, options.Coordination, options.Clock, options.HistoryMode, () => Volatile.Read(ref maximum), () => destination?.Lifecycle?.Current(), Fail, lifetime.Token);
+        approval = new(options.Profile, options.Coordination, options.Messaging, Storage, File + ".decisions", options.Clock, activity.Ready, lifetime.Token);
         destination = Take(await options.Runtime(new(approval.Request, statistics.Usage, approval.Responded, () => approval.Unresolved, PendingInput, observer.Observe), lifetime.Token));
         nativeFailure = Runtime.Lifetime.Register(() => Fail(new("unavailable", "Owned native runtime connection stopped; exact saved histories and original pending input remain retained")));
         state = SteeringControl.Load(Storage, ControlFile, Runtime.SessionId); since = ReceiveState.SyncCursor(Storage, File); cycle = ReceiveSnapshots.LoadWake(Storage, File);
@@ -103,22 +103,22 @@ public sealed partial class ListenerReceiver
             _ => true, observer.Delivered, activity.Delivered, events => { statistics.Record(events, true); AcceptedSteering(events); }, InputPriority.Steering);
         controlled = new(Storage, File + ".controller-input", options.Control, Runtime, artifacts, () => maximum, options.Clock);
         scheduled = new(Storage, File + ".wake-input", options.Coordination, options.Profile, Runtime, () => new(activity.RunId ?? throw new InvalidOperationException("Scheduled delivery requires a reporting listener"), Runtime.SessionId), artifacts, () => maximum, options.Clock);
-        queries = new(Storage, File, options.Matrix, options.Profile, options.Coordination, options.Clock, artifacts,
+        queries = new(Storage, File, options.Messaging, options.Profile, options.Coordination, options.Clock, artifacts,
             () => { lock (gate) return chat.Pending || priorityChat.Pending || state.Controls.Any(value => value.Status is "interrupting" or "interrupted") || completed is not null; },
-            events => statistics.Record(events, false), events => { statistics.Record(events, true); activity.Delivered(events.Count(value => value.Type == "m.room.message")); },
+            events => statistics.Record(events, false), events => { statistics.Record(events, true); activity.Delivered(events.Count(value => value.Type == "message")); },
             () => { lock (gate) { cycle = null; ReceiveSnapshots.SaveWake(Storage, File, null); windowEnd = 0; } Change(); }, lifetime.Token, gate);
         maintenance = new(Storage, File + ".maintenance", options.Profile.Id, options.Coordination, options.Clock, options.ReconcileMs, options.Invitations);
-        Take(await OwnerAuthority.Authorize(options.Coordination, options.Matrix, options.Profile, lifetime.Token)); await Access(lifetime.Token); Take(await ReceiveState.Flush(Storage, options.Matrix, File, lifetime.Token));
+        Take(await OwnerAuthority.Authorize(options.Coordination, options.Messaging, options.Profile, lifetime.Token)); await Access(lifetime.Token); Take(await ReceiveState.Flush(Storage, options.Messaging, File, lifetime.Token));
         foreach (var control in state.Controls.Where(value => value.Status == "interrupting"))
         {
             if (control.Turn is not null) { if (Runtime.TurnControl is null) throw new ReceiverFailure(new("invalid", "Native turn cancellation is unavailable for this attachment")); Take(await Runtime.TurnControl.Interrupt(control.Turn, true, new(InputPriority.Steering, lifetime.Token))); }
             SetControl(control, control with { Status = control.Stop ? "delivered" : "interrupted" }); state = state with { Paused = control.Stop }; SaveControl();
         }
-        joined = Take(await ReceivePages.Joined(options.Matrix, lifetime.Token)); SyncEvents.RetainJoined(Storage, File, joined); options.Control.Changed += ControlChanged; await Activate();
+        joined = Take(await ReceivePages.Joined(options.Messaging, lifetime.Token)); SyncEvents.RetainJoined(Storage, File, joined); options.Control.Changed += ControlChanged; await Activate();
         options.Ready?.Invoke(Diagnose, queries); acquisition = AcquireLoop();
     }
     private bool Accept(ReceivedEvent value)
-    { lock (gate) return !ReceivedEvents.Notice(value) && !(value.Type == "m.room.message" && value.Sender == options.Profile.Account.UserId) && !state.Controls.Any(control => control.Room == value.RoomId && control.Event == value.EventId && control.Status == "delivered"); }
+    { lock (gate) return !ReceivedEvents.Notice(value) && !(value.Type == "message" && value.Sender == options.Profile.Account.UserId) && !state.Controls.Any(control => control.Room == value.RoomId && control.Event == value.EventId && control.Status == "delivered"); }
     private void SetControl(SourceControl original, SourceControl replacement)
     { lock (gate) state = state with { Controls = state.Controls.Select(control => control == original ? replacement : control).ToArray() }; }
     private void AcceptedSteering(IReadOnlyList<ReceivedEvent> events)

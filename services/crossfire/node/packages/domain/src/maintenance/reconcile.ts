@@ -20,13 +20,13 @@ export async function reconcile(services: Services, stopped: () => boolean): Pro
   if (!claims.ok) return claims;
   for (const invitation of claims.value) {
     if (stopped()) return success(undefined);
-    const removed = await services.matrix.discard(invitation.claimMatrixUserId!);
+    const removed = await services.messaging.discard(invitation.claimBackendUserId!);
     if (!removed.ok) continue;
     const cleared = services.unitOfWork.run(() => {
       const current = services.repositories.memberInvitation.find({ id: invitation.id });
       if (!current.ok) return current;
       if (!current.value || current.value.consumedByMemberId !== null || current.value.claimFingerprint !== invitation.claimFingerprint) return success(undefined);
-      return services.repositories.memberInvitation.update({ ...current.value, claimMatrixUserId: null, claimDisplayName: null, claimFingerprint: null });
+      return services.repositories.memberInvitation.update({ ...current.value, claimBackendUserId: null, claimDisplayName: null, claimFingerprint: null });
     });
     if (!cleared.ok) return cleared;
   }
@@ -48,7 +48,7 @@ export async function reconcile(services: Services, stopped: () => boolean): Pro
   if (!notices.ok) return notices;
   for (const notice of notices.value) {
     if (stopped()) return success(undefined);
-    const sent = await publishWakeNotice(services, notice.receiverAgentId, notice.eventId);
+    const sent = await publishWakeNotice(services, notice.receiverAgentId, notice.roomId, notice.eventId);
     if (!sent.ok && sent.error.code !== 'conflict') return sent;
   }
   return success(undefined);

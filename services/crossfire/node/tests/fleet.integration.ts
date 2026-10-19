@@ -22,12 +22,13 @@ import { roomAccess } from '@ctlflow/crossfire-adapter-crossfire/room-access';
 import { createClient } from '@ctlflow/crossfire-client/client';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { runtimeOperation, type FleetRuntimeOperation } from '@ctlflow/crossfire-contracts/fleet-runtime';
-import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { API, segment } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { readDeliveryJournal } from '@ctlflow/crossfire-adapter-runtime/journal';
 import { codexInput } from '@ctlflow/crossfire-adapter-codex/input';
 import { contextState, contextReceipt } from '@ctlflow/crossfire-adapter-codex/context-state';
+import type { BackendAccount } from '@ctlflow/crossfire-domain/port/messaging';
 import { listenerRequest } from '@ctlflow/crossfire-adapter-crossfire/listener-client';
 
 const execute = promisify(execFile);
@@ -36,7 +37,7 @@ async function until(predicate: () => boolean | Promise<boolean>): Promise<void>
   while (!await predicate()) { assert(Date.now() < deadline, 'Native integration observation timed out'); await delay(30); }
 }
 type Fleet = { fleetId: string; phase: string; connection: { connected: boolean; deliveryEnabled: boolean; revision: number | null }; instances: { instance: { key: string }; phase: string; sessionId: string | null; listenerActive: boolean }[] };
-type Binding = { fleetId: string; controllerCredential: string; identities: { instanceKey: string; agentId: string; account: { user_id: string; access_token: string } }[] };
+type Binding = { fleetId: string; controllerCredential: string; identities: { instanceKey: string; agentId: string; account: BackendAccount }[] };
 
 test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume without model housekeeping', { timeout: 180000 }, async scope => {
   const fixture = await nativeServer(scope, builtRelease().release), { services, admin, origin, worker } = fixture;
@@ -46,7 +47,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const env = { ...process.env, HOME: home, CODEX_HOME: home, XDG_CONFIG_HOME: join(directory, 'config') };
   const cli = (...args: string[]) => execute(process.execPath, [cliPath, ...args], { env, timeout: 60000 });
   const definition = join(fleet, 'agents/analyst'); mkdirSync(definition, { recursive: true, mode: 0o700 });
-  const coordinationOptions = '\n[coordination_options]\nwake_mode = "selected"\npermissions = ["room.agent.invite"]\n[[coordination_options.wake_senders]]\nmatrix_user_id = "' + admin.member.principal.matrixUserId + '"\ninclude_agents = true\n';
+  const coordinationOptions = '\n[coordination_options]\nwake_mode = "selected"\npermissions = ["room.agent.invite"]\n[[coordination_options.wake_senders]]\nbackend_user_id = "' + admin.member.principal.backendUserId + '"\ninclude_agents = true\n';
   writeFileSync(join(definition, 'agent.toml'), 'name = "Research analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "gpt-5.2"\nmodel_reasoning_effort = "high"\nsandbox_mode = "read-only"\napproval_policy = "never"\n' + coordinationOptions, { mode: 0o600 });
   writeFileSync(join(definition, 'AGENTS.md'), 'Inert research fixture. Never contact an external provider.', { mode: 0o600 });
   const keys = ['north', 'south'];
@@ -58,7 +59,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
     trustWorkspace(nativeHome, join(definition, 'workarea', key));
   }
   writeFileSync(join(fleet, 'runtime.toml'), 'fleet = "research"\n[coordination]\nadapter = "crossfire"\nserver = ' + JSON.stringify(origin)
-    + '\nowner = ' + JSON.stringify(admin.member.principal.matrixUserId) + '\n' + keys.map(key => '\n[[instances]]\nkey = "' + key + '"\nname = "' + key
+    + '\nowner = ' + JSON.stringify(admin.member.principal.backendUserId) + '\n' + keys.map(key => '\n[[instances]]\nkey = "' + key + '"\nname = "' + key
       + '"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/' + key + '"\n').join(''), { mode: 0o600 });
   await cli('daemon', 'start', '--root', root, '--name', 'native-controller');
   cleanup(scope, async () => { await cli('daemon', 'stop').catch(() => {}); });
@@ -89,7 +90,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
     await until(async () => {
       if (!existsSync(cursor)) return false;
       const checkpoint = readJson<string>(cursor);
-      const snapshot = value(await nativeOk({ base: fixture.native.base, token: north.account.access_token }, 'GET',
+      const snapshot = value(await nativeOk({ base: fixture.native.base, token: north.account.accessToken }, 'GET',
         API + '/sync?timeout=0&since=' + segment(checkpoint)));
       assert.equal(typeof snapshot.next_batch, 'string');
       return snapshot.next_batch === checkpoint && readJson<string>(cursor) === checkpoint;
@@ -110,12 +111,12 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const roomId = created.room_id as string;
   const roomPath = API + '/rooms/' + segment(roomId);
   value(await changeRoomGrant(services, admin.actor, { agentId: north.agentId, roomId, expectedRevision: value(services.directory.agent(north.agentId))!.principal.revision,
-    expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID()));
+    expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false }, randomUUID()));
   await worker.drain();
   assert.deepEqual(value(services.collection.roomPermissions({ agentId: north.agentId, roomId })).map(permission => permission.permissionCode), ['room.agent.invite']);
   const other = await fixture.member('other'), guest = await fixture.agent(other.actor, 'guest');
-  const invitations = roomAccess({ origin, token: north.account.access_token });
-  value(await invitations.change(guest.id, roomId, { accessMode: 'reply', powerLevel: null })); await worker.drain();
+  const invitations = roomAccess({ origin, token: north.account.accessToken });
+  value(await invitations.change(guest.id, roomId, { accessMode: 'reply', nativeAccess: null })); await worker.drain();
   assert.equal(value(services.repositories.ownerConversation.find({ agentId: guest.id })), null);
   assert.deepEqual(value(await nativeOk({ base: fixture.native.base, token: guest.token }, 'GET', API + '/joined_rooms')).joined_rooms, [roomId]);
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: guest.id, roomId }))!.addedById, north.agentId);
@@ -135,10 +136,10 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   await terminal.quit();
   assert(providers.every(provider => provider.requests.length === 0), 'TUI pointer and native attachment make no model calls');
   assert((JSON.parse((await cli('show', 'research')).stdout) as Fleet).instances.every(instance => instance.phase === 'running'));
-  value(await invitations.change(guest.id, roomId, { accessMode: 'reply', powerLevel: null })); await worker.drain();
+  value(await invitations.change(guest.id, roomId, { accessMode: 'reply', nativeAccess: null })); await worker.drain();
   value(await nativeOk({ base: fixture.native.base, token: guest.token }, 'PUT', roomPath + '/send/m.room.message/foreign-context',
     { msgtype: 'm.text', body: 'Context from another owner’s agent' }));
-  value(await nativeOk(ownerNative, 'POST', roomPath + '/invite', { user_id: other.member.principal.matrixUserId }));
+  value(await nativeOk(ownerNative, 'POST', roomPath + '/invite', { user_id: other.member.principal.backendUserId }));
   value(await nativeOk({ base: fixture.native.base, token: other.token }, 'POST', roomPath + '/join', {}));
   value(await nativeOk({ base: fixture.native.base, token: other.token }, 'PUT', roomPath + '/send/m.room.message/human-context',
     { msgtype: 'm.text', body: 'Context from another registered human' }));
@@ -158,12 +159,12 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   assert(input, 'The actual native provider request contains the listener envelope');
   const deliveredContext = JSON.parse(input.slice(input.indexOf('\n') + 1)) as { owner: string;
     senders: Record<string, { kind: 'human' | 'agent' | 'unknown'; owner?: string }> };
-  assert.equal(deliveredContext.owner, admin.member.principal.matrixUserId);
-  assert.deepEqual(deliveredContext.senders[admin.member.principal.matrixUserId], { kind: 'human', display_name: 'admin', relationship: 'owner' });
-  assert.deepEqual(deliveredContext.senders[other.member.principal.matrixUserId], { kind: 'human', display_name: 'other', relationship: 'other-human' });
-  assert.deepEqual(deliveredContext.senders[guest.matrixUserId], { kind: 'agent', owner: other.member.principal.matrixUserId, display_name: 'guest (other)', owner_display_name: 'other', relationship: 'other-owners-agent' });
-  assert.deepEqual(deliveredContext.senders[outsider.id], { kind: 'unknown', display_name: null, relationship: 'unknown' });
-  assert(!input.includes(north.account.access_token) && !input.includes(guest.token));
+  assert.equal(deliveredContext.owner, admin.member.principal.backendUserId);
+  assert.deepEqual(deliveredContext.senders[admin.member.principal.backendUserId], { kind: 'human', displayName: 'admin', relationship: 'owner' });
+  assert.deepEqual(deliveredContext.senders[other.member.principal.backendUserId], { kind: 'human', displayName: 'other', relationship: 'other-human' });
+  assert.deepEqual(deliveredContext.senders[guest.backendUserId], { kind: 'agent', owner: other.member.principal.backendUserId, displayName: 'guest (other)', ownerDisplayName: 'other', relationship: 'other-owners-agent' });
+  assert.deepEqual(deliveredContext.senders[outsider.id], { kind: 'unknown', displayName: null, relationship: 'unknown' });
+  assert(!input.includes(north.account.accessToken) && !input.includes(guest.token));
   assert.equal(providers[1]!.requests.length, 0); providers[0]!.finish();
   await acknowledged();
   const outside = join(directory, 'full-access.txt');

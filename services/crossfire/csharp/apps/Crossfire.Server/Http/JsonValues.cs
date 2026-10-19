@@ -36,7 +36,7 @@ public static class JsonValues
     }
     public static void Member(ProtocolWriter writer, MemberView value)
     {
-        writer.WriteStartObject(); writer.WriteString("memberId", value.Principal.Id); writer.WriteString("matrixUserId", value.Principal.MatrixUserId);
+        writer.WriteStartObject(); writer.WriteString("memberId", value.Principal.Id); writer.WriteString("backendUserId", value.Principal.BackendUserId);
         writer.WriteString("displayName", value.Member.DisplayName); writer.WriteString("roleCode", value.Role.RoleCode); writer.WriteString("status", value.Principal.Status);
         writer.WriteNumber("revision", value.Principal.Revision); writer.WriteNumber("createdAt", value.Principal.CreatedAt); Application(writer, value.Application); writer.WriteEndObject();
     }

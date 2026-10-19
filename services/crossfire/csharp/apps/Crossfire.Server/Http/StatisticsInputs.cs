@@ -14,16 +14,16 @@ public static class StatisticsInputs
         var ended = Validation.Integer(input.GetProperty("endedAt")); var dropped = Validation.Integer(input.GetProperty("dropped"));
         var flows = Validation.List(input.GetProperty("flows"), Flow, 256); var usage = Validation.List(input.GetProperty("usage"), Usage, 32);
         return !sequence.IsSuccess || !started.IsSuccess || !ended.IsSuccess || ended.Value < started.Value || !dropped.IsSuccess || !flows.IsSuccess || !usage.IsSuccess
-            || flows.Value.Select(value => (value.RoomId, value.SenderMatrixId, value.MessageType)).Distinct().Count() != flows.Value.Count
+            || flows.Value.Select(value => (value.RoomId, value.SenderBackendUserId, value.MessageType)).Distinct().Count() != flows.Value.Count
             || usage.Value.Select(value => (value.Runtime, value.SessionId)).Distinct().Count() != usage.Value.Count ? Results.Fail<StatisticsBatch>("invalid", "Invalid interval or duplicate summaries")
             : Result<StatisticsBatch>.Success(new(sequence.Value, started.Value, ended.Value, dropped.Value, flows.Value, usage.Value));
     }
 
     private static Result<TrafficFlow> Flow(JsonElement input)
     {
-        var fields = Validation.Fields(input, ["roomId", "senderMatrixId", "messageType", "observed", "delivered", "contentBytes", "deliveredBytes", "attachmentBytes", "largestBytes"]);
+        var fields = Validation.Fields(input, ["roomId", "senderBackendUserId", "messageType", "observed", "delivered", "contentBytes", "deliveredBytes", "attachmentBytes", "largestBytes"]);
         if (!fields.IsSuccess) return Result<TrafficFlow>.Fail(fields.Error);
-        var room = Validation.Text(input.GetProperty("roomId")); var sender = Validation.Text(input.GetProperty("senderMatrixId")); var type = Validation.Text(input.GetProperty("messageType"), 100);
+        var room = Validation.Text(input.GetProperty("roomId")); var sender = Validation.Text(input.GetProperty("senderBackendUserId")); var type = Validation.Text(input.GetProperty("messageType"), 100);
         var counts = new[] { "observed", "delivered", "contentBytes", "deliveredBytes", "attachmentBytes", "largestBytes" }.Select(name => Validation.Integer(input.GetProperty(name))).ToArray();
         return !room.IsSuccess || !Validation.RoomId(room.Value) || !sender.IsSuccess || !Validation.UserId(sender.Value) || !type.IsSuccess || counts.Any(value => !value.IsSuccess)
             ? Results.Fail<TrafficFlow>("invalid", "Invalid bounded traffic counters") : Result<TrafficFlow>.Success(new(room.Value, sender.Value, type.Value,

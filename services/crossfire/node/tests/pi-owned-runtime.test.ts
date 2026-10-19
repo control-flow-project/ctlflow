@@ -144,7 +144,7 @@ test('Pi recovers real receipts without duplicate delivery, and missing history 
 test('Pi per-room histories stay separate and explicit reset preserves archived native histories', { timeout: 60000 }, async scope => {
   const proof = await fixture(scope); proof.input.listenerOptions = { historyMode: 'per-room' };
   const runtime = await proof.start(); assert(runtime.conversation);
-  const first = await runtime.conversation('!first:fixture'), second = await runtime.conversation('!second:fixture');
+  const first = await runtime.conversation('control'), second = await runtime.conversation('!second:fixture');
   assert.notEqual(first.sessionId, second.sessionId); assert.notEqual(first.sessionId, runtime.sessionId);
   await first.deliver('Private first-room fact violet 51.', 'pi-first-room'); first.acknowledge(['pi-first-room']);
   await until(async () => !(await first.inspect()).busy);

@@ -28,7 +28,7 @@ test('enrollment and reconciliation create no chats; first use and reconnect ret
   const agent = await fixture.agent(admin.actor, 'ada');
   assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id })), null);
   assert.deepEqual(value(services.collection.roomGrants({ agentId: agent.id })), []);
-  assert.deepEqual(value(await services.matrix.joined(agent.matrixUserId)), []);
+  assert.deepEqual(value(await services.messaging.joined(agent.backendUserId)), []);
   value(await reconcilePrincipal(services, agent.id));
   assert.equal(fixture.native.rooms.size, 0);
   const created = await Promise.all([connectOwnerConversation(services, agent.actor, agent.id), connectOwnerConversation(services, agent.actor, agent.id)]);
@@ -62,10 +62,10 @@ test('owners, administrators and agents cannot downgrade, mute, remove or delega
   const original = value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId: conversation.roomId }))!;
   const revision = value(services.directory.agent(agent.id))!.principal.revision;
   for (const actor of [owner.actor, admin.actor, other.actor]) {
-    for (const intent of [{ accessMode: 'none' as const, muted: false, powerLevel: null },
-      { accessMode: 'read' as const, muted: false, powerLevel: null },
-      { accessMode: 'custom' as const, muted: false, powerLevel: 50 },
-      { accessMode: 'reply' as const, muted: true, powerLevel: null }]) {
+    for (const intent of [{ accessMode: 'none' as const, muted: false, nativeAccess: null },
+      { accessMode: 'read' as const, muted: false, nativeAccess: null },
+      { accessMode: 'custom' as const, muted: false, nativeAccess: { powerLevel: 50 } },
+      { accessMode: 'reply' as const, muted: true, nativeAccess: null }]) {
       const changed = await changeRoomGrant(services, actor, { agentId: agent.id, roomId: conversation.roomId,
         expectedRevision: revision, expectedGeneration: original.generation, ...intent }, randomUUID());
       assert(!changed.ok); assert.equal(changed.error.code, 'forbidden');
@@ -86,40 +86,40 @@ test('owners, administrators and agents cannot downgrade, mute, remove or delega
 test('withdrawal during first owner DM verification never binds or re-invites the conversation', async scope => {
   const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
   const agent = await fixture.agent(admin.actor, 'ada');
-  const owner = admin.member.principal.matrixUserId;
+  const owner = admin.member.principal.backendUserId;
   const roomId = value(await native.createRoom(owner, 'Private matter')).roomId;
-  const membership = { matrixUserId: agent.matrixUserId, displayName: 'Ada', membership: 'invite' as const, creator: false as const, powerLevel: 0 };
-  native.rooms.get(roomId)!.members.set(agent.matrixUserId, membership);
-  native.invitations.set(roomId + ':' + agent.matrixUserId, { roomId, senderMatrixId: owner, eventId: '$owner-dm', direct: true });
-  const verify = services.matrix.verifyOwnerConversation;
-  services.matrix.verifyOwnerConversation = async (...input) => {
+  const membership = { backendUserId: agent.backendUserId, displayName: 'Ada', membership: 'invite' as const, creator: false as const, powerLevel: 0 };
+  native.rooms.get(roomId)!.members.set(agent.backendUserId, membership);
+  native.invitations.set(roomId + ':' + agent.backendUserId, { roomId, senderBackendUserId: owner, eventId: '$owner-dm', direct: true });
+  const verify = services.messaging.verifyOwnerConversation;
+  services.messaging.verifyOwnerConversation = async (...input) => {
     const result = await verify(...input);
-    native.invitations.delete(roomId + ':' + agent.matrixUserId);
-    native.rooms.get(roomId)!.members.set(agent.matrixUserId, { ...membership, membership: 'leave' });
+    native.invitations.delete(roomId + ':' + agent.backendUserId);
+    native.rooms.get(roomId)!.members.set(agent.backendUserId, { ...membership, membership: 'leave' });
     return result;
   };
   assert.equal((await acceptRoomInvitation(services, agent.actor, agent.id, roomId, randomUUID())).ok, false);
   assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id })), null);
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: agent.id, roomId })), null);
   assert.equal(native.rooms.size, 1, 'No alternate approval conversation is created');
-  assert.equal(native.rooms.get(roomId)!.members.get(agent.matrixUserId)!.membership, 'leave');
+  assert.equal(native.rooms.get(roomId)!.members.get(agent.backendUserId)!.membership, 'leave');
   const reconciled = await reconcileRoomGrant(services, agent.id, roomId);
   assert(!reconciled.ok); assert.equal(reconciled.error.code, 'missing');
-  assert.equal(native.rooms.get(roomId)!.members.get(agent.matrixUserId)!.membership, 'leave');
+  assert.equal(native.rooms.get(roomId)!.members.get(agent.backendUserId)!.membership, 'leave');
 });
 
 test('withdrawal after a private DM claim never acquires confirmed owner-conversation repair authority', async scope => {
   const fixture = await applicationFixture(scope), { services, admin, native } = fixture;
-  const agent = await fixture.agent(admin.actor, 'ada'), owner = admin.member.principal.matrixUserId;
+  const agent = await fixture.agent(admin.actor, 'ada'), owner = admin.member.principal.backendUserId;
   const roomId = value(await native.createRoom(owner, 'Private matter')).roomId;
-  const membership = { matrixUserId: agent.matrixUserId, displayName: 'Ada', membership: 'invite' as const, creator: false as const, powerLevel: 0 };
-  native.rooms.get(roomId)!.members.set(agent.matrixUserId, membership);
-  native.invitations.set(roomId + ':' + agent.matrixUserId, { roomId, senderMatrixId: owner, eventId: '$owner-dm', direct: true });
-  const apply = services.matrix.setRoomAccess;
-  services.matrix.setRoomAccess = async (...input) => {
+  const membership = { backendUserId: agent.backendUserId, displayName: 'Ada', membership: 'invite' as const, creator: false as const, powerLevel: 0 };
+  native.rooms.get(roomId)!.members.set(agent.backendUserId, membership);
+  native.invitations.set(roomId + ':' + agent.backendUserId, { roomId, senderBackendUserId: owner, eventId: '$owner-dm', direct: true });
+  const apply = services.messaging.setRoomAccess;
+  services.messaging.setRoomAccess = async (...input) => {
     assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id }))!.roomId, roomId);
-    native.invitations.delete(roomId + ':' + agent.matrixUserId);
-    native.rooms.get(roomId)!.members.set(agent.matrixUserId, { ...membership, membership: 'leave' });
+    native.invitations.delete(roomId + ':' + agent.backendUserId);
+    native.rooms.get(roomId)!.members.set(agent.backendUserId, { ...membership, membership: 'leave' });
     return apply(...input);
   };
   assert.equal((await acceptRoomInvitation(services, agent.actor, agent.id, roomId, randomUUID())).ok, false);
@@ -128,7 +128,7 @@ test('withdrawal after a private DM claim never acquires confirmed owner-convers
   assert.equal(value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId }))!.lastSuccessAt, null);
   value(await reconcilePrincipal(services, agent.id));
   assert.equal(value(services.repositories.roomGrantApplication.find({ agentId: agent.id, roomId }))!.lastSuccessAt, null);
-  assert.equal(native.rooms.get(roomId)!.members.get(agent.matrixUserId)!.membership, 'leave');
+  assert.equal(native.rooms.get(roomId)!.members.get(agent.backendUserId)!.membership, 'leave');
   assert.equal(native.rooms.size, 1);
 });
 
@@ -165,7 +165,7 @@ test('owner DMs exclude other agents at authorization, storage and room-discover
     const revision = value(services.directory.agent(agent.id))!.principal.revision;
     for (const actor of [alice.actor, bob.actor, admin.actor, ada.actor]) {
       const changed = await changeRoomGrant(services, actor, { agentId: agent.id, roomId: conversation.roomId,
-        expectedRevision: revision, expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID());
+        expectedRevision: revision, expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false }, randomUUID());
       assert(!changed.ok); assert.equal(changed.error.code, 'forbidden');
     }
     const grant = { ...original, agentId: agent.id, generation: randomUUID() };
@@ -190,20 +190,20 @@ test('active owner DM membership and reply permissions are repaired; suspension 
   const agent = await fixture.agent(admin.actor, 'ada');
   value(await connectOwnerConversation(services, agent.actor, agent.id));
   const conversation = value(services.repositories.ownerConversation.find({ agentId: agent.id }))!;
-  const member = native.rooms.get(conversation.roomId)!.members.get(agent.matrixUserId)!;
+  const member = native.rooms.get(conversation.roomId)!.members.get(agent.backendUserId)!;
   member.membership = 'leave'; member.powerLevel = -1;
   value(await reconcileRoomGrant(services, agent.id, conversation.roomId));
-  assert.equal(native.rooms.get(conversation.roomId)!.members.get(agent.matrixUserId)!.membership, 'join');
-  assert.equal(native.rooms.get(conversation.roomId)!.members.get(agent.matrixUserId)!.powerLevel, 0);
+  assert.equal(native.rooms.get(conversation.roomId)!.members.get(agent.backendUserId)!.membership, 'join');
+  assert.equal(native.rooms.get(conversation.roomId)!.members.get(agent.backendUserId)!.powerLevel, 0);
   const revision = value(services.directory.agent(agent.id))!.principal.revision;
   value(changeAgent(services, admin.actor, agent.id, { expectedRevision: revision, status: 'suspended' }, randomUUID()));
   value(await reconcilePrincipal(services, agent.id));
   value(await reconcileRoomGrant(services, agent.id, conversation.roomId));
-  assert.equal(native.rooms.get(conversation.roomId)!.members.get(agent.matrixUserId)!.membership, 'leave');
+  assert.equal(native.rooms.get(conversation.roomId)!.members.get(agent.backendUserId)!.membership, 'leave');
   assert.equal((await connectOwnerConversation(services, agent.actor, agent.id)).ok, false);
   value(changeAgent(services, admin.actor, agent.id, { expectedRevision: revision + 1, status: 'active' }, randomUUID()));
   value(await reconcilePrincipal(services, agent.id));
-  assert.equal(native.rooms.get(conversation.roomId)!.members.get(agent.matrixUserId)!.membership, 'join');
+  assert.equal(native.rooms.get(conversation.roomId)!.members.get(agent.backendUserId)!.membership, 'join');
   assert.deepEqual(value(services.repositories.ownerConversation.find({ agentId: agent.id })), conversation);
 });
 
@@ -219,7 +219,7 @@ test('binding an owner DM invalidates pending third-party grant authorization at
   const conversation = value(services.repositories.ownerConversation.find({ agentId: ada.id }))!;
   executeDelete(database, schema, (query, params) => query.deleteFrom('agent_owner_conversation').where(row => row.agent_id === params.agentId), { agentId: ada.id });
   const input = { agentId: jo.id, roomId: conversation.roomId, expectedRevision: value(services.directory.agent(jo.id))!.principal.revision,
-    expectedGeneration: null, accessMode: 'reply' as const, powerLevel: null, muted: false };
+    expectedGeneration: null, accessMode: 'reply' as const, nativeAccess: null, muted: false };
   const proof = value(await authorizeGrantChange(services, admin.actor, input));
   value(services.repositories.ownerConversation.insert(conversation));
   const rechecked = services.unitOfWork.run(() => recheckGrantAuthorization(services, admin.actor, proof));

@@ -66,7 +66,7 @@ test('clean installed public tarballs resolve only public dependencies and own o
     const packageRoot = join(prefix, 'node_modules', '@ctlflow', name), sourceRoot = dirname(fileURLToPath(import.meta.resolve('@ctlflow/' + name + '/package.json')));
     const guides = readdirSync(join(sourceRoot, 'docs')); for (const guide of guides) assert.match(guide, /^[A-Za-z0-9-]+\.md$/u, 'Published guides contain only Markdown');
     const expected = ['LICENSE', 'README.md', 'package.json', join('dist', 'bin', name + '.mjs'), ...guides.map(file => join('docs', file)),
-      ...(name === 'fleetd' ? [join('dist', 'bin', 'native-guard.js'), ...['README.md', 'SKILL.md', 'crossfire-client.mjs', 'manifest.json', 'matrix-spec-LICENSE.txt'].map(file => join('dist', 'assets', file))] : [])];
+      ...(name === 'fleetd' ? [join('dist', 'bin', 'native-guard.js'), ...['README.md', 'SKILL.md', 'crossfire-client.mjs', 'manifest.json', 'messaging-LICENSE.txt'].map(file => join('dist', 'assets', file))] : [])];
     assert.deepEqual(installedFiles(packageRoot).sort(), expected.sort(), 'Exact public files contain no source, tests, credentials or extra artifact path');
     const license = readFileSync(join(sourceRoot, 'LICENSE'), 'utf8');
     assert.equal(readFileSync(join(packageRoot, 'LICENSE'), 'utf8'), license, 'The installed public product includes the complete MIT license');
@@ -108,7 +108,7 @@ test('clean installed public tarballs resolve only public dependencies and own o
   const client = createDaemonClient(join(root, 'fleetd.sock'), undefined, () => readAuthentication(join(directory, 'config/ctlflow/fleetd.json')));
   const installedVersion = (JSON.parse(readFileSync(join(prefix, 'node_modules', '@ctlflow', 'fleet', 'package.json'), 'utf8')) as { version: string }).version;
   const setup = () => client.call(operations.setup, {}, { workspace: directory, configuration: join(configuration, 'runtime.toml'),
-    descriptor: { schemaVersion: 1, server: 'https://127.0.0.1:1', ownerMatrixId: '@owner:example.test', package: { name: '@ctlflow/fleet', version: installedVersion }, instructions: '' } });
+    descriptor: { schemaVersion: 1, server: 'https://127.0.0.1:1', ownerBackendUserId: '@owner:example.test', package: { name: '@ctlflow/fleet', version: installedVersion }, instructions: '' } });
   const rejected = await setup(); assert(!rejected.ok); assert.equal(rejected.error.code, 'invalid'); assert.match(rejected.error.message, /Unavailable Pi model/u);
   writeFileSync(agentFile, agentOptions('fixture-model'), { mode: 0o600 });
   const accepted = await setup(); assert(accepted.ok, 'Installed bundle admits native Pi and its exact instruction extension before enrollment');
@@ -124,7 +124,7 @@ test('clean installed public tarballs resolve only public dependencies and own o
   assert.equal(provider.requests.length, 0);
   assert.equal(readdirSync(join(definition, 'workarea', 'worker')).some(name => name.startsWith('.pi-inspection-')), false, 'Installed inspection disposes native histories');
   const sourceAssets = dirname(fileURLToPath(import.meta.resolve('@ctlflow/fleetd/artifacts'))), installedAssets = join(prefix, 'node_modules', '@ctlflow', 'fleetd', 'dist', 'assets');
-  assert.deepEqual(readdirSync(installedAssets).sort(), ['README.md', 'SKILL.md', 'crossfire-client.mjs', 'manifest.json', 'matrix-spec-LICENSE.txt']);
+  assert.deepEqual(readdirSync(installedAssets).sort(), ['README.md', 'SKILL.md', 'crossfire-client.mjs', 'manifest.json', 'messaging-LICENSE.txt']);
   for (const file of readdirSync(installedAssets)) assert.equal(readFileSync(join(installedAssets, file)).equals(readFileSync(join(sourceAssets, file))), true, 'Packed canonical artifact bytes: ' + file);
   await cli('daemon', 'stop');
   const deadline = Date.now() + 10000;

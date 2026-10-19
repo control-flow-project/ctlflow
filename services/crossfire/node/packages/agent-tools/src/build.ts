@@ -23,7 +23,7 @@ export async function buildAgentArtifacts(outputDirectory: string, version: stri
     'README.md': Buffer.from(readFileSync(join(assets, 'README.md'), 'utf8') + '\n## License\n\n' + readFileSync(join(assets, '..', 'LICENSE'), 'utf8')),
     'SKILL.md': readFileSync(join(assets, 'SKILL.md')),
     'crossfire-client.mjs': readFileSync(join(outputDirectory, 'crossfire-client.mjs')),
-    'matrix-spec-LICENSE.txt': readFileSync(join(assets, 'matrix-spec-LICENSE.txt')),
+    'messaging-LICENSE.txt': readFileSync(join(assets, 'messaging-LICENSE.txt')),
   };
   const manifest: Manifest = { version, release: version + '-' + releaseHash(files),
     artifacts: Object.fromEntries(ARTIFACTS.map(name => [name, { bytes: files[name].length, sha256: artifactHash(files[name]) }])) as Manifest['artifacts'] };

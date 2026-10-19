@@ -142,13 +142,17 @@ public sealed class PiProtocol : IAsyncDisposable
     private bool Enter()
     { lock (gate) { if (failure is not null || closing is not null || operating >= 256) return false; operating++; return true; } }
     private void Leave() { lock (gate) { operating--; if (closing is not null && operating == 0) drained.TrySetResult(); } }
-    private Result<Pending> Register(Dictionary<string, Pending> map, string command)
+    private Result<Pending> Register(Dictionary<string, Pending> map, string command, bool readOnly = false)
     {
         lock (gate)
         {
             if (failure is not null) return Result<Pending>.Fail(failure); if (map.Count >= 64) return Results.Fail<Pending>("limit", "Pi native request capacity is exhausted");
             var pending = new Pending(Identity.Identifier(), command); map.Add(pending.Id, pending);
-            pending.Deadline = time.CreateTimer(_ => Fail(new("unavailable", "Native Pi command timed out before confirmation")), null, TimeSpan.FromMilliseconds(timeout), Timeout.InfiniteTimeSpan);
+            pending.Deadline = time.CreateTimer(_ =>
+            {
+                if (!readOnly) Fail(new("unavailable", "Native Pi command timed out before confirmation"));
+                else { Forget(map, pending); pending.Response.TrySetResult(Results.Fail<JsonElement>("unavailable", "Native Pi metadata request timed out")); }
+            }, null, TimeSpan.FromMilliseconds(timeout), Timeout.InfiniteTimeSpan);
             return Result<Pending>.Success(pending);
         }
     }
@@ -165,7 +169,7 @@ public sealed class PiProtocol : IAsyncDisposable
             if (value.ValueKind != JsonValueKind.Object) return Results.Fail<Unit>("invalid", "Native Pi commands require an object");
             var bytes = JsonSerializer.SerializeToUtf8Bytes(value, PiJsonContext.Default.JsonElement); if (bytes.Length > MaximumFrame) return Results.Fail<Unit>("limit", "Native Pi command exceeds its finite byte budget");
             await writing.WaitAsync(scope.Token);
-            try { scope.Token.ThrowIfCancellationRequested(); began = true; started?.Invoke(); await process.Input.BaseStream.WriteAsync(bytes, scope.Token); await process.Input.BaseStream.WriteAsync("\n"u8.ToArray(), scope.Token); await process.Input.BaseStream.FlushAsync(scope.Token); }
+            try { scope.Token.ThrowIfCancellationRequested(); began = true; started?.Invoke(); await process.Input.BaseStream.WriteAsync(bytes, Lifetime); await process.Input.BaseStream.WriteAsync("\n"u8.ToArray(), Lifetime); await process.Input.BaseStream.FlushAsync(Lifetime); }
             finally { writing.Release(); }
             return Results.Done();
         }
@@ -176,11 +180,14 @@ public sealed class PiProtocol : IAsyncDisposable
     private async ValueTask<Result<JsonElement>> RequestTracked(string command, JsonElement parameters, CancellationToken cancellation, Action? publicationStarted = null)
     {
         if (!Enter()) return Result<JsonElement>.Fail(Error);
+        Pending? reading = null;
         try
         {
             if (parameters.ValueKind != JsonValueKind.Object || string.IsNullOrEmpty(command) || command.Length > 200) return Results.Fail<JsonElement>("invalid", "Invalid native Pi command and parameters");
             if (cancellation.IsCancellationRequested) return Results.Fail<JsonElement>("unavailable", "Pi request was cancelled before acceptance");
-            var registered = Register(requests, command); if (!registered.IsSuccess) return Result<JsonElement>.Fail(registered.Error); var pending = registered.Value;
+            var readOnly = command is "get_state" or "get_available_models";
+            var registered = Register(requests, command, readOnly); if (!registered.IsSuccess) return Result<JsonElement>.Fail(registered.Error); var pending = registered.Value;
+            if (readOnly) reading = pending;
             var began = false;
             var written = await Write(PiValues.Object(writer => { foreach (var field in parameters.EnumerateObject()) if (field.Name is not ("type" or "id")) field.WriteTo(writer); writer.WriteString("type", command); writer.WriteString("id", pending.Id); }), cancellation,
                 () => { began = true; publicationStarted?.Invoke(); });
@@ -188,7 +195,7 @@ public sealed class PiProtocol : IAsyncDisposable
             using var scope = CancellationTokenSource.CreateLinkedTokenSource(Lifetime, cancellation); return await pending.Response.Task.WaitAsync(scope.Token);
         }
         catch (OperationCanceledException) { return Results.Fail<JsonElement>("unavailable", "Pi request stopped before confirmation"); }
-        finally { Leave(); }
+        finally { if (reading is not null) Forget(requests, reading); Leave(); }
     }
     public async ValueTask<Result<JsonElement>> Control(string operation, JsonElement parameters, CancellationToken cancellation = default)
     {

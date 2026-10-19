@@ -32,8 +32,8 @@ pub struct Collector {
     dropped: i64,
     flows: BTreeMap<(String, String, String), Flow>,
     usage: BTreeMap<(String, String), Usage>,
-    recent: HashMap<String, Recent>,
-    order: BTreeMap<u64, String>,
+    recent: HashMap<(String, String), Recent>,
+    order: BTreeMap<u64, (String, String)>,
     position: u64,
     pending: Option<Arc<Batch>>,
 }
@@ -60,7 +60,8 @@ impl Collector {
         if !event.room_message || event.listener_notice || event.sender == self.principal {
             return;
         }
-        let previous = self.recent.get(event.event_id).copied();
+        let event_key = (event.room_id.to_owned(), event.event_id.to_owned());
+        let previous = self.recent.get(&event_key).copied();
         if previous.is_some_and(|value| value.delivered || !delivered) {
             return;
         }
@@ -91,7 +92,7 @@ impl Collector {
         }
         let flow = self.flows.entry(key).or_insert_with(|| Flow {
             room_id: event.room_id.to_owned(),
-            sender_matrix_id: event.sender.to_owned(),
+            sender_backend_user_id: event.sender.to_owned(),
             message_type: message_type.to_owned(),
             totals: Totals::default(),
         });
@@ -139,13 +140,13 @@ impl Collector {
         }
         self.position += 1;
         self.recent.insert(
-            event.event_id.to_owned(),
+            event_key.clone(),
             Recent {
                 delivered,
                 order: self.position,
             },
         );
-        self.order.insert(self.position, event.event_id.to_owned());
+        self.order.insert(self.position, event_key);
         if self.recent.len() > RECENT_EVENTS
             && let Some((_, expired)) = self.order.pop_first()
         {

@@ -6,7 +6,7 @@ import { value } from './support/application.js';
 import { createMemberInvitation, revokeMemberInvitation } from '@ctlflow/crossfire-domain/member/invitation';
 import { listInvitations, readInvitation } from '@ctlflow/crossfire-domain/member/read-member';
 import { changeInstancePolicy } from '@ctlflow/crossfire-domain/policy/change-policy';
-import { registrationStage } from '../apps/server/src/http/registration.js';
+import { registrationStage } from '@ctlflow/crossfire-adapter-matrix/web/registration';
 import { session as parseSession } from '@ctlflow/crossfire-contracts/schema/response';
 import { changeMember } from '@ctlflow/crossfire-domain/member/change-member';
 test('normal Element signup requires a link in invitation mode and never grants administrator authority through open signup', { timeout: 120000 }, async scope => {
@@ -67,10 +67,10 @@ test('normal Element signup requires a link in invitation mode and never grants 
   assert.equal(created.status, 200, await created.clone().text());
   const credentials = await created.json() as { user_id: string; access_token: string; device_id: string };
   assert.equal(credentials.device_id, 'ELEMENT_DEVICE');
-  const identity = value(await services.matrix.identify(credentials.access_token));
+  const identity = value(await services.messaging.identify(credentials.access_token));
   assert.equal(identity, credentials.user_id);
   await verifyManagement(credentials.access_token, account.username);
-  const principal = value(services.directory.principalByMatrixId(identity))!;
+  const principal = value(services.directory.principalByBackendUserId(identity))!;
   assert.equal(value(services.directory.member(principal.id))!.role.roleCode, 'member');
   const usedSession = await challengeFor({ ...account, username: 'another-person' });
   assert.equal((await fetch(confirmationUrl(usedSession), { headers: { Cookie: cookie } })).status, 403);
@@ -85,13 +85,13 @@ test('normal Element signup requires a link in invitation mode and never grants 
   assert.equal(registered.status, 200, await registered.clone().text());
   const openAccount = await registered.json() as { user_id: string; access_token: string };
   await verifyManagement(openAccount.access_token, openUsername);
-  const openPrincipal = value(services.directory.principalByMatrixId(openAccount.user_id))!;
+  const openPrincipal = value(services.directory.principalByBackendUserId(openAccount.user_id))!;
   assert.equal(value(services.directory.member(openPrincipal.id))!.role.roleCode, 'member');
   assert.equal((await post({ username: 'agent-forbidden', password: 'another-private-password', auth: { session: openSession } })).status, 400);
   const rejectedSession = await challengeFor({ username: 'agent-forbidden', password: 'another-private-password' });
   await authorize(rejectedSession);
   assert.equal((await post({ auth: { session: rejectedSession } })).status, 400);
-  assert.equal(value(await services.matrix.exists('@agent-forbidden:' + services.instance.serverName)), false);
+  assert.equal(value(await services.messaging.exists('@agent-forbidden:' + services.messaging.serviceUserId().split(':').slice(1).join(':'))), false);
   const administratorInvitation = value(createMemberInvitation(services, admin.actor, { roleCode: 'administrator', expiresSeconds: 600 }, 'administrator-invitation'));
   const claimedAdministrator = await fetch(origin + '/api/member-invitations/' + administratorInvitation.invitationId + '/claim', { method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify({ claimSecret: administratorInvitation.claimSecret }) });
   const administratorCookie = claimedAdministrator.headers.get('set-cookie')!.split(';')[0]!;
@@ -100,14 +100,14 @@ test('normal Element signup requires a link in invitation mode and never grants 
   const administratorResponse = await post({ auth: { session: administratorSession } });
   assert.equal(administratorResponse.status, 200);
   const administratorAccount = await administratorResponse.json() as { user_id: string };
-  const administratorPrincipal = value(services.directory.principalByMatrixId(administratorAccount.user_id))!;
+  const administratorPrincipal = value(services.directory.principalByBackendUserId(administratorAccount.user_id))!;
   assert.equal(value(services.directory.member(administratorPrincipal.id))!.role.roleCode, 'administrator');
   const policyBeforeClosing = value(services.repositories.instancePolicy.find({ id: 'instance' }))!;
   const closingSession = await challengeFor({ username: 'closing-person', password: 'another-private-password' });
   await authorize(closingSession);
   value(changeInstancePolicy(services, admin.actor, { ...policyBeforeClosing, expectedRevision: policyBeforeClosing.revision, signupMode: 'invitation' }, 'close'));
   assert.equal((await post({ auth: { session: closingSession } })).status, 403);
-  assert.equal(value(await services.matrix.exists('@closing-person:' + services.instance.serverName)), false);
+  assert.equal(value(await services.messaging.exists('@closing-person:' + services.messaging.serviceUserId().split(':').slice(1).join(':'))), false);
 });
 test('invitation issuers follow policy and members cannot elevate roles or inspect another issuer’s invitations', { timeout: 120000 }, async scope => {
   const fixture = await nativeServer(scope, await releaseFixture()), { services, admin } = fixture;

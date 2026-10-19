@@ -2,7 +2,7 @@ using Crossfire.Kernel;
 
 namespace Crossfire.Domain;
 
-public sealed record NativeActorPorts(AuthorizationPorts Authorization, Func<string, Result<Principal?>> PrincipalByMatrixId,
+public sealed record NativeActorPorts(AuthorizationPorts Authorization, Func<string, Result<Principal?>> PrincipalByBackendUserId,
     Func<string, CancellationToken, ValueTask<Result<string>>> Identify);
 
 public static class NativeActors
@@ -11,7 +11,7 @@ public static class NativeActors
     {
         var identity = await ports.Identify(token, cancellation);
         if (!identity.IsSuccess) return Result<Actor>.Fail(identity.Error);
-        var principal = ports.PrincipalByMatrixId(identity.Value);
+        var principal = ports.PrincipalByBackendUserId(identity.Value);
         if (!principal.IsSuccess) return Result<Actor>.Fail(principal.Error);
         if (principal.Value is null) return Results.Fail<Actor>("forbidden", "Registered identity authentication is required");
         var actor = new Actor(principal.Value.Id, principal.Value.Kind, new NativeAuthentication(identity.Value));

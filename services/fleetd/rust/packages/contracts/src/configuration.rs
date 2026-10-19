@@ -1,6 +1,6 @@
 use crossfire_contracts::validation as check;
 use crossfire_domain::{
-    coordination::{MatrixSender, Policy},
+    coordination::{BackendSender, Policy},
     identity::WakeMode,
     runtime::values::{HistoryMode, Runtime},
 };
@@ -171,7 +171,7 @@ pub fn roster(value: &Value) -> Result<Roster> {
         fleet: check::name(&value["fleet"])?.to_owned(),
         coordination: Coordination {
             server: server.to_owned(),
-            owner: check::matrix_user_id(&coordination["owner"])?.to_owned(),
+            owner: check::backend_user_id(&coordination["owner"])?.to_owned(),
         },
         instances,
     })
@@ -195,9 +195,10 @@ pub fn definition(value: &Value, instructions: String, owner: &str) -> Result<De
             let senders = check::list(&policy["wake_senders"], 0, 2000)?
                 .iter()
                 .map(|value| {
-                    let value = check::object(value, &["matrix_user_id", "include_agents"], &[])?;
-                    Ok(MatrixSender {
-                        matrix_user_id: check::matrix_user_id(&value["matrix_user_id"])?.to_owned(),
+                    let value = check::object(value, &["backend_user_id", "include_agents"], &[])?;
+                    Ok(BackendSender {
+                        backend_user_id: check::backend_user_id(&value["backend_user_id"])?
+                            .to_owned(),
                         include_agents: check::boolean(&value["include_agents"])?,
                     })
                 })
@@ -209,7 +210,7 @@ pub fn definition(value: &Value, instructions: String, owner: &str) -> Result<De
             if mode == WakeMode::Everyone && !senders.is_empty()
                 || senders
                     .iter()
-                    .map(|sender| &sender.matrix_user_id)
+                    .map(|sender| &sender.backend_user_id)
                     .collect::<BTreeSet<_>>()
                     .len()
                     != senders.len()

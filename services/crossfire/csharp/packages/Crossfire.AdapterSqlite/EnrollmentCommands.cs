@@ -80,10 +80,8 @@ public static class EnrollmentCommands
         context.SaveChanges(); return Results.Done();
     }
 
-    public static EnrollmentPorts Ports(CrossfireDbContext context, Func<long> now, string serverName,
-        Func<string, CancellationToken, ValueTask<Result<string>>> identify,
-        Func<string, string, CancellationToken, ValueTask<Result<RoomFacts>>> room)
-        => new(EnrollmentAdmissionQueries.Ports(context, now, identify), new SqliteUnitOfWork(context), RoomGrantCommands.Ports(context, now, room), WakeCommands.Ports(context, now),
+    public static EnrollmentPorts Ports(CrossfireDbContext context, Func<long> now, MessagingPorts messaging)
+        => new(EnrollmentAdmissionQueries.Ports(context, now, messaging.Identify), new SqliteUnitOfWork(context), RoomGrantCommands.Ports(context, now, messaging), WakeCommands.Ports(context, now),
             id => EnrollmentQueries.Find(context, id), id => EnrollmentQueries.Items(context, id), id => EnrollmentQueries.Policies(context, id),
             timestamp => EnrollmentQueries.Expired(context, timestamp), () => EnrollmentQueries.PendingCount(context), (value, create) => Save(context, value, create),
             (value, create) => Item(context, value, create), (item, policy) => Policy(context, item, policy), (id, values) => Metadata(context, id, values),
@@ -93,5 +91,5 @@ public static class EnrollmentCommands
             id => EnrollmentQueries.Credential(context, id), (fleet, create) => EnrollmentFleetCommands.Fleet(context, fleet, create),
             (binding, create) => EnrollmentFleetCommands.Binding(context, binding, create), credential => EnrollmentFleetCommands.Credential(context, credential),
             (id, values) => EnrollmentFleetCommands.Metadata(context, id, values), (id, policy) => EnrollmentFleetCommands.Policy(context, id, policy, now()),
-            id => WakeCommands.Senders(context, id), serverName);
+            id => WakeCommands.Senders(context, id), messaging);
 }

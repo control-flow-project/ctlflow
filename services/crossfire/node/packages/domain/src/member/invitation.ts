@@ -12,7 +12,7 @@ export function createMemberInvitation(services: Dependencies, actor: Actor, inp
     const id = services.identity.id(), claimSecret = services.identity.secret(), now = services.clock.now();
     const saved = services.repositories.memberInvitation.insert({ id, createdByMemberId: actor.principalId, claimHash: services.identity.hash(claimSecret),
       roleCode: input.roleCode, principalKind: 'human', createdAt: now, expiresAt: now + input.expiresSeconds * 1000,
-      consumedByMemberId: null, revokedAt: null, claimMatrixUserId: null, claimDisplayName: null, claimFingerprint: null });
+      consumedByMemberId: null, revokedAt: null, claimBackendUserId: null, claimDisplayName: null, claimFingerprint: null });
     if (!saved.ok) return saved;
     const audit = recordEvent(services, actor, requestId, { targetKind: 'member-invitation', targetId: id, action: 'member-invitation.create' });
     return audit.ok ? success({ invitationId: id, claimSecret, expiresAt: now + input.expiresSeconds * 1000 }) : audit;

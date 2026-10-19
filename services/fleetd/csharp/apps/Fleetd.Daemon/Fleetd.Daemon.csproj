@@ -5,6 +5,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterMatrix/Crossfire.AdapterMatrix.csproj" />
     <Using Include="Crossfire.Kernel.Results" Alias="Results" />
     <ProjectReference Include="../../packages/Fleetd.AdapterExecution/Fleetd.AdapterExecution.csproj" />
     <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterCodex/Crossfire.AdapterCodex.csproj" />

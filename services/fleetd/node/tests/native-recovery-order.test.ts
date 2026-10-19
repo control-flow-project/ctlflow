@@ -1,3 +1,4 @@
+import { contextRoom } from '@ctlflow/crossfire-kernel/history-context';
 import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -25,7 +26,7 @@ async function fixture(scope: TestContext, originalReceipt: NativeReceipt = true
   const sessionId = randomUUID(), journal = join(directory, 'receipt.json');
   const original = { text: 'Attributed pending @mention', messageId: randomUUID() };
   const store = createResumeWork(directory, () => 1000);
-  const roomId = context === 'shared' || context === 'control' ? null : context;
+  const roomId = contextRoom(context);
   const contexts: SavedRuntimeContext[] = [{ context, sessionId, runtime: 'fixture', workspace: directory }];
   const submitted: NativeMessage[] = [], order: string[] = [];
   let loseResponse = true;
@@ -43,6 +44,7 @@ async function fixture(scope: TestContext, originalReceipt: NativeReceipt = true
     }, input, { journal, pollMs: 100 });
     observe?.({ kind: 'state', observation: { sessionId, roomId, runtime: 'fixture', state: 'idle', observedAt: 1000, settings: [], errorMessage: null } });
     return { ...delivery, attachment: { runtime: 'fixture', sessionId, workspace: directory, connection: {} }, attachments: async () => [],
+      provider: async () => success('unknown'),
       activity: async () => { const busy = delivery.unsettled() || (await delivery.inspect()).busy; return { busy, contexts: [{ context, sessionId, busy }] }; },
       turnControl: { activeTurn: async () => null, interrupt: async () => 'inactive' } };
   }
@@ -75,14 +77,14 @@ for (const outcome of [true, 'cancelled', 'interrupted'] as const) {
 }
 
 test('per-room continuations settle only each exact room receipt and retain original control input', async scope => {
-  const control = await fixture(scope, true, 'control'), first = await fixture(scope, true, '!first:test'), second = await fixture(scope, true, '!second:test');
+  const control = await fixture(scope, true, 'control'), first = await fixture(scope, true, 'room/control'), second = await fixture(scope, true, 'room/second');
   const rooms = new Map([first, second].map(current => [current.contexts[0]!.context, current.open(scope.signal)]));
   const primary = control.open(scope.signal);
   cleanup(scope, async () => { await primary.close(); for (const room of [...rooms.values()].toReversed()) await room.close(); });
   const contexts = [...control.contexts, ...first.contexts, ...second.contexts];
   value(first.store.capture(second.contexts.map(({ context, sessionId }) => ({ context, sessionId }))));
   const checkpoints = value(first.store.read());
-  const connection: OwnedRuntimeConnection = { ...primary, conversation: async room => rooms.get(room) ?? assert.fail('Cannot create another room history') };
+  const connection: OwnedRuntimeConnection = { ...primary, conversation: async room => rooms.get('room/' + room) ?? assert.fail('Cannot create another room history') };
   await resumeInterruptedWork(connection, 'control', contexts, first.store);
   assert.equal(value(first.store.read()).length, 2);
   assert(value(first.store.read()).every(work => !checkpoints.some(before => before.messageId === work.messageId)), 'Both room tasks remain checkpointed with new restart identities');
@@ -90,7 +92,7 @@ test('per-room continuations settle only each exact room receipt and retain orig
     const checkpoint = value(first.store.read()).find(work => work.sessionId === current.sessionId)!;
     assert.deepEqual(current.submitted.map(message => message.messageId), [current.original.messageId, checkpoint.messageId]);
     assert(current.order.indexOf('receipt:' + current.original.messageId) < current.order.indexOf('publish:' + checkpoint.messageId));
-    assert(current.submitted[1]!.text.includes(current.contexts[0]!.context));
+    assert(current.submitted[1]!.text.includes(contextRoom(current.contexts[0]!.context)!));
     assert.equal(await rooms.get(current.contexts[0]!.context)!.recover(current.original.text, current.original.messageId), true);
   }
   assert.equal(control.submitted.length, 1);

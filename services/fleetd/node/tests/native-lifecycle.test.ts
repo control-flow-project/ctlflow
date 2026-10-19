@@ -1,3 +1,4 @@
+import { roomContext, contextRoom } from '@ctlflow/crossfire-kernel/history-context';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setImmediate as yieldLoop } from 'node:timers/promises';
@@ -28,9 +29,11 @@ function fixture() {
     delay: async (_milliseconds, signal) => { signal.throwIfAborted(); },
   };
   const saved: SavedRuntimeContext[] = [{ context: 'shared', runtime: 'fixture', sessionId: 'exact-history', workspace: '/fixture' }];
-  const started: AbortController[] = [], closed: string[] = [], delivered: string[] = [], failures: unknown[] = [], observed: RuntimeObservationEvent[] = [];
+  const started: AbortController[] = [], closed: string[] = [], delivered: string[] = [], acknowledged: string[] = [], failures: unknown[] = [], observed: RuntimeObservationEvent[] = [];
   const nativeObservers: NonNullable<NativeLifecycleServices['hooks']['observe']>[] = [];
   let recovered = 0, inspect: (() => Promise<{ busy: boolean }>) | undefined;
+  let provider: OwnedRuntimeConnection['provider'] = async () => success('unknown');
+  let settle: OwnedRuntimeConnection['settle'] = async () => false;
   const services: NativeLifecycleServices = { clock, primary: 'shared', runtime: 'fixture', approval: 'none', initialSettings: [], initial: 'running',
     work: { read: () => success(work.map(item => ({ ...item }))),
       capture: contexts => { for (const context of contexts) if (!work.some(item => item.context === context.context)) work.push({ ...context,
@@ -51,12 +54,13 @@ function fixture() {
       const context = saved.find(context => context.context === 'shared')!;
       observe({ kind: 'state', observation: { runtime: 'fixture', sessionId: context.sessionId, roomId: null, state: 'idle', observedAt: now, settings: [], errorMessage: null } });
       const connection: OwnedRuntimeConnection = { sessionId: context.sessionId, signal: stop.signal, approval: 'none',
+        provider: signal => provider(signal),
         attachment: { runtime: 'fixture', sessionId: context.sessionId, workspace: '/fixture', connection: {} },
         attachments: async () => saved.map(context => ({ context: context.context, attachment: { runtime: 'fixture', sessionId: context.sessionId, workspace: '/fixture', connection: {} } })),
         inspect: () => inspect ? inspect() : unknown ? Promise.reject(new Error('Unknown native status')) : Promise.resolve({ busy }),
         activity: async () => { const status = await connection.inspect(); return { ...status, contexts: saved.map(item => ({ context: item.context, sessionId: item.sessionId, busy: status.busy })) }; },
         deliver: async (_text, messageId) => { delivered.push(messageId); }, recover: async (_text, messageId) => delivered.includes(messageId),
-        acknowledge: () => {}, settle: async () => false, turnControl: { activeTurn: async () => null, interrupt: async () => 'inactive' },
+        acknowledge: ids => { acknowledged.push(...ids); }, settle: cancellation => settle(cancellation), turnControl: { activeTurn: async () => null, interrupt: async () => 'inactive' },
         close: async () => { closed.push(context.sessionId); stop.abort(new Error('Closed native fixture')); },
       };
       return success(connection);
@@ -67,11 +71,52 @@ function fixture() {
     for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.callback(); }
     await yieldLoop();
   }
-  return { services, advance, started, saved, closed, delivered, failures, observed, nativeObservers,
+  return { services, advance, started, saved, closed, delivered, acknowledged, failures, observed, nativeObservers,
+    setSettle: (value: OwnedRuntimeConnection['settle']) => { settle = value; },
+    setProvider: (value: OwnedRuntimeConnection['provider']) => { provider = value; },
     setBusy: (value: boolean) => { busy = value; }, setUnknown: (value: boolean) => { unknown = value; },
     setPending: (value: boolean) => { pending = value; }, setDecisions: (value: boolean) => { decisions = value; },
     setInspect: (value: typeof inspect) => { inspect = value; }, recovered: () => recovered, timers: () => timers.size };
 }
+
+test('diagnostics observe busy and owner-decision states without touching resume checkpoints or invoking readiness', async scope => {
+  const current = fixture(), managed = value(await initializedLifecycle(current.services, scope.signal));
+  scope.after(() => managed.close());
+  let probes = 0;
+  current.setProvider(async () => { probes++; return success('present'); });
+  const observer = current.nativeObservers.at(-1)!;
+  observer({ kind: 'state', observation: { runtime: 'fixture', sessionId: 'exact-history', roomId: null, state: 'working', observedAt: 1000, settings: [], errorMessage: null } });
+  current.setPending(true); current.setDecisions(true);
+  const before = value(current.services.work.read()), nativeState = managed.nativeState(), observed = current.observed.length;
+  current.setInspect(async () => assert.fail('Diagnostic reads cannot invoke mutating readiness inspection'));
+  const report = await managed.diagnostics(scope.signal);
+  assert.equal(report.state, 'working'); assert.equal(report.provider, 'present'); assert.equal(report.providerObservedAt, 1000);
+  assert.equal(report.pendingInput, true); assert.equal(report.pendingDecision, true); assert.equal(probes, 1);
+  assert.deepEqual(value(current.services.work.read()), before); assert.deepEqual(managed.nativeState(), nativeState);
+  assert.equal(current.observed.length, observed); assert.equal(current.delivered.length, 0); assert.equal(current.failures.length, 0);
+  observer({ kind: 'state', observation: { runtime: 'fixture', sessionId: 'exact-history', roomId: null, state: 'waiting-answer', observedAt: 1001, settings: [], errorMessage: null } });
+  assert.equal((await managed.diagnostics(scope.signal)).state, 'waiting-answer');
+});
+
+test('failed or cancelled diagnostic provider reads do not fail or restart the owned native generation', async scope => {
+  const current = fixture(), managed = value(await initializedLifecycle(current.services, scope.signal));
+  scope.after(() => managed.close());
+  const state = managed.nativeState(), count = current.started.length;
+  current.setProvider(async () => failure('unavailable', 'Private detail that must not be forwarded'));
+  assert.equal((await managed.diagnostics(scope.signal)).provider, 'unknown');
+  current.setProvider(async signal => { signal.throwIfAborted(); throw new Error('Private failure'); });
+  assert.equal((await managed.diagnostics(scope.signal)).provider, 'unknown');
+  assert.equal((await managed.diagnostics(AbortSignal.abort())).provider, 'unknown');
+  assert.deepEqual(managed.nativeState(), state); assert.equal(current.started.length, count); assert.equal(current.failures.length, 0);
+});
+
+test('sleeping diagnostics never open a native process, touch history files or probe a provider', async scope => {
+  const current = fixture(); current.services.initial = 'sleeping';
+  const managed = value(await createNativeLifecycle(current.services, scope.signal)); scope.after(() => managed.close());
+  current.setProvider(async () => assert.fail('Sleeping inspection must not probe an account'));
+  const report = await managed.diagnostics(scope.signal);
+  assert.equal(report.state, 'sleeping'); assert.equal(report.provider, 'unknown'); assert.equal(current.started.length, 0);
+});
 
 test('opened native generation stays waking and cannot report recovery until listener activation', async scope => {
   const current = fixture(), managed = value(await createNativeLifecycle(current.services, scope.signal));
@@ -263,6 +308,20 @@ test('recovery binds sleeping histories without a process and concurrent inputs 
   await Promise.all([managed.runtime.deliver('One', 'one'), managed.runtime.deliver('Two', 'two')]);
   managed.runtime.acknowledge(['one', 'two']);
   assert.equal(fixture_.started.length, 1); assert.deepEqual(fixture_.delivered.toSorted(), ['one', 'two']);
+});
+
+test('receipt retirement waits until every retained history has finished initialization', async scope => {
+  const current = fixture(), managed = value(await createNativeLifecycle(current.services, scope.signal)); scope.after(() => managed.close());
+  let entered = false, release!: () => void;
+  const blocked = new Promise<void>(resolve => { release = resolve; });
+  current.setSettle(async () => { entered = true; await blocked; return false; });
+  const activating = managed.activate(); await until(() => entered);
+  let rejected = false;
+  try { managed.runtime.acknowledge(['producer-receipt']); } catch (error) { rejected = error instanceof Error && 'code' in error && error.code === 'unavailable'; }
+  const beforeReady = [...current.acknowledged]; release(); await activating;
+  assert.equal(rejected, true, 'Partially initialized native histories cannot retire producer evidence');
+  assert.deepEqual(beforeReady, []);
+  managed.runtime.acknowledge(['producer-receipt']); assert.deepEqual(current.acknowledged, ['producer-receipt']);
 });
 
 test('empty receipt checkpoints settle while sleeping without waking native history; real receipts remain fenced', async scope => {
@@ -491,9 +550,9 @@ test('failed write-ahead persistence prevents any native submission', async scop
 });
 
 test('inspection and stop clear a completed room without clearing another room with unacknowledged input', async scope => {
-  for (const action of ['inspect', 'stop', 'stop-during-inspection']) {
+  for (const action of ['inspect', 'stop', 'stop-during-inspection', 'other-room-during-inspection']) {
     const current = fixture(), start = current.services.start;
-    const rooms = ['!active:test', '!completed:test'].map((context, index) => ({ context, runtime: 'fixture', sessionId: 'room-history-' + index, workspace: '/fixture' }));
+    const rooms = ['control', 'completed'].map((room, index) => ({ context: roomContext(room), runtime: 'fixture', sessionId: 'room-history-' + index, workspace: '/fixture' }));
     current.saved.push(...rooms);
     const busy = new Map(rooms.map(item => [item.context, false]));
     let holdInspection = false, inspecting = false, release: (() => void) | undefined;
@@ -508,22 +567,26 @@ test('inspection and stop clear a completed room without clearing another room w
         return snapshot;
       };
       root.conversation = async room => {
-        const saved = rooms.find(item => item.context === room)!;
-        return { ...root, sessionId: saved.sessionId, deliver: async () => { busy.set(room, true); } };
+        const saved = rooms.find(item => item.context === roomContext(room))!;
+        return { ...root, sessionId: saved.sessionId, deliver: async () => { busy.set(roomContext(room), true); } };
       };
       return result;
     };
     const managed = value(await initializedLifecycle(current.services, scope.signal));
     try {
-      const completed = await managed.runtime.conversation!(rooms[1]!.context);
+      const completed = await managed.runtime.conversation!(contextRoom(rooms[1]!.context)!);
       await completed.deliver('Complete this room task', 'completed'); completed.acknowledge(['completed']); busy.set(rooms[1]!.context, false);
-      const active = await managed.runtime.conversation!(rooms[0]!.context);
+      const active = await managed.runtime.conversation!(contextRoom(rooms[0]!.context)!);
       await active.deliver('Keep this room task pending', 'active');
       assert.equal(value(current.services.work.read()).length, 2);
-      if (action === 'stop-during-inspection') {
+      if (action === 'stop-during-inspection' || action === 'other-room-during-inspection') {
         holdInspection = true; older = managed.runtime.inspect(); await until(() => inspecting);
       }
-      if (action === 'inspect') assert.equal((await managed.runtime.inspect()).busy, true);
+      if (action === 'other-room-during-inspection') {
+        current.nativeObservers.at(-1)!({ kind: 'state', observation: { runtime: 'fixture', sessionId: rooms[0]!.sessionId,
+          roomId: 'control', state: 'working', observedAt: 1001, settings: [], errorMessage: null } });
+        release!(); await older; older = undefined;
+      } else if (action === 'inspect') assert.equal((await managed.runtime.inspect()).busy, true);
       else await managed.close();
       release?.(); await older;
       assert.deepEqual(value(current.services.work.read()).map(item => item.context), [rooms[0]!.context], 'Only the unfinished exact room can receive a later restart reminder');
@@ -533,7 +596,7 @@ test('inspection and stop clear a completed room without clearing another room w
 
 test('a selected room defaults native turn inspection to that room while preserving an explicit room override', async scope => {
   const current = fixture(), start = current.services.start, room = '!selected:test';
-  current.saved.push({ context: room, runtime: 'fixture', sessionId: 'selected-history', workspace: '/fixture' });
+  current.saved.push({ context: roomContext(room), runtime: 'fixture', sessionId: 'selected-history', workspace: '/fixture' });
   const captured: (string | undefined)[] = [];
   current.services.start = async (...input) => {
     const result = await start(...input); if (!result.ok) return result;

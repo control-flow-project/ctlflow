@@ -4,6 +4,7 @@ use crate::{
     local_state::{self, LocalState},
 };
 use crossfire_contracts::{call::Call, operations::OperationId, validation as check};
+use crossfire_domain::messaging_client::InvitationReader;
 use crossfire_kernel::{Result, failure::ErrorCode, time::Clock};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -119,7 +120,7 @@ impl<S: LocalState, C: Coordination, T: Clock + Send + Sync> Maintenance<S, C, T
     }
     pub async fn publish(
         &self,
-        matrix: &impl crate::matrix::Matrix,
+        messaging: &impl InvitationReader,
         stop: CancellationToken,
     ) -> Result<bool> {
         let now = self.clock.now()?;
@@ -137,7 +138,7 @@ impl<S: LocalState, C: Coordination, T: Clock + Send + Sync> Maintenance<S, C, T
             )
         };
         let invitations = if refresh {
-            Some(crate::receive_pages::invitations(matrix, stop.clone()).await?)
+            Some(messaging.invitation_rooms(stop.clone()).await?)
         } else {
             None
         };

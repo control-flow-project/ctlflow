@@ -32,7 +32,9 @@ fn invalid(message: &str) -> Failure {
     Failure::new(ErrorCode::Invalid, message)
 }
 pub fn allocate(context: &str) -> Result<Binding> {
-    validation::text(&json!(context), 1, 255)?;
+    if !crossfire_kernel::history_context::valid(context) {
+        return Err(invalid("Invalid native history context"));
+    }
     Ok(Binding {
         context: context.to_owned(),
         file: journal::digest(context) + ".jsonl",

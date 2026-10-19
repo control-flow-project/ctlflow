@@ -42,7 +42,7 @@ pub fn resolve(
                 value.owner_id.as_deref(),
             )
         })
-        .map(|value| value.principal.matrix_user_id)
+        .map(|value| value.principal.backend_user_id)
         .collect::<Vec<_>>();
     result.sort();
     Ok(result)

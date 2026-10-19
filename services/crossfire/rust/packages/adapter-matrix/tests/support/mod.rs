@@ -12,7 +12,7 @@ pub fn authority(fixture: &Fixture) -> Result<Authority> {
         server_name: "example.test".to_owned(),
         jwt_secret: Secret::new("control-key".to_owned()),
         registration_secret: Secret::new("registration-key".to_owned()),
-        service_matrix_id: "@service:example.test".to_owned(),
+        service_backend_user_id: "@service:example.test".to_owned(),
     })
 }
 

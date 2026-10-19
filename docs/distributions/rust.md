@@ -73,13 +73,13 @@ For a new local instance:
 ```
 
 Initialization refuses nonempty state. The initial password is in private
-`bootstrap.json`, field `administratorPassword`. The package selects its backend
-independently of the operator language. Rust can run any verified backend package,
+`bootstrap.json`, field `administratorPassword`. The package selects its server
+implementation independently of the operator language. Rust can run any verified implementation package,
 and Node/C# operators can run the Rust package. The operator verifies exclusive
 ownership, archive bytes, image platform/release labels and exact owned orphan
 cleanup, verifies a required upgrade backup and runs Knex before startup.
 The superseded `--source`, `--compile` and `--runtime` flags are rejected.
-There is no backend fallback. Ctrl+C stops the owned container and
+There is no implementation fallback. Ctrl+C stops the owned container and
 retains persistent data.
 
 The example serves Element at `http://127.0.0.1:8098/` and management at
@@ -117,7 +117,7 @@ it is not another shared listener or a persistent service.
 ```sh
 export PATH="/absolute/releases/rust/fleet:/absolute/releases/rust/fleetd:$PATH"
 fleet --help
-fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerMatrixId=%40member%3Aexample.test'
+fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerBackendUserId=%40member%3Aexample.test'
 fleet list
 ```
 

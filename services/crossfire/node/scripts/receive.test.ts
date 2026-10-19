@@ -1,51 +1,54 @@
+import type { MessageEvent } from '@ctlflow/crossfire-domain/port/messaging-client';
+import { createMessagingClient } from '@ctlflow/crossfire-adapter-matrix/messaging-client';
+import { messageEvent } from '@ctlflow/crossfire-adapter-matrix/events';
 import { localState as storage } from '@ctlflow/crossfire-adapter-filesystem/state';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { matrix } from '@ctlflow/crossfire-adapter-matrix/http';
 import { writeJson } from '@ctlflow/crossfire-adapter-filesystem/index';
-import type { Event } from '@ctlflow/crossfire-contracts/client';
-import { eventView, readUnread, synchronize, loadSyncCursor, checkpointSync, incrementalEvents, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, acquisitionBytes, type Sync } from '@ctlflow/crossfire-agent-core/receive';
+import type { MatrixEvent as Event } from '@ctlflow/crossfire-adapter-matrix/values';
+import { eventView, readUnread, loadSyncCursor, checkpointSync, incrementalEvents, acknowledge, flushAcknowledgements, retainJoinedCursors, acquisitionBytes } from '@ctlflow/crossfire-agent-core/receive';
 import { chatBatches } from '@ctlflow/crossfire-agent-core/chat-batches';
 import { messageArtifacts } from '@ctlflow/crossfire-agent-core/message-artifacts';
 import { deliveryEvents } from '@ctlflow/crossfire-agent-core/senders';
 import { matrixFixture, message, OBSERVER, ROOM, SELF, temporary } from './test-support/listener.js';
 
-async function collected(source: AsyncIterable<Event>): Promise<Event[]> {
-  const events: Event[] = []; for await (const event of source) events.push(event); return events;
+async function collected(source: AsyncIterable<MessageEvent>): Promise<MessageEvent[]> {
+  const events: MessageEvent[] = []; for await (const event of source) events.push(event); return events;
 }
 
 test('canonical reads preserve room order, all message kinds, and independent cursor proposals', async t => {
   const fixture = await matrixFixture(t, temporary(t));
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   const secondRoom = '!other:test.localhost';
   fixture.subscribe(ROOM);
   fixture.subscribe(secondRoom);
   fixture.add(ROOM, message('$z'), { ...message('$state'), type: 'm.room.member' }, message('$a'));
   fixture.add(secondRoom, { ...message('$file'), content: { msgtype: 'm.file', url: 'mxc://test.localhost/file' } },
     { ...message('$redact'), type: 'm.room.redaction' }, { ...message('$encrypted'), type: 'm.room.encrypted' });
-  const first = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 2);
-  assert.deepEqual(first.events.map(event => event.event_id), ['$z', '$file']);
-  assert.deepEqual(first.more_rooms, [ROOM, secondRoom]);
+  const first = await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 2);
+  assert.deepEqual(first.events.map(event => event.eventId), ['$z', '$file']);
+  assert.deepEqual(first.moreRooms, [ROOM, secondRoom]);
   assert.deepEqual(JSON.parse(readFileSync(fixture.cursorFile, 'utf8')), { [ROOM]: '0', [secondRoom]: '0' });
   writeJson(fixture.cursorFile, first.cursors);
   const saved = readFileSync(fixture.cursorFile, 'utf8');
-  const second = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 2, ROOM);
-  assert.deepEqual(second.events.map(event => event.event_id), ['$state', '$a']);
+  const second = await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 2, ROOM);
+  assert.deepEqual(second.events.map(event => event.eventId), ['$state', '$a']);
   assert.equal(second.cursors[secondRoom], first.cursors[secondRoom]);
   assert.equal(readFileSync(fixture.cursorFile, 'utf8'), saved);
-  assert.deepEqual(second.more_rooms, [ROOM]);
+  assert.deepEqual(second.moreRooms, [ROOM]);
 });
 
 test('sync reports invitations without automatic joining or provisioning access', async t => {
   const fixture = await matrixFixture(t, temporary(t));
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   const invite = (sender: string): Event => ({ ...message('$invite', sender), type: 'm.room.member',
     state_key: SELF, content: { membership: 'invite' } });
   fixture.invites['!accepted'] = { invite_state: { events: [invite(OBSERVER)] } };
   fixture.invites['!rejected'] = { invite_state: { events: [invite('@other:test.localhost')] } };
-  const token = await synchronize(client);
-  assert.equal(typeof token.next_batch, 'string');
+  const token = await createMessagingClient(client, fixture.account.userId).synchronize();
+  assert.equal(typeof token.cursor, 'string');
   assert(!fixture.joined.has('!accepted'));
   assert(!fixture.joined.has('!rejected'));
   assert(!fixture.requests.some(request => request.method === 'POST'));
@@ -55,27 +58,27 @@ test('sync reports invitations without automatic joining or provisioning access'
 
 test('rooms without the owner remain natively readable; corrupt events, cursors and pages fail closed', async t => {
   const fixture = await matrixFixture(t, temporary(t));
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   fixture.missingObserver.add(ROOM);
-  assert.deepEqual((await readUnread(storage, client, fixture.settings, fixture.cursorFile, 2)).events, []);
+  assert.deepEqual((await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 2)).events, []);
   fixture.missingObserver.clear();
   for (const cursors of [[], null, { [ROOM]: 42 }]) {
     writeJson(fixture.cursorFile, cursors);
-    await assert.rejects(readUnread(storage, client, fixture.settings, fixture.cursorFile, 2), /Invalid saved read cursors/);
+    await assert.rejects(readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 2), /Invalid saved read cursors/);
   }
   writeJson(fixture.cursorFile, { [ROOM]: '0' });
   for (const page of [{ chunk: [message('$one')] }, { chunk: [message('$one')], end: '0' },
     { chunk: 'invalid' }, { chunk: [], end: 1 }, { chunk: [message('$a'), message('$b'), message('$c')], end: '3' },
     { chunk: [{ ...message('$one'), sender: '' }], end: '1' }]) {
     fixture.overridePage(page);
-    await assert.rejects(readUnread(storage, client, fixture.settings, fixture.cursorFile, 2));
+    await assert.rejects(readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 2));
     assert.deepEqual(JSON.parse(readFileSync(fixture.cursorFile, 'utf8')), { [ROOM]: '0' });
   }
 });
 
 test('delivery retains attribution and attachments, excludes self echoes, and bounds UTF-8 batches', async t => {
   const fixture = await matrixFixture(t, temporary(t));
-  const view = (event: Event) => eventView(event, ROOM);
+  const view = (event: Event) => eventView(messageEvent(event, ROOM), ROOM);
   const events = [view(message('$self', SELF)), view({ ...message('$file', OBSERVER),
     content: { msgtype: 'm.file', url: 'mxc://test.localhost/file', body: 'file.txt' } }),
     view(message('$large', OBSERVER, '😀'.repeat(12_000))),
@@ -104,10 +107,10 @@ test('delivery retains attribution and attachments, excludes self echoes, and bo
 
 test('the minimum input budget admits a fitting event without an arbitrary metadata reservation', async scope => {
   const fixture = await matrixFixture(scope, temporary(scope)); fixture.subscribe(ROOM);
-  const client = matrix({ base: fixture.settings.homeserver, token: fixture.account.access_token });
+  const client = matrix({ base: fixture.settings.server, token: fixture.account.accessToken });
   fixture.add(ROOM, message('$small', OBSERVER, 'Hi'));
-  const batch = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 20, undefined, 1024);
-  assert.deepEqual(batch.events.map(event => event.event_id), ['$small']);
+  const batch = await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 20, undefined, 1024);
+  assert.deepEqual(batch.events.map(event => event.eventId), ['$small']);
   assert(acquisitionBytes(batch.events, fixture.settings) <= 1024);
   const packed = chatBatches(batch.events, fixture.settings, fixture.identities, 1024, 'shared', messageArtifacts(storage, fixture.cursorFile + '.messages', Date.now));
   assert.equal(packed.length, 1);
@@ -116,78 +119,78 @@ test('the minimum input budget admits a fitting event without an arbitrary metad
 
 test('a fresh identity receives only a bounded recent snapshot across rooms, then exact live continuation', async context => {
   const fixture = await matrixFixture(context, temporary(context));
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   const other = '!other:test.localhost'; fixture.joined.add(other);
   for (let index = 0; index < 40; index++) fixture.add(index % 2 ? other : ROOM, { ...message('$' + index), origin_server_ts: index });
-  const sync = await synchronize(client);
-  const recent = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 5, undefined, 65536, sync.next_batch, new Set([ROOM, other]));
-  assert.deepEqual(recent.events.map(event => event.event_id), ['$34', '$36', '$37', '$38', '$39']);
+  const sync = await createMessagingClient(client, fixture.account.userId).synchronize();
+  const recent = await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 5, undefined, 65536, sync.cursor, new Set([ROOM, other]));
+  assert.deepEqual(recent.events.map(event => event.eventId), ['$34', '$36', '$37', '$38', '$39']);
   assert.equal(existsSync(fixture.cursorFile), false);
   fixture.add(ROOM, message('$after-snapshot'));
-  await acknowledge(storage, client, fixture.cursorFile, recent);
-  const fresh = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 5);
-  assert.deepEqual(fresh.events.map(event => event.event_id), ['$after-snapshot']);
+  await acknowledge(storage, createMessagingClient(client, fixture.account.userId), fixture.cursorFile, recent);
+  const fresh = await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 5);
+  assert.deepEqual(fresh.events.map(event => event.eventId), ['$after-snapshot']);
 });
 
 test('file-backed acquisition preserves every unread event without duplicate HTML or extra model inputs', async context => {
   const fixture = await matrixFixture(context, temporary(context)); fixture.subscribe(ROOM);
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   fixture.add(ROOM, ...Array.from({ length: 4 }, (_, index) => ({ ...message('$' + index),
     content: { msgtype: 'm.text', body: '😀'.repeat(10000), formatted_body: '<p>' + 'x'.repeat(40000) + '</p>' } })));
   const artifacts = messageArtifacts(storage, fixture.cursorFile + '.messages', Date.now);
-  const batch = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 100, undefined, 65536, undefined, undefined, undefined, artifacts.stage);
-  assert.deepEqual(batch.events.map(event => event.event_id), ['$0', '$1', '$2', '$3']);
-  assert(batch.events.every(event => event.content_file && event.content.formatted_body === undefined));
+  const batch = await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 100, undefined, 65536, undefined, undefined, undefined, artifacts.stage);
+  assert.deepEqual(batch.events.map(event => event.eventId), ['$0', '$1', '$2', '$3']);
+  assert(batch.events.every(event => event.contentFile && !Object.hasOwn(event.content.attributes, 'formatted_body')));
   assert(batch.events.every(event => JSON.stringify(event.omitted) === JSON.stringify(['content.formatted_body'])));
   assert(acquisitionBytes(batch.events, fixture.settings) <= 65536);
   const packed = chatBatches(batch.events, fixture.settings, fixture.identities, 65536, 'shared', artifacts);
   assert.equal(packed.length, 1); assert(Buffer.byteLength(packed[0]!.text) <= 65536);
   for (const event of batch.events) {
-    const content = JSON.parse(readFileSync(event.content_file!.file, 'utf8'));
+    const content = JSON.parse(readFileSync(event.contentFile!.file, 'utf8'));
     assert.equal(content.body, '😀'.repeat(10000)); assert.equal(content.formatted_body, undefined);
   }
   assert.equal(loadSyncCursor(storage, fixture.cursorFile), undefined);
-  await acknowledge(storage, client, fixture.cursorFile, batch);
-  assert.deepEqual((await readUnread(storage, client, fixture.settings, fixture.cursorFile)).events, []);
+  await acknowledge(storage, createMessagingClient(client, fixture.account.userId), fixture.cursorFile, batch);
+  assert.deepEqual((await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile)).events, []);
 });
 
 test('failed Matrix read-marker publication never replays already acknowledged input', async context => {
   const fixture = await matrixFixture(context, temporary(context)); fixture.subscribe(ROOM);
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   fixture.add(ROOM, message('$one'));
-  const batch = await readUnread(storage, client, fixture.settings, fixture.cursorFile);
+  const batch = await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile);
   fixture.failures.set('/_matrix/client/v3/rooms/' + ROOM + '/read_markers', [503]);
-  await assert.rejects(acknowledge(storage, client, fixture.cursorFile, batch), /503/);
+  await assert.rejects(acknowledge(storage, createMessagingClient(client, fixture.account.userId), fixture.cursorFile, batch), /503/);
   assert.equal(JSON.parse(readFileSync(fixture.cursorFile, 'utf8'))[ROOM], '1');
-  await flushAcknowledgements(storage, client, fixture.cursorFile);
+  await flushAcknowledgements(storage, createMessagingClient(client, fixture.account.userId), fixture.cursorFile);
   assert(!existsSync(fixture.cursorFile + '.ack'));
-  assert.deepEqual((await readUnread(storage, client, fixture.settings, fixture.cursorFile)).events, []);
+  assert.deepEqual((await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile)).events, []);
   assert.deepEqual(fixture.requests.filter(request => request.path.endsWith('/read_markers')).map(request => request.body),
     [{ 'm.fully_read': '$one', 'm.read.private': '$one' }, { 'm.fully_read': '$one', 'm.read.private': '$one' }]);
 });
 
 test('leaving persists through discovery and sync; rejoining establishes a fresh bounded boundary', async context => {
   const fixture = await matrixFixture(context, temporary(context)); fixture.subscribe(ROOM);
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   fixture.add(ROOM, message('$old'));
   await client.post('/_matrix/client/v3/rooms/' + encodeURIComponent(ROOM) + '/leave', {});
-  await synchronize(client);
+  await createMessagingClient(client, fixture.account.userId).synchronize();
   assert(!fixture.joined.has(ROOM));
-  const left = await readUnread(storage, client, fixture.settings, fixture.cursorFile);
-  await acknowledge(storage, client, fixture.cursorFile, left);
+  const left = await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile);
+  await acknowledge(storage, createMessagingClient(client, fixture.account.userId), fixture.cursorFile, left);
   assert.equal(Object.hasOwn(left.cursors, ROOM), false);
   fixture.add(ROOM, message('$away-one'), message('$away-two'));
   await client.post('/_matrix/client/v3/join/' + encodeURIComponent(ROOM), {});
-  const rejoined = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 1);
-  assert.deepEqual(rejoined.events.map(event => event.event_id), ['$away-two']);
+  const rejoined = await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 1);
+  assert.deepEqual(rejoined.events.map(event => event.eventId), ['$away-two']);
 });
 
 test('departed-room cursor removal also retires pending acknowledgement proof', async context => {
   const fixture = await matrixFixture(context, temporary(context)); fixture.subscribe(ROOM);
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   writeJson(fixture.cursorFile + '.ack', { cursors: { [ROOM]: '3' }, receipts: { [ROOM]: '$three' } });
   retainJoinedCursors(storage, fixture.cursorFile, new Set());
-  await flushAcknowledgements(storage, client, fixture.cursorFile);
+  await flushAcknowledgements(storage, createMessagingClient(client, fixture.account.userId), fixture.cursorFile);
   assert.deepEqual(JSON.parse(readFileSync(fixture.cursorFile, 'utf8')), {});
   assert(!fixture.requests.some(request => request.path.endsWith('/read_markers')));
 });
@@ -207,56 +210,61 @@ test('native sync continuation is independent of delivery and preserves exact op
 
 test('initial history includes the newest event and resumes without losing or duplicating that boundary', async context => {
   const fixture = await matrixFixture(context, temporary(context));
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   fixture.add(ROOM, message('$newest'));
-  const synced = await synchronize(client);
-  const recent = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 1, undefined, 65536, synced.next_batch);
-  assert.deepEqual(recent.events.map(event => event.event_id), ['$newest']);
-  await acknowledge(storage, client, fixture.cursorFile, recent);
+  const synced = await createMessagingClient(client, fixture.account.userId).synchronize();
+  const recent = await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 1, undefined, 65536, synced.cursor);
+  assert.deepEqual(recent.events.map(event => event.eventId), ['$newest']);
+  await acknowledge(storage, createMessagingClient(client, fixture.account.userId), fixture.cursorFile, recent);
   fixture.add(ROOM, message('$next'));
-  const next = await synchronize(client, synced.next_batch);
-  assert.deepEqual((await readUnread(storage, client, fixture.settings, fixture.cursorFile, 20, undefined, 65536, next.next_batch))
-    .events.map(event => event.event_id), ['$next']);
+  const next = await createMessagingClient(client, fixture.account.userId).synchronize(synced.cursor);
+  assert.deepEqual((await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 20, undefined, 65536, next.cursor))
+    .events.map(event => event.eventId), ['$next']);
   assert(fixture.requests.filter(request => request.path.endsWith('/messages') && request.query.get('dir') === 'f')
     .every(request => !request.query.has('to')));
 });
 
 test('native membership transitions reset rapid rejoin positions without resetting profile changes or other users', async context => {
   const fixture = await matrixFixture(context, temporary(context)); fixture.subscribe(ROOM);
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   const membership = (id: string, current: string, previous: string, self = SELF): Event => ({ ...message(id),
     type: 'm.room.member', state_key: self, content: { membership: current }, unsigned: { prev_content: { membership: previous } } });
   const profile = membership('$profile', 'join', 'join');
   const foreign = membership('$other', 'join', 'leave', '@other:test.localhost');
-  const snapshot = (events: Event[]): Sync => ({ next_batch: 'sync-10', rooms: { join: { [ROOM]: { state: { events }, timeline: { events } } } } });
-  assert.deepEqual([...await membershipResets(client, snapshot([profile, foreign]), fixture.account, 'sync-0')], []);
+  const snapshot = (events: Event[]) => ({ next_batch: 'sync-10', rooms: { join: { [ROOM]: { state: { events }, timeline: { events } } } } });
+  fixture.overrideSync(snapshot([profile, foreign]));
+  assert.deepEqual((await createMessagingClient(client, fixture.account.userId).synchronize('sync-0')).resetRooms, []);
   const rejoin = membership('$rejoin', 'join', 'leave');
-  assert.deepEqual([...await membershipResets(client, snapshot([rejoin]), fixture.account, 'sync-0')], [ROOM]);
-  assert.deepEqual([...await membershipResets(client, snapshot([rejoin]), fixture.account)], []);
+  fixture.overrideSync(snapshot([rejoin]));
+  assert.deepEqual((await createMessagingClient(client, fixture.account.userId).synchronize('sync-0')).resetRooms, [ROOM]);
+  assert.deepEqual((await createMessagingClient(client, fixture.account.userId).synchronize()).resetRooms, []);
   fixture.add(ROOM, membership('$leave', 'leave', 'join'), rejoin, profile,
     ...Array.from({ length: 25 }, (_, index) => message('$after-' + index)));
-  const limited: Sync = { next_batch: 'sync-28', rooms: { join: { [ROOM]: {
+  const limited = { next_batch: 'sync-28', rooms: { join: { [ROOM]: {
     state: { events: [profile] }, timeline: { events: [message('$after-24')], limited: true },
   } } } };
-  assert.deepEqual([...await membershipResets(client, limited, fixture.account, 'sync-0')], [ROOM]);
+  fixture.overrideSync(limited);
+  assert.deepEqual((await createMessagingClient(client, fixture.account.userId).synchronize('sync-0')).resetRooms, [ROOM]);
   retainJoinedCursors(storage, fixture.cursorFile, new Set());
-  const recent = await readUnread(storage, client, fixture.settings, fixture.cursorFile, 1);
-  assert.deepEqual(recent.events.map(event => event.event_id), ['$after-24']);
-  assert.equal(recent.more_rooms.length, 0);
+  const recent = await readUnread(storage, createMessagingClient(client, fixture.account.userId), fixture.settings, fixture.cursorFile, 1);
+  assert.deepEqual(recent.events.map(event => event.eventId), ['$after-24']);
+  assert.equal(recent.moreRooms.length, 0);
 });
 
 test('native gaps stream large history and sync-boundary events without a whole-gap input limit', async context => {
   const fixture = await matrixFixture(context, temporary(context));
-  const client = matrix({base: fixture.settings.homeserver, token: fixture.account.access_token});
+  const client = matrix({base: fixture.settings.server, token: fixture.account.accessToken});
   fixture.overridePage({ chunk: [message('$large-gap', OBSERVER, 'x'.repeat(900000))], end: 'upper-boundary' });
-  const synced: Sync = { next_batch: 'upper-boundary', rooms: { join: { [ROOM]: { timeline: {
+  const synced = { next_batch: 'upper-boundary', rooms: { join: { [ROOM]: { timeline: {
     limited: true, events: [message('$upper', OBSERVER, 'x'.repeat(200000))],
   } } } } };
-  const events = await collected(incrementalEvents(client, synced, 'previous', ROOM, { types: ['m.room.message'] }));
-  assert.deepEqual(events.map(event => event.event_id), ['$large-gap', '$upper']);
+  fixture.overrideSync(synced);
+  const messaging = createMessagingClient(client, fixture.account.userId);
+  const events = await collected(incrementalEvents(messaging, await messaging.synchronize('previous'), 'previous', ROOM, { types: ['message'] }));
+  assert.deepEqual(events.map(event => event.eventId), ['$large-gap', '$upper']);
   assert.equal(String(events[0]!.content.body).length, 900000);
   assert.equal(String(events[1]!.content.body).length, 200000);
   fixture.overridePage({ chunk: [], end: 'upper-boundary' });
   synced.rooms!.join![ROOM]!.timeline!.events = Array.from({ length: 1001 }, (_, index) => message('$' + index));
-  assert.equal((await collected(incrementalEvents(client, synced, 'previous', ROOM, { types: ['m.room.message'] }))).length, 1001);
+  assert.equal((await collected(incrementalEvents(messaging, await messaging.synchronize('previous'), 'previous', ROOM, { types: ['message'] }))).length, 1001);
 });

@@ -9,13 +9,13 @@ public static class RoomViews
     public static void Grant(ProtocolWriter writer, RoomGrant value)
     {
         writer.WriteStartObject(); writer.WriteString("agentId", value.AgentId); writer.WriteString("roomId", value.RoomId); writer.WriteString("generation", value.Generation); writer.WriteString("authorizerId", value.AuthorizerId); writer.WriteString("addedById", value.AddedById);
-        writer.WriteString("accessMode", value.AccessMode); JsonValues.Number(writer, "powerLevel", value.PowerLevel); writer.WriteBoolean("muted", value.Muted); writer.WriteNumber("revision", value.Revision); writer.WriteNumber("accessRevision", value.AccessRevision); writer.WriteNumber("updatedAt", value.UpdatedAt); writer.WriteEndObject();
+        writer.WriteString("accessMode", value.AccessMode); NativeAccess(writer, value.NativeAccess); writer.WriteBoolean("muted", value.Muted); writer.WriteNumber("revision", value.Revision); writer.WriteNumber("accessRevision", value.AccessRevision); writer.WriteNumber("updatedAt", value.UpdatedAt); writer.WriteEndObject();
     }
 
     public static void Application(ProtocolWriter writer, RoomGrantApplication value)
     {
         writer.WriteStartObject(); writer.WriteString("observedGeneration", value.ObservedGeneration); JsonValues.Number(writer, "appliedRevision", value.AppliedRevision); JsonValues.Number(writer, "appliedAccessRevision", value.AppliedAccessRevision);
-        writer.WriteString("membership", value.Membership); writer.WriteBoolean("creator", value.Creator); JsonValues.Number(writer, "powerLevel", value.PowerLevel);
+        writer.WriteString("membership", value.Membership); NativeAccess(writer, value.NativeAccess);
         JsonValues.Number(writer, "lastAttemptAt", value.LastAttemptAt); JsonValues.Number(writer, "lastSuccessAt", value.LastSuccessAt); writer.WriteString("errorCode", value.ErrorCode); writer.WriteString("errorMessage", value.ErrorMessage); writer.WriteEndObject();
     }
 
@@ -34,10 +34,10 @@ public static class RoomViews
         if (value.Authority is not { } facts) writer.WriteNullValue();
         else
         {
-            writer.WriteStartObject(); writer.WriteString("matrixUserId", facts.MatrixUserId); JsonValues.Number(writer, "powerLevel", facts.PowerLevel); writer.WriteBoolean("creator", facts.Creator); JsonValues.Strings(writer, "creatorIds", facts.CreatorIds);
-            writer.WriteNumber("readLevel", facts.ReadLevel); writer.WriteNumber("replyLevel", facts.ReplyLevel); writer.WriteNumber("inviteLevel", facts.InviteLevel); writer.WriteNumber("kickLevel", facts.KickLevel); writer.WriteNumber("changePowerLevel", facts.ChangePowerLevel);
-            writer.WritePropertyName("nativePermissions"); JsonValues.Array(facts.NativePermissions, (output, permission) => { output.WriteStartObject(); output.WriteString("action", permission.Action); output.WriteNumber("level", permission.Level); output.WriteEndObject(); }).WriteTo(writer); writer.WriteEndObject();
+            writer.WriteStartObject(); MessagingJson.WriteAuthority(writer, facts); writer.WriteEndObject();
         }
         writer.WriteEndObject();
     }
+    public static void NativeAccess(ProtocolWriter writer, JsonElement? value)
+    { writer.WritePropertyName("nativeAccess"); if (value is { } native) native.WriteTo(writer); else writer.WriteNullValue(); }
 }

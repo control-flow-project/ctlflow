@@ -7,7 +7,7 @@ use diesel::{dsl::exists, prelude::*};
 struct Row {
     receiver_agent_id: String,
     event_id: String,
-    sender_matrix_id: String,
+    sender_backend_user_id: String,
     room_id: String,
     reserved_at: i64,
     message_body: String,
@@ -22,7 +22,7 @@ impl From<&Notice> for Row {
         Self {
             receiver_agent_id: value.receiver_agent_id.clone(),
             event_id: value.event_id.clone(),
-            sender_matrix_id: value.sender_matrix_id.clone(),
+            sender_backend_user_id: value.sender_backend_user_id.clone(),
             room_id: value.room_id.clone(),
             reserved_at: value.reserved_at,
             message_body: value.message_body.clone(),
@@ -51,7 +51,7 @@ impl TryFrom<Row> for Notice {
         Ok(Self {
             receiver_agent_id: row.receiver_agent_id,
             event_id: row.event_id,
-            sender_matrix_id: row.sender_matrix_id,
+            sender_backend_user_id: row.sender_backend_user_id,
             room_id: row.room_id,
             reserved_at: row.reserved_at,
             message_body: row.message_body,
@@ -64,11 +64,12 @@ impl TryFrom<Row> for Notice {
     }
 }
 impl NoticeRepository for Store {
-    fn wake_notice(&mut self, agent: &str, event: &str) -> Result<Option<Notice>> {
+    fn wake_notice(&mut self, agent: &str, room: &str, event: &str) -> Result<Option<Notice>> {
         wake_notice::table
             .filter(
                 wake_notice::receiver_agent_id
                     .eq(agent)
+                    .and(wake_notice::room_id.eq(room))
                     .and(wake_notice::event_id.eq(event)),
             )
             .select(Row::as_select())
@@ -83,7 +84,7 @@ impl NoticeRepository for Store {
             wake_notice::table.filter(
                 wake_notice::receiver_agent_id
                     .eq(agent)
-                    .and(wake_notice::sender_matrix_id.eq(sender))
+                    .and(wake_notice::sender_backend_user_id.eq(sender))
                     .and(wake_notice::reserved_at.ge(since)),
             ),
         ))
@@ -101,6 +102,7 @@ impl NoticeRepository for Store {
                 wake_notice::table.filter(
                     wake_notice::receiver_agent_id
                         .eq(&value.receiver_agent_id)
+                        .and(wake_notice::room_id.eq(&value.room_id))
                         .and(wake_notice::event_id.eq(&value.event_id)),
                 ),
             )

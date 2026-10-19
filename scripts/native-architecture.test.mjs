@@ -29,10 +29,10 @@ test('C# SDK, EF compiler packages and container stages select the same exact re
 });
 
 test('native JSON values and asynchronous coordination are primitives, not transport or storage adapters', () => {
-  for (const library of ['serde_json', 'tokio']) assert.equal(validateNativeGraph([owner('domain', {edges:[{kind:'runtime',manifest:null,library}]})]).length,1);
+  for (const library of ['serde', 'serde_json', 'tokio', 'tokio-util']) assert.equal(validateNativeGraph([owner('domain', {edges:[{kind:'runtime',manifest:null,library}]})]).length,1);
   for (const library of ['reqwest', 'diesel', 'unknown']) assert.throws(() => validateNativeGraph([owner('domain', {edges:[{kind:'runtime',manifest:null,library}]})]), /pure library owners/u);
   verifyDomainPrimitives('use tokio::sync::Semaphore; tokio::task::JoinSet::new();');
-  for (const owner of ['tokio::fs', 'tokio::net', 'std::process', 'std::io']) assert.throws(() => verifyDomainPrimitives('use '+owner+'::Owned;'), /concrete filesystem/u);
+  for (const owner of ['tokio::fs', 'tokio::net', 'tokio_util::io', 'std::process', 'std::io']) assert.throws(() => verifyDomainPrimitives('use '+owner+'::Owned;'), /concrete filesystem/u);
   assert.throws(() => verifyDomainPrimitives('use tokio::{sync::Mutex, net::TcpStream};'), /concrete filesystem/u);
 });
 function owner(role, { layer = 'packages', edges = [] } = {}) {

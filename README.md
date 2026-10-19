@@ -1,11 +1,11 @@
 # ctlflow
 
-ctlflow is the monorepo for three products that coordinate Matrix identities,
+ctlflow is the monorepo for three products that coordinate messaging identities,
 room access and message delivery for fleet-managed coding agents.
 
 | Product | Responsibility | Distribution |
 | --- | --- | --- |
-| crossfire | REST API, Matrix integration, management UI, authorization and coordination records | Private |
+| crossfire | REST API, messaging adapters, management UI, authorization and coordination records | Private |
 | fleetd | User-scoped controller, shared listener and native session lifecycle | `@ctlflow/fleetd` |
 | fleet | CLI for the controller's private API, locally or through SSH | `@ctlflow/fleet` |
 
@@ -18,7 +18,7 @@ Setup creates a separate managed conversation; it does not attach the coding
 assistant that runs setup.
 
 Personalized setup always installs pinned npm fleet and Node fleetd, independent
-of server backend. Setup hosts do not need .NET or Rust. fleetd creates a private
+of server implementation. Setup hosts do not need .NET or Rust. fleetd creates a private
 OS-native authentication file automatically; fleet reads it.
 Docker runs the server side only: crossfire, Matrix, Element, management and
 content. fleetd and its agents run on the user's execution host with an existing
@@ -28,6 +28,10 @@ Node, C# and Rust implement the same products. C# targets .NET 11 with managed a
 NativeAOT outputs. They share the React UI, wire contracts and SQLite database.
 Knex alone owns database creation and migrations for all implementations. The
 combined gate selects Node, C# managed, C# NativeAOT and Rust explicitly.
+
+Matrix is the implemented messaging backend. Its native identity, permission,
+invitation, authentication and client-protocol rules belong to its adapter.
+Other messaging backends are not implemented.
 
 ## Documentation
 
@@ -39,6 +43,7 @@ combined gate selects Node, C# managed, C# NativeAOT and Rust explicitly.
 - [Agent and fleet setup](services/fleet/docs/getting-started.md)
 - [Controller operation](services/fleetd/docs/operations.md)
 - [Architecture and contracts](docs/specification.md)
+- [Messaging adapter boundaries](docs/architecture/messaging-backends.md)
 - [C# build and distribution](services/crossfire/csharp/README.md)
 - [Rust build and distribution](services/crossfire/rust/README.md)
 - [Native ownership layout](docs/architecture/native-layout.md)
@@ -70,7 +75,7 @@ Fixtures use separate state and inert providers, not production accounts.
 ## Limits
 
 Codex and Earendil Pi are implemented. Claude is not selectable.
-Agent memory, filesystem access, native permissions and Matrix room access are
+Agent memory, filesystem access, native permissions and messaging room access are
 different boundaries. Per-room history is not a process or credential sandbox.
 Static reports are public to anyone with their link.
 

@@ -57,9 +57,8 @@ Links, hardlinks, unowned/public files and malformed records are retained with
 an error for inspection. Files are 0600; directories 0700.
 
 Only daily diagnostic partitions and UUID operation files are current storage.
-Controller roots containing `daemon.log` or `operations.json` are rejected before
-operation recovery. Startup never imports, converts or deletes these files.
-Verify an offline backup and resolve obsolete files before starting the controller.
+Startup reads only these current formats; it does not inspect, convert or import
+historical files.
 Profiles and listener state use immutable instance keys, never display-name lookup
 or automatic relocation. There is no count-only history cap or alternate reader.
 

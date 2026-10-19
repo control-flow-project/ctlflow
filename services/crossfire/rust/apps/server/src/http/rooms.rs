@@ -11,10 +11,12 @@ use crossfire_domain::{
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
 use serde_json::json;
 
-pub async fn rooms(context: &Context<'_>) -> Result<Reply> {
+pub async fn rooms(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let values = room_access::read::rooms(
         &context.state.repository,
-        &context.state.matrix,
+        context.state.messaging.as_ref(),
         &identity::now,
         RoomQuery {
             actor: context.actor()?,
@@ -27,10 +29,12 @@ pub async fn rooms(context: &Context<'_>) -> Result<Reply> {
     .await?;
     reply::page(values, |value| Ok(wire::room(value)))
 }
-pub async fn room(context: &Context<'_>) -> Result<Reply> {
+pub async fn room(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = room_access::read::room(
         &context.state.repository,
-        &context.state.matrix,
+        context.state.messaging.as_ref(),
         &identity::now,
         context.actor()?,
         context.parameter("roomId")?,
@@ -39,7 +43,9 @@ pub async fn room(context: &Context<'_>) -> Result<Reply> {
     .await?;
     reply::of(wire::room(&value))
 }
-pub fn grants(context: &Context<'_>) -> Result<Reply> {
+pub fn grants(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let selected = context
         .query
         .get("roomIds")
@@ -75,10 +81,12 @@ pub fn grants(context: &Context<'_>) -> Result<Reply> {
     })?;
     reply::page(values, |value| Ok(wire::grant_view(value)))
 }
-pub async fn grant(context: &Context<'_>) -> Result<Reply> {
+pub async fn grant(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = room_access::read::grant(
         &context.state.repository,
-        &context.state.matrix,
+        context.state.messaging.as_ref(),
         &identity::now,
         context.actor()?,
         context.parameter("agentId")?,
@@ -87,7 +95,10 @@ pub async fn grant(context: &Context<'_>) -> Result<Reply> {
     .await?;
     reply::of(wire::grant_view(&value))
 }
-pub async fn change(context: &Context<'_>, removal: bool) -> Result<Reply> {
+pub async fn change(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+    removal: bool,
+) -> Result<Reply> {
     let input = wire::change(
         &context.input,
         context.parameter("agentId")?,
@@ -101,10 +112,14 @@ pub async fn change(context: &Context<'_>, removal: bool) -> Result<Reply> {
         .await?;
     grant(context).await
 }
-pub async fn permissions(context: &Context<'_>) -> Result<Reply> {
+pub async fn permissions(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     grant(context).await
 }
-pub async fn set_permissions(context: &Context<'_>) -> Result<Reply> {
+pub async fn set_permissions(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let input = wire::permissions(
         &context.input,
         context.parameter("agentId")?,
@@ -116,12 +131,14 @@ pub async fn set_permissions(context: &Context<'_>) -> Result<Reply> {
         .set_permission(context.actor()?, &input, &context.request_id)?;
     permissions(context).await
 }
-pub async fn accept(context: &Context<'_>) -> Result<Reply> {
+pub async fn accept(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let input = check::object(&context.input, &["roomId"], &[])?;
     let room = check::room_id(&input["roomId"])?;
     let value = room_access::invitation::accept(
         &context.state.repository,
-        &context.state.matrix,
+        context.state.messaging.as_ref(),
         &context.state.room_operations,
         &identity::now,
         room_access::invitation::Request {
@@ -134,7 +151,9 @@ pub async fn accept(context: &Context<'_>) -> Result<Reply> {
     .await?;
     reply::of(json!({"accepted":value}))
 }
-pub async fn owner_conversation(context: &Context<'_>) -> Result<Reply> {
+pub async fn owner_conversation(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     context.empty()?;
     let agent = context.parameter("agentId")?;
     context.with(|repo, now| {
@@ -157,7 +176,7 @@ pub async fn owner_conversation(context: &Context<'_>) -> Result<Reply> {
     })?;
     let room = room_access::owner_conversation::ensure(
         &context.state.repository,
-        &context.state.matrix,
+        context.state.messaging.as_ref(),
         &context.state.room_operations,
         &identity::now,
         agent,
@@ -180,7 +199,9 @@ pub async fn owner_conversation(context: &Context<'_>) -> Result<Reply> {
         reply::of(json!({"roomId":room}))
     })
 }
-pub async fn preview(context: &Context<'_>) -> Result<Reply> {
+pub async fn preview(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["plan"], &[])?;
     let plan = room_plan::plan(&value["plan"])?;
     let value = room_access::plan::preview(
@@ -192,7 +213,9 @@ pub async fn preview(context: &Context<'_>) -> Result<Reply> {
     .await?;
     reply::of(room_plan::preview(&value))
 }
-pub async fn apply(context: &Context<'_>) -> Result<Reply> {
+pub async fn apply(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     let value = check::object(&context.input, &["plan", "digest", "snapshots"], &[])?;
     let plan = room_plan::plan(&value["plan"])?;
     let snapshots = room_plan::snapshots(&value["snapshots"])?;

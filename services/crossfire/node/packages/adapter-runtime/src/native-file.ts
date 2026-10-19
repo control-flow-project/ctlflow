@@ -1,5 +1,5 @@
 import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
-import { json } from '@ctlflow/crossfire-contracts/matrix';
+import { json } from '@ctlflow/crossfire-kernel/json';
 import { openSync, closeSync, fstatSync, constants, readSync, realpathSync, type Stats } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { createHash } from 'node:crypto';

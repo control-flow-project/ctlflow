@@ -13,8 +13,8 @@ public static class EnrollmentClaims
         var owner = ports.Admission.Fleet.Authorization.Principal(value.OwnerId);
         if (!owner.IsSuccess) return Result<EnrollmentExchange>.Fail(owner.Error);
         if (owner.Value?.Status != "active") return Results.Fail<EnrollmentExchange>("forbidden", "Owner access is no longer active");
-        if (value.ExpiresAt <= ports.Admission.Fleet.Authorization.Now()) return Result<EnrollmentExchange>.Success(new("expired", owner.Value.MatrixUserId, null, []));
-        if (value.Status != "approved") return Result<EnrollmentExchange>.Success(new(value.Status, owner.Value.MatrixUserId, null, []));
+        if (value.ExpiresAt <= ports.Admission.Fleet.Authorization.Now()) return Result<EnrollmentExchange>.Success(new("expired", owner.Value.BackendUserId, null, []));
+        if (value.Status != "approved") return Result<EnrollmentExchange>.Success(new(value.Status, owner.Value.BackendUserId, null, []));
         var fleet = ports.Admission.ByKey(value.OwnerId, value.FleetKey);
         if (!fleet.IsSuccess) return Result<EnrollmentExchange>.Fail(fleet.Error);
         if (fleet.Value is null || fleet.Value.ArchivedAt is not null) return Results.Fail<EnrollmentExchange>("forbidden", "Fleet enrollment is no longer current");
@@ -41,9 +41,9 @@ public static class EnrollmentClaims
             var ready = credentials.Value.AccessToken is not null && agent.Value.Application.AppliedStatus == "active"
                 && agent.Value.Application.NativeDisplayName == item.RequestedName + " (" + agent.Value.OwnerMember.DisplayName + ")" && agent.Value.Application.ErrorCode is null;
             instances.Add(new(item.InstanceKey, item.RequestedName, item.AgentId, ready ? "ready" : "provisioning", agent.Value.Application.ErrorCode,
-                ready ? new(agent.Value.Principal.MatrixUserId, credentials.Value.AccessToken!, "CROSSFIRE_AGENT") : null));
+                ready ? ports.Messaging.AgentAccount(agent.Value.Principal.BackendUserId, credentials.Value.AccessToken!) : null));
         }
-        return Result<EnrollmentExchange>.Success(new(instances.Any(item => item.Status == "provisioning") ? "provisioning" : "ready", owner.Value.MatrixUserId,
+        return Result<EnrollmentExchange>.Success(new(instances.Any(item => item.Status == "provisioning") ? "provisioning" : "ready", owner.Value.BackendUserId,
             new(fleet.Value.Id, issued.Value is { RevokedAt: null } ? FleetAuthority.ControllerToken(enrollmentId, claimSecret) : null), instances));
     }
 }

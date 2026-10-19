@@ -3,7 +3,7 @@ using Crossfire.Kernel;
 
 namespace Crossfire.Domain;
 
-public sealed record PrincipalApplyPorts(AuthorizationPorts Authorization, UnitOfWork Transaction, MatrixPorts Matrix, RoomOperation Operation,
+public sealed record PrincipalApplyPorts(AuthorizationPorts Authorization, UnitOfWork Transaction, MessagingPorts Messaging, RoomOperation Operation,
     Func<Result<InstancePolicy?>> Policy, Func<string, Result<MemberView?>> Member, Func<string, Result<PrincipalApplication?>> Application,
     Func<PrincipalApplication, Result<Unit>> SaveApplication, Func<string, Result<AgentCredential?>> Credential, Func<AgentCredential, Result<Unit>> SaveCredential,
     RoomGrantPorts Rooms);
@@ -11,9 +11,9 @@ public sealed record PrincipalNativeIntent(Principal Principal, PrincipalApplica
 
 public static class PrincipalApplications
 {
-    public static string Hash(string matrixUserId, string status, string displayName)
+    public static string Hash(string backendUserId, string status, string displayName)
     {
-        var text = new StringBuilder("{\"matrixUserId\":"); ProtocolJson.String(text, matrixUserId);
+        var text = new StringBuilder("{\"backendUserId\":"); ProtocolJson.String(text, backendUserId);
         text.Append(",\"status\":"); ProtocolJson.String(text, status);
         text.Append(",\"displayName\":"); ProtocolJson.String(text, displayName);
         return Identity.Hash(text.Append('}').ToString());
@@ -63,37 +63,37 @@ public static class PrincipalApplications
         var principal = intent.Principal; var token = intent.Token;
         if (intent.Status == "revoked")
         {
-            var present = await ports.Matrix.Exists(principal.MatrixUserId, cancellation);
+            var present = await ports.Messaging.Exists(principal.BackendUserId, cancellation);
             if (!present.IsSuccess) return Result<string?>.Fail(present.Error);
             if (!present.Value) return Result<string?>.Success(null);
-            return (await ports.Matrix.Deactivate(principal.MatrixUserId, cancellation)).Map<string?>(_ => null);
+            return (await ports.Messaging.Deactivate(principal.BackendUserId, cancellation)).Map<string?>(_ => null);
         }
         if (principal.Kind == "agent")
         {
-            var valid = token is null ? Result<string>.Success("") : await ports.Matrix.Identify(token, cancellation);
-            if (!valid.IsSuccess || valid.Value != principal.MatrixUserId)
+            var valid = token is null ? Result<string>.Success("") : await ports.Messaging.Identify(token, cancellation);
+            if (!valid.IsSuccess || valid.Value != principal.BackendUserId)
             {
                 var credential = ports.Credential(principal.Id);
                 if (!credential.IsSuccess) return Result<string?>.Fail(credential.Error);
                 if (credential.Value is null) return Results.Fail<string?>("missing", "Agent credentials are missing");
-                var account = await ports.Matrix.Provision(principal.MatrixUserId, credential.Value.ProvisioningPassword, "CROSSFIRE_AGENT", cancellation);
+                var account = await ports.Messaging.Provision(principal.BackendUserId, credential.Value.ProvisioningPassword, null, cancellation);
                 if (!account.IsSuccess) return Result<string?>.Fail(account.Error);
                 token = account.Value.AccessToken;
             }
         }
-        var rooms = await ports.Matrix.Joined(principal.MatrixUserId, cancellation);
+        var rooms = await ports.Messaging.Joined(principal.BackendUserId, cancellation);
         if (!rooms.IsSuccess) return Result<string?>.Fail(rooms.Error);
         var grants = principal.Kind == "agent" ? ports.Rooms.Grants(principal.Id) : Result<IReadOnlyList<RoomGrant>>.Success([]);
         if (!grants.IsSuccess) return Result<string?>.Fail(grants.Error);
         foreach (var room in rooms.Value)
         {
             if (intent.Status == "active" && (principal.Kind != "agent" || grants.Value.Any(grant => grant.RoomId == room && grant.AccessMode != "none"))) continue;
-            var left = await ports.Matrix.Leave(principal.MatrixUserId, room, cancellation);
+            var left = await ports.Messaging.Leave(principal.BackendUserId, room, cancellation);
             if (!left.IsSuccess) return Result<string?>.Fail(left.Error);
         }
-        if (intent.Application.AppliedIntentHash != Hash(principal.MatrixUserId, intent.Status, intent.DisplayName))
+        if (intent.Application.AppliedIntentHash != Hash(principal.BackendUserId, intent.Status, intent.DisplayName))
         {
-            var named = await ports.Matrix.SetDisplayName(principal.MatrixUserId, intent.DisplayName, cancellation);
+            var named = await ports.Messaging.SetDisplayName(principal.BackendUserId, intent.DisplayName, cancellation);
             if (!named.IsSuccess) return Result<string?>.Fail(named.Error);
             if (intent.Owner is not null && intent.Application.NativeDisplayName != intent.DisplayName)
             {
@@ -101,7 +101,7 @@ public static class PrincipalApplications
                 if (!conversation.IsSuccess) return Result<string?>.Fail(conversation.Error);
                 if (conversation.Value is not null)
                 {
-                    var updated = await ports.Matrix.OwnerConversation(intent.Owner.MatrixUserId, principal.MatrixUserId, conversation.Value, intent.Application.NativeDisplayName, cancellation);
+                    var updated = await ports.Messaging.OwnerConversation(intent.Owner.BackendUserId, principal.BackendUserId, conversation.Value, intent.Application.NativeDisplayName, cancellation);
                     if (!updated.IsSuccess) return Result<string?>.Fail(updated.Error);
                     if (updated.Value != conversation.Value) return Results.Fail<string?>("conflict", "Owner conversation changed during renaming");
                 }
@@ -131,7 +131,7 @@ public static class PrincipalApplications
             if (!saved.IsSuccess) return saved;
         }
         var application = intent.Application with { LastAttemptAt = now, NextCheckAt = nextCheckAt };
-        application = result.IsSuccess ? application with { AppliedRevision = intent.Principal.Revision, AppliedIntentHash = Hash(intent.Principal.MatrixUserId, intent.Status, intent.DisplayName),
+        application = result.IsSuccess ? application with { AppliedRevision = intent.Principal.Revision, AppliedIntentHash = Hash(intent.Principal.BackendUserId, intent.Status, intent.DisplayName),
             AppliedStatus = intent.Status, NativeDisplayName = intent.DisplayName, LastSuccessAt = now, ErrorCode = null, ErrorMessage = null }
             : application with { ErrorCode = result.Error.Code, ErrorMessage = result.Error.Message };
         return ports.SaveApplication(application);

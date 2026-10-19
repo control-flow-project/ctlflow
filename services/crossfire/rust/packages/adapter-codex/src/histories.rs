@@ -160,11 +160,12 @@ impl<H: Hooks + 'static> Histories<H> {
             "control"
         }
     }
-    pub fn context<'a>(&'a self, room: Option<&'a str>) -> &'a str {
+    pub fn context(&self, room: Option<&str>) -> String {
         if self.mode == HistoryMode::Shared {
-            "shared"
+            "shared".to_owned()
         } else {
-            room.unwrap_or("control")
+            room.map(crossfire_kernel::history_context::for_room)
+                .unwrap_or_else(|| "control".to_owned())
         }
     }
 

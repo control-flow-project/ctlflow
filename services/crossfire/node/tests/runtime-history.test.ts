@@ -14,6 +14,7 @@ import { success } from '@ctlflow/crossfire-kernel/result';
 import { codexTerminal } from '@ctlflow/crossfire-adapter-codex/terminal';
 import type { UsageSample } from '@ctlflow/crossfire-contracts/statistics';
 import { CONTEXT_REGISTRY } from '@ctlflow/crossfire-adapter-codex/context-state';
+import { roomContext } from '@ctlflow/crossfire-kernel/history-context';
 
 async function environment(scope: Parameters<typeof nativeProvider>[0]) {
   const directory = mkdtempSync(join(process.cwd(), '.temp/native-histories-'));
@@ -94,13 +95,13 @@ test('stock Codex routes persistent room histories, protects unacknowledged work
   cleanup(scope, () => runtime.close());
   assert.equal(provider.requests.length, 0);
   assert(runtime.conversation);
-  const opening = runtime.conversation('!alpha:test');
+  const opening = runtime.conversation('control');
   assert.equal((await runtime.inspect()).busy, true, 'Initializing a secondary context vetoes sleep');
   const alpha = await opening, beta = await runtime.conversation('!beta:test');
   pendingDecision = true; assert.equal((await runtime.inspect()).busy, true); pendingDecision = false;
   assert.notEqual(alpha.sessionId, beta.sessionId); assert.notEqual(alpha.sessionId, runtime.sessionId);
   const retained = (await runtime.attachments()).map(entry => [entry.context, entry.attachment.sessionId]);
-  const pointer = (await runtime.attachments()).find(entry => entry.context === '!alpha:test')!;
+  const pointer = (await runtime.attachments()).find(entry => entry.context === 'room/control')!;
   assert(value(codexTerminal().command(pointer.attachment)).includes(alpha.sessionId));
   assert.equal(provider.requests.length, 0, 'History selection/attachment performs no inference');
   await alpha.deliver('alpha private evidence', 'alpha-input', stop.signal);
@@ -142,7 +143,7 @@ test('stock Codex routes persistent room histories, protects unacknowledged work
   await runtime.close();
   const contexts = join(workspace, '.codex', CONTEXT_REGISTRY);
   const state = JSON.parse(readFileSync(contexts, 'utf8')) as { mode: string; bindings: { context: string; sessionId: string }[] };
-  state.bindings.find(binding => binding.context === '!alpha:test')!.sessionId = randomUUID(); writeFileSync(contexts, JSON.stringify(state), { mode: 0o600 });
+  state.bindings.find(binding => binding.context === 'room/control')!.sessionId = randomUUID(); writeFileSync(contexts, JSON.stringify(state), { mode: 0o600 });
   runtime = value(await adapter.start(input, stop.signal));
   await assert.rejects(runtime.inspect(), /thread|history|session/iu, 'A missing secondary native history cannot be guessed idle');
   assert.equal(provider.requests.length, 2);
@@ -183,12 +184,12 @@ test('corrupt native history bindings cannot share a session or ambiguously sele
   const { workspace, provider, adapter } = await environment(scope);
   const shared = randomUUID(), other = randomUUID();
   for (const rooms of [
-    [{ room: '!alpha:test', sessionId: shared }],
-    [{ room: '!alpha:test', sessionId: other }, { room: '!beta:test', sessionId: other }],
-    [{ room: '!alpha:test', sessionId: other }, { room: '!alpha:test', sessionId: randomUUID() }],
+    [{ room: 'control', sessionId: shared }],
+    [{ room: 'control', sessionId: other }, { room: '!beta:test', sessionId: other }],
+    [{ room: 'control', sessionId: other }, { room: 'control', sessionId: randomUUID() }],
   ]) {
     writeFileSync(join(workspace, '.codex', CONTEXT_REGISTRY), JSON.stringify({ mode: 'per-room',
-      bindings: [{ context: 'shared', sessionId: shared }, ...rooms.map(room => ({ context: room.room, sessionId: room.sessionId }))] }), { mode: 0o600 });
+      bindings: [{ context: 'shared', sessionId: shared }, ...rooms.map(room => ({ context: roomContext(room.room), sessionId: room.sessionId }))] }), { mode: 0o600 });
     const started = await adapter.start({ profile: 'invalid-history', name: 'invalid-history', workspace, stateDirectory: workspace, instructions: 'No input.', options: {},
       listenerOptions: { historyMode: 'per-room' }, hooks: { requestDecision: async () => { throw new Error('No decision expected'); } } }, new AbortController().signal);
     assert(!started.ok && started.error.message.includes('unique rooms and distinct session identities'));

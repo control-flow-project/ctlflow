@@ -5,7 +5,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from 'node:os';
-import { collect } from '@ctlflow/crossfire-adapter-matrix/http';
+import { collect } from '@ctlflow/crossfire-kernel/collect';
 import { nativeModels } from './native-models.js';
 
 export async function nativeProvider(context: TestContext, home: string) {

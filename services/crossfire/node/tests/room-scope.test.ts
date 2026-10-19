@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { API, segment } from '@ctlflow/crossfire-adapter-matrix/protocol';
 import { grantView, room as roomView } from '@ctlflow/crossfire-contracts/schema/response';
 import { nativeOk } from '@ctlflow/crossfire-adapter-matrix/http';
 import { reconcileRoomGrant } from '@ctlflow/crossfire-domain/room-access/reconcile-grant';
@@ -39,7 +39,7 @@ test('room discovery and canonical agent grants retain native authority without 
   async function assign(agentId: string, headers: Record<string, string>) {
     const current = await grant(agentId, headers);
     return http.request(grantPath(agentId), 'PUT', { expectedRevision: current.revision,
-      expectedGeneration: current.grant?.generation ?? null, accessMode: 'reply', powerLevel: null, muted: false }, headers);
+      expectedGeneration: current.grant?.generation ?? null, accessMode: 'reply', nativeAccess: null, muted: false }, headers);
   }
 
   await scope.test('deleted operations reject every authentication kind and cannot change native state', async () => {
@@ -72,7 +72,7 @@ test('room discovery and canonical agent grants retain native authority without 
     assert.equal(response.status, 200);
     const details = value(roomView((await response.json() as { data: unknown }).data));
     assert.equal(details.name, 'Engineering');
-    assert.equal(details.authority?.creator, true);
+    assert.equal(details.authority?.canInvite, true);
     const otherRooms = await http.request('/api/rooms', 'GET', undefined, ownerHeaders);
     assert.equal(otherRooms.status, 200);
     assert.deepEqual((await otherRooms.json() as { data: unknown[] }).data.map(room => value(roomView(room)).roomId), [targetRoom]);
@@ -85,7 +85,7 @@ test('room discovery and canonical agent grants retain native authority without 
     value(await reconcileRoomGrant(services, inviter.id, roomId));
     assert.deepEqual((await joined(inviter.token) as string[]).sort(), [inviterRoom, roomId].sort());
     assert.equal((await http.request(grantPath(target.id), 'PUT', { expectedRevision: value(services.directory.agent(target.id))!.principal.revision, expectedGeneration: null,
-      accessMode: 'reply', powerLevel: null, muted: false }, inviterHeaders)).status, 403);
+      accessMode: 'reply', nativeAccess: null, muted: false }, inviterHeaders)).status, 403);
     const current = await grant(inviter.id, adminHeaders);
     assert(current.grant);
     assert.equal((await http.request(grantPath(inviter.id) + '/permissions', 'PUT', {
@@ -104,7 +104,7 @@ test('room discovery and canonical agent grants retain native authority without 
     assert.equal(current.grant.addedById, inviter.id);
     assert.equal(current.grant.authorizerId, inviter.id);
     assert.equal(current.application?.membership, 'join');
-    assert.equal(current.application?.powerLevel, 0);
+    assert.equal(current.application?.nativeAccess?.powerLevel, 0);
     assert.equal((await http.request(grantPath(target.id), 'DELETE', { expectedRevision: current.revision,
       expectedGeneration: current.grant.generation }, inviterHeaders)).status, 202);
     value(await reconcileRoomGrant(services, target.id, roomId));

@@ -1,6 +1,5 @@
 pub mod application;
 pub mod assets;
-pub mod bootstrap;
 pub mod configuration;
 pub mod container;
 pub mod container_commands;
@@ -10,10 +9,8 @@ pub mod container_package;
 pub mod content;
 pub mod host;
 pub mod http;
-pub mod matrix_routes;
 pub mod operator;
 pub mod platform;
-pub mod registration;
 pub mod request;
 pub mod security;
 pub mod state;

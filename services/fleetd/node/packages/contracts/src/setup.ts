@@ -7,11 +7,11 @@ export const setupInput = check.object({ descriptor: setupDescriptorSchema, work
 export type SetupInput = check.Parsed<typeof setupInput>;
 export function descriptorUrl(value: string): Result<URL> {
   try {
-    const url = new URL(value), trusted = endpoint(url.origin), owner = check.matrixUserId(url.searchParams.get('ownerMatrixId'));
+    const url = new URL(value), trusted = endpoint(url.origin), owner = check.backendUserId(url.searchParams.get('ownerBackendUserId'));
     if (!trusted.ok) return trusted;
     if (!owner.ok) return owner;
     if (url.pathname !== '/onboarding/setup.json' || url.username || url.password || url.hash || [...url.searchParams.keys()].length !== 1
-      || url.searchParams.getAll('ownerMatrixId').length !== 1) return failure('invalid', 'Use the personalized Crossfire setup descriptor URL');
+      || url.searchParams.getAll('ownerBackendUserId').length !== 1) return failure('invalid', 'Use the personalized Crossfire setup descriptor URL');
     return success(url);
   } catch { return failure('invalid', 'Invalid Crossfire setup descriptor URL'); }
 }

@@ -1,10 +1,9 @@
-import type { Clock, LocalState, Transport } from './port.js';
-import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
-import type { Matrix } from './port.js';
+import type { Clock, LocalState, MessagingTransport } from './port.js';
+import type { MessagingClient } from './port.js';
 import { selectRoom } from '@ctlflow/crossfire-contracts/validation';
-import type { Account, Settings, Event } from '@ctlflow/crossfire-contracts/client';
+import type { Account, Settings } from '@ctlflow/crossfire-contracts/client';
 import type { Coordination } from './coordination.js';
-import { synchronize, loadSyncCursor, loadCursors, sameCursors, checkpointSync, membershipResets, acknowledge, flushAcknowledgements, retainJoinedCursors, eventView, joinedRooms, type ReceivedEvent } from './receive.js';
+import { loadSyncCursor, loadCursors, sameCursors, checkpointSync, acknowledge, flushAcknowledgements, retainJoinedCursors, eventView, type ReceivedEvent } from './receive.js';
 import { captureWake, collectBatch, pendingBatch, wakeEvent, loadWake, saveWake, retireSnapshot, snapshotContentFiles } from './delivery.js';
 import { eventOrigins } from './origins.js';
 import type { RuntimeAdapter } from './runtime.js';
@@ -43,7 +42,7 @@ export type ListenerOptions = {
   budget?: ListenerBudget;
   control: ListenerControl;
   storage: LocalState;
-  transport: Transport;
+  transport: MessagingTransport;
   invitationRooms: (signal: AbortSignal) => Promise<readonly string[]>;
   activity?: (runId: string, binding: ControllerBinding) => void;
   ready?: (test: () => Promise<ListenerTest>, queries: HistoryQueries) => void;
@@ -63,9 +62,8 @@ export type ListenerOptions = {
 };
 
 function retryable(error: unknown): boolean {
-  if (error instanceof Error && 'status' in error && typeof error.status === 'number') return error.status === 429 || error.status >= 500;
   return error instanceof Error && 'code' in error
-    && ['native', 'unavailable', 'body_too_large', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(String(error.code));
+    && ['native', 'unavailable', 'rate_limit', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(String(error.code));
 }
 
 export async function listen(options: ListenerOptions, stop: AbortSignal): Promise<void> {
@@ -83,20 +81,20 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   if (!current.ok) throw Object.assign(new Error(current.error.message), { code: current.error.code });
   const failed = new AbortController();
   const lifetime = AbortSignal.any([stop, failed.signal]);
-  const statistics = listenerStatistics(options.account.user_id, options.clock.now);
+  const statistics = listenerStatistics(options.account.userId, options.clock.now);
   let maximum = INPUT_BYTES;
   let pendingInput = () => true;
   let destination: Awaited<ReturnType<RuntimeAdapter>>;
   let activity: ReturnType<typeof createListenerActivity> | undefined;
   let runReady!: () => void;
   const reporting = new Promise<void>(resolve => { runReady = resolve; });
-  const observer = ownerObservation({ agentId: options.id, userId: options.account.user_id, file: options.cursorFile + '.observation', storage,
+  const observer = ownerObservation({ agentId: options.id, userId: options.account.userId, file: options.cursorFile + '.observation', storage,
     clock: options.clock, transport: options.transport, coordination: options.coordination, historyMode: options.historyMode ?? 'shared', get maximum() { return maximum; },
     native: () => destination?.lifecycle?.current() }, lifetime);
   const approval = decisions({
     client: options.transport(lifetime, 45_000),
     clock: options.clock,
-    coordination: options.coordination, settings: options.settings, matrixUserId: options.account.user_id, agent: options.id,
+    coordination: options.coordination, settings: options.settings, backendUserId: options.account.userId, agent: options.id,
     run: async signal => { await reporting; signal.throwIfAborted(); if (!activity) throw new Error('Listener reporting is not ready'); return activity.ready(signal); },
     storage, file: options.cursorFile + '.decisions',
   }, lifetime);
@@ -153,11 +151,11 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   let completed: { batch: ReadBatch; messageIds: string[]; membership: number } | undefined;
   const chat = chatPublication({ storage, file: options.cursorFile + '.chat-publication', settings: options.settings, runtime: destination,
     mode: options.historyMode ?? 'shared', get maximum() { return maximum; }, artifacts,
-    admit: event => !state.controls.some(control => control.room === event.room_id && control.event === event.event_id && control.status === 'delivered'),
+    admit: event => !state.controls.some(control => control.room === event.roomId && control.event === event.eventId && control.status === 'delivered'),
     delivered: async (room, session) => { void observer.delivered(room, session); }, count: messages => activity?.delivered(messages), traffic: statistics.delivered });
   function acceptedSteering(events: readonly ReceivedEvent[]): void {
     for (const event of events) {
-      const control = state.controls.find(control => control.room === event.room_id && control.event === event.event_id);
+      const control = state.controls.find(control => control.room === event.roomId && control.event === event.eventId);
       if (control?.status !== 'delivered') receipt(event, 'accepted');
       if (control) control.status = 'delivered';
     }
@@ -170,7 +168,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   const queries = historyQueries({ storage, file: options.cursorFile, transport: options.transport, signal, coordination: options.coordination,
     account: options.account, settings: options.settings, agentId: options.id, now: options.clock.now, artifacts,
     publishing: () => chat.pending() || priorityChat.pending() || state.controls.some(control => control.status === 'interrupting' || control.status === 'interrupted') || completed !== undefined,
-    observed: statistics.observed, delivered: events => { statistics.delivered(events); activity?.delivered(events.filter(event => event.type === 'm.room.message').length); },
+    observed: statistics.observed, delivered: events => { statistics.delivered(events); activity?.delivered(events.filter(event => event.type === "message").length); },
     acknowledged: () => { cycle = undefined; saveWake(storage, options.cursorFile); windowEnd = 0; changed(); } });
   const maintenance = listenerMaintenance({ clock: options.clock, interval: options.reconcileMs, agentId: options.id,
     storage, file: options.cursorFile + '.maintenance', coordination: options.coordination, invitationRooms: options.invitationRooms });
@@ -188,7 +186,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       }
     }
   }
-  async function work<Result>(operation: (client: Matrix, scope: AbortSignal) => Promise<Result>): Promise<Result> {
+  async function work<Result>(operation: (client: MessagingClient, scope: AbortSignal) => Promise<Result>): Promise<Result> {
     if (urgentControl()) throw new Error('Ordinary listener work preempted by accepted steering', { cause: steeringPreemptionCause });
     const deadline = options.clock.deadline(options.reconcileMs);
     const preempted = ordinary.signal;
@@ -260,10 +258,10 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
     const view = parsed.value;
     maximum = view.maxMessageBytes;
     destination.lifecycle?.configureIdle(view.fleetIdleTimeoutSeconds);
-    if (view.agentId !== options.id || view.matrixUserId !== options.account.user_id || view.ownerMatrixId !== options.settings.owner
+    if (view.agentId !== options.id || view.backendUserId !== options.account.userId || view.ownerBackendUserId !== options.settings.owner
       || view.status !== 'active' || view.ownerStatus !== 'active') throw Object.assign(new Error('Agent or owner access is no longer active'), { code: 'forbidden' });
     const next = new Set(view.roomGrants.filter(grant => !grant.muted).map(grant => grant.roomId));
-    const nextSenders = new Set(view.senderMatrixIds);
+    const nextSenders = new Set(view.senderBackendUserIds);
     const different = next.size !== allowed.size || [...allowed].some(room => !next.has(room))
       || nextSenders.size !== senders.size || [...senders].some(sender => !nextSenders.has(sender));
     if (different) {
@@ -300,15 +298,15 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       saveControl(storage, controlFile, state);
     }
     const selected = options.room ? selectRoom(options.room) : undefined;
-    let joined = new Set(await joinedRooms(client));
+    let joined = new Set(await client.joinedRooms());
     retainJoinedCursors(storage, options.cursorFile, joined);
     if (options.control.current().connected) await activity.activate();
     signal.throwIfAborted();
     options.ready?.(() => {
       const deadline = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
-      return testListener({ coordination: options.coordination, runtime: destination, matrix: options.transport(deadline, 10000),
+      return testListener({ coordination: options.coordination, runtime: destination, messaging: options.transport(deadline, 10000),
         ...(approval ? { authorizeApproval: approval.authorize } : {}),
-        id: options.id, owner: options.settings.owner, matrixUserId: options.account.user_id, paused: state.paused || !options.control.current().active, signal: deadline });
+        id: options.id, owner: options.settings.owner, backendUserId: options.account.userId, paused: state.paused || !options.control.current().active, signal: deadline });
     }, queries);
     acquisition = (async () => {
       for (;;) {
@@ -319,12 +317,12 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         const scope = AbortSignal.any([signal, generation, deadline]);
         try {
         const client = options.transport(scope, Math.min(45_000, options.reconcileMs));
-        const synced = await retry(() => synchronize(client, since, Math.min(options.pollMs, Math.floor(options.reconcileMs / 2))), scope);
+        const synced = await retry(() => client.synchronize(since, Math.min(options.pollMs, Math.floor(options.reconcileMs / 2))), scope);
         controlling = true;
-        const membership = new Set(await joinedRooms(client));
+        const membership = new Set(await client.joinedRooms());
         const membershipChanged = membership.size !== joined.size || [...joined].some(room => !membership.has(room));
         if (membershipChanged || options.clock.now() - lastAccess >= options.reconcileMs) await retry(() => access(scope), scope);
-        const reset = await retry(() => membershipResets(client, synced, options.account, since), scope);
+        const reset = new Set(synced.resetRooms);
         for (const room of joined) if (!membership.has(room)) reset.add(room);
         if (reset.size) {
           if (cycle && reset.has(cycle.room)) { cycle = undefined; saveWake(storage, options.cursorFile); windowEnd = 0; }
@@ -336,20 +334,20 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           state.controls = state.controls.filter(control => !reset.has(control.room));
         }
         for await (const event of sourceEvents(client, synced, since, selected)) {
-          if (!joined.has(event.room_id) || !membership.has(event.room_id) || reset.has(event.room_id)) continue;
+          if (!joined.has(event.roomId) || !membership.has(event.roomId) || reset.has(event.roomId)) continue;
           statistics.observed([event]);
-          if (state.controls.some(control => control.room === event.room_id && control.event === event.event_id)) continue;
-          const candidate = mentionsAgent(event, options.account.user_id)
+          if (state.controls.some(control => control.room === event.roomId && control.event === event.eventId)) continue;
+          const candidate = mentionsAgent(event, options.account.userId)
             || event.sender === options.settings.owner && String(event.content.body).trim() === '!!';
           if (candidate) await retry(() => access(scope), scope);
-          if (!allowed.has(event.room_id)) continue;
-          if (!senders.has(event.sender) && mentionsAgent(event, options.account.user_id)) maintenance.notice(event);
+          if (!allowed.has(event.roomId)) continue;
+          if (!senders.has(event.sender) && mentionsAgent(event, options.account.userId)) maintenance.notice(event);
           if (!await isControl(client, options.settings, options.account, event, options.coordination, senders, scope)) {
             if (state.paused && sourceText(event, options.settings.owner)) { state.paused = false; changed(); }
             continue;
           }
           {
-            const [attributed] = await eventOrigins(client, options.account.user_id, [event]);
+            const [attributed] = await eventOrigins(client, options.account.userId, [event]);
             const source = attributed!;
             receipt(source, 'received');
             const previousPublication = preempt();
@@ -358,25 +356,25 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
               await previousPublication;
               receipt(source, 'failed', 'This runtime has no captured-turn interruption capability');
               state.paused = true;
-              state.controls.push({ room: event.room_id, event: event.event_id, turn: null, stop: true, status: 'delivered' });
+              state.controls.push({ room: event.roomId, event: event.eventId, turn: null, stop: true, status: 'delivered' });
               saveControl(storage, controlFile, state);
               await publishControlNotice(client, options.coordination, options.id, options.settings, options.account, event, scope);
               continue;
             }
             let turn: string | null;
-            try { turn = await destination.turnControl.activeTurn(options.historyMode === 'per-room' ? event.room_id : undefined,
+            try { turn = await destination.turnControl.activeTurn(options.historyMode === 'per-room' ? event.roomId : undefined,
               { priority: 'steering', signal: scope }); }
             catch (error) { receipt(source, 'failed', error instanceof Error ? error.message : 'Native turn capture failed'); throw error; }
             await retry(() => access(scope), scope);
-            if (!allowed.has(event.room_id) || !await isControl(client, options.settings, options.account, event, options.coordination, senders, scope)) {
+            if (!allowed.has(event.roomId) || !await isControl(client, options.settings, options.account, event, options.coordination, senders, scope)) {
               receipt(source, 'failed', 'Source or room authority changed before cancellation'); continue;
             }
             scope.throwIfAborted();
             for (const earlier of state.controls) if (earlier.status === 'interrupted'
-              && (options.historyMode !== 'per-room' || earlier.room === event.room_id)) {
+              && (options.historyMode !== 'per-room' || earlier.room === event.roomId)) {
               earlier.status = 'superseded'; receipts.superseded(earlier.room, earlier.event, source);
             }
-            const control = { room: event.room_id, event: event.event_id, stop: event.sender === options.settings.owner && String(event.content.body).trim() === '!!',
+            const control = { room: event.roomId, event: event.eventId, stop: event.sender === options.settings.owner && String(event.content.body).trim() === '!!',
               turn, status: 'interrupting' as const };
             state.controls.push(control);
             saveControl(storage, controlFile, state);
@@ -395,8 +393,8 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         controlling = false;
         maintenance.observe(synced);
         saveControl(storage, controlFile, state);
-        checkpointSync(storage, options.cursorFile, synced.next_batch);
-        since = synced.next_batch;
+        checkpointSync(storage, options.cursorFile, synced.cursor);
+        since = synced.cursor;
         synchronized = true;
         if (ordinary.signal.aborted) ordinary = new AbortController();
         changed();
@@ -434,7 +432,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         }
         if (priorityChat.recovering()) continue;
         const current = urgentControl();
-        if (!current || !priorityChat.events().some(event => event.room_id === current.room && event.event_id === current.event)) {
+        if (!current || !priorityChat.events().some(event => event.roomId === current.room && event.eventId === current.event)) {
           priorityChat.discardUnpublished(); continue;
         }
       }
@@ -444,8 +442,8 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         const urgentClient = options.transport(scope, Math.min(30_000, options.reconcileMs));
         let source: ReceivedEvent | undefined;
         try {
-          const event = await urgentClient.get<Event>(`${API}/rooms/${segment(urgent.room)}/event/${segment(urgent.event)}`);
-          if (event.event_id !== urgent.event) throw new Error('Urgent event identity changed');
+          const event = await urgentClient.event(urgent.room, urgent.event);
+          if (event.eventId !== urgent.event) throw new Error('Urgent event identity changed');
           source = eventView(event, urgent.room);
           await access(scope);
           if (!joined.has(urgent.room) || !allowed.has(urgent.room)
@@ -455,10 +453,10 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           }
           if (controlling || state.paused || urgent.status !== 'interrupted' || urgentControl() !== urgent) continue;
           if (!priorityChat.pending()) {
-            const events = await eventOrigins(urgentClient, options.account.user_id, [source]);
+            const events = await eventOrigins(urgentClient, options.account.userId, [source]);
             const identities = await resolveSenders(options.coordination, events, scope);
             scope.throwIfAborted();
-            priorityChat.prepare({ events, cursors: {}, latest: {}, more_rooms: [] }, events, identities);
+            priorityChat.prepare({ events, cursors: {}, latest: {}, moreRooms: [] }, events, identities);
           }
           scope.throwIfAborted();
           let published: Awaited<ReturnType<typeof priorityChat.publish>>;
@@ -480,10 +478,10 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
         destination.acknowledge(value.messageIds); chat.acknowledge(); completed = undefined;
         if (value.membership !== membershipRevision) continue;
         state.controls = state.controls.filter(control => !['delivered', 'superseded'].includes(control.status)
-          || !value.batch.events.some(event => event.room_id === control.room && event.event_id === control.event));
+          || !value.batch.events.some(event => event.roomId === control.room && event.eventId === control.event));
         saveControl(storage, controlFile, state);
-        if (!value.batch.more_rooms.length) { cycle = undefined; saveWake(storage, options.cursorFile); }
-        if (!value.batch.more_rooms.length) await wait(previous);
+        if (!value.batch.moreRooms.length) { cycle = undefined; saveWake(storage, options.cursorFile); }
+        if (!value.batch.moreRooms.length) await wait(previous);
         continue;
       }
       let recoveredWake = false;
@@ -525,8 +523,8 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
       if (!senders.size) { windowEnd = 0; acquiring = false; await wait(previous); continue; }
       async function accept(event: ReceivedEvent): Promise<boolean> {
         if (isListenerNotice(event)) return false;
-        if (event.sender === options.account.user_id && event.type === 'm.room.message') return false;
-        if (state.controls.some(control => control.room === event.room_id && control.event === event.event_id && control.status === 'delivered')) return false;
+        if (event.sender === options.account.userId && event.type === "message") return false;
+        if (state.controls.some(control => control.room === event.roomId && control.event === event.eventId && control.status === 'delivered')) return false;
         return true;
       }
       const pending: ReceivedEvent[] = [];
@@ -539,22 +537,22 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
           if (now < windowEnd) { acquiring = false; await wait(previous, Math.ceil(windowEnd - now)); continue; }
           cycle = await work(client => captureWake(client, trigger,
             new Set(Object.keys(batch.cursors).filter(room => allowed.has(room) && (!selected || room === selected)
-              && (options.historyMode !== 'per-room' || room === trigger.room_id))), since!));
+              && (options.historyMode !== 'per-room' || room === trigger.roomId))), since!));
           saveWake(storage, options.cursorFile, cycle); windowEnd = 0;
         } else if (pending.length) { windowEnd = 0; acquiring = false; await wait(previous); continue; }
       }
       if (cycle) {
         const eligible = options.historyMode === 'per-room' ? new Set(Object.keys(cycle.ends).filter(room => allowed.has(room))) : allowed;
-        if (options.historyMode === 'per-room') batch = { events: batch.events.filter(event => eligible.has(event.room_id)),
+        if (options.historyMode === 'per-room') batch = { events: batch.events.filter(event => eligible.has(event.roomId)),
           cursors: { ...loadCursors(storage, options.cursorFile), ...Object.fromEntries(Object.entries(batch.cursors).filter(([room]) => eligible.has(room))) },
-          latest: Object.fromEntries(Object.entries(batch.latest).filter(([room]) => eligible.has(room))), more_rooms: batch.more_rooms.filter(room => eligible.has(room)) };
+          latest: Object.fromEntries(Object.entries(batch.latest).filter(([room]) => eligible.has(room))), moreRooms: batch.moreRooms.filter(room => eligible.has(room)) };
         batch = await work(client => collectBatch(storage, client, options.settings, options.cursorFile, options.limit, maximum, batch, cycle!, eligible, artifacts));
       }
       if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl()) continue;
       const events: ReceivedEvent[] = [];
       for (const event of batch.events) if (await accept(event)) events.push(event);
       const { emitted, identities } = await work(async (client, scope) => {
-        const emitted = await eventOrigins(client, options.account.user_id, deliveryEvents(events, options.account.user_id));
+        const emitted = await eventOrigins(client, options.account.userId, deliveryEvents(events, options.account.userId));
         return { emitted, identities: await resolveSenders(options.coordination, emitted, scope) };
       });
       if (membershipAtRead !== membershipRevision || controlling || state.paused || urgentControl() || queries.pending()

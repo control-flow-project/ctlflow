@@ -18,7 +18,7 @@
    installed assets, restart that controller and inspect its actual bindings.
 8. Verify affected user flows in a real browser.
 
-No phase silently falls back to another runtime or an old schema.
+No phase silently substitutes another runtime or schema.
 A successful image build or migration does not establish browser or fleet health.
 Website deployment, npm publication and starting fleets are separate actions.
 
@@ -41,10 +41,10 @@ as proof that no writer exists. Concurrent starts cannot overlap migrations.
 
 ## Persistent data
 
-Knex is the only SQL migration owner. Schema 18 accepts the inventoried
-13–17 forward migrations and current-schema validation; foreign/future or older
-unsupported stores are refused. Application startup validates schema identity,
-version and applied migration names without creating or upgrading tables.
+Knex is the only SQL migration owner. One `00_initial.mjs` migration creates
+schema 1 directly, including constraints, indexes and reference data. Application
+startup validates the current schema and migration metadata without creating or
+upgrading tables. There are no historical conversions or alternate readers.
 
 Conduit's RocksDB, static reports and fleetd/native histories have different
 owners and are not reset by a SQL migration. Replacing the backend does not
@@ -64,7 +64,7 @@ import/export management data.
 | Native sleeping | Normal idle state; eligible input resumes saved history |
 | Native explicitly stopped | Resume selected sessions; messages must not restart them |
 | Waiting for a decision | Exact owner decision page and protected DM |
-| Mention delayed | Matrix mention metadata, current room/wake authority and native generation |
+| Mention delayed | Structured mention metadata, current room/wake authority and native generation |
 | No room reply | Intentional messaging-tool output; terminal output goes only to owner |
 | History resume fails | Exact saved binding and native writer lock; never substitute a new history |
 | Retirement unavailable | Current exact native-stop evidence and unsettled work |

@@ -9,7 +9,7 @@ export const fleetControl = check.object({ fleetId: check.identifier, revision: 
 const messageBody = check.refine(check.plainText(16384), body => !!body.trim() && body.length <= 4096, 'Expected a fleet message of 1–4096 characters');
 export const fleetMessageCommand = check.object({ messageId: check.identifier, fleetId: check.identifier, body: messageBody,
   createdAt: check.integer(), expiresAt: check.integer(), sender: check.refine(check.object({ kind: check.choice('human', 'controller'),
-    matrixUserId: check.nullable(check.matrixUserId) }), sender => (sender.kind === 'human') === (sender.matrixUserId !== null), 'Invalid fleet message sender'),
+    backendUserId: check.nullable(check.backendUserId) }), sender => (sender.kind === 'human') === (sender.backendUserId !== null), 'Invalid fleet message sender'),
   agentIds: check.list(check.identifier, 100) });
 export const fleetControlSnapshot = check.refine(check.object({ fleetId: check.identifier, revision: check.integer(), deliveryEnabled: check.boolean,
   connection: check.object({ status: check.choice('online', 'offline'), lastSeenAt: check.nullable(check.integer()) }),

@@ -3,6 +3,7 @@ import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { readJson } from '@ctlflow/crossfire-adapter-filesystem/index';
 import { config } from '../apps/server/src/config.js';
+import { matrixConfiguration } from '@ctlflow/crossfire-adapter-matrix/config';
 
 export function checkContainerConfiguration(arguments_: string[]): void {
   const { values, positionals } = parseArgs({ args: arguments_, allowPositionals: true, options: {
@@ -13,7 +14,8 @@ export function checkContainerConfiguration(arguments_: string[]): void {
     throw new Error('Supply --directory, --instance, --origin, --content-origin and --server-name');
   const parsed = config(readJson(join(values.directory, 'config.json')));
   if (!parsed.ok) throw new Error(parsed.error.message);
-  if (parsed.value.instance !== values.instance || parsed.value.publicOrigin !== values.origin || parsed.value.contentOrigin !== values['content-origin'] || parsed.value.serverName !== values['server-name'])
+  const messaging = matrixConfiguration(parsed.value.messaging); if (!messaging.ok) throw new Error(messaging.error.message);
+  if (parsed.value.instance !== values.instance || parsed.value.publicOrigin !== values.origin || parsed.value.contentOrigin !== values['content-origin'] || messaging.value.serverName !== values['server-name'])
     throw new Error('Private configuration does not match the deployment identity and origins');
 }
 

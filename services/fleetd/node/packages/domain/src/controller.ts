@@ -8,6 +8,7 @@ import { createSetup } from './setup.js';
 import { createResumeSelections } from './resume-selection.js';
 import { loggingRetentionDays } from '@ctlflow/crossfire-kernel/logging';
 import { createOperationHistory } from './operation-history.js';
+import { createDiagnostics } from './diagnostics.js';
 
 export function createController(services: Services) {
   const retention = loggingRetentionDays(services.loggingRetentionDays); if (!retention.ok) return retention;
@@ -30,6 +31,8 @@ export function createController(services: Services) {
   const restoring = new Map<string, Promise<void>>();
   const connectionErrors = new Map<string, string>();
   let stopping = false;
+  const diagnostics = createDiagnostics({ now: services.now, stopping: () => stopping, fleet: view,
+    registered: fleetId => records.some(record => record.fleetId === fleetId), running: (fleetId, instanceKey) => running.get(key(fleetId, instanceKey)) });
   const startedAt = services.now();
   function connect(configuration: Configuration): void {
     const result = services.execution.connect(configuration, lifetime.signal, { execute: async input => {
@@ -510,8 +513,6 @@ export function createController(services: Services) {
         const completed = services.registry.completeSetup(operation.operationId);
         if (!completed.ok) operation.errors.push({ instanceKey: null, ...completed.error });
       }
-      operation.status = operation.errors.length ? 'failed' : 'succeeded'; operation.completedAt = services.now(); operation.approval = null; saveOperation(operation);
-      if (active.get(fleetId)?.stop.signal === signal) active.delete(fleetId);
     }
   }
   async function operate(input: OperationInput, receiptPending = false): Promise<Result<Operation>> {
@@ -596,12 +597,15 @@ export function createController(services: Services) {
     for (const instance of selected) restorationOwned.delete(key(target.fleetId, instance.key));
     if (configuration) deployed.set(target.fleetId, configuration);
     const done = Promise.resolve().then(async () => { await predecessor?.done; await execute(operation, configuration, selected, stop.signal); }).catch(async error => {
-      operation.status = 'failed'; operation.completedAt = services.now(); operation.approval = null;
       operation.errors.push({ instanceKey: null, code: 'unavailable', message: error instanceof Error ? error.message : 'Operation persistence failed' });
       for (const instance of selected) {
         try { await stopInstance(target.fleetId!, instance); } catch { lifetime.abort(new Error('Runtime cleanup failed')); }
       }
-    }).finally(() => { if (active.get(target.fleetId!)?.stop === stop) active.delete(target.fleetId!); });
+    }).finally(() => {
+      operation.status = operation.errors.length ? 'failed' : 'succeeded'; operation.completedAt = services.now(); operation.approval = null;
+      if (active.get(target.fleetId!)?.stop === stop) active.delete(target.fleetId!);
+      try { saveOperation(operation); } catch (error) { stopping = true; lifetime.abort(error); }
+    });
     active.set(target.fleetId, { stop, done });
     return success(structuredClone(operation));
   }
@@ -621,7 +625,7 @@ export function createController(services: Services) {
     running.clear();
     await services.execution.close();
   }
-  return success({ status: () => ({ controller: services.controller, startedAt, stopping }), maintainHistory: history.prune, ready: () => restoration, list, view, attachment, contexts, test, add, setup, rename, remove, editInstance, operate, close,
+  return success({ status: () => ({ controller: services.controller, startedAt, stopping }), diagnostics, maintainHistory: history.prune, ready: () => restoration, list, view, attachment, contexts, test, add, setup, rename, remove, editInstance, operate, close,
     async delivery(fleetId: string, input: { expectedRevision: number; enabled: boolean }) {
       const current = inspect(fleetId); if (!current.ok) return current;
       if (stopping) return failure('unavailable', 'Controller is stopping');

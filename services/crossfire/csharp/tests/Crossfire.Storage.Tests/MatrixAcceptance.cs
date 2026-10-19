@@ -42,7 +42,7 @@ public static class MatrixAcceptance
         Equal(conversation.IsSuccess, true, "real private owner DM creation" + (conversation.IsSuccess ? "" : ": " + conversation.Error.Message));
         var dm = conversation.Value;
         Equal((await authority.OwnerConversation(owner, agent, null, null)).Value, dm, "private owner DM discovered from native direct account data");
-        Equal((await authority.Room(owner, dm)).Value.Name, "Native specialist (Native owner)", "owner conversation has meaningful display name");
+        Equal((await authority.Room(owner, dm, null)).Value.Name, "Native specialist (Native owner)", "owner conversation has meaningful display name");
         Equal((await authority.Membership(owner, agent, dm)).Value.Membership, "join", "agent joins private owner DM");
         Equal((await authority.Leave(agent, dm)).IsSuccess, true, "agent leaves native owner DM");
         Equal((await authority.OwnerConversation(owner, agent, dm, null)).Value, dm, "repair preserves exact owner DM identity");
@@ -52,26 +52,26 @@ public static class MatrixAcceptance
             writer.WriteString("preset", "public_chat"); writer.WriteString("name", "Native shared room");
         }));
         var room = created.GetProperty("room_id").GetString()!;
-        var granted = await authority.SetRoomAccess(owner, agent, room, new("read", -1), new("managed"));
+        var granted = await authority.SetRoomAccess(owner, agent, room, new("read", null, false), new("managed"));
         Equal(granted.IsSuccess, true, "real native managed room admission" + (granted.IsSuccess ? "" : ": " + granted.Error.Message));
         Equal(granted.Value.Membership, "join", "managed native membership confirmed");
-        Equal(granted.Value.PowerLevel, -1L, "read-only native level confirmed");
-        Equal((await authority.SetRoomAccess(owner, agent, room, new("reply", 0), null)).Value.PowerLevel, 0L, "native reply access upgrade");
+        Equal(granted.Value.NativeAccess!.Value.GetProperty("powerLevel").GetInt64(), -1L, "read-only native level confirmed");
+        Equal((await authority.SetRoomAccess(owner, agent, room, new("reply", null, false), new("managed"))).Value.NativeAccess!.Value.GetProperty("powerLevel").GetInt64(), 0L, "native reply access upgrade");
         Equal((await authority.Leave(agent, room)).IsSuccess, true, "real shared-room departure");
-        Equal((await authority.SetRoomAccess(owner, agent, room, new("reply", 0), null)).Value.Membership, "leave", "ordinary reconciliation cannot readmit departed agent");
+        Equal((await authority.SetRoomAccess(owner, agent, room, new("reply", null, false), null)).Value.Membership, "leave", "ordinary reconciliation cannot readmit departed agent");
         async Task Invite() => _ = await Request("POST", "/rooms/" + MatrixJson.Segment(room) + "/invite", MatrixJson.Object(writer => writer.WriteString("user_id", agent)));
         await Invite();
         var invitation = await authority.Invitation(agent, room);
         Equal(invitation.IsSuccess, true, "real native invitation sync" + (invitation.IsSuccess ? "" : ": " + invitation.Error.Message));
-        Equal(invitation.Value?.SenderMatrixId, owner, "native invitation sender proof");
+        Equal(invitation.Value?.SenderBackendUserId, owner, "native invitation sender proof");
         var eventId = invitation.Value!.EventId;
         Equal((await authority.Leave(agent, room)).IsSuccess, true, "withdraw native invitation");
-        Equal((await authority.SetRoomAccess(owner, agent, room, new("reply", 0), new("invitation", eventId, owner))).Error.Code, "conflict",
+        Equal((await authority.SetRoomAccess(owner, agent, room, new("reply", null, false), new("invitation", eventId, owner))).Error.Code, "conflict",
             "withdrawn invitation cannot be accepted from old receipt");
         await Invite();
         var nextInvitation = await authority.Invitation(agent, room);
         Equal(nextInvitation.Value!.EventId != eventId, true, "new native invitation has exact new identity");
-        Equal((await authority.SetRoomAccess(owner, agent, room, new("reply", 0), new("invitation", nextInvitation.Value.EventId, owner))).Value.Membership,
+        Equal((await authority.SetRoomAccess(owner, agent, room, new("reply", null, false), new("invitation", nextInvitation.Value.EventId, owner))).Value.Membership,
             "join", "exact invitation admission verified against real Matrix");
         Equal((await authority.Invitation(agent, room)).Value is null, true, "incremental invitation cache removes joined rooms");
         var notice = await authority.SendNotice(owner, room, Identity.Identifier(), "Native delivery verified", agent);

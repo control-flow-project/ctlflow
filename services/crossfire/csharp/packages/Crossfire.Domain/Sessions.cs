@@ -6,7 +6,7 @@ public sealed record SessionCreation(string Secret, string CsrfSecret, MemberVie
 public sealed record AuthenticatedMember(Actor Actor, MemberView Member, string CsrfSecret, IReadOnlyList<string> Permissions);
 public sealed record SessionPorts(AuthorizationPorts Authorization, UnitOfWork Transaction,
     Func<string, CancellationToken, ValueTask<Result<string>>> Identify,
-    Func<string, Result<Principal?>> ByMatrixId, Func<string, Result<MemberView?>> Member,
+    Func<string, Result<Principal?>> ByBackendUserId, Func<string, Result<MemberView?>> Member,
     Func<long, Result<Unit>> RemoveExpired, Func<string, long, Result<long>> Count,
     Func<MemberSession, Result<Unit>> Insert, Func<string, Result<Unit>> Remove,
     Func<string> Secret, Func<string, string> Hash);
@@ -19,7 +19,7 @@ public static class Sessions
         if (!identity.IsSuccess) return Result<SessionCreation>.Fail(identity.Error);
         return ports.Transaction.Run(() =>
         {
-            var found = ports.ByMatrixId(identity.Value);
+            var found = ports.ByBackendUserId(identity.Value);
             if (!found.IsSuccess) return Result<SessionCreation>.Fail(found.Error);
             if (found.Value is not { Kind: "human", Status: "active" } principal)
                 return Results.Fail<SessionCreation>("forbidden", "An active human membership is required");
@@ -54,7 +54,7 @@ public static class Sessions
         if (!identity.IsSuccess) return Result<AuthenticatedMember>.Fail(identity.Error);
         var member = ports.Member(session.Value.MemberId);
         if (!member.IsSuccess) return Result<AuthenticatedMember>.Fail(member.Error);
-        if (member.Value is null || member.Value.Principal.MatrixUserId != identity.Value)
+        if (member.Value is null || member.Value.Principal.BackendUserId != identity.Value)
             return Results.Fail<AuthenticatedMember>("unauthorized", "Native session identity changed");
         var actor = new Actor(session.Value.MemberId, "human", new ManagementAuthentication(session.Value.SecretHash));
         var active = Authorization.ActiveActor(ports.Authorization, actor);

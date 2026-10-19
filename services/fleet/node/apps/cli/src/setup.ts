@@ -26,7 +26,7 @@ function configuredDescriptor(file: string): string {
     const information = fstatSync(descriptor);
     if (!information.isFile() || information.uid !== process.getuid!() || information.size > 1024 * 1024 || information.mode & 0o022) throw new Error('Configuration must be a bounded, owned file not writable by others');
     const configuration = value(parseToml(readFileSync(descriptor, 'utf8'), validateRoster));
-    return configuration.coordination.server + '/onboarding/setup.json?ownerMatrixId=' + encodeURIComponent(configuration.coordination.owner);
+    return configuration.coordination.server + '/onboarding/setup.json?ownerBackendUserId=' + encodeURIComponent(configuration.coordination.owner);
   } finally { closeSync(descriptor); }
 }
 export async function setup(options: SetupOptions, signal: AbortSignal, output: (value: unknown) => void): Promise<void> {
@@ -47,7 +47,7 @@ export async function setup(options: SetupOptions, signal: AbortSignal, output: 
   const information = lstatSync(workspace);
   if (!information.isDirectory() || information.uid !== process.getuid!() || information.mode & 0o002) throw new Error('Current workspace must be owned and not writable by other users');
   writeJson(recordPath, { workspace, descriptor, root, ...(configuration ? { configuration } : {}) });
-  output({ status: 'starting-controller', workspace, controllerRoot: root, server: verified.server, owner: verified.ownerMatrixId,
+  output({ status: 'starting-controller', workspace, controllerRoot: root, server: verified.server, owner: verified.ownerBackendUserId,
     conversation: 'New fleet-managed agent; this coding session remains independent' });
   const controller = await launchDaemon(root, undefined, signal);
   connections.localRoot = root; saveConnections(connections);

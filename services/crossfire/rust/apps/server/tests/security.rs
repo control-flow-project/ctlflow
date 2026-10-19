@@ -1,10 +1,11 @@
+use crossfire_adapter_http::security;
 use crossfire_adapter_http::server::HeaderMap;
 use crossfire_kernel::secret::Secret;
-use crossfire_server::{configuration, security};
+use crossfire_server::configuration;
 use serde_json::json;
 
 fn configuration_value() -> serde_json::Value {
-    json!({ "instance":"contracts", "serverName":"architecture.localhost", "publicOrigin":"http://127.0.0.1:8001", "contentOrigin":"http://localhost:8002", "matrixOrigin":"http://127.0.0.1:8003", "administrator":"@admin:architecture.localhost", "jwtSecret":"a".repeat(43), "registrationSecret":"b".repeat(43) })
+    json!({ "instance":"contracts", "publicOrigin":"http://127.0.0.1:8001", "contentOrigin":"http://localhost:8002", "administrator":"@admin:architecture.localhost", "messaging":{"type":"matrix","parameters":{"serverName":"architecture.localhost","origin":"http://127.0.0.1:8003","jwtSecret":"a".repeat(43),"registrationSecret":"b".repeat(43)}} })
 }
 
 #[test]
@@ -15,7 +16,12 @@ fn origins_and_resource_configuration_are_validated_at_the_boundary()
     assert_eq!(config.logging_retention_days, 7);
     assert_eq!(config.publication_budget.uploads, 8);
     assert_eq!(
-        config.service_matrix_id(),
+        crossfire_adapter_matrix::settings::read(
+            &config.messaging,
+            &config.instance,
+            &config.administrator
+        )?
+        .service_backend_user_id,
         "@crossfire-contracts:architecture.localhost"
     );
     for origin in [

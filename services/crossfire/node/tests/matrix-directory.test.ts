@@ -8,8 +8,8 @@ import { releaseFixture } from './release-fixture.js';
 import { authenticateNativePrincipal, authenticateMember } from '@ctlflow/crossfire-domain/session/authenticate';
 import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
 import { changeMember } from '@ctlflow/crossfire-domain/member/change-member';
-import { API } from '@ctlflow/crossfire-contracts/matrix';
-import type { MatrixDirectoryResult } from '@ctlflow/crossfire-contracts/matrix-directory';
+import { API } from '@ctlflow/crossfire-adapter-matrix/protocol';
+import type { MatrixDirectoryResult } from '@ctlflow/crossfire-adapter-matrix/directory';
 
 const path = '/_matrix/client/v3/user_directory/search';
 test('Matrix directory authenticates native principals, bounds searches and retains REST session authority', async scope => {
@@ -22,12 +22,12 @@ test('Matrix directory authenticates native principals, bounds searches and reta
   for (const token of [admin.token, owner.token, other.token, agent.token]) {
     const response = await search(token);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { results: [{ user_id: agent.matrixUserId, display_name: 'bea (alice)' }], limited: false });
+    assert.deepEqual(await response.json(), { results: [{ user_id: agent.backendUserId, display_name: 'bea (alice)' }], limited: false });
     assert.equal(response.headers.get('cache-control'), 'no-store');
   }
   assert.equal((await search(owner.token, { search_term: 'BEA' }, { Cookie: '__Host-crossfire=unrelated' })).status, 200, 'Element’s native authentication is independent of a management cookie');
-  const exact = await search(other.token, { search_term: agent.matrixUserId });
-  assert.equal((await exact.json() as MatrixDirectoryResult).results[0]?.user_id, agent.matrixUserId);
+  const exact = await search(other.token, { search_term: agent.backendUserId });
+  assert.equal((await exact.json() as MatrixDirectoryResult).results[0]?.user_id, agent.backendUserId);
   assert.deepEqual(await (await search(owner.token, { search_term: 'absent' })).json(), { results: [], limited: false });
   assert.deepEqual(await (await search(owner.token, { search_term: '', limit: 0 })).json(), { results: [], limited: true });
   const limited = await (await search(owner.token, { search_term: '', limit: 1 })).json() as MatrixDirectoryResult;
@@ -38,7 +38,7 @@ test('Matrix directory authenticates native principals, bounds searches and reta
   assert.equal((await request(path)).status, 405);
   assert.equal((await request(path, 'POST', { search_term: 'bea' }, headers(admin))).status, 401);
   assert.equal((await search('invalid')).status, 401);
-  const unregistered = value(await services.matrix.provision('@stranger:test.localhost', secret(), 'fixture'));
+  const unregistered = value(await services.messaging.provision('@stranger:test.localhost', secret(), { deviceId: 'fixture' }));
   assert.equal((await search(unregistered.accessToken)).status, 403);
   assert.equal((await request('/api/members', 'GET', undefined, { Authorization: 'Bearer ' + owner.token })).status, 401);
   assert.equal((await request('/api/agents', 'GET', undefined, { Authorization: 'Bearer ' + owner.token })).status, 401);
@@ -67,7 +67,7 @@ test('public Matrix directory routes identities through Crossfire without granti
   assert.equal(native.status, 200); assert.deepEqual((await native.json() as MatrixDirectoryResult).results, [], 'Preserve the actual native missing-discovery control');
   const response = await fetch(fixture.origin + path, { method: 'POST', headers: { Authorization: 'Bearer ' + searcher.token, 'Content-Type': 'application/json' }, body: JSON.stringify({ search_term: 'bea', limit: 100 }) });
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { results: [{ user_id: agent.matrixUserId, display_name: 'bea (alice)' }], limited: false });
+  assert.deepEqual(await response.json(), { results: [{ user_id: agent.backendUserId, display_name: 'bea (alice)' }], limited: false });
   const joined = await fetch(fixture.origin + API + '/joined_rooms', { headers: { Authorization: 'Bearer ' + agent.token } });
   assert.equal(value(fixture.services.repositories.ownerConversation.find({ agentId: agent.id })), null);
   assert.equal(joined.status, 200); assert.deepEqual(await joined.json(), { joined_rooms: [] });

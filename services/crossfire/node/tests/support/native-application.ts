@@ -21,8 +21,8 @@ export async function nativeApplication(scope: TestContext) {
   const started = performance.now();
   const jwtSecret = secret(), native = await conduitFixture(scope, { jwtSecret });
   const service = await native.register('crossfire-tests'), administrator = await native.register('admin');
-  const config = { instance: 'tests', serverName: 'architecture.localhost', publicOrigin: 'http://127.0.0.1', contentOrigin: 'http://localhost', matrixOrigin: native.base,
-    administrator: administrator.id, registrationSecret: native.registrationToken, jwtSecret };
+  const config = { instance: 'tests', publicOrigin: 'http://127.0.0.1', contentOrigin: 'http://localhost',
+    messaging: { type: 'matrix', parameters: { serverName: 'architecture.localhost', origin: native.base, registrationSecret: native.registrationToken, jwtSecret } }, administrator: administrator.id };
   const application = createApplication(applicationDatabase(scope), config), { services } = application;
   cleanup(scope, () => application.close());
   async function login(token: string) {
@@ -39,9 +39,9 @@ export async function nativeApplication(scope: TestContext) {
   }
   async function agent(owner: Actor, name: string) {
     const ownerRecord = value(services.directory.member(owner.principalId))!;
-    const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: ownerRecord.principal.matrixUserId,
+    const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: ownerRecord.principal.backendUserId,
       fleetKey: 'test-' + name, controller: { name: 'Native test controller' },
-      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy(ownerRecord.principal.matrixUserId) }] };
+      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy(ownerRecord.principal.backendUserId) }] };
     const introduced = value(await introduceEnrollment(services, input));
     value(decideEnrollment(services, owner, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
     const item = value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))[0]!;
@@ -50,7 +50,7 @@ export async function nativeApplication(scope: TestContext) {
     const controller = { fleetId: ready.fleet!.fleetId, connectionId: randomUUID(), credential: ready.fleet!.controllerCredential! };
     value(reportFleetConnection(services, value(authenticateController(services, controller.credential)), controller.fleetId, controller.connectionId, false));
     const account = ready.instances[0]!.account!;
-    return { id: item.agentId!, matrixUserId: account.matrixUserId, token: account.accessToken, controller,
+    return { id: item.agentId!, backendUserId: account.userId, token: account.accessToken, controller,
       actor: { principalId: item.agentId!, kind: 'agent' as const }, input };
   }
   return { application, services, native, service, admin, member, agent };

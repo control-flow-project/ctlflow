@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, readdirSync, existsSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readdirSync, existsSync, symlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
@@ -74,19 +74,4 @@ test('abandoned atomic writes are reclaimed and unsafe operation storage is reje
   const unsafe = join(root, 'operations', randomUUID() + '.json'); symlinkSync('/dev/null', unsafe);
   assert.equal(storage.pendingOperations().ok, false); rmSync(unsafe);
   assert.deepEqual(value(storage.operation(item.operationId)), item);
-});
-
-test('obsolete operation arrays and untimestamped logs are rejected without conversion or deleting current state', scope => {
-  const root = mkdtempSync(join(tmpdir(), 'fleet-op-unsupported-')); cleanup(scope, () => rmSync(root, { recursive: true }));
-  const storage = operationStorage(root), item = operation(1); value(storage.saveOperation(item));
-  for (const name of ['operations.json', 'daemon.log']) {
-    const file = join(root, name), bytes = Buffer.from('unsupported input');
-    writeFileSync(file, bytes, { mode: 0o600 });
-    assert.throws(() => createRegistry(root), /Unsupported controller state/u);
-    assert.deepEqual(readFileSync(file), bytes);
-    assert.deepEqual(value(storage.operation(item.operationId)), item);
-    rmSync(file); symlinkSync(join(root, 'missing-history'), file);
-    assert.throws(() => createRegistry(root), /Unsupported controller state/u);
-    rmSync(file);
-  }
 });

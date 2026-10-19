@@ -15,8 +15,8 @@ export async function operatorFixture(scope: TestContext) {
     const path = new URL(request.url!, 'http://localhost').pathname;
     requests.push({ method: request.method!, path });
     const reply = (status: number, value: unknown) => { response.writeHead(status, { 'Content-Type': 'application/json' }); response.end(JSON.stringify(value)); };
-    if (path === '/_matrix/client/v3/login') {
-      reply(200, { user_id: wrongAccount ? '@different:test.localhost' : fixture.application.config.administrator, access_token: fixture.admin.token }); return;
+    if (path === '/api/backend-authentication') {
+      reply(200, { data: { accessToken: wrongAccount ? 'unknown-account-token' : fixture.admin.token }, meta: { requestId: randomUUID() } }); return;
     }
     if (path === '/_matrix/client/v3/logout') { reply(200, {}); return; }
     if (path === '/_matrix/client/v3/joined_rooms') { reply(200, { joined_rooms: [] }); return; }
@@ -28,6 +28,6 @@ export async function operatorFixture(scope: TestContext) {
     if (failAgents && path === '/api/agents') { reply(503, { error: { code: 'native', message: 'PRIVATE_TOKEN_' + fixture.admin.token }, meta: { requestId: randomUUID() } }); return; }
     for (const listener of listeners) listener.call(backend.server, request, response);
   })().catch(() => { response.writeHead(500); response.end(); }); });
-  return { ...fixture, server: backend.server, origin: backend.origin, release, requests, account: { matrixUserId: fixture.application.config.administrator, password: 'fixture-only' },
+  return { ...fixture, server: backend.server, origin: backend.origin, release, requests, account: { backendUserId: fixture.application.config.administrator, password: 'fixture-only' },
     failAgents() { failAgents = true; }, wrongAccount() { wrongAccount = true; } };
 }

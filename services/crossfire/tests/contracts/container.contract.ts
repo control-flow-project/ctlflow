@@ -137,7 +137,7 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
         assert.equal(joined.status, 200);
         assert((await joined.json() as { joined_rooms: string[] }).joined_rooms.includes(publicRoom));
         await page.goto(origin + '/manage/');
-        await page.getByLabel('Matrix username').fill('@admin:verification.localhost');
+        await page.getByLabel('Username', { exact: true }).fill('@admin:verification.localhost');
         await page.getByLabel('Password', { exact: true }).fill(secrets.administratorPassword);
         await page.getByRole('button', { name: 'Sign in', exact: true }).click();
         await expect(page.getByRole('heading', { name: 'Agents', exact: true })).toBeVisible();
@@ -163,7 +163,7 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
         const descriptor = setupDescriptorSchema(await descriptorResponse.json());
         assert(descriptor.ok, 'The personalized npm setup descriptor validates');
         assert.equal(descriptor.value.server, origin);
-        assert.equal(descriptor.value.ownerMatrixId, account.user_id);
+        assert.equal(descriptor.value.ownerBackendUserId, account.user_id);
         assert.deepEqual(descriptor.value.package, { name: '@ctlflow/fleet', version: health.version });
         assert(!copied.includes(secrets.administratorPassword));
         assert(!copied.includes(additionalInstructions));

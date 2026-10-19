@@ -1,6 +1,9 @@
+use crossfire_adapter_matrix::{
+    agent::Client,
+    protocol::{Protocol, Request, Response},
+};
 mod support;
 use crossfire_agent_core::{
-    matrix::{Matrix, Request, Response},
     profile::Settings,
     receive_state,
     unread::{self, HistoryEnd, Options, Window},
@@ -26,7 +29,7 @@ struct Native {
     fail_receipt: AtomicBool,
     rooms: Vec<String>,
 }
-impl Matrix for Native {
+impl Protocol for Native {
     async fn request(&self, request: &Request, _stop: CancellationToken) -> Result<Response> {
         if request.path.ends_with("/joined_rooms") {
             return Ok(Response {
@@ -76,8 +79,14 @@ impl Matrix for Native {
 fn settings() -> Settings {
     Settings {
         instance: "analyst".to_owned(),
-        homeserver: "http://localhost:3000".to_owned(),
-        server_name: "local".to_owned(),
+        server: "http://localhost:3000".to_owned(),
+        backend: crossfire_domain::messaging::BackendConfiguration {
+            backend_type: "matrix".to_owned(),
+            parameters: serde_json::Map::from_iter([
+                ("origin".into(), json!("http://localhost:3000")),
+                ("serverName".into(), json!("local")),
+            ]),
+        },
         owner: "@owner:local".to_owned(),
         max_upload_bytes: 1048576,
     }
@@ -98,7 +107,7 @@ async fn fresh_rooms_get_a_bounded_recent_floor_without_marking_old_history_or_o
     let storage = Memory::default();
     let batch = unread::read(
         &storage,
-        &native,
+        &Client::from_protocol(&native, "@agent:local")?,
         &settings(),
         &Inline,
         Options {
@@ -130,7 +139,7 @@ async fn fresh_rooms_get_a_bounded_recent_floor_without_marking_old_history_or_o
     );
     receive_state::acknowledge(
         &storage,
-        &native,
+        &Client::from_protocol(&native, "@agent:local")?,
         "cursor",
         &batch,
         CancellationToken::new(),
@@ -155,14 +164,15 @@ async fn saved_positions_read_only_forward_to_the_captured_room_boundary_and_fai
         room.clone(),
         HistoryEnd {
             cursor: "boundary".to_owned(),
-            event: Some(
-                json!({"event_id":"$terminal","sender":"@human:local","type":"m.room.message","content":{"msgtype":"m.text","body":"terminal"},"origin_server_ts":21}),
-            ),
+            event: Some(crossfire_adapter_matrix::message_events::parse(
+                &json!({"event_id":"$terminal","sender":"@human:local","type":"m.room.message","content":{"msgtype":"m.text","body":"terminal"},"origin_server_ts":21}),
+                "!room:local",
+            )?),
         },
     )]);
     let batch = unread::read(
         &storage,
-        &native,
+        &Client::from_protocol(&native, "@agent:local")?,
         &settings(),
         &Inline,
         Options {
@@ -191,7 +201,7 @@ async fn saved_positions_read_only_forward_to_the_captured_room_boundary_and_fai
     assert!(
         receive_state::acknowledge(
             &storage,
-            &native,
+            &Client::from_protocol(&native, "@agent:local")?,
             "cursor",
             &batch,
             CancellationToken::new()
@@ -200,7 +210,13 @@ async fn saved_positions_read_only_forward_to_the_captured_room_boundary_and_fai
         .is_err()
     );
     assert_eq!(receive_state::load(&storage, "cursor")?, batch.cursors);
-    receive_state::flush(&storage, &native, "cursor", CancellationToken::new()).await?;
+    receive_state::flush(
+        &storage,
+        &Client::from_protocol(&native, "@agent:local")?,
+        "cursor",
+        CancellationToken::new(),
+    )
+    .await?;
     assert_eq!(receive_state::load(&storage, "cursor")?, batch.cursors);
     Ok(())
 }
@@ -216,7 +232,7 @@ async fn repeated_native_positions_and_unjoined_selected_rooms_do_not_advance_st
     let allowed = BTreeSet::from(["!room:local".to_owned(), "!unjoined:local".to_owned()]);
     let result = unread::read(
         &storage,
-        &native,
+        &Client::from_protocol(&native, "@agent:local")?,
         &settings(),
         &Inline,
         Options {
@@ -239,7 +255,7 @@ async fn repeated_native_positions_and_unjoined_selected_rooms_do_not_advance_st
     crossfire_agent_core::local_state::write(&storage, "cursor", &cursors, 65536)?;
     let result = unread::read(
         &storage,
-        &native,
+        &Client::from_protocol(&native, "@agent:local")?,
         &settings(),
         &Inline,
         Options {

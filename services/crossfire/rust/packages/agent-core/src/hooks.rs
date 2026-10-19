@@ -50,8 +50,8 @@ impl<H: Hooks> Hooks for ContextHooks<H> {
                     observed_at,
                     settings,
                     error_message,
-                    room_id: (!matches!(self.context.as_str(), "shared" | "control"))
-                        .then(|| self.context.clone()),
+                    room_id: crossfire_kernel::history_context::room(&self.context)
+                        .map(str::to_owned),
                 }
             }
             event => event,

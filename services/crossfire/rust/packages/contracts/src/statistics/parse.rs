@@ -50,7 +50,7 @@ fn flow(value: &Value) -> Result<Flow> {
         value,
         &[
             "roomId",
-            "senderMatrixId",
+            "senderBackendUserId",
             "messageType",
             "observed",
             "delivered",
@@ -63,7 +63,7 @@ fn flow(value: &Value) -> Result<Flow> {
     )?;
     Ok(Flow {
         room_id: check::room_id(&object["roomId"])?,
-        sender_matrix_id: check::matrix_user_id(&object["senderMatrixId"])?.to_owned(),
+        sender_backend_user_id: check::backend_user_id(&object["senderBackendUserId"])?.to_owned(),
         message_type: check::text(&object["messageType"], 1, 100)?.to_owned(),
         totals: Totals {
             observed: count(&object["observed"])?,
@@ -113,10 +113,13 @@ pub fn batch(value: &Value) -> Result<Batch> {
     let mut flows = HashSet::new();
     let mut usage = HashSet::new();
     if value.ended_at < value.started_at
-        || value
-            .flows
-            .iter()
-            .any(|flow| !flows.insert((&flow.room_id, &flow.sender_matrix_id, &flow.message_type)))
+        || value.flows.iter().any(|flow| {
+            !flows.insert((
+                &flow.room_id,
+                &flow.sender_backend_user_id,
+                &flow.message_type,
+            ))
+        })
         || value
             .usage
             .iter()

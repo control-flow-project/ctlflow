@@ -27,7 +27,7 @@ export type CollectionRepository = {
   wakeSendersForAgents(agentIds: string[]): Result<AgentWakeSender[]>;
   listenerRuns(input: { agentId: string }): Result<ListenerRun[]>;
   pendingNotices(input: { now: number }): Result<WakeNotice[]>;
-  noticeHistory(input: { receiverAgentId: string; senderMatrixId: string; since: number }): Result<WakeNotice[]>;
+  noticeHistory(input: { receiverAgentId: string; senderBackendUserId: string; since: number }): Result<WakeNotice[]>;
   duePrincipals(input: { now: number }): Result<PrincipalApplication[]>;
   dueRoomGrants(input: { now: number }): Result<RoomGrantApplication[]>;
   agentRoomApplications(input: { agentId: string }): Result<RoomGrantApplication[]>;
@@ -43,5 +43,5 @@ export type CollectionRepository = {
   pendingIdentityCount(ownerId?: string): Result<number>;
   memberSessionCount(memberId: string, now: number): Result<number>;
   removeExpiredSessions(now: number): Result<void>;
-  invitationByClaim(matrixUserId: string): Result<MemberInvitation | null>;
+  invitationByClaim(backendUserId: string): Result<MemberInvitation | null>;
 };

@@ -15,7 +15,7 @@ pub struct Invitation {
     pub expires_at: i64,
     pub consumed_by_member_id: Option<String>,
     pub revoked_at: Option<i64>,
-    pub claim_matrix_user_id: Option<String>,
+    pub claim_backend_user_id: Option<String>,
     pub claim_display_name: Option<String>,
     pub claim_fingerprint: Option<String>,
 }
@@ -28,7 +28,7 @@ pub trait InvitationRepository: CoreRepository {
         page: i64,
         size: i64,
     ) -> Result<Page<Invitation>>;
-    fn invitation_by_claim(&mut self, matrix_id: &str) -> Result<Option<Invitation>>;
+    fn invitation_by_claim(&mut self, backend_user_id: &str) -> Result<Option<Invitation>>;
     fn abandoned_invitation_claims(&mut self, now: i64) -> Result<Vec<Invitation>>;
 }
 pub struct Created {
@@ -90,7 +90,7 @@ pub fn create(
                 expires_at,
                 consumed_by_member_id: None,
                 revoked_at: None,
-                claim_matrix_user_id: None,
+                claim_backend_user_id: None,
                 claim_display_name: None,
                 claim_fingerprint: None,
             },

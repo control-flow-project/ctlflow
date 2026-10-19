@@ -4,7 +4,7 @@ import { mkdirSync, openSync, closeSync, writeFileSync, renameSync, unlinkSync, 
 import { dirname, join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { MAX_JSON_BYTES } from "@ctlflow/crossfire-contracts/limits";
-import { json } from '@ctlflow/crossfire-contracts/matrix';
+import { json } from '@ctlflow/crossfire-kernel/json';
 
 export function privateDir(path: string): string {
   if (!existsSync(path)) {

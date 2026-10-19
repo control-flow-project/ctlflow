@@ -11,7 +11,7 @@ export function createWakeNoticeRepository(database: Database.Database): WakeNot
     find(key) {
       return stored(() => {
         const row = executeSelect(database, schema, (query, params) => query.from('wake_notice')
-          .where(row => row.receiver_agent_id === params.receiverAgentId && row.event_id === params.eventId).firstOrDefault(), key);
+          .where(row => row.receiver_agent_id === params.receiverAgentId && row.room_id === params.roomId && row.event_id === params.eventId).firstOrDefault(), key);
         return success(row ? mapWakeNotice(row) : null);
       });
     },
@@ -20,7 +20,7 @@ export function createWakeNoticeRepository(database: Database.Database): WakeNot
         executeInsert(database, schema, (query, params) => query.insertInto('wake_notice').values({
       receiver_agent_id: params.receiverAgentId,
       event_id: params.eventId,
-      sender_matrix_id: params.senderMatrixId,
+      sender_backend_user_id: params.senderBackendUserId,
       room_id: params.roomId,
       reserved_at: params.reservedAt,
       message_body: params.messageBody,
@@ -36,8 +36,7 @@ export function createWakeNoticeRepository(database: Database.Database): WakeNot
     update(value) {
       return stored(() => {
         const changed = executeUpdate(database, schema, (query, params) => query.update('wake_notice').set({
-      sender_matrix_id: params.senderMatrixId,
-      room_id: params.roomId,
+      sender_backend_user_id: params.senderBackendUserId,
       reserved_at: params.reservedAt,
       message_body: params.messageBody,
       status: params.status,
@@ -45,7 +44,7 @@ export function createWakeNoticeRepository(database: Database.Database): WakeNot
       native_event_id: params.nativeEventId,
       next_attempt_at: params.nextAttemptAt,
       last_error: params.lastError,
-        }).where(row => row.receiver_agent_id === params.receiverAgentId && row.event_id === params.eventId), value);
+        }).where(row => row.receiver_agent_id === params.receiverAgentId && row.room_id === params.roomId && row.event_id === params.eventId), value);
         return changed === 1 ? success(undefined) : failure('missing', 'WakeNotice not found');
       });
     },

@@ -28,6 +28,8 @@ function runtimeFixture(input: { sessionId: string; signal: AbortSignal; control
   close: Running['close']; nativeState?: Running['nativeState']; resume?: Running['resume'] }): Running {
   const nativeState: Running['nativeState'] = input.nativeState ?? (() => ({ phase: 'running', lastActivityAt: 1, historyAvailable: true }));
   return { sessionId: input.sessionId, signal: input.signal, control: input.control, nativeState, close: input.close,
+    diagnostics: async () => { const phase = nativeState().phase; return { checkedAt: 1, state: phase === 'running' ? 'unknown' : phase,
+      observedAt: 1, provider: 'unknown', providerObservedAt: null, pendingInput: false, pendingDecision: false }; },
     resume: input.resume ?? (async () => success(undefined)),
     attachment: async () => nativeState().phase === 'running' ? success(input.pointer) : failure('conflict', 'Resume this sleeping session explicitly to attach'),
     attachments: async () => nativeState().phase === 'running' ? success([{ context: 'shared', attachment: input.pointer }]) : failure('conflict', 'No live native endpoint'),
@@ -109,6 +111,27 @@ test('rosters are strict, disjoint and bounded; empty stopped fleets and persist
   for (const workarea of ['../escape', '/escape', 'agents/original/workarea/../escape', 'agents/original/workarea']) assert.equal(validateRoster({ ...roster, instances: [{ ...instance, workarea }] }).ok, false);
   assert.equal(validateRoster({ ...roster, instances: [instance, { ...instance, key: 'two', name: 'two', workarea: instance.workarea + '/nested' }] }).ok, false);
   assert.equal(parseToml('fleet = "one"\nfleet = "two"', validateRoster).ok, false);
+});
+
+test('observing terminal operation storage immediately permits its successor', async scope => {
+  const current = fixtureController(); cleanup(scope, () => current.controller.close());
+  await current.finish(await current.operation('start'));
+  const save = current.registry.saveOperation;
+  let next: Promise<Result<Operation>> | undefined;
+  let observed = false;
+  current.registry.saveOperation = operation => {
+    const saved = save(operation);
+    if (saved.ok && operation.action === 'stop' && operation.completedAt !== null && !observed) {
+      observed = true;
+      next = current.controller.operate({ operationId: randomUUID(), action: 'start',
+        target: { kind: 'fleet', fleetId: current.record.fleetId }, expectedRevision: current.record.revision });
+    }
+    return saved;
+  };
+  assert.equal((await current.finish(await current.operation('stop'))).status, 'succeeded');
+  assert(next, 'A storage subscriber observes the terminal operation');
+  const resumed = value(await next);
+  assert.equal((await current.finish(resumed)).status, 'succeeded');
 });
 
 test('controller owns runtimes, rejects duplicates and operation reuse with different input', async scope => {

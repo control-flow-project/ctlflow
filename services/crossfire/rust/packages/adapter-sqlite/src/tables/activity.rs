@@ -57,11 +57,11 @@ diesel::table! {
 }
 
 diesel::table! {
-    listener_stat_flow (run_id, bucket_at, room_id, sender_matrix_id, message_type) {
+    listener_stat_flow (run_id, bucket_at, room_id, sender_backend_user_id, message_type) {
         run_id -> Text,
         bucket_at -> BigInt,
         room_id -> Text,
-        sender_matrix_id -> Text,
+        sender_backend_user_id -> Text,
         message_type -> Text,
         observed -> BigInt,
         delivered -> BigInt,

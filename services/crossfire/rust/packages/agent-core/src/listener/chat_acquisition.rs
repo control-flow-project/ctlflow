@@ -1,10 +1,11 @@
 use super::*;
 use crate::{origins, unread};
+use crossfire_domain::messaging_client::MessagingClient;
 
 impl<
     S: LocalState,
     C: Coordination,
-    M: Matrix,
+    M: MessagingClient + crossfire_domain::messaging_client::InvitationReader,
     N: Connection + TurnControl + Lifecycle + 'static,
     A: Acknowledgment,
     T: Clock + Clone + Send + Sync + 'static,
@@ -37,7 +38,7 @@ impl<
         let cursors = receive_state::load(self.resources.storage.as_ref(), &self.options.file)?;
         let mut batch = receive_snapshots::pending(
             self.resources.storage.as_ref(),
-            self.resources.matrix.as_ref(),
+            self.resources.messaging.as_ref(),
             &self.options.profile.settings,
             self.artifacts.as_ref(),
             unread::Options {
@@ -70,7 +71,7 @@ impl<
             Some(wake)
         } else {
             let trigger = receive_snapshots::wake(
-                self.resources.matrix.as_ref(),
+                self.resources.messaging.as_ref(),
                 &batch,
                 &policy.senders,
                 &allowed,
@@ -108,7 +109,7 @@ impl<
                     .cloned()
                     .collect();
                 let wake = receive_snapshots::capture(
-                    self.resources.matrix.as_ref(),
+                    self.resources.messaging.as_ref(),
                     &trigger,
                     &rooms,
                     since
@@ -155,7 +156,7 @@ impl<
             let positions = batch.cursors.clone();
             batch = receive_snapshots::collect(
                 self.resources.storage.as_ref(),
-                self.resources.matrix.as_ref(),
+                self.resources.messaging.as_ref(),
                 &self.options.profile.settings,
                 self.artifacts.as_ref(),
                 batch,
@@ -204,7 +205,7 @@ impl<
             };
             receive_state::acknowledge(
                 self.resources.storage.as_ref(),
-                self.resources.matrix.as_ref(),
+                self.resources.messaging.as_ref(),
                 &self.options.file,
                 &batch,
                 stop,
@@ -214,7 +215,7 @@ impl<
             return Ok(());
         }
         let events = origins::enrich(
-            self.resources.matrix.as_ref(),
+            self.resources.messaging.as_ref(),
             &self.options.profile.account.user_id,
             events,
             stop.clone(),

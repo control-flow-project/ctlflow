@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
+import { ChatLink } from './backend.js';
 import type { Result } from '@ctlflow/crossfire-kernel/result';
 
 export function Alert({ children }: { children?: ReactNode }) {
@@ -13,7 +14,7 @@ export function Page({ title, description, action, children }: { title: string; 
 }
 export function AccountPage({ title, children }: { title: string; children: ReactNode }) {
   return <main className="account-page"><a className="brand" href="/manage/">crossfire<span>↗</span></a>
-    <Page title={title} description={location.host}>{children}</Page><a className="account-chat" href="/">Open Element →</a></main>;
+    <Page title={title} description={location.host}>{children}</Page><ChatLink className="account-chat"/></main>;
 }
 export function Panel({ title, description, action, label, children }: { title: string; description?: string; action?: ReactNode; label?: string; children: ReactNode }) {
   return <section className="panel" aria-label={label ?? title}><header className="panel-heading"><div><h2>{title}</h2>{description && <p>{description}</p>}</div>{action}</header>{children}</section>;

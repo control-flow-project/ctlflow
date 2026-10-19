@@ -4,7 +4,7 @@ public class WakeNoticeRow
 {
     public string ReceiverAgentId { get; set; } = "";
     public string EventId { get; set; } = "";
-    public string SenderMatrixId { get; set; } = "";
+    public string SenderBackendUserId { get; set; } = "";
     public string RoomId { get; set; } = "";
     public long ReservedAt { get; set; }
     public string MessageBody { get; set; } = "";

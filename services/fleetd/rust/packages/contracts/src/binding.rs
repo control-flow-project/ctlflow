@@ -1,4 +1,3 @@
-use crossfire_agent_core::profile::Account;
 use crossfire_contracts::{origin, validation as check};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, secret::Secret};
 use fleetd_domain::binding::{Binding, Claim, Identity};
@@ -7,20 +6,12 @@ use std::collections::BTreeSet;
 
 pub fn identity(value: &Value) -> Result<Identity> {
     let value = check::object(value, &["instanceKey", "name", "agentId", "account"], &[])?;
-    let account = check::object(
-        &value["account"],
-        &["user_id", "access_token", "device_id"],
-        &[],
-    )?;
+    let account = crossfire_contracts::messaging::account(&value["account"])?;
     Ok(Identity {
         instance_key: check::name(&value["instanceKey"])?.to_owned(),
         name: check::name(&value["name"])?.to_owned(),
         agent_id: check::identifier(&value["agentId"])?.to_owned(),
-        account: Account {
-            user_id: check::matrix_user_id(&account["user_id"])?.to_owned(),
-            access_token: Secret::new(check::text(&account["access_token"], 1, 8192)?.to_owned()),
-            device_id: check::text(&account["device_id"], 1, 255)?.to_owned(),
-        },
+        account,
     })
 }
 pub fn parse(value: &Value) -> Result<Binding> {
@@ -92,7 +83,7 @@ pub fn parse(value: &Value) -> Result<Binding> {
     }
     Ok(Binding {
         server,
-        owner: check::matrix_user_id(&value["owner"])?.to_owned(),
+        owner: check::backend_user_id(&value["owner"])?.to_owned(),
         fleet_key: check::name(&value["fleetKey"])?.to_owned(),
         fleet_id,
         controller_credential: credential,
@@ -114,5 +105,5 @@ fn digest(value: &Value) -> Result<String> {
     Ok(digest.to_owned())
 }
 pub fn value(binding: &Binding) -> Value {
-    json!({"server":binding.server,"owner":binding.owner,"fleetKey":binding.fleet_key,"fleetId":binding.fleet_id,"controllerCredential":binding.controller_credential.as_ref().map(Secret::expose),"request":binding.request.as_ref().map(|request|json!({"enrollmentId":request.enrollment_id,"claimSecret":request.claim_secret.expose(),"digest":request.digest})),"identities":binding.identities.iter().map(|identity|json!({"instanceKey":identity.instance_key,"name":identity.name,"agentId":identity.agent_id,"account":{"user_id":identity.account.user_id,"access_token":identity.account.access_token.expose(),"device_id":identity.account.device_id}})).collect::<Vec<_>>()})
+    json!({"server":binding.server,"owner":binding.owner,"fleetKey":binding.fleet_key,"fleetId":binding.fleet_id,"controllerCredential":binding.controller_credential.as_ref().map(Secret::expose),"request":binding.request.as_ref().map(|request|json!({"enrollmentId":request.enrollment_id,"claimSecret":request.claim_secret.expose(),"digest":request.digest})),"identities":binding.identities.iter().map(|identity|json!({"instanceKey":identity.instance_key,"name":identity.name,"agentId":identity.agent_id,"account":crossfire_contracts::messaging::account_value(&identity.account)})).collect::<Vec<_>>()})
 }

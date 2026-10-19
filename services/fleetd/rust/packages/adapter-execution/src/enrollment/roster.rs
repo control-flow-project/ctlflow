@@ -5,7 +5,7 @@ use serde::Serialize;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Request<'a> {
-    owner_matrix_id: &'a str,
+    owner_backend_user_id: &'a str,
     fleet_key: &'a str,
     controller: Controller<'a>,
     instances: Vec<Entry<'a>>,
@@ -37,7 +37,7 @@ struct PolicyWire<'a> {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Sender<'a> {
-    matrix_user_id: &'a str,
+    backend_user_id: &'a str,
     include_agents: bool,
 }
 #[derive(Serialize)]
@@ -53,7 +53,7 @@ fn policy(policy: &Policy) -> PolicyWire<'_> {
             .senders
             .iter()
             .map(|sender| Sender {
-                matrix_user_id: &sender.matrix_user_id,
+                backend_user_id: &sender.backend_user_id,
                 include_agents: sender.include_agents,
             })
             .collect(),
@@ -97,7 +97,7 @@ fn wire<'a>(
         })
         .collect::<Result<_>>()?;
     Ok(Request {
-        owner_matrix_id: &binding.owner,
+        owner_backend_user_id: &binding.owner,
         fleet_key: &binding.fleet_key,
         controller: Controller {
             name: &controller.name,
@@ -141,7 +141,7 @@ pub async fn verify(
     let current = client.call(&call, stop.clone()).await?;
     if current["fleetId"] != fleet
         || current["fleetKey"] != binding.fleet_key
-        || current["owner"]["matrixUserId"] != binding.owner
+        || current["owner"]["backendUserId"] != binding.owner
     {
         return Err(Failure::new(
             ErrorCode::Conflict,
@@ -204,10 +204,10 @@ pub async fn verify(
             })?;
         if id != expected.agent_id
             || agent["name"] != configured.name
-            || agent["matrixUserId"] != expected.account.user_id
+            || agent["backendUserId"] != expected.account.user_id
             || agent["deployment"]["fleetId"] != fleet
             || agent["deployment"]["instanceKey"] != key
-            || agent["owner"]["matrixUserId"] != binding.owner
+            || agent["owner"]["backendUserId"] != binding.owner
         {
             return Err(Failure::new(
                 ErrorCode::Conflict,

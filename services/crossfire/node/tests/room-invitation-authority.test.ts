@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { randomUUID } from 'node:crypto';
 import { setImmediate as yieldToOperations } from 'node:timers/promises';
-import { success, failure } from '@ctlflow/crossfire-kernel/result';
+import { failure } from '@ctlflow/crossfire-kernel/result';
 import { acceptRoomInvitation } from '@ctlflow/crossfire-domain/room-access/accept-invitation';
 import { changeMember } from '@ctlflow/crossfire-domain/member/change-member';
 import { changeAgent } from '@ctlflow/crossfire-domain/agent/change-agent';
@@ -13,9 +13,9 @@ import { applicationFixture, value } from './support/application.js';
 
 async function invitedFixture(scope: TestContext) {
   const fixture = await applicationFixture(scope), owner = await fixture.member('alice');
-  const target = await fixture.agent(owner.actor, 'ada'), roomId = value(await fixture.native.createRoom(owner.member.principal.matrixUserId, 'Matter')).roomId;
-  fixture.native.rooms.get(roomId)!.members.set(target.matrixUserId, { matrixUserId: target.matrixUserId, displayName: 'Ada', membership: 'invite', creator: false, powerLevel: 0 });
-  fixture.native.invitations.set(roomId + ':' + target.matrixUserId, { roomId, eventId: '$original-invite', senderMatrixId: owner.member.principal.matrixUserId, direct: false });
+  const target = await fixture.agent(owner.actor, 'ada'), roomId = value(await fixture.native.createRoom(owner.member.principal.backendUserId, 'Matter')).roomId;
+  fixture.native.rooms.get(roomId)!.members.set(target.backendUserId, { backendUserId: target.backendUserId, displayName: 'Ada', membership: 'invite', creator: false, powerLevel: 0 });
+  fixture.native.invitations.set(roomId + ':' + target.backendUserId, { roomId, eventId: '$original-invite', senderBackendUserId: owner.member.principal.backendUserId, direct: false });
   return { ...fixture, owner, target, roomId };
 }
 
@@ -24,9 +24,9 @@ test('invitation admission and background reconciliation share exclusive room ap
   let entered!: () => void, release!: () => void;
   const entering = new Promise<void>(resolve => { entered = resolve; });
   const releasing = new Promise<void>(resolve => { release = resolve; });
-  const original = services.matrix.setRoomAccess;
+  const original = services.messaging.setRoomAccess;
   let active = 0, maximum = 0, calls = 0;
-  services.matrix.setRoomAccess = async (...input) => {
+  services.messaging.setRoomAccess = async (...input) => {
     active++; maximum = Math.max(maximum, active);
     try {
       if (++calls === 1) { entered(); await releasing; }
@@ -43,14 +43,14 @@ test('invitation admission and background reconciliation share exclusive room ap
   assert.equal(maximum, 1, 'A second reconciler cannot enter native application with a stale membership snapshot');
   assert.equal(calls, 2);
   assert.equal(value(services.repositories.roomGrantApplication.find({ agentId: target.id, roomId }))?.errorCode, null);
-  assert.equal(fixture.native.rooms.get(roomId)?.members.get(target.matrixUserId)?.membership, 'join');
+  assert.equal(fixture.native.rooms.get(roomId)?.members.get(target.backendUserId)?.membership, 'join');
 });
 
 test('native invitation admission rechecks owner and target authority after native reads', async scope => {
   for (const changed of ['owner', 'target'] as const) await scope.test(changed, async control => {
     const fixture = await invitedFixture(control), { services, owner, target, roomId, admin } = fixture;
-    const original = services.matrix.room;
-    services.matrix.room = async (...input) => {
+    const original = services.messaging.authorizeRoomAccess;
+    services.messaging.authorizeRoomAccess = async (...input) => {
       const facts = await original(...input);
       if (changed === 'owner') value(changeMember(services, admin.actor, owner.actor.principalId, { expectedRevision: 0, status: 'suspended' }, randomUUID()));
       else value(changeAgent(services, owner.actor, target.id, { expectedRevision: value(services.directory.agent(target.id))!.principal.revision, status: 'revoked' }, randomUUID()));
@@ -59,16 +59,16 @@ test('native invitation admission rechecks owner and target authority after nati
     const accepted = await acceptRoomInvitation(services, target.actor, target.id, roomId, randomUUID());
     assert.equal(accepted.ok, false);
     assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId })), null);
-    assert.equal(fixture.native.rooms.get(roomId)!.members.get(target.matrixUserId)?.membership, 'invite');
+    assert.equal(fixture.native.rooms.get(roomId)!.members.get(target.backendUserId)?.membership, 'invite');
   });
 });
 
 test('native admission never claims read-and-reply access above the current authorizer ceiling', async scope => {
   const fixture = await invitedFixture(scope), { services, target, roomId } = fixture;
-  const original = services.matrix.room;
-  services.matrix.room = async (...input) => {
+  const original = services.messaging.authorizeRoomAccess;
+  services.messaging.authorizeRoomAccess = async (...input) => {
     const facts = await original(...input);
-    return facts.ok ? success({ ...facts.value, creator: false, powerLevel: -1 }) : facts;
+    return facts.ok ? failure('forbidden', 'Fixture authorizer cannot grant reply access') : facts;
   };
   const accepted = await acceptRoomInvitation(services, target.actor, target.id, roomId, randomUUID());
   assert(!accepted.ok);
@@ -78,34 +78,29 @@ test('native admission never claims read-and-reply access above the current auth
 
 test('losing reply authority after grant approval cannot admit a read-only room as read-and-reply', async scope => {
   const fixture = await invitedFixture(scope), { services, target, roomId } = fixture;
-  const original = services.matrix.room;
-  let calls = 0;
-  services.matrix.room = async (...input) => {
-    const facts = await original(...input);
-    return facts.ok && ++calls > 1 ? success({ ...facts.value, creator: false, powerLevel: -1 }) : facts;
-  };
+  services.messaging.setRoomAccess = async () => failure('forbidden', 'Fixture authorizer lost reply authority after approval');
   const accepted = await acceptRoomInvitation(services, target.actor, target.id, roomId, randomUUID());
   assert(!accepted.ok);
   assert.equal(accepted.error.code, 'forbidden');
   const application = value(services.repositories.roomGrantApplication.find({ agentId: target.id, roomId }))!;
   assert.equal(application.membership, 'leave');
   assert.equal(application.errorCode, 'forbidden');
-  assert.equal(fixture.native.rooms.get(roomId)!.members.get(target.matrixUserId)?.membership, 'leave');
+  assert.equal(fixture.native.rooms.get(roomId)!.members.get(target.backendUserId)?.membership, 'leave');
 });
 
 test('withdrawing delegation during a native invitation check prevents a cross-owner addition', async scope => {
   const fixture = await invitedFixture(scope), { services, admin, target, roomId } = fixture;
   const other = await fixture.member('bob'), inviter = await fixture.agent(other.actor, 'jo');
-  fixture.native.rooms.get(roomId)!.members.set(admin.member.principal.matrixUserId, {
-    matrixUserId: admin.member.principal.matrixUserId, displayName: 'Admin', membership: 'join', creator: false, powerLevel: 100 });
+  fixture.native.rooms.get(roomId)!.members.set(admin.member.principal.backendUserId, {
+    backendUserId: admin.member.principal.backendUserId, displayName: 'Admin', membership: 'join', creator: false, powerLevel: 100 });
   const assigned = value(await changeRoomGrant(services, admin.actor, { agentId: inviter.id, roomId, expectedRevision: value(services.directory.agent(inviter.id))!.principal.revision,
-    expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID())).grant!;
+    expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false }, randomUUID())).grant!;
   value(await reconcileRoomGrant(services, inviter.id, roomId));
   value(setRoomPermission(services, other.actor, { agentId: inviter.id, roomId, expectedRevision: value(services.directory.agent(inviter.id))!.principal.revision,
     expectedGeneration: assigned.generation, permissions: ['room.agent.invite'] }, randomUUID()));
-  fixture.native.invitations.set(roomId + ':' + target.matrixUserId, { roomId, eventId: '$delegated-invite', senderMatrixId: inviter.matrixUserId, direct: false });
-  const original = services.matrix.room;
-  services.matrix.room = async (...input) => {
+  fixture.native.invitations.set(roomId + ':' + target.backendUserId, { roomId, eventId: '$delegated-invite', senderBackendUserId: inviter.backendUserId, direct: false });
+  const original = services.messaging.authorizeRoomAccess;
+  services.messaging.authorizeRoomAccess = async (...input) => {
     const facts = await original(...input);
     value(setRoomPermission(services, other.actor, { agentId: inviter.id, roomId, expectedRevision: value(services.directory.agent(inviter.id))!.principal.revision,
       expectedGeneration: assigned.generation, permissions: [] }, randomUUID()));
@@ -123,14 +118,14 @@ test('the same unconsumed native invitation cannot undo an owner removal', async
   const previous = value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId }))!;
   value(await changeRoomGrant(services, owner.actor, { agentId: target.id, roomId,
     expectedRevision: value(services.directory.agent(target.id))!.principal.revision,
-    expectedGeneration: previous.generation, accessMode: 'none', powerLevel: null, muted: false }, randomUUID()));
-  fixture.native.rooms.get(roomId)!.members.get(target.matrixUserId)!.membership = 'invite';
+    expectedGeneration: previous.generation, accessMode: 'none', nativeAccess: null, muted: false }, randomUUID()));
+  fixture.native.rooms.get(roomId)!.members.get(target.backendUserId)!.membership = 'invite';
   const accepted = await acceptRoomInvitation(services, target.actor, target.id, roomId, randomUUID());
   assert(!accepted.ok);
   assert.equal(accepted.error.code, 'forbidden');
   assert.equal(value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId }))?.accessMode, 'none');
   value(await reconcileRoomGrant(services, target.id, roomId));
-  assert.equal(fixture.native.rooms.get(roomId)!.members.get(target.matrixUserId)?.membership, 'leave');
+  assert.equal(fixture.native.rooms.get(roomId)!.members.get(target.backendUserId)?.membership, 'leave');
 });
 
 test('owner access edits retain invitation addition provenance and existing delegation', async scope => {
@@ -142,7 +137,7 @@ test('owner access edits retain invitation addition provenance and existing dele
     expectedGeneration: previous.generation, permissions: ['room.agent.invite'] }, randomUUID()));
   value(await changeRoomGrant(services, owner.actor, { agentId: target.id, roomId,
     expectedRevision: value(services.directory.agent(target.id))!.principal.revision,
-    expectedGeneration: previous.generation, accessMode: 'custom', powerLevel: 25, muted: false }, randomUUID()));
+    expectedGeneration: previous.generation, accessMode: 'custom', nativeAccess: { powerLevel: 25 }, muted: false }, randomUUID()));
   value(await reconcileRoomGrant(services, target.id, roomId));
   const current = value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId }))!;
   assert.equal(current.generation, previous.generation);
@@ -150,7 +145,7 @@ test('owner access edits retain invitation addition provenance and existing dele
   assert.equal(current.invitationEventId, previous.invitationEventId);
   assert.equal(current.admissionKind, 'managed');
   assert.equal(value(services.collection.roomPermissions({ agentId: target.id, roomId })).length, 1);
-  assert.equal(fixture.native.rooms.get(roomId)!.members.get(target.matrixUserId)?.powerLevel, 25);
+  assert.equal(fixture.native.rooms.get(roomId)!.members.get(target.backendUserId)?.powerLevel, 25);
 });
 
 test('a delegated agent cannot take over another principal’s durable addition by issuing a new native invite', async scope => {
@@ -159,17 +154,17 @@ test('a delegated agent cannot take over another principal’s durable addition 
   const previous = value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId }))!;
   const other = await fixture.member('bob'), inviter = await fixture.agent(other.actor, 'jo');
   const assigned = value(await changeRoomGrant(services, owner.actor, { agentId: target.id, roomId,
-    expectedRevision: value(services.directory.agent(target.id))!.principal.revision, expectedGeneration: previous.generation, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID()));
+    expectedRevision: value(services.directory.agent(target.id))!.principal.revision, expectedGeneration: previous.generation, accessMode: 'reply', nativeAccess: null, muted: false }, randomUUID()));
   assert.equal(assigned.grant?.addedById, owner.actor.principalId);
-  const adminId = fixture.admin.member.principal.matrixUserId;
-  fixture.native.rooms.get(roomId)!.members.set(adminId, { matrixUserId: adminId, displayName: 'Admin', membership: 'join', creator: false, powerLevel: 100 });
+  const adminId = fixture.admin.member.principal.backendUserId;
+  fixture.native.rooms.get(roomId)!.members.set(adminId, { backendUserId: adminId, displayName: 'Admin', membership: 'join', creator: false, powerLevel: 100 });
   const delegated = value(await changeRoomGrant(services, fixture.admin.actor, { agentId: inviter.id, roomId, expectedRevision: value(services.directory.agent(inviter.id))!.principal.revision,
-    expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID())).grant!;
+    expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false }, randomUUID())).grant!;
   value(await reconcileRoomGrant(services, inviter.id, roomId));
   value(setRoomPermission(services, other.actor, { agentId: inviter.id, roomId, expectedRevision: value(services.directory.agent(inviter.id))!.principal.revision,
     expectedGeneration: delegated.generation, permissions: ['room.agent.invite'] }, randomUUID()));
-  fixture.native.rooms.get(roomId)!.members.get(target.matrixUserId)!.membership = 'invite';
-  fixture.native.invitations.set(roomId + ':' + target.matrixUserId, { roomId, eventId: '$replacement-from-jo', senderMatrixId: inviter.matrixUserId, direct: false });
+  fixture.native.rooms.get(roomId)!.members.get(target.backendUserId)!.membership = 'invite';
+  fixture.native.invitations.set(roomId + ':' + target.backendUserId, { roomId, eventId: '$replacement-from-jo', senderBackendUserId: inviter.backendUserId, direct: false });
   const accepted = await acceptRoomInvitation(services, target.actor, target.id, roomId, randomUUID());
   assert(!accepted.ok);
   assert.equal(accepted.error.code, 'forbidden');
@@ -178,18 +173,18 @@ test('a delegated agent cannot take over another principal’s durable addition 
 
 test('a manual access edit cannot erase the native receipt and let an old pending invite undo removal', async scope => {
   const fixture = await invitedFixture(scope), { services, owner, target, roomId } = fixture;
-  const original = services.matrix.setRoomAccess;
-  services.matrix.setRoomAccess = async () => failure('native', 'Native acceptance is temporarily unavailable');
+  const original = services.messaging.setRoomAccess;
+  services.messaging.setRoomAccess = async () => failure('native', 'Native acceptance is temporarily unavailable');
   assert.equal((await acceptRoomInvitation(services, target.actor, target.id, roomId, randomUUID())).ok, false);
-  services.matrix.setRoomAccess = original;
+  services.messaging.setRoomAccess = original;
   const previous = value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId }))!;
   value(await changeRoomGrant(services, owner.actor, { agentId: target.id, roomId,
     expectedRevision: value(services.directory.agent(target.id))!.principal.revision,
-    expectedGeneration: previous.generation, accessMode: 'custom', powerLevel: 25, muted: false }, randomUUID()));
+    expectedGeneration: previous.generation, accessMode: 'custom', nativeAccess: { powerLevel: 25 }, muted: false }, randomUUID()));
   value(await changeRoomGrant(services, owner.actor, { agentId: target.id, roomId,
     expectedRevision: value(services.directory.agent(target.id))!.principal.revision,
-    expectedGeneration: previous.generation, accessMode: 'none', powerLevel: null, muted: false }, randomUUID()));
-  fixture.native.rooms.get(roomId)!.members.get(target.matrixUserId)!.membership = 'invite';
+    expectedGeneration: previous.generation, accessMode: 'none', nativeAccess: null, muted: false }, randomUUID()));
+  fixture.native.rooms.get(roomId)!.members.get(target.backendUserId)!.membership = 'invite';
   const accepted = await acceptRoomInvitation(services, target.actor, target.id, roomId, randomUUID());
   assert(!accepted.ok);
   assert.equal(accepted.error.code, 'forbidden');
@@ -198,17 +193,17 @@ test('a manual access edit cannot erase the native receipt and let an old pendin
 
 test('replaying an admitted native invite preserves later owner access and mute settings', async scope => {
   const fixture = await invitedFixture(scope), { services, owner, target, roomId } = fixture;
-  const original = services.matrix.setRoomAccess;
-  services.matrix.setRoomAccess = async () => failure('native', 'Native acceptance is temporarily unavailable');
+  const original = services.messaging.setRoomAccess;
+  services.messaging.setRoomAccess = async () => failure('native', 'Native acceptance is temporarily unavailable');
   assert.equal((await acceptRoomInvitation(services, target.actor, target.id, roomId, randomUUID())).ok, false);
-  services.matrix.setRoomAccess = original;
+  services.messaging.setRoomAccess = original;
   const previous = value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId }))!;
   value(await changeRoomGrant(services, owner.actor, { agentId: target.id, roomId,
     expectedRevision: value(services.directory.agent(target.id))!.principal.revision,
-    expectedGeneration: previous.generation, accessMode: 'custom', powerLevel: 25, muted: true }, randomUUID()));
-  fixture.native.rooms.get(roomId)!.members.get(target.matrixUserId)!.membership = 'invite';
+    expectedGeneration: previous.generation, accessMode: 'custom', nativeAccess: { powerLevel: 25 }, muted: true }, randomUUID()));
+  fixture.native.rooms.get(roomId)!.members.get(target.backendUserId)!.membership = 'invite';
   const expected = value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId }));
   assert.equal(value(await acceptRoomInvitation(services, target.actor, target.id, roomId, randomUUID())).accepted, true);
   assert.deepEqual(value(services.repositories.agentRoomGrant.find({ agentId: target.id, roomId })), expected);
-  assert.equal(fixture.native.rooms.get(roomId)!.members.get(target.matrixUserId)?.powerLevel, 25);
+  assert.equal(fixture.native.rooms.get(roomId)!.members.get(target.backendUserId)?.powerLevel, 25);
 });

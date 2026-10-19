@@ -30,7 +30,7 @@ public sealed record MemberPorts(AuthorizationPorts Authorization, UnitOfWork Tr
     Func<Result<long>> ActiveAdministratorCount, Func<MemberChanges, Result<Unit>> Apply,
     Func<AuditIntent, Result<Unit>> Audit);
 
-public sealed record PrincipalPorts(UnitOfWork Transaction, Func<string, Result<Principal?>> ByMatrixId,
+public sealed record PrincipalPorts(UnitOfWork Transaction, Func<string, Result<Principal?>> ByBackendUserId,
     Func<Result<InstancePolicy?>> Policy, Func<InstancePolicy, Result<Unit>> AddPolicy,
     Func<Principal, PrincipalRole, PrincipalApplication, Member, Result<Unit>> Register,
     Func<long> Now, Func<string> Identifier);
@@ -40,7 +40,7 @@ public static class PrincipalValues
     public static PrincipalApplication Pending(string principalId, long now)
         => new(principalId, null, null, null, null, null, null, now, null, null);
 
-    public static Result<Unit> Initialize(PrincipalPorts ports, string administratorMatrixId)
+    public static Result<Unit> Initialize(PrincipalPorts ports, string administratorBackendUserId, string displayName)
         => ports.Transaction.Run(() =>
         {
             var policy = ports.Policy();
@@ -50,13 +50,13 @@ public static class PrincipalValues
                 var added = ports.AddPolicy(new("instance", 0, 10, 100, 100, 600, 300, 65536, 1800, "", "invitation", "administrators"));
                 if (!added.IsSuccess) return added;
             }
-            var existing = ports.ByMatrixId(administratorMatrixId);
+            var existing = ports.ByBackendUserId(administratorBackendUserId);
             if (!existing.IsSuccess) return Result<Unit>.Fail(existing.Error);
             if (existing.Value is not null) return Results.Done();
             var id = ports.Identifier();
             var now = ports.Now();
-            return ports.Register(new(id, administratorMatrixId, "human", "active", 0, now),
+            return ports.Register(new(id, administratorBackendUserId, "human", "active", 0, now),
                 new(id, "human", "administrator", null, now), Pending(id, now),
-                new(id, "human", administratorMatrixId[1..administratorMatrixId.IndexOf(':')]));
+                new(id, "human", displayName));
         });
 }

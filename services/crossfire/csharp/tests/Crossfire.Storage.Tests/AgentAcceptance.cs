@@ -13,7 +13,7 @@ public static class AgentAcceptance
         var agentId = Identity.Identifier(); var fleetId = Identity.Identifier(); var fleetKey = "test-" + fleetId[..8];
         var saved = Transactions.Run(context, () =>
         {
-            context.Principal.Add(new() { Id = agentId, MatrixUserId = "@agent-" + agentId + ":example.test", Kind = "agent", Status = "active", CreatedAt = now() });
+            context.Principal.Add(new() { Id = agentId, BackendUserId = "@agent-" + agentId + ":example.test", Kind = "agent", Status = "active", CreatedAt = now() });
             context.Agent.Add(new() { PrincipalId = agentId, PrincipalKind = "agent", OwnerId = owner.PrincipalId, WakeMode = "selected" });
             context.AgentName.Add(new() { Name = "test-" + agentId[..8], AgentId = agentId });
             context.PrincipalRole.Add(new() { PrincipalId = agentId, PrincipalKind = "agent", RoleCode = "agent", AssignedAt = now() });

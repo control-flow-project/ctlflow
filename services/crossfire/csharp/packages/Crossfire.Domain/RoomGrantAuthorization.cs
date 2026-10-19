@@ -17,15 +17,15 @@ public static class RoomGrantAuthorization
         if (input.AccessMode != "none" && (target.Value.Principal.Status != "active" || target.Value.Owner.Status != "active"))
             return Results.Fail<GrantProof>("forbidden", "Target and its owner must be active");
         if (target.Value.Principal.Revision != input.ExpectedRevision) return Results.Fail<GrantProof>("conflict", "Agent revision changed");
-        if (input.AccessMode is not ("none" or "read" or "reply" or "custom") || (input.AccessMode == "custom") != (input.PowerLevel is not null)
-            || input.PowerLevel > 9007199254740991L || input.PowerLevel < -9007199254740991L || input.AccessMode == "none" && input.Muted)
+        if (input.AccessMode is not ("none" or "read" or "reply" or "custom") || (input.AccessMode == "custom") != (input.NativeAccess is not null)
+            || input.NativeAccess is { } nativeAccess && !BackendData.Valid(nativeAccess) || input.AccessMode == "none" && input.Muted)
             return Results.Fail<GrantProof>("invalid", "Invalid room access settings");
         var stored = ports.Find(input.AgentId, input.RoomId);
         if (!stored.IsSuccess) return Result<GrantProof>.Fail(stored.Error);
         var previous = stored.Value;
         var freshInvitation = invitation is not null && invitation.EventId != previous?.InvitationEventId;
-        if (invitation is not null && (invitation.RoomId != input.RoomId || invitation.SenderMatrixId != acting.Value.MatrixUserId
-            || input.AccessMode != "reply" || input.PowerLevel is not null || input.Muted))
+        if (invitation is not null && (invitation.RoomId != input.RoomId || invitation.SenderBackendUserId != acting.Value.BackendUserId
+            || input.AccessMode != "reply" || input.NativeAccess is not null || input.Muted))
             return Results.Fail<GrantProof>("invalid", "Native invitation does not match the grant intent");
         if (invitation is not null && previous?.InvitationEventId == invitation.EventId && previous.AccessMode == "none")
             return Results.Fail<GrantProof>("forbidden", "This invitation was already withdrawn");
@@ -53,18 +53,15 @@ public static class RoomGrantAuthorization
         }
         var changed = freshInvitation || (previous is null ? input.AccessMode != "none" : !RoomGrantValues.Same(previous, input));
         var needsNative = input.AccessMode != "none" && changed && (freshInvitation || previous is null || previous.AccessMode == "none"
-            || previous.AccessMode != input.AccessMode || previous.PowerLevel != input.PowerLevel);
+            || previous.AccessMode != input.AccessMode || !BackendData.Equal(previous.NativeAccess, input.NativeAccess));
         RoomFacts? native = null;
         if (needsNative || actor.Kind == "agent" && input.AccessMode != "none")
         {
-            var facts = await ports.Room(acting.Value.MatrixUserId, input.RoomId, cancellation);
+            var facts = await ports.AuthorizeRoomAccess(acting.Value.BackendUserId, target.Value.Principal.BackendUserId, input.RoomId,
+                new(input.AccessMode, input.NativeAccess, input.Muted), cancellation);
             if (!facts.IsSuccess) return Result<GrantProof>.Fail(facts.Error);
-            if (actor.Kind == "agent" && !facts.Value.Creator && facts.Value.PowerLevel < facts.Value.InviteLevel)
-                return Results.Fail<GrantProof>("forbidden", "The inviter lacks native Matrix invitation authority");
-            if (facts.Value.CreatorIds.Contains(target.Value.Principal.MatrixUserId, StringComparer.Ordinal) && input.AccessMode != "reply")
-                return Results.Fail<GrantProof>("forbidden", "A native room creator can have read-and-reply access or no membership; its Matrix authority cannot be restricted");
-            var permitted = RoomGrantValues.Power(facts.Value, input);
-            if (!permitted.IsSuccess) return Result<GrantProof>.Fail(permitted.Error);
+            if (actor.Kind == "agent" && !facts.Value.CanInvite)
+                return Results.Fail<GrantProof>("forbidden", "The inviter lacks backend invitation authority");
             native = facts.Value;
         }
         return Result<GrantProof>.Success(new(input, previous, acting.Value.Revision, target.Value.Principal.Revision, target.Value.Owner.Revision,

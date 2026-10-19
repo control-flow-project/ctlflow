@@ -22,7 +22,7 @@ export function roomRoutes() {
       return result.ok ? reply(await readRoomGrant(context.services, actor(context), params.agentId, params.roomId), view.grantView) : result;
     }),
     bind(operations.removeGrant, async (context, params, _query, input) => {
-      const result = await changeRoomGrant(context.services, actor(context), { ...input, ...params, accessMode: 'none', powerLevel: null, muted: false }, context.requestId);
+      const result = await changeRoomGrant(context.services, actor(context), { ...input, ...params, accessMode: 'none', nativeAccess: null, muted: false }, context.requestId);
       return result.ok ? reply(await readRoomGrant(context.services, actor(context), params.agentId, params.roomId), view.grantView) : result;
     }),
     bind(operations.grantPermissions, async (context, params) => reply(await readRoomGrant(context.services, actor(context), params.agentId, params.roomId), view.grantView)),

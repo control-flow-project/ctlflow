@@ -19,15 +19,19 @@ import { success, type Result } from '@ctlflow/crossfire-kernel/result';
 import type { Actor } from '@ctlflow/crossfire-domain/port/services';
 import { matrixAuthorityFixture } from './matrix-authority.js';
 import { applicationDatabase } from './storage.js';
+import { backendHttp } from '../../apps/server/src/messaging.js';
 export function value<Value>(result: Result<Value>): Value { if (!result.ok) assert.fail(result.error.code + ': ' + result.error.message); return result.value; }
 export function secret(): string { return randomBytes(32).toString('base64url'); }
 export async function applicationFixture(scope: TestContext, databasePath = ':memory:', logging: { loggingRetentionDays?: number } = {}) {
   let now = 1_800_000_000_000;
   const native = matrixAuthorityFixture();
-  const config = { instance: 'tests', serverName: 'test.localhost', publicOrigin: 'http://127.0.0.1', contentOrigin: 'http://localhost', matrixOrigin: 'http://127.0.0.1',
-    administrator: '@admin:test.localhost', jwtSecret: secret(), registrationSecret: secret(), ...logging };
-  const adminNative = value(await native.matrix.provision(config.administrator, secret(), 'test'));
-  const application = createApplication(applicationDatabase(scope, databasePath), config, { now: () => now, matrix: native.matrix });
+  const config = { instance: 'tests', publicOrigin: 'http://127.0.0.1', contentOrigin: 'http://localhost',
+    messaging: { type: 'matrix', parameters: { serverName: 'test.localhost', origin: 'http://127.0.0.1', jwtSecret: secret(), registrationSecret: secret() } },
+    administrator: '@admin:test.localhost', ...logging };
+  const adminNative = value(await native.messaging.provision(config.administrator, secret(), { deviceId: 'test' }));
+  const application = createApplication(applicationDatabase(scope, databasePath), config, { now: () => now, backend: configuration => {
+    return { http: backendHttp(configuration, 'test.localhost'), authority: native.messaging };
+  } });
   cleanup(scope, () => application.close());
   const { services } = application;
   async function login(token: string) {
@@ -51,10 +55,10 @@ export async function applicationFixture(scope: TestContext, databasePath = ':me
     }
   }
   async function member(name: string) {
-    const account = value(await native.matrix.provision('@' + name + ':' + config.serverName, secret(), 'test'));
+    const account = value(await native.messaging.provision('@' + name + ':test.localhost', secret(), { deviceId: 'test' }));
     const id = randomUUID();
     value(services.unitOfWork.run(() => {
-      const registered = registerPrincipal(services, { id, matrixUserId: account.userId, kind: 'human', status: 'active', revision: 0, createdAt: now }, 'member', admin.actor.principalId);
+      const registered = registerPrincipal(services, { id, backendUserId: account.userId, kind: 'human', status: 'active', revision: 0, createdAt: now }, 'member', admin.actor.principalId);
       if (!registered.ok) return registered;
       return services.repositories.member.insert({ principalId: id, principalKind: 'human', displayName: name });
     }));
@@ -62,9 +66,9 @@ export async function applicationFixture(scope: TestContext, databasePath = ':me
   }
   async function agent(owner: Actor, name: string) {
     const ownerRecord = value(services.directory.member(owner.principalId))!;
-    const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: ownerRecord.principal.matrixUserId,
+    const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: ownerRecord.principal.backendUserId,
       fleetKey: 'test-' + name, controller: { name: 'Test controller' },
-      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy(ownerRecord.principal.matrixUserId) }] };
+      instances: [{ instanceKey: name, name, coordinationPolicy: defaultCoordinationPolicy(ownerRecord.principal.backendUserId) }] };
     const introduced = value(await introduceEnrollment(services, input));
     value(decideEnrollment(services, owner, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: introduced.request.verificationCode }, randomUUID()));
     const item = value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))[0]!;
@@ -76,7 +80,7 @@ export async function applicationFixture(scope: TestContext, databasePath = ':me
     const controller = { fleetId: exchanged.fleet.fleetId, connectionId: randomUUID(), credential: exchanged.fleet.controllerCredential };
     renewController(controller);
     const account = exchanged.instances[0]!.account!;
-    return { id: item.agentId, matrixUserId: account.matrixUserId, token: account.accessToken, controller,
+    return { id: item.agentId, backendUserId: account.userId, token: account.accessToken, controller,
       actor: { principalId: item.agentId, kind: 'agent' as const } };
   }
   function listen(instance: Awaited<ReturnType<typeof agent>>, release = 'test', runId = randomUUID()) {

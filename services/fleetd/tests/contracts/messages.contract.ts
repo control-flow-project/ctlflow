@@ -8,7 +8,7 @@ import { contractHttp } from '@ctlflow/crossfire-test-support/contract-http';
 import { list, observe, record, text } from '@ctlflow/crossfire-test-support/contract-process';
 import type { ContractPlatform } from '@ctlflow/crossfire-test-support/contract-platform';
 
-export type MessageFixture = { platform: ContractPlatform; fleetDirectory: string; agent: { id: string; matrixUserId: string; token: string };
+export type MessageFixture = { platform: ContractPlatform; fleetDirectory: string; agent: { id: string; backendUserId: string; token: string };
   provider: { requests: readonly unknown[]; hold(): void; held(): ServerResponse | undefined; finish(): void }; idle(): Promise<boolean>; delivery(enabled: boolean): Promise<void> };
 export function lastUser(request: unknown): string {
   const body = record(request), rows = list(body.input ?? body.messages).map(record), user = rows.findLast(value => value.role === 'user'); assert(user, 'Native provider must receive an attributed user input');
@@ -24,16 +24,16 @@ export async function messageContracts(scope: TestContext, fixture: MessageFixtu
   async function query(room?: string) {
     const result = await listener({ action: 'read', input: { kind: 'history', ...(room ? { room } : {}), limit: 10, outputBytes: 4096, direction: 'b', cursors: { entries: [] } } }); assert.equal(result.ok, true); return record(result.value);
   }
-  const created = await matrix('POST', '/createRoom', { name: 'Native message contracts', invite: [agent.matrixUserId] }); const room = text(created.room_id);
+  const created = await matrix('POST', '/createRoom', { name: 'Native message contracts', invite: [agent.backendUserId] }); const room = text(created.room_id);
   await observe(async () => {
-    const members = await matrix('GET', '/rooms/' + encodeURIComponent(room) + '/joined_members'); return Object.hasOwn(record(members.joined), agent.matrixUserId);
+    const members = await matrix('GET', '/rooms/' + encodeURIComponent(room) + '/joined_members'); return Object.hasOwn(record(members.joined), agent.backendUserId);
   }, 'Authorized native invitation must be accepted by the shared listener', 90000);
   await observe(async () => { const response = await contractHttp(platform.origin, 'GET', '/api/agents/' + agent.id + '/delivery-policy', undefined, { Authorization: 'Bearer ' + agent.token }); return response.status === 200 && JSON.stringify(response.body).includes(room); }, 'Accepted native room must have its scoped grant');
-  const send = (body: string, mention = false) => matrix('PUT', '/rooms/' + encodeURIComponent(room) + '/send/m.room.message/' + randomUUID(), { msgtype: 'm.text', body, ...(mention ? { 'm.mentions': { user_ids: [agent.matrixUserId] } } : {}) });
+  const send = (body: string, mention = false) => matrix('PUT', '/rooms/' + encodeURIComponent(room) + '/send/m.room.message/' + randomUUID(), { msgtype: 'm.text', body, ...(mention ? { 'm.mentions': { user_ids: [agent.backendUserId] } } : {}) });
   await scope.test('real messages carry source attribution and real mentions interrupt held native work', async child => {
     child.after(() => { if (provider.held()) provider.finish(); });
     provider.hold(); const first = 'Original task ' + randomUUID(); await send(first); await observe(() => provider.held() !== undefined, 'First native task reaches the held inert provider', 30000); const held = provider.held()!;
-    assert.equal(provider.requests.length, 1); assert(lastUser(provider.requests[0]).includes(first)); assert(lastUser(provider.requests[0]).includes(room)); assert(lastUser(provider.requests[0]).includes(platform.owner.matrixUserId));
+    assert.equal(provider.requests.length, 1); assert(lastUser(provider.requests[0]).includes(first)); assert(lastUser(provider.requests[0]).includes(room)); assert(lastUser(provider.requests[0]).includes(platform.owner.backendUserId));
     provider.hold(); const replacement = 'Interrupt and use this instruction ' + randomUUID(); const started = Date.now(); const mentioned = await send(replacement, true); const event = text(mentioned.event_id);
     try { await observe(() => provider.requests.length === 2 && provider.held() !== undefined, 'Mention reaches a replacement native turn without waiting for the first response', 10000); }
     catch (error) {

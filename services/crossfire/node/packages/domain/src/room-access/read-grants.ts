@@ -2,7 +2,7 @@ import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Services, Actor } from '../port/services.js';
 import { activeActor, authorizeAgent } from '../authorization/authorize.js';
 import type { PageRequest } from '../port/directory.js';
-type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'roomGrantRead' | 'clock' | 'matrix' | 'runtime'>;
+type Dependencies = Pick<Services, 'repositories' | 'directory' | 'collection' | 'roomGrantRead' | 'clock' | 'messaging' | 'runtime'>;
 export function listRoomGrants(services: Dependencies, actor: Actor, agentId: string, page: PageRequest & { roomIds?: string[] }) {
   const target = authorizeAgent(services, actor, agentId, 'read');
   if (!target.ok) return target;
@@ -34,9 +34,9 @@ export async function readRoomGrant(services: Dependencies, actor: Actor, agentI
     const permission = services.repositories.agentRoomPermission.find({ agentId: actor.principalId, roomId, permissionCode: 'room.agent.invite' });
     if (!inviter.ok) return inviter; if (!permission.ok) return permission;
     if (inviter.value && inviter.value.accessMode !== 'none' && permission.value?.generation === inviter.value.generation) {
-      const native = await services.matrix.room(current.value.matrixUserId, roomId);
+      const native = await services.messaging.room(current.value.backendUserId, roomId);
       if (!native.ok) return native;
-      delegated = native.value.creator || native.value.powerLevel >= native.value.inviteLevel;
+      delegated = native.value.canInvite;
       canRead = delegated;
     }
   }

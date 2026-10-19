@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 fn sample() -> Value {
     json!({"sequence":1, "startedAt":1, "endedAt":2, "dropped":0,
-        "flows":[{"roomId":"!room:example.test", "senderMatrixId":"@sender:example.test", "messageType":"m.text", "observed":2, "delivered":1, "contentBytes":100, "deliveredBytes":40, "attachmentBytes":0, "largestBytes":60}],
+        "flows":[{"roomId":"!room:example.test", "senderBackendUserId":"@sender:example.test", "messageType":"m.text", "observed":2, "delivered":1, "contentBytes":100, "deliveredBytes":40, "attachmentBytes":0, "largestBytes":60}],
         "usage":[{"runtime":"codex", "sessionId":"session-🦉", "tokens":{"input":100, "cachedInput":40, "cacheWriteInput":null, "output":20, "reasoningOutput":5, "total":120}}]})
 }
 
@@ -16,7 +16,7 @@ fn statistics_digest_matches_the_real_node_contract_including_unicode_and_nulls(
     let content = serde_json::to_string(&BatchWire(&parsed))?;
     assert_eq!(
         identity::hash(&content),
-        "c5500884b72eeb49f2cf645ec9710824a7aef5b92b7480a3fedef555df69531f"
+        "e2e63aa63db66abecb6ec45d508ed145ed62e5b91f515782887aa2d492d57e20"
     );
     assert!(serde_json::from_str::<Value>(&content)? == input);
     Ok(())

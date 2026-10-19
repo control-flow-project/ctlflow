@@ -37,7 +37,7 @@ pub enum Role {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Principal {
     pub id: String,
-    pub matrix_user_id: String,
+    pub backend_user_id: String,
     pub kind: PrincipalKind,
     pub status: Status,
     pub revision: i64,
@@ -117,7 +117,7 @@ pub struct MemberSession {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Authentication {
     Management { session_hash: String },
-    Native { matrix_user_id: String },
+    Native { backend_user_id: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -146,11 +146,11 @@ pub struct Page<T> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrincipalSummary {
     pub principal_id: String,
-    pub matrix_user_id: String,
+    pub backend_user_id: String,
     pub kind: PrincipalKind,
     pub display_name: String,
     pub owner_id: String,
-    pub owner_matrix_id: String,
+    pub owner_backend_user_id: String,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActiveIdentity {

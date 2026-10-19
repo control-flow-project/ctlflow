@@ -98,7 +98,4 @@ public static class Metadata
     public static string Journal(CrossfireDbContext context) => context.JournalConfigurations.Select(row => row.JournalMode).Single();
     public static bool Valid(CrossfireDbContext context) => context.IntegrityChecks.Select(row => row.Value).ToArray() is ["ok"]
         && !context.ForeignKeyViolations.Any();
-    public static bool Empty(CrossfireDbContext context) => !context.SchemaEntries.Any(row => row.Type == "table"
-        && !row.Name.StartsWith("sqlite_") && row.Name != "knex_migrations" && row.Name != "knex_migrations_lock")
-        && (!HasMigrations(context) || !context.AppliedMigrations.Any());
 }

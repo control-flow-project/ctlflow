@@ -1,7 +1,18 @@
 {
-  "name": "@ctlflow/fleet-ssh-transport", "version": "0.1.22", "private": true, "type": "module",
+  "name": "@ctlflow/fleet-ssh-transport",
+  "version": "0.1.23",
+  "private": true,
+  "type": "module",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
-  "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } },
-  "dependencies": { "@ctlflow/fleetd-storage": "0.1.22" }
+  "exports": {
+    "./*": {
+      "types": "./src/*.ts",
+      "source": "./src/*.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "dependencies": {
+    "@ctlflow/fleetd-storage": "0.1.23"
+  }
 }

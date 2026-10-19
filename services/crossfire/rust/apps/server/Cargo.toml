@@ -21,6 +21,7 @@ crossfire-adapter-matrix.workspace = true
 crossfire-adapter-http.workspace = true
 crossfire-adapter-schedule.workspace = true
 crossfire-adapter-process.workspace = true
+crossfire-adapter-runtime.workspace = true
 tempfile.workspace = true
 serde.workspace = true
 serde_json.workspace = true

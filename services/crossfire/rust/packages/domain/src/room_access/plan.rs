@@ -9,7 +9,7 @@ use crate::{
     authorization::{AgentAction, authorize_agent},
     fleet::{authority::authorize_fleet, values::FleetActor},
     identity::{Actor, PrincipalKind},
-    matrix::MatrixAuthority,
+    messaging::MessagingAuthority,
     port::{
         AgentRepository, AuthorizationRepository, CoreRepository, FleetRepository,
         RepositoryAccess, UnitOfWork,
@@ -65,7 +65,7 @@ pub trait PlanEncoding {
 fn invalid(message: &str) -> Failure {
     Failure::new(ErrorCode::Invalid, message)
 }
-pub async fn preview<A: RepositoryAccess, M: MatrixAuthority, C: Clock>(
+pub async fn preview<A: RepositoryAccess, M: MessagingAuthority, C: Clock>(
     service: &Service<'_, A, M, C>,
     encoding: &impl PlanEncoding,
     actor: &Actor,
@@ -203,7 +203,7 @@ where
                 .map_or(
                     Intent {
                         access: Access::None,
-                        power: None,
+                        native_access: None,
                         muted: false,
                     },
                     |grant| grant.intent.clone(),
@@ -226,7 +226,7 @@ where
             } else {
                 read::room(
                     service.repository,
-                    service.matrix,
+                    service.messaging,
                     service.clock,
                     actor,
                     &room,
@@ -266,7 +266,7 @@ where
     result.digest = encoding.digest(&result)?;
     Ok(result)
 }
-pub async fn apply<A: RepositoryAccess, M: MatrixAuthority, C: Clock>(
+pub async fn apply<A: RepositoryAccess, M: MessagingAuthority, C: Clock>(
     service: &Service<'_, A, M, C>,
     encoding: &impl PlanEncoding,
     actor: &Actor,

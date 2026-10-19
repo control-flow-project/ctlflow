@@ -45,6 +45,23 @@ export async function operatorContracts(scope: TestContext, selected: Pick<Contr
     assert.deepEqual(readdirSync(state).sort(), contents, 'Invalid arguments must not create a state lock or other state files');
     preserved();
   }
+  await scope.test('backend initialization rejects invalid native parameters before writing state or invoking Docker', () => {
+    const invalid: [string, string][] = [
+      ['administrator', 'conduit'], ['administrator', 'agent-system'], ['administrator', 'crossfire-service'],
+      ['administrator', 'Uppercase'], ['administrator', 'with space'], ['administrator', 'human:other'],
+      ['server-name', 'bad/host'], ['server-name', 'bad host'], ['server-name', 'example:port'], ['server-name', 'a'.repeat(201)],
+    ];
+    for (const [index, [key, value]] of invalid.entries()) {
+      const unopened = join(directory, 'invalid-' + index);
+      const values = { ...initialization, directory: unopened, [key]: value };
+      writeFileSync(calls, '', { mode: 0o600 });
+      const result = run(['init', ...Object.entries(values).flatMap(([name, text]) => ['--' + name, text])]);
+      assert.equal(result.status, 1, 'Invalid native initialization parameters must be rejected');
+      assert.equal(existsSync(unopened), false, 'Invalid native configuration cannot create private state');
+      assert.equal(readFileSync(calls, 'utf8'), '', 'Backend configuration validation cannot invoke Docker');
+      preserved();
+    }
+  });
   await scope.test('repeated initialization and startup options reject identical and different values', () => {
     for (const [arguments_, values] of [[init, initialization], [start, options]] as const)
       for (const [key, value] of Object.entries(values)) for (const repeated of [value, 'different'])

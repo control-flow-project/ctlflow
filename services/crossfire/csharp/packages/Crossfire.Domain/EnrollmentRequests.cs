@@ -39,15 +39,15 @@ public static class EnrollmentRequests
                 if (!agent.IsSuccess) return Result<EnrollmentReview>.Fail(agent.Error);
                 name = agent.Value?.Name;
             }
-            var senders = new List<MatrixWakeSender>();
+            var senders = new List<BackendWakeSender>();
             foreach (var sender in policy.Senders)
             {
                 var selected = ports.Admission.Fleet.Authorization.Principal(sender.PrincipalId);
                 if (!selected.IsSuccess) return Result<EnrollmentReview>.Fail(selected.Error);
                 if (selected.Value is null) return Results.Fail<EnrollmentReview>("unavailable", "Enrollment selected identity is missing");
-                senders.Add(new(selected.Value.MatrixUserId, sender.IncludeAgents));
+                senders.Add(new(selected.Value.BackendUserId, sender.IncludeAgents));
             }
-            views.Add(new(item, name, new(policy.WakeMode, senders.OrderBy(value => value.MatrixUserId, StringComparer.Ordinal).ToArray(), policy.Permissions)));
+            views.Add(new(item, name, new(policy.WakeMode, senders.OrderBy(value => value.BackendUserId, StringComparer.Ordinal).ToArray(), policy.Permissions)));
         }
         return Result<EnrollmentReview>.Success(new(request, owner.Value, views));
     }

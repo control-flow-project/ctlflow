@@ -92,6 +92,8 @@ pub fn fields(operation: OperationId) -> &'static [&'static str] {
         | Policy
         | ChangePolicy
         | Release
+        | MessagingBackend
+        | AuthenticateBackend
         | Health => &[],
     }
 }

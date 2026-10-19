@@ -52,6 +52,7 @@ public interface RunningAgent : IAsyncDisposable
     bool DeliberatelyStopped { get; }
     bool ListenerActive { get; }
     NativeSessionState NativeState();
+    ValueTask<NativeDiagnostic> Diagnostics(CancellationToken cancellation);
     ValueTask<Result<Unit>> Resume();
     ValueTask<Result<RuntimeAttachment>> Attachment(string? context = null);
     Result<IReadOnlyList<SavedRuntimeContext>> Contexts();

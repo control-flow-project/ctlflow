@@ -1,15 +1,16 @@
 using Crossfire.Kernel;
+using System.Text.Json;
 
 namespace Crossfire.Domain;
 
 public sealed record RoomGrant(string AgentId, string RoomId, string Generation, string AuthorizerId, string AddedById,
-    string? InvitationEventId, string AdmissionKind, string AccessMode, long? PowerLevel, bool Muted, long Revision, long AccessRevision, long UpdatedAt);
+    string? InvitationEventId, string AdmissionKind, string AccessMode, JsonElement? NativeAccess, bool Muted, long Revision, long AccessRevision, long UpdatedAt);
 public sealed record RoomPermission(string AgentId, string RoomId, string Generation, string PermissionCode, string GrantScope, string GrantedByMemberId, long GrantedAt);
 public sealed record RoomGrantApplication(string AgentId, string RoomId, string? ObservedGeneration, long? AppliedRevision, long? AppliedAccessRevision,
-    string? Membership, bool Creator, long? PowerLevel, long? LastAttemptAt, long? LastSuccessAt, long NextCheckAt, string? ErrorCode, string? ErrorMessage);
-public sealed record RoomInvitation(string RoomId, string SenderMatrixId, string EventId, bool Direct = false);
-public sealed record GrantIntent(string AccessMode, long? PowerLevel, bool Muted);
-public sealed record GrantChange(string AgentId, string RoomId, long ExpectedRevision, string? ExpectedGeneration, string AccessMode, long? PowerLevel, bool Muted);
+    string? Membership, JsonElement? NativeAccess, long? LastAttemptAt, long? LastSuccessAt, long NextCheckAt, string? ErrorCode, string? ErrorMessage);
+public sealed record RoomInvitation(string RoomId, string SenderBackendUserId, string EventId, bool Direct = false);
+public sealed record GrantIntent(string AccessMode, JsonElement? NativeAccess, bool Muted);
+public sealed record GrantChange(string AgentId, string RoomId, long ExpectedRevision, string? ExpectedGeneration, string AccessMode, JsonElement? NativeAccess, bool Muted);
 public sealed record GrantProof(GrantChange Input, RoomGrant? Previous, long ActorRevision, long TargetRevision, long OwnerRevision,
     string? InviterGeneration, long? InviterRevision, string AuthorizerId, RoomFacts? Native, bool Changed, string? InvitationEventId, string AdmissionKind);
 public sealed record GrantResult(RoomGrant? Grant, long Revision);
@@ -25,21 +26,13 @@ public sealed record RoomGrantPorts(AuthorizationPorts Authorization, UnitOfWork
     Func<string, Result<RoomPolicy?>> FleetPolicy,
     Func<string, string, Result<RoomGrantApplication?>> Application, Func<RoomGrantApplication, Result<Unit>> SaveApplication,
     Func<string, string, CancellationToken, ValueTask<Result<RoomFacts>>> Room,
+    Func<string, string, string, RoomAccessIntent, CancellationToken, ValueTask<Result<RoomFacts>>> AuthorizeRoomAccess,
     Func<AuditIntent, Result<Unit>> Audit, Func<string> Identifier);
 
 public static class RoomGrantValues
 {
     public static bool Same(RoomGrant grant, GrantChange input)
-        => grant.AccessMode == input.AccessMode && grant.PowerLevel == input.PowerLevel && grant.Muted == input.Muted;
-
-    public static Result<long> Power(RoomFacts facts, GrantChange input)
-    {
-        var level = input.AccessMode == "read" ? facts.ReadLevel : input.AccessMode == "custom" ? input.PowerLevel : facts.ReplyLevel;
-        if (level is null || level > 9007199254740991L || level < -9007199254740991L)
-            return Results.Fail<long>("invalid", "A finite integer Matrix power level is required");
-        return facts.Creator || level <= facts.PowerLevel ? Result<long>.Success(level.Value)
-            : Results.Fail<long>("forbidden", "Requested access exceeds the authorizer’s native room permissions");
-    }
+        => grant.AccessMode == input.AccessMode && BackendData.Equal(grant.NativeAccess, input.NativeAccess) && grant.Muted == input.Muted;
 
     public static Result<Unit> Protect(RoomGrantPorts ports, GrantChange input)
     {
@@ -48,7 +41,7 @@ public static class RoomGrantValues
         if (conversation.Value is null) return Results.Done();
         if (conversation.Value.Kind == "management" || conversation.Value.AgentId != input.AgentId)
             return Results.Fail<Unit>("forbidden", "Another agent cannot join a private owner DM");
-        return input.AccessMode != "reply" || input.PowerLevel is not null || input.Muted
+        return input.AccessMode != "reply" || input.NativeAccess is not null || input.Muted
             ? Results.Fail<Unit>("forbidden", "Owner DMs always have read-and-reply access and cannot be muted or removed") : Results.Done();
     }
 }

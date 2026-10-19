@@ -42,18 +42,9 @@ pub fn backup_before_migration(directory: &Path) -> Result<Option<PathBuf>> {
         Ok(_) => {}
     }
     let mut source = open(&file)?;
-    let application = schema::pragma(&mut source, "application_id")?;
     let version = schema::pragma(&mut source, "user_version")?;
-    if application == 0 && version == 0 && schema::empty(&mut source)? {
-        return Ok(None);
-    }
-    if application != tables::APPLICATION_ID || !(13..=tables::SCHEMA_VERSION).contains(&version) {
-        return Err(invalid());
-    }
+    schema::verify(&mut source)?;
     verify(&mut source)?;
-    if schema::verify(&mut source).is_ok() {
-        return Ok(None);
-    }
     let backups = private.child("backups", true)?;
     let name = format!("management-{}.sqlite", identity::id());
     let target = directory.join("backups").join(&name);

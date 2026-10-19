@@ -8,7 +8,7 @@ import { coordinationPolicy } from '../coordination-policy.js';
 const revision = check.integer();
 const accountProof = check.object({ agentId: check.identifier, accessToken: check.text(8192) });
 const instance = check.object({ instanceKey: check.name, name: check.name, identity: check.optional(accountProof), coordinationPolicy });
-const roster = { controller, controllerCredential: check.optional(check.text(200)), ownerMatrixId: check.matrixUserId, fleetKey: check.name, instances: check.list(instance, 100, 1) };
+const roster = { controller, controllerCredential: check.optional(check.text(200)), ownerBackendUserId: check.backendUserId, fleetKey: check.name, instances: check.list(instance, 100, 1) };
 export const preflight = check.object(roster);
 export const enrollment = check.object({ ...roster, enrollmentId: check.identifier, claimSecret: check.secret });
 export const enrollmentDecision = check.object({ expectedRevision: revision, decision: check.choice('approve', 'reject'), verificationCode: check.text(12, 12) });
@@ -23,15 +23,15 @@ export const memberChange = check.object({ expectedRevision: revision, status: c
 export const memberRole = check.object({ expectedRevision: revision, roleCode: check.choice('member', 'administrator') });
 export const memberInvitation = check.object({ roleCode: check.choice('member', 'administrator'), expiresSeconds: check.integer(60, 604800) });
 export const invitationClaim = check.object({ claimSecret: check.secret });
-export const grantIntent = check.object({ roomId: check.roomId, accessMode: check.choice('read', 'reply', 'custom'), powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), muted: check.boolean });
-export const roomGrant = check.object({ expectedRevision: revision, expectedGeneration: check.nullable(check.identifier), accessMode: check.choice('read', 'reply', 'custom'), powerLevel: check.nullable(check.integer(Number.MIN_SAFE_INTEGER)), muted: check.boolean });
+export const grantIntent = check.object({ roomId: check.roomId, accessMode: check.choice('read', 'reply', 'custom'), nativeAccess: check.nullable(check.backendParameters), muted: check.boolean });
+export const roomGrant = check.object({ expectedRevision: revision, expectedGeneration: check.nullable(check.identifier), accessMode: check.choice('read', 'reply', 'custom'), nativeAccess: check.nullable(check.backendParameters), muted: check.boolean });
 export const removeGrant = check.object({ expectedRevision: revision, expectedGeneration: check.nullable(check.identifier) });
 export const roomPermissions = check.object({ expectedRevision: revision, expectedGeneration: check.identifier, permissions: check.list(check.choice('room.agent.invite'), 1) });
 export const heartbeat = check.object({ release: check.text(200), messagesDelivered: check.integer(), stopped: check.boolean,
   controller: check.object({ fleetId: check.identifier, connectionId: check.identifier, credential: check.text(200) }), statistics: check.nullable(statisticsBatch) });
 export const wakeNotice = check.object({ roomId: check.roomId });
-export const principalResolution = check.object({ matrixUserIds: check.refine(check.list(check.matrixUserId, 100, 1),
-  ids => new Set(ids).size === ids.length, 'Resolve unique Matrix identities') });
+export const principalResolution = check.object({ backendUserIds: check.refine(check.list(check.backendUserId, 100, 1),
+  ids => new Set(ids).size === ids.length, 'Resolve unique backend identities') });
 export const plan = check.object({ fleetId: check.identifier, agents: check.list(check.object({ instanceKey: check.name, grants: check.list(grantIntent, 100) }), 100, 1) });
 export const planPreview = check.object({ plan });
 export const planChange = check.object({ plan, digest: check.text(64, 64), snapshots: check.list(check.object({ agentId: check.identifier, revision,

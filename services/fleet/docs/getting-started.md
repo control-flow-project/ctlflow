@@ -13,7 +13,7 @@ globally. The guide invokes that private executable directly. Examples using
 `fleet` below assume you use that executable or add its directory to your PATH.
 
 ```sh
-fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerMatrixId=%40member%3Aexample.test'
+fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerBackendUserId=%40member%3Aexample.test'
 ```
 
 Use the actual personalized URL, not this example.
@@ -50,7 +50,7 @@ missing software or signs in through the selected harness, then repeats setup.
 ## Optional configuration
 
 ```sh
-fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerMatrixId=%40member%3Aexample.test' \
+fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerBackendUserId=%40member%3Aexample.test' \
   --root /absolute/private/controller \
   --config /absolute/private/fleet/runtime.toml
 ```

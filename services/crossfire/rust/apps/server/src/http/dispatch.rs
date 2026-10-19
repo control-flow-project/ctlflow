@@ -8,9 +8,25 @@ use crossfire_contracts::operations::OperationId;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use serde_json::json;
 
-pub async fn invoke(context: &Context<'_>) -> Result<Reply> {
+pub async fn invoke(
+    context: &Context<'_, impl crossfire_domain::messaging::MessagingAuthority>,
+) -> Result<Reply> {
     use OperationId::*;
     match context.selection.operation.id {
+        MessagingBackend => {
+            context.empty()?;
+            reply::of(crossfire_contracts::messaging::description_value(
+                &context.state.messaging.describe(
+                    context
+                        .state
+                        .configuration
+                        .public_origin
+                        .as_str()
+                        .trim_end_matches('/'),
+                ),
+            ))
+        }
+        AuthenticateBackend => identity::authenticate_backend(context).await,
         RecordFleetNativeStop => fleet::native_stop(context),
         CreatePublication => publication::create(context),
         Publications => publication::list(context),

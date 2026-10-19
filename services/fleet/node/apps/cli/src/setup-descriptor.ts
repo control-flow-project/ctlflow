@@ -25,7 +25,7 @@ export async function fetchSetupDescriptor(address: string, version: string, sig
     }
     const parsed = setupDescriptorSchema(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(bytes))));
     if (!parsed.ok) return parsed;
-    if (parsed.value.server !== selected.value.origin || parsed.value.ownerMatrixId !== selected.value.searchParams.get('ownerMatrixId')) return failure('forbidden', 'Setup descriptor does not match its requested server and owner');
+    if (parsed.value.server !== selected.value.origin || parsed.value.ownerBackendUserId !== selected.value.searchParams.get('ownerBackendUserId')) return failure('forbidden', 'Setup descriptor does not match its requested server and owner');
     if (parsed.value.package.version !== version) return failure('conflict', 'Install the exact pinned package @ctlflow/fleet@' + parsed.value.package.version + ' from the setup guide, then rerun setup');
     return success(parsed.value);
   } catch (error) { return failure('unavailable', signal.aborted ? 'Setup cancelled' : error instanceof Error ? error.message : 'Cannot fetch the trusted setup descriptor'); }

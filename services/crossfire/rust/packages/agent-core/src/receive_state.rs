@@ -1,10 +1,11 @@
+use crate::history_resources::HISTORY_BYTES;
 use crate::{
     events::{Event, invalid},
     local_state::{self, LocalState},
-    matrix::{self, API, Matrix, Request},
     receive_pages,
 };
-use crossfire_contracts::{operations::Method, origin::segment, validation as check};
+use crossfire_contracts::validation as check;
+use crossfire_domain::messaging_client::MessagingClient;
 use crossfire_kernel::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -59,8 +60,7 @@ impl Batch {
     }
 }
 pub fn load(storage: &impl LocalState, file: &str) -> Result<Cursors> {
-    let values: Cursors =
-        local_state::read(storage, file, matrix::HISTORY_BYTES)?.unwrap_or_default();
+    let values: Cursors = local_state::read(storage, file, HISTORY_BYTES)?.unwrap_or_default();
     validate_cursors(&values)?;
     Ok(values)
 }
@@ -96,30 +96,25 @@ pub fn retain_joined(
         return Ok(());
     }
     if let Some(mut pending) =
-        local_state::read::<Ack>(storage, &format!("{file}.ack"), matrix::HISTORY_BYTES)?
+        local_state::read::<Ack>(storage, &format!("{file}.ack"), HISTORY_BYTES)?
     {
         validate_cursors(&pending.cursors)?;
         validate_cursors(&pending.receipts)?;
         pending.cursors = retained.clone();
         pending.receipts = filter(&pending.receipts, joined);
-        local_state::write(
-            storage,
-            &format!("{file}.ack"),
-            &pending,
-            matrix::HISTORY_BYTES,
-        )?;
+        local_state::write(storage, &format!("{file}.ack"), &pending, HISTORY_BYTES)?;
     }
-    local_state::write(storage, file, &retained, matrix::HISTORY_BYTES)
+    local_state::write(storage, file, &retained, HISTORY_BYTES)
 }
 pub async fn acknowledge(
     storage: &impl LocalState,
-    matrix: &impl Matrix,
+    messaging: &impl MessagingClient,
     file: &str,
     batch: &Batch,
     stop: CancellationToken,
 ) -> Result<()> {
     batch.validate()?;
-    flush(storage, matrix, file, stop.clone()).await?;
+    flush(storage, messaging, file, stop.clone()).await?;
     let receipts: Cursors = batch
         .latest
         .iter()
@@ -141,19 +136,18 @@ pub async fn acknowledge(
             cursors: batch.cursors.clone(),
             receipts,
         },
-        matrix::HISTORY_BYTES,
+        HISTORY_BYTES,
     )?;
-    flush(storage, matrix, file, stop).await
+    flush(storage, messaging, file, stop).await
 }
 pub async fn flush(
     storage: &impl LocalState,
-    matrix: &impl Matrix,
+    messaging: &impl MessagingClient,
     file: &str,
     stop: CancellationToken,
 ) -> Result<()> {
     let pending_file = format!("{file}.ack");
-    let Some(pending): Option<Ack> =
-        local_state::read(storage, &pending_file, matrix::HISTORY_BYTES)?
+    let Some(pending): Option<Ack> = local_state::read(storage, &pending_file, HISTORY_BYTES)?
     else {
         return Ok(());
     };
@@ -161,7 +155,7 @@ pub async fn flush(
     validate_cursors(&pending.receipts)?;
     let snapshot_file = format!("{file}.snapshot");
     if let Some(mut snapshot) =
-        local_state::read::<Snapshot>(storage, &snapshot_file, matrix::HISTORY_BYTES)?
+        local_state::read::<Snapshot>(storage, &snapshot_file, HISTORY_BYTES)?
     {
         validate_cursors(&snapshot.base)?;
         snapshot.batch.validate()?;
@@ -190,22 +184,17 @@ pub async fn flush(
                 .more_rooms
                 .retain(|room| remaining.contains(room));
             snapshot.base = pending.cursors.clone();
-            local_state::write(storage, &snapshot_file, &snapshot, matrix::HISTORY_BYTES)?;
+            local_state::write(storage, &snapshot_file, &snapshot, HISTORY_BYTES)?;
         }
     }
-    local_state::write(storage, file, &pending.cursors, matrix::HISTORY_BYTES)?;
-    let joined = receive_pages::joined(matrix, stop.clone()).await?;
+    local_state::write(storage, file, &pending.cursors, HISTORY_BYTES)?;
+    let joined = receive_pages::joined(messaging, stop.clone()).await?;
     for (room, event) in pending.receipts {
         if !joined.contains(&room) {
             continue;
         }
         check::event_id(&json!(event))?;
-        let mut request = Request::new(
-            Method::Post,
-            format!("{API}/rooms/{}/read_markers", segment(&room)),
-        );
-        request.body = Some(json!({"m.fully_read":event,"m.read.private":event}));
-        matrix::request(matrix, &request, stop.clone()).await?;
+        messaging.acknowledge(&room, &event, stop.clone()).await?;
     }
     storage.remove(&pending_file)
 }

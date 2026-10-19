@@ -22,6 +22,27 @@ pub struct CodexConnection<P, H> {
 }
 
 impl<P: Protocol, H: Hooks> CodexConnection<P, H> {
+    pub async fn provider(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Result<crossfire_agent_core::owned_runtime::ProviderState> {
+        match self
+            .session
+            .protocol
+            .request(
+                "account/read",
+                &serde_json::json!({"refreshToken":false}),
+                cancellation,
+            )
+            .await
+        {
+            Ok(crate::protocol::Reply::Value(value)) => crate::provider::parse(&value),
+            _ => Err(Failure::new(
+                ErrorCode::Unavailable,
+                "Native provider metadata could not be read without refresh",
+            )),
+        }
+    }
     pub fn open(
         session: Arc<Session<P>>,
         hooks: Arc<H>,

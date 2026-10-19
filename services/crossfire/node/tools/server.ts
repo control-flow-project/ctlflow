@@ -1,6 +1,5 @@
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
-import { nativeJson } from '@ctlflow/crossfire-adapter-matrix/http';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { withHuman, operatorClient, type Credentials } from './auth.js';
 import { collectPages } from '@ctlflow/crossfire-operator-support/collections';
@@ -30,19 +29,15 @@ export async function verifyServer(origin: string, account: Credentials, expecte
       if (expected.release && agent.activity.activeRuns.some(run => run.release !== expected.release)) return failure('conflict', 'A live listener is running a different release');
       const grants = await collectPages(query => human.client.call(operations.grants, { agentId: agent.agentId }, {}, query), grant => grant.grant?.roomId ?? ''); if (!grants.ok) return grants;
       if (expected.emptyRooms && grants.value.some(grant => grant.grant?.accessMode !== 'none')) return failure('conflict', 'An agent has unexpected assigned room access');
-      const found = await nativeJson({ base: origin, token: human.nativeAccessToken, signal }, 'POST', '/_matrix/client/v3/user_directory/search', { search_term: agent.matrixUserId, limit: 100 });
+      const found = await human.messaging.verifyProfile(agent.backendUserId, agent.displayName);
       if (!found.ok) return found;
-      const body = found.value.body;
-      if (found.value.status !== 200 || !body || typeof body !== 'object' || Array.isArray(body) || !Array.isArray(body.results)
-        || !body.results.some(item => item && typeof item === 'object' && !Array.isArray(item) && item.user_id === agent.matrixUserId && item.display_name === agent.displayName)) return failure('native', 'Agent is absent or incorrectly named in the native invitation directory');
       instances.push({ agentId: agent.agentId, name: agent.name, listener: agent.activity.status,
         installedReleases: agent.activity.activeRuns.map(run => run.release), runtime: observations.value.data, roomGrants: grants.value.length });
     }
     if (expected.emptyRooms) {
-      const joined = await nativeJson({ base: origin, token: human.nativeAccessToken, signal }, 'GET', '/_matrix/client/v3/joined_rooms');
+      const joined = await human.messaging.joinedRooms();
       if (!joined.ok) return joined;
-      const body = joined.value.body;
-      if (joined.value.status !== 200 || !body || typeof body !== 'object' || Array.isArray(body) || !Array.isArray(body.joined_rooms) || body.joined_rooms.length) return failure('conflict', 'Human has unexpected joined rooms');
+      if (joined.value.length) return failure('conflict', 'Human has unexpected joined rooms');
     }
     const maps = [];
     for (const fleet of fleets.value) {
@@ -51,7 +46,7 @@ export async function verifyServer(origin: string, account: Credentials, expecte
         agents: map.value.data.agents.length, rooms: map.value.data.rooms.length, connections: map.value.data.connections.length });
       if (expected.emptyRooms && map.value.data.rooms.length) return failure('conflict', 'Fleet map has unexpected room memberships');
     }
-    return success({ origin, release: health.value.data.release, human: human.viewer.member.matrixUserId,
+    return success({ origin, release: health.value.data.release, human: human.viewer.member.backendUserId,
       role: human.viewer.member.roleCode, agents: instances, fleets: maps, checkedAt: new Date().toISOString(), modelCalls: 0 });
   });
 }

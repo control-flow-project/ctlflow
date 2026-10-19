@@ -11,6 +11,8 @@ public static class RestOperations
 {
     public static readonly IReadOnlyDictionary<string, RestOperation> All = new Dictionary<string, RestOperation>(StringComparer.Ordinal)
     {
+        ["messagingBackend"] = new("messagingBackend", "GET", "/api/messaging-backend", "public", 200, false, 2097152, false),
+        ["authenticateBackend"] = new("authenticateBackend", "POST", "/api/backend-authentication", "public", 200, false, 2097152, false),
         ["recordFleetNativeStop"] = new("recordFleetNativeStop", "PUT", "/api/fleets/{fleetId}/agents/{agentId}/native-stop", "fleet", 200, false, 2097152, false),
         ["createPublication"] = new("createPublication", "POST", "/api/publications", "agent", 201, false, 2097152, false),
         ["publications"] = new("publications", "GET", "/api/publications", "human", 200, true, 2097152, false),

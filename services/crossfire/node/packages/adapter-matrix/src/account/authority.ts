@@ -1,24 +1,22 @@
 import { createHmac, createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { failure, success, type Result } from "@ctlflow/crossfire-kernel/result";
-import { object, text, userId } from "@ctlflow/crossfire-contracts/validation";
-import { API, segment } from '@ctlflow/crossfire-contracts/matrix';
+import { userId } from '../syntax.js';
+import { object, text } from "@ctlflow/crossfire-contracts/validation";
+import { API, segment } from '../protocol.js';
 import { nativeOk, nativeRequest, type Native } from "../http.js";
-export type Config = { matrixOrigin: string; serverName: string; jwtSecret: string; registrationSecret: string; serviceMatrixId: string };
-import { account, type Account } from "@ctlflow/crossfire-contracts/client";
-
-export type Credentials = Account;
+export type Config = { matrixOrigin: string; serverName: string; jwtSecret: string; registrationSecret: string; serviceBackendUserId: string };
+export type Credentials = { user_id: string; access_token: string; device_id: string };
 export type Authority = ReturnType<typeof authority>;
 
 function credentials(value: unknown, expected: string): Result<Credentials> {
   const parsed = object(value);
   if (!parsed.ok) return parsed;
   const input = parsed.value;
-  const result = account({ user_id: input.user_id, access_token: input.access_token, device_id: input.device_id });
-  if (input.user_id !== expected || !result.ok) {
+  if (input.user_id !== expected || !userId(input.user_id) || !text(input.access_token, 8192) || !text(input.device_id, 255)) {
     return failure("native", "Unexpected native account credentials");
   }
-  return result;
+  return success({ user_id: input.user_id, access_token: input.access_token, device_id: input.device_id });
 }
 
 export function authority(config: Config) {
@@ -138,13 +136,13 @@ export function authority(config: Config) {
   }
 
   async function remove(id: string): Promise<Result<void>> {
-    if (!userId(id) || !id.endsWith(":" + config.serverName) || id === config.serviceMatrixId || id === "@conduit:" + config.serverName) {
+    if (!userId(id) || !id.endsWith(":" + config.serverName) || id === config.serviceBackendUserId || id === "@conduit:" + config.serverName) {
       return failure("forbidden", "Protected or invalid native account");
     }
     const checked = await deactivated(id);
     if (!checked.ok) return checked;
     if (checked.value) return success(undefined);
-    const administrator = await asUser(config.serviceMatrixId);
+    const administrator = await asUser(config.serviceBackendUserId);
     if (!administrator.ok) return administrator;
     const room = await nativeOk(administrator.value, "GET", API + "/directory/room/" + segment("#admins:" + config.serverName));
     if (!room.ok) return room;

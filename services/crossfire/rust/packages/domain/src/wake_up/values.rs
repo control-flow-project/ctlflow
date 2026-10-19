@@ -99,8 +99,8 @@ pub struct ScheduledWake {
     pub message: String,
     pub scheduled_at: i64,
     pub session_id: String,
-    pub owner_matrix_id: String,
-    pub authorizer_matrix_id: String,
+    pub owner_backend_user_id: String,
+    pub authorizer_backend_user_id: String,
 }
 
 pub struct Metadata {

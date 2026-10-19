@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, type FormEvent, type ReactNode } from 'react';
 import type { SessionView } from '@ctlflow/crossfire-contracts/schema/response';
-import { login } from '@ctlflow/crossfire-client/matrix-login';
+import { useBackend } from './backend.js';
 import { call, operations, useAction, useResource } from './api.js';
 import { AccountPage, Alert } from './ui.js';
 
@@ -12,6 +12,7 @@ export function useSession(): SessionView {
 }
 
 export function Login() {
+  const backend = useBackend();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const action = useAction();
@@ -19,17 +20,17 @@ export function Login() {
   function submit(event: FormEvent) {
     event.preventDefault();
     void action.run(async () => {
-      const native = await login(location.origin, username, password);
+      const native = await call(operations.authenticateBackend, {}, { username, password });
       if (!native.ok) return native;
-      return call(operations.createSession, {}, { nativeAccessToken: native.value });
+      return call(operations.createSession, {}, { nativeAccessToken: native.value.accessToken });
     });
   }
-  return <AccountPage title="Sign in"><p>Use your Matrix account on this server.</p>
-    <form onSubmit={submit}><label>Matrix username<input autoComplete="username" required value={username} onChange={event => setUsername(event.target.value)} placeholder="@you:your-server"/></label>
+  return <AccountPage title="Sign in"><p>Use your {backend.label} account on this server.</p>
+    <form onSubmit={submit}><label>Username<input autoComplete="username" required value={username} onChange={event => setUsername(event.target.value)}/></label>
       <label>Password<input type="password" autoComplete="current-password" required value={password} onChange={event => setPassword(event.target.value)}/></label>
       <Alert>{action.error}</Alert><button className="primary" disabled={action.pending}>{action.pending ? 'Signing in…' : 'Sign in'}</button></form>
     <p className="support">{signup.result?.ok && signup.result.value.data.signupMode === 'open'
-      ? <a href="/#/register">Create your account in Element →</a> : 'To create an account, open the private invitation link you received.'}</p></AccountPage>;
+      ? <a href={backend.signupUrl}>Create your account →</a> : 'To create an account, open the private invitation link you received.'}</p></AccountPage>;
 }
 
 export function Session({ children }: { children: ReactNode }) {

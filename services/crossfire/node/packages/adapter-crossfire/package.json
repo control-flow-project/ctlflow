@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-adapter-crossfire",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
@@ -10,13 +10,12 @@
     "npm": ">=11.17.0"
   },
   "dependencies": {
-    "@ctlflow/crossfire-client": "0.1.22",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.22",
-    "@ctlflow/crossfire-adapter-matrix": "0.1.22",
-    "@ctlflow/crossfire-adapter-runtime": "0.1.22",
-    "@ctlflow/crossfire-contracts": "0.1.22",
-    "@ctlflow/crossfire-kernel": "0.1.22",
-    "@ctlflow/crossfire-agent-core": "0.1.22"
+    "@ctlflow/crossfire-client": "0.1.23",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.23",
+    "@ctlflow/crossfire-adapter-runtime": "0.1.23",
+    "@ctlflow/crossfire-contracts": "0.1.23",
+    "@ctlflow/crossfire-kernel": "0.1.23",
+    "@ctlflow/crossfire-agent-core": "0.1.23"
   },
   "exports": {
     "./*": {

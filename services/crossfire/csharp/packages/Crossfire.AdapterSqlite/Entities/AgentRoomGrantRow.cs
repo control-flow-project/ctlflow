@@ -10,7 +10,7 @@ public class AgentRoomGrantRow
     public string? InvitationEventId { get; set; }
     public string AdmissionKind { get; set; } = "";
     public string AccessMode { get; set; } = "";
-    public long? PowerLevel { get; set; }
+    public string? NativeAccess { get; set; }
     public long Muted { get; set; }
     public long Revision { get; set; }
     public long AccessRevision { get; set; }

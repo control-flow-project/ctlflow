@@ -9,9 +9,9 @@ export function pruneWorkflows(database: Database.Database, cutoff: number, limi
   if (audit.length) executeDelete(database, schema, (query, params) => query.deleteFrom('audit_event').where(row => params.ids.includes(row.id)), { ids: audit });
   const notices = executeSelect(database, schema, (query, params) => query.from('wake_notice')
     .where(row => row.status !== 'pending' && (row.sent_at ?? row.reserved_at) < params.cutoff)
-    .orderBy(row => row.reserved_at).take(params.limit).select(row => ({ receiver: row.receiver_agent_id, event: row.event_id })), parameters);
+    .orderBy(row => row.reserved_at).take(params.limit).select(row => ({ receiver: row.receiver_agent_id, room: row.room_id, event: row.event_id })), parameters);
   for (const notice of notices) executeDelete(database, schema, (query, params) => query.deleteFrom('wake_notice')
-    .where(row => row.receiver_agent_id === params.receiver && row.event_id === params.event), notice);
+    .where(row => row.receiver_agent_id === params.receiver && row.room_id === params.room && row.event_id === params.event), notice);
   const wakes = executeSelect(database, schema, (query, params) => query.from('wake_delivery')
     .where(row => row.status !== 'pending' && (row.delivered_at ?? row.created_at) < params.cutoff)
     .orderBy(row => row.created_at).thenBy(row => row.id).take(params.limit).select(row => ({ id: row.id })), parameters).map(row => row.id);
@@ -20,7 +20,7 @@ export function pruneWorkflows(database: Database.Database, cutoff: number, limi
     .orderBy(row => row.expires_at).thenBy(row => row.id).take(params.limit).select(row => ({ id: row.id })), parameters).map(row => row.id);
   if (messages.length) executeDelete(database, schema, (query, params) => query.deleteFrom('fleet_message').where(row => params.ids.includes(row.id)), { ids: messages });
   const invitations = executeSelect(database, schema, (query, params) => query.from('member_invitation')
-    .where(row => row.expires_at < params.cutoff && (row.consumed_by_member_id !== null || row.claim_matrix_user_id === null))
+    .where(row => row.expires_at < params.cutoff && (row.consumed_by_member_id !== null || row.claim_backend_user_id === null))
     .orderBy(row => row.expires_at).thenBy(row => row.id).take(params.limit).select(row => ({ id: row.id })), parameters).map(row => row.id);
   if (invitations.length) executeDelete(database, schema, (query, params) => query.deleteFrom('member_invitation').where(row => params.ids.includes(row.id)), { ids: invitations });
   const archives = executeSelect(database, schema, (query, params) => query.from('enrollment_archive').where(row => row.created_at < params.cutoff)

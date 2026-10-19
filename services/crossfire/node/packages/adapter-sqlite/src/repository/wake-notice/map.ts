@@ -4,7 +4,7 @@ export function mapWakeNotice(row: Tables['wake_notice']): WakeNotice {
   return {
     receiverAgentId: row.receiver_agent_id,
     eventId: row.event_id,
-    senderMatrixId: row.sender_matrix_id,
+    senderBackendUserId: row.sender_backend_user_id,
     roomId: row.room_id,
     reservedAt: row.reserved_at,
     messageBody: row.message_body,

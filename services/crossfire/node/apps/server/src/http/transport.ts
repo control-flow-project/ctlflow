@@ -3,7 +3,7 @@ import { failure, success, type FailureCode, type Result } from '@ctlflow/crossf
 import { HTTP_LIMITS } from '@ctlflow/crossfire-contracts/rest/limits';
 import type { Reply } from './bind.js';
 import { decodeUtf8 } from '@ctlflow/crossfire-kernel/bytes';
-import { json } from '@ctlflow/crossfire-contracts/matrix';
+import { json } from '@ctlflow/crossfire-kernel/json';
 export const COOKIE_NAME = '__Host-crossfire';
 const failureStatus: Record<FailureCode, number> = { invalid: 400, unauthorized: 401, forbidden: 403, missing: 404, conflict: 409, limit: 413, native: 502, unavailable: 503,
   stale_revision: 409, name_collision: 409, capacity: 409, rate_limit: 429, body_too_large: 413, method_not_allowed: 405 };

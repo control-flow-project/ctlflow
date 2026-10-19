@@ -15,14 +15,14 @@ test('actual Tinqer Wake-up pages, deadlines and pending claims seek normalized 
   database.transaction(() => {
     for (let ownerIndex = 0; ownerIndex < 2; ownerIndex++) {
       const ownerId = 'owner-' + ownerIndex, agentId = 'agent-' + ownerIndex;
-      value(repositories.principal.insert({ id: ownerId, matrixUserId: '@' + ownerId + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
+      value(repositories.principal.insert({ id: ownerId, backendUserId: '@' + ownerId + ':test', kind: 'human', status: 'active', revision: 0, createdAt: 1 }));
       value(repositories.member.insert({ principalId: ownerId, principalKind: 'human', displayName: ownerId }));
       const fleetId = 'fleet-' + ownerId, credentialId = 'credential-' + ownerId, connectionId = 'connection-' + ownerId;
       value(repositories.fleet.insert({ id: fleetId, ownerId, fleetKey: ownerId, label: ownerId, controllerName: 'Computer',
         revision: 0, deliveryEnabled: true, archivedAt: null, createdAt: 1, updatedAt: 1 }));
       value(repositories.fleetCredential.insert({ id: credentialId, fleetId, secretHash: 'hash-' + ownerId, createdAt: 1, revokedAt: null }));
       value(repositories.fleetConnection.save({ fleetId, credentialId, connectionId, lastSeenAt: 1, expiresAt: 1000, closedAt: null }));
-      value(repositories.principal.insert({ id: agentId, matrixUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
+      value(repositories.principal.insert({ id: agentId, backendUserId: '@' + agentId + ':test', kind: 'agent', status: 'active', revision: 0, createdAt: 1 }));
       value(repositories.agent.insert({ principalId: agentId, principalKind: 'agent', ownerId, wakeMode: 'selected' }));
       value(repositories.fleetInstance.insert({ ownerId, fleetKey: ownerId, instanceKey: agentId, agentId, retiredAt: null }));
       value(repositories.listenerRun.insert({ id: 'run-' + ownerIndex, agentId, release: 'proof', controller: { fleetId, connectionId, credentialId }, startedAt: 1, lastSeenAt: 1,

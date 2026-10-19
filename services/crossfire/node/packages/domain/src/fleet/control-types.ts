@@ -10,7 +10,7 @@ export type DeliveryStatus = 'pending' | 'delivered' | 'failed' | 'skipped';
 export type FleetMessageDelivery = { messageId: string; agentId: string; status: DeliveryStatus; completedAt: number | null; errorMessage: string | null };
 export type FleetConnectionView = { status: 'online' | 'offline'; lastSeenAt: number | null };
 export type FleetMessageCommand = { messageId: string; fleetId: string; body: string; createdAt: number; expiresAt: number;
-  sender: { kind: 'human' | 'controller'; matrixUserId: string | null }; agentIds: string[] };
+  sender: { kind: 'human' | 'controller'; backendUserId: string | null }; agentIds: string[] };
 export type FleetControlView = { fleetId: string; revision: number; deliveryEnabled: boolean; connection: FleetConnectionView };
 export type FleetControlSnapshot = FleetControlView & { agentIds: string[]; messages: FleetMessageCommand[]; runtimeOperations: import('./runtime-types.js').RuntimeOperationView[] };
 export type FleetConnectionRepository = {

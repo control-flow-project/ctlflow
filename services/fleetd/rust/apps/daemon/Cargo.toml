@@ -18,6 +18,7 @@ crossfire-contracts.workspace = true
 crossfire-agent-core.workspace = true
 crossfire-adapter-filesystem.workspace = true
 crossfire-adapter-http.workspace = true
+crossfire-adapter-matrix.workspace = true
 crossfire-adapter-codex.workspace = true
 crossfire-adapter-pi.workspace = true
 crossfire-adapter-process.workspace = true

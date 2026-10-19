@@ -1,16 +1,56 @@
 use crate::account::Authority;
-use crossfire_domain::matrix::{
-    Account, MatrixAuthority, MatrixEvent, RoomAccess, RoomAdmission, RoomFacts, RoomInvitation,
-    RoomMembership,
+use crossfire_domain::messaging::{
+    Account, BackendDescription, BackendEvent, MessagingAuthority, RoomAdmission, RoomFacts,
+    RoomInvitation, RoomMembership,
 };
 use crossfire_kernel::{Result, secret::Secret};
 
-impl MatrixAuthority for Authority {
+impl MessagingAuthority for Authority {
+    fn describe(&self, origin: &str) -> BackendDescription {
+        self.describe(origin)
+    }
+    async fn authenticate(&self, username: &str, password: &Secret) -> Result<Secret> {
+        self.authenticate(username, password).await
+    }
+    fn agent_account(&self, user: &str, token: Secret) -> Account {
+        self.agent_account(user, token)
+    }
+    fn agent_user_id(&self, id: &str) -> String {
+        self.agent_user_id(id)
+    }
+    fn service_user_id(&self) -> &str {
+        self.service_user_id()
+    }
+    fn local_label(&self, user: &str) -> Result<String> {
+        self.local_label(user)
+    }
+    fn registration_user_id(
+        &self,
+        username: &str,
+        password: &Secret,
+        native: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<String> {
+        self.registration_user_id(username, password, native)
+    }
+    async fn authorize_room_access(
+        &self,
+        user: &str,
+        target: &str,
+        room: &str,
+        intent: &crossfire_domain::room_access::values::Intent,
+    ) -> Result<RoomFacts> {
+        self.authorize_room_access(user, target, room, intent).await
+    }
     async fn exists(&self, user: &str) -> Result<bool> {
         self.exists(user).await
     }
-    async fn provision(&self, user: &str, password: &Secret, device: &str) -> Result<Account> {
-        self.provision(user, password, device).await
+    async fn provision(
+        &self,
+        user: &str,
+        password: &Secret,
+        native: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<Account> {
+        self.provision(user, password, native).await
     }
     async fn deactivate(&self, user: &str) -> Result<()> {
         self.deactivate(user).await
@@ -43,8 +83,8 @@ impl MatrixAuthority for Authority {
     async fn mark_direct(&self, user: &str, counterpart: &str, room: &str) -> Result<()> {
         self.mark_direct(user, counterpart, room).await
     }
-    async fn room(&self, user: &str, room: &str) -> Result<RoomFacts> {
-        self.room(user, room).await
+    async fn room(&self, user: &str, room: &str, subject: Option<&str>) -> Result<RoomFacts> {
+        self.room(user, room, subject).await
     }
     async fn membership(&self, user: &str, target: &str, room: &str) -> Result<RoomMembership> {
         self.membership(user, target, room).await
@@ -57,7 +97,7 @@ impl MatrixAuthority for Authority {
         user: &str,
         target: &str,
         room: &str,
-        access: RoomAccess,
+        access: &crossfire_domain::room_access::values::Intent,
         admission: Option<&RoomAdmission>,
     ) -> Result<RoomMembership> {
         self.set_room_access(user, target, room, access, admission)
@@ -66,7 +106,7 @@ impl MatrixAuthority for Authority {
     async fn leave(&self, user: &str, room: &str) -> Result<()> {
         self.leave(user, room).await
     }
-    async fn event(&self, user: &str, room: &str, event: &str) -> Result<MatrixEvent> {
+    async fn event(&self, user: &str, room: &str, event: &str) -> Result<BackendEvent> {
         self.event(user, room, event).await
     }
     async fn send_notice(

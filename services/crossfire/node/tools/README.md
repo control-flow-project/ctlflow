@@ -37,7 +37,7 @@ they do not call a model or publish a report.
 Private credentials input:
 
 ```json
-{"matrixUserId":"@operator:example.test","password":"supplied-secret"}
+{"backendUserId":"@operator:example.test","password":"supplied-secret"}
 ```
 
 Tools use native Matrix login and the ordinary crossfire cookie/CSRF session.

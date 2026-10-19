@@ -13,7 +13,7 @@ public static class AuthorizationQueries
 
     public static Result<Principal?> Principal(CrossfireDbContext context, string id)
         => Stored.Read(() => context.Principal.AsNoTracking().Where(row => row.Id == id)
-            .Select(row => new Principal(row.Id, row.MatrixUserId, row.Kind, row.Status, row.Revision, row.CreatedAt)).SingleOrDefault());
+            .Select(row => new Principal(row.Id, row.BackendUserId, row.Kind, row.Status, row.Revision, row.CreatedAt)).SingleOrDefault());
 
     public static Result<MemberSession?> Session(CrossfireDbContext context, string hash)
         => Stored.Read(() => context.MemberSession.AsNoTracking().Where(row => row.SecretHash == hash)
@@ -48,11 +48,11 @@ public static class AuthorizationQueries
             .Join(context.PrincipalApplication, joined => joined.agent.PrincipalId, application => application.PrincipalId, (joined, application) => new { joined.agent, joined.principal, joined.name, application })
             .Join(context.Principal, joined => joined.agent.OwnerId, owner => owner.Id, (joined, owner) => new { joined.agent, joined.principal, joined.name, joined.application, owner })
             .Join(context.Member, joined => joined.agent.OwnerId, member => member.PrincipalId, (joined, member) => new { joined.agent, joined.principal, joined.name, joined.application, joined.owner, member })
-            .Select(joined => new AgentView(new Principal(joined.principal.Id, joined.principal.MatrixUserId, joined.principal.Kind, joined.principal.Status, joined.principal.Revision, joined.principal.CreatedAt),
+            .Select(joined => new AgentView(new Principal(joined.principal.Id, joined.principal.BackendUserId, joined.principal.Kind, joined.principal.Status, joined.principal.Revision, joined.principal.CreatedAt),
                 new Agent(joined.agent.PrincipalId, joined.agent.PrincipalKind, joined.agent.OwnerId, joined.agent.WakeMode), joined.name.Name,
                 new PrincipalApplication(joined.application.PrincipalId, joined.application.AppliedRevision, joined.application.AppliedIntentHash, joined.application.AppliedStatus,
                     joined.application.NativeDisplayName, joined.application.LastAttemptAt, joined.application.LastSuccessAt, joined.application.NextCheckAt, joined.application.ErrorCode, joined.application.ErrorMessage),
-                new Principal(joined.owner.Id, joined.owner.MatrixUserId, joined.owner.Kind, joined.owner.Status, joined.owner.Revision, joined.owner.CreatedAt),
+                new Principal(joined.owner.Id, joined.owner.BackendUserId, joined.owner.Kind, joined.owner.Status, joined.owner.Revision, joined.owner.CreatedAt),
                 new Member(joined.member.PrincipalId, joined.member.PrincipalKind, joined.member.DisplayName))).ToArray());
     }
 }

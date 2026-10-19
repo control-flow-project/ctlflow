@@ -4,10 +4,11 @@ import { endpoint } from '@ctlflow/crossfire-contracts/origin';
 import { PUBLICATION_LIMITS, type PublicationBudget } from '@ctlflow/crossfire-domain/publication/values';
 import { loggingRetentionDays } from '@ctlflow/crossfire-kernel/logging';
 import { trustedProxyAddresses } from './http/public-request-budget.js';
+import { backendConfiguration } from '@ctlflow/crossfire-contracts/client';
+import type { BackendConfiguration } from '@ctlflow/crossfire-domain/port/messaging';
 
 export type Config = {
-  instance: string; serverName: string; publicOrigin: string; contentOrigin: string; matrixOrigin: string;
-  administrator: string; jwtSecret: string; registrationSecret: string;
+  instance: string; publicOrigin: string; contentOrigin: string; messaging: BackendConfiguration; administrator: string;
   publicationBudget?: PublicationBudget;
   loggingRetentionDays?: number;
   trustedProxyAddresses?: string[];
@@ -28,33 +29,23 @@ export function publicationBudget(value: unknown = { instanceBytes: PUBLICATION_
     agentCount: input.agentCount, uploads: input.uploads });
 }
 
-export function serviceUser(config: Config): string {
-  return "@crossfire-" + config.instance + ":" + config.serverName;
-}
-
 export function config(value: unknown): Result<Config> {
-  const parsed = fields(value, ["instance", "serverName", "publicOrigin", "contentOrigin", "matrixOrigin", "administrator", "jwtSecret", "registrationSecret"], ['publicationBudget', 'loggingRetentionDays', 'trustedProxyAddresses']);
+  const parsed = fields(value, ['instance', 'publicOrigin', 'contentOrigin', 'messaging', 'administrator'], ['publicationBudget', 'loggingRetentionDays', 'trustedProxyAddresses']);
   if (!parsed.ok) return parsed;
   const input = parsed.value;
   if (!text(input.instance, 40) || !/^[a-z][a-z0-9-]*$/u.test(input.instance)
-    || !text(input.serverName, 200) || !/^[a-z0-9.-]+(?::[0-9]+)?$/u.test(input.serverName)
-    || !userId(input.administrator) || !input.administrator.endsWith(":" + input.serverName)
-    || !text(input.jwtSecret, 200) || input.jwtSecret.length < 32
-    || !text(input.registrationSecret, 200) || input.registrationSecret.length < 32
-    || typeof input.publicOrigin !== "string" || typeof input.contentOrigin !== 'string' || typeof input.matrixOrigin !== "string") return failure("invalid", "Invalid server configuration");
+    || !userId(input.administrator) || typeof input.publicOrigin !== 'string' || typeof input.contentOrigin !== 'string') return failure('invalid', 'Invalid server configuration');
   const publicOrigin = endpoint(input.publicOrigin);
-  const matrixOrigin = endpoint(input.matrixOrigin);
+  const messaging = backendConfiguration(input.messaging);
   const contentOrigin = endpoint(input.contentOrigin);
   if (!publicOrigin.ok) return publicOrigin;
-  if (!matrixOrigin.ok) return matrixOrigin;
+  if (!messaging.ok) return messaging;
   if (!contentOrigin.ok) return contentOrigin;
-  if (contentOrigin.value === publicOrigin.value || contentOrigin.value === matrixOrigin.value
-    || new URL(contentOrigin.value).protocol === 'https:' && [new URL(publicOrigin.value).hostname, new URL(matrixOrigin.value).hostname].includes(new URL(contentOrigin.value).hostname))
+  if (contentOrigin.value === publicOrigin.value || new URL(contentOrigin.value).hostname === new URL(publicOrigin.value).hostname)
     return failure('invalid', 'Publications require a separate content hostname and origin');
   const budget = publicationBudget(input.publicationBudget); if (!budget.ok) return budget;
   const retention = loggingRetentionDays(input.loggingRetentionDays); if (!retention.ok) return retention;
   const proxies = trustedProxyAddresses(input.trustedProxyAddresses); if (!proxies.ok) return proxies;
-  return success({ instance: input.instance, serverName: input.serverName, publicOrigin: publicOrigin.value,
-    contentOrigin: contentOrigin.value, matrixOrigin: matrixOrigin.value, administrator: input.administrator, jwtSecret: input.jwtSecret,
-    registrationSecret: input.registrationSecret, publicationBudget: budget.value, loggingRetentionDays: retention.value, trustedProxyAddresses: proxies.value });
+  return success({ instance: input.instance, publicOrigin: publicOrigin.value, contentOrigin: contentOrigin.value, messaging: messaging.value,
+    administrator: input.administrator, publicationBudget: budget.value, loggingRetentionDays: retention.value, trustedProxyAddresses: proxies.value });
 }

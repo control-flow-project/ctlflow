@@ -20,6 +20,12 @@ Labels and profile names do not authenticate a connection.
 
 ## Registry and lifecycle
 
+Use `fleet diagnose [FLEET]` or `fleet agent diagnose FLEET INSTANCE` for bounded,
+read-only findings, including when the daemon is unreachable. These commands do
+not start a controller or native session.
+
+- [Diagnostic report and limits](diagnostics.md)
+
 ```sh
 fleet add /absolute/private/research
 fleet list
@@ -51,17 +57,19 @@ mean native completion; inspect its per-instance outcome.
 ```sh
 fleet agent contexts research analyst-west
 fleet agent attach research analyst-west
-fleet agent attach research analyst-west --context '!EXACT_ROOM_ID:example.test'
+fleet agent attach research analyst-west --context 'room/!EXACT_ROOM_ID:example.test'
 fleet start research --fresh-history
 fleet agent start research analyst-west --fresh-history
 ```
 
 Contexts is read-only. Attach prints the exact running native terminal command;
 it does not start/fork a conversation or launch another listener.
+Use the exact context key reported by `contexts`: private histories use `shared`
+or `control`; per-room histories use `room/` followed by the opaque room ID.
 Pi does not support live TUI attachment.
 
 Fresh history explicitly calls controller reset. Normal start does not.
-Reset preserves identity, permissions, Matrix data and archived native histories.
+Reset preserves identity, permissions, chat data and archived native histories.
 
 ## Delivery and direct input
 

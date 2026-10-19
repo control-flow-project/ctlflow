@@ -2,7 +2,7 @@ use super::{agent, fleet, port::ReadRepository, values::*};
 use crate::{
     fleet::values::FleetActor,
     identity::{Actor, PrincipalSummary, Status, WakeMode},
-    matrix::Membership,
+    messaging::Membership,
     room_access::{
         port::RoomReadRepository,
         values::{Access, Application, Grant},

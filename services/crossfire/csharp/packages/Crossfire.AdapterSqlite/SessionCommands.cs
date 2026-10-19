@@ -35,7 +35,7 @@ public static class SessionCommands
     public static SessionPorts Ports(CrossfireDbContext context, Func<long> now,
         Func<string, CancellationToken, ValueTask<Result<string>>> identify)
         => new(AuthorizationQueries.Ports(context, now), new SqliteUnitOfWork(context), identify,
-            id => MemberQueries.ByMatrixId(context, id), id => MemberQueries.Find(context, id),
+            id => MemberQueries.ByBackendUserId(context, id), id => MemberQueries.Find(context, id),
             timestamp => RemoveExpired(context, timestamp), (id, timestamp) => Count(context, id, timestamp),
             value => Add(context, value), hash => Remove(context, hash), Identity.Secret, Identity.Hash);
 }

@@ -38,7 +38,7 @@ public static class EnrollmentAdmissionQueries
 
     public static EnrollmentAdmissionPorts Ports(CrossfireDbContext context, Func<long> now,
         Func<string, CancellationToken, ValueTask<Result<string>>> identify)
-        => new(FleetCommands.Ports(context, now), id => MemberQueries.ByMatrixId(context, id), id => MemberQueries.Find(context, id),
+        => new(FleetCommands.Ports(context, now), id => MemberQueries.ByBackendUserId(context, id), id => MemberQueries.Find(context, id),
             (owner, key) => Fleet(context, owner, key), (owner, key, instance) => Binding(context, owner, key, instance),
             name => Name(context, name), id => Token(context, id), () => PolicyQueries.Find(context),
             owner => ActiveAgents(context, owner), owner => PendingIdentities(context, owner), identify);

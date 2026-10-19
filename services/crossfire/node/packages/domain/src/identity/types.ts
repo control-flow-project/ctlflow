@@ -1,6 +1,6 @@
 export type Principal = {
   id: string;
-  matrixUserId: string;
+  backendUserId: string;
   kind: 'human' | 'agent';
   status: 'active' | 'suspended' | 'revoked';
   revision: number;

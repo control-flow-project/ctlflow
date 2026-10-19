@@ -1,6 +1,6 @@
 use crossfire_contracts::enrollment::Digest;
 use crossfire_domain::{
-    coordination::{MatrixSender, Policy},
+    coordination::{BackendSender, Policy},
     enrollment::values::{Controller, Entry, Roster},
 };
 use std::collections::BTreeMap;
@@ -44,7 +44,7 @@ fn native_enrollment_collation_and_json_bytes_match_the_current_node_contract()
         .collect::<Vec<_>>();
     assert_eq!(actual, expected);
     let roster = Roster {
-        owner_matrix_id: "@owner:example.test".to_owned(),
+        owner_backend_user_id: "@owner:example.test".to_owned(),
         fleet_key: "fleet".to_owned(),
         controller: Controller {
             name: "Owner \"controller\" 😀".to_owned(),
@@ -63,8 +63,8 @@ fn native_enrollment_collation_and_json_bytes_match_the_current_node_contract()
                 senders: values
                     .iter()
                     .rev()
-                    .map(|value| MatrixSender {
-                        matrix_user_id: (*value).to_owned(),
+                    .map(|value| BackendSender {
+                        backend_user_id: (*value).to_owned(),
                         include_agents: false,
                     })
                     .collect(),
@@ -73,7 +73,7 @@ fn native_enrollment_collation_and_json_bytes_match_the_current_node_contract()
         }],
     };
     let value = digest.value(&roster)?;
-    let output = std::process::Command::new("node").args(["--input-type=module","-e","const v=JSON.parse(process.argv[1]);v.controller.metadata.sort(([a],[b])=>a.localeCompare(b));for(const item of v.items)item[3].senders.sort((a,b)=>a.matrixUserId.localeCompare(b.matrixUserId));v.items.sort((a,b)=>a[0].localeCompare(b[0]));process.stdout.write(JSON.stringify(v));",&value]).output()?;
+    let output = std::process::Command::new("node").args(["--input-type=module","-e","const v=JSON.parse(process.argv[1]);v.controller.metadata.sort(([a],[b])=>a.localeCompare(b));for(const item of v.items)item[3].senders.sort((a,b)=>a.backendUserId.localeCompare(b.backendUserId));v.items.sort((a,b)=>a[0].localeCompare(b[0]));process.stdout.write(JSON.stringify(v));",&value]).output()?;
     assert!(output.status.success());
     assert_eq!(value, String::from_utf8(output.stdout)?);
     Ok(())
@@ -83,8 +83,8 @@ fn enrollment_wire_boundaries_reject_unknown_aliases_duplicate_sources_and_inval
 -> Result<(), Box<dyn std::error::Error>> {
     use crossfire_contracts::enrollment;
     use serde_json::json;
-    let value = json!({"controller":{"name":"Controller","metadata":{"label":"owned"}},"ownerMatrixId":"@owner:example.test","fleetKey":"fleet",
-        "instances":[{"instanceKey":"worker","name":"worker-high","coordinationPolicy":{"wakeMode":"selected","senders":[{"matrixUserId":"@owner:example.test","includeAgents":true}],"permissions":["room.agent.invite"]}}]});
+    let value = json!({"controller":{"name":"Controller","metadata":{"label":"owned"}},"ownerBackendUserId":"@owner:example.test","fleetKey":"fleet",
+        "instances":[{"instanceKey":"worker","name":"worker-high","coordinationPolicy":{"wakeMode":"selected","senders":[{"backendUserId":"@owner:example.test","includeAgents":true}],"permissions":["room.agent.invite"]}}]});
     let parsed = enrollment::roster(&value)?;
     assert!(parsed.instances[0].policy.invite_agents);
     assert!(parsed.instances[0].policy.senders[0].include_agents);
@@ -92,7 +92,7 @@ fn enrollment_wire_boundaries_reject_unknown_aliases_duplicate_sources_and_inval
     unknown["runtime"] = json!("codex");
     assert!(enrollment::roster(&unknown).is_err());
     let mut duplicate = value.clone();
-    duplicate["instances"][0]["coordinationPolicy"]["senders"] = json!([{"matrixUserId":"@owner:example.test","includeAgents":true},{"matrixUserId":"@owner:example.test","includeAgents":false}]);
+    duplicate["instances"][0]["coordinationPolicy"]["senders"] = json!([{"backendUserId":"@owner:example.test","includeAgents":true},{"backendUserId":"@owner:example.test","includeAgents":false}]);
     assert!(enrollment::roster(&duplicate).is_err());
     let mut everyone = value.clone();
     everyone["instances"][0]["coordinationPolicy"]["wakeMode"] = json!("everyone");

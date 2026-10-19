@@ -7,7 +7,7 @@ import type { Settings } from '@ctlflow/crossfire-contracts/client';
 import type { PrincipalIdentity } from '@ctlflow/crossfire-contracts/schema/response';
 import { principalIdentity } from '@ctlflow/crossfire-contracts/schema/response';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
-import { json } from '@ctlflow/crossfire-contracts/matrix';
+import { json } from '@ctlflow/crossfire-kernel/json';
 import type { MessageArtifacts } from './message-artifacts.js';
 
 type Step = { indices: number[]; text: string; id: string; room: string | null; session: string | null; status: 'prepared' | 'publishing' | 'delivered' };
@@ -34,12 +34,12 @@ export function chatPublication(options: { storage: LocalState; file: string; se
   const save = () => options.storage.write(options.file, plan, bytes);
   const outcome = (allowed: ReadonlySet<string>) => plan && !plan.steps.some(step => step.status !== 'delivered') ? {
     batch: { ...plan.batch, cursors: Object.fromEntries(Object.entries(plan.batch.cursors).filter(([room]) => allowed.has(room))),
-      latest: Object.fromEntries(Object.entries(plan.batch.latest).filter(([room]) => allowed.has(room))), more_rooms: plan.batch.more_rooms.filter(room => allowed.has(room)) },
+      latest: Object.fromEntries(Object.entries(plan.batch.latest).filter(([room]) => allowed.has(room))), moreRooms: plan.batch.moreRooms.filter(room => allowed.has(room)) },
     messageIds: plan.steps.map(step => step.id),
   } : undefined;
-  const identity = (event: ReceivedEvent) => JSON.stringify([event.room_id, event.event_id]);
+  const identity = (event: ReceivedEvent) => JSON.stringify([event.roomId, event.eventId]);
   function steps(events: ReceivedEvent[], identities: PrincipalIdentity[], records: ReceivedEvent[]): Step[] {
-    const directory = new Map(identities.map(identity => [identity.matrixUserId, identity]));
+    const directory = new Map(identities.map(identity => [identity.backendUserId, identity]));
     const positions = new Map(records.map((event, index) => [identity(event), index]));
     return chatBatches(events, options.settings, directory, options.maximum, options.mode, options.artifacts)
       .map(batch => ({ indices: batch.events.map(event => { const index = positions.get(identity(event)); if (index === undefined) throw new Error('Publication event is outside its acquisition'); return index; }),
@@ -61,7 +61,7 @@ export function chatPublication(options: { storage: LocalState; file: string; se
       if (plan) options.artifacts.release(plan.steps.map(step => step.id));
       plan = undefined; if (options.storage.exists(options.file)) options.storage.remove(options.file);
     },
-    contentFiles: () => plan?.batch.events.flatMap(event => event.content_file ? [event.content_file.file] : []) ?? [],
+    contentFiles: () => plan?.batch.events.flatMap(event => event.contentFile ? [event.contentFile.file] : []) ?? [],
     prepare(batch: ReadBatch, events: ReceivedEvent[], identities: ReadonlyMap<string, PrincipalIdentity>) {
       if (plan) throw new Error('Settle the original chat publication before preparing another');
       const enriched = new Map(events.map(event => [identity(event), event]));
@@ -75,7 +75,7 @@ export function chatPublication(options: { storage: LocalState; file: string; se
         if (!target || target.sessionId !== step.session) throw new Error('Original pending history is unavailable');
         const received = await target.recover(step.text, step.id, signal);
         step.status = received ? 'delivered' : 'prepared'; save();
-        if (received) { const events = stepEvents(step); options.count(events.filter(event => event.type === 'm.room.message').length); options.traffic(events); }
+        if (received) { const events = stepEvents(step); options.count(events.filter(event => event.type === "message").length); options.traffic(events); }
       }
       return outcome(allowed);
     },
@@ -87,7 +87,7 @@ export function chatPublication(options: { storage: LocalState; file: string; se
         signal.throwIfAborted();
         const events = stepEvents(step);
         if (step.status === 'prepared') {
-          const remaining = events.filter(event => allowed.has(event.room_id) && (options.admit?.(event) ?? true));
+          const remaining = events.filter(event => allowed.has(event.roomId) && (options.admit?.(event) ?? true));
           if (remaining.length !== events.length) {
             replace(index, step, remaining); index--; continue;
           }
@@ -97,18 +97,18 @@ export function chatPublication(options: { storage: LocalState; file: string; se
         if (!target) throw new Error('Selected native runtime cannot own room histories');
         if (step.session !== null && step.session !== target.sessionId) throw new Error('Pending input belongs to another native history; it was not retargeted');
         if (step.status === 'publishing' && await target.recover(step.text, step.id, signal)) {
-          step.status = 'delivered'; save(); options.count(events.filter(event => event.type === 'm.room.message').length); options.traffic(events); continue;
+          step.status = 'delivered'; save(); options.count(events.filter(event => event.type === "message").length); options.traffic(events); continue;
         }
-        const remaining = events.filter(event => allowed.has(event.room_id) && (options.admit?.(event) ?? true));
+        const remaining = events.filter(event => allowed.has(event.roomId) && (options.admit?.(event) ?? true));
         if (remaining.length !== events.length) {
           replace(index, step, remaining); index--; continue;
         }
         if (options.priority) await target.settle(signal);
         step.session = target.sessionId; step.status = 'publishing'; save();
         await target.deliver(step.text, step.id, signal, options.priority);
-        step.status = 'delivered'; save(); options.count(events.filter(event => event.type === 'm.room.message').length);
+        step.status = 'delivered'; save(); options.count(events.filter(event => event.type === "message").length);
         options.traffic(events);
-        const room = events.findLast(event => event.type === 'm.room.message')?.room_id;
+        const room = events.findLast(event => event.type === "message")?.roomId;
         if (room) await options.delivered(room, target.sessionId);
       }
       return outcome(allowed);

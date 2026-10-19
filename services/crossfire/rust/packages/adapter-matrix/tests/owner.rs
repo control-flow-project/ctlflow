@@ -157,9 +157,8 @@ async fn notice_publication_uses_real_mention_metadata_and_does_not_turn_native_
     );
     protocol?;
     let event = result?;
-    assert!(!crossfire_contracts::matrix_event::mentions_agent(
-        &event,
-        "@agent:example.test"
-    ));
+    assert_eq!(event.event_type, "message");
+    assert!(event.mentions.is_empty());
+    assert!(!event.edited && !event.control);
     Ok(())
 }

@@ -15,16 +15,16 @@ export function statisticsReader(database: Database.Database): StatisticsReposit
     const flows = executeSelect(database, schema, (query, params) => query.from('listener_stat_flow')
       .join(query.from('listener_stat_interval'), flow => flow.run_id, interval => interval.run_id, (flow, interval) => ({ flow, interval }))
       .where(row => row.flow.bucket_at === row.interval.bucket_at && params.agentIds.includes(row.interval.agent_id) && row.interval.captured_at >= params.since)
-      .groupBy(row => ({ agentId: row.interval.agent_id, roomId: row.flow.room_id, senderMatrixId: row.flow.sender_matrix_id, messageType: row.flow.message_type }))
-      .select(group => ({ agentId: group.key.agentId, roomId: group.key.roomId, senderMatrixId: group.key.senderMatrixId, messageType: group.key.messageType,
+      .groupBy(row => ({ agentId: row.interval.agent_id, roomId: row.flow.room_id, senderBackendUserId: row.flow.sender_backend_user_id, messageType: row.flow.message_type }))
+      .select(group => ({ agentId: group.key.agentId, roomId: group.key.roomId, senderBackendUserId: group.key.senderBackendUserId, messageType: group.key.messageType,
         observed: group.sum(row => row.flow.observed), delivered: group.sum(row => row.flow.delivered), contentBytes: group.sum(row => row.flow.content_bytes),
         deliveredBytes: group.sum(row => row.flow.delivered_bytes), attachmentBytes: group.sum(row => row.flow.attachment_bytes), largestBytes: group.max(row => row.flow.largest_bytes) }))
-      .orderByDescending(row => row.observed).thenBy(row => row.senderMatrixId).thenBy(row => row.agentId).thenBy(row => row.roomId).thenBy(row => row.messageType)
+      .orderByDescending(row => row.observed).thenBy(row => row.senderBackendUserId).thenBy(row => row.agentId).thenBy(row => row.roomId).thenBy(row => row.messageType)
       .skip(params.offset).take(params.limit), parameters);
     const totalFlows = executeSelect(database, schema, (query, params) => query.from('listener_stat_flow')
       .join(query.from('listener_stat_interval'), flow => flow.run_id, interval => interval.run_id, (flow, interval) => ({ flow, interval }))
       .where(row => row.flow.bucket_at === row.interval.bucket_at && params.agentIds.includes(row.interval.agent_id) && row.interval.captured_at >= params.since)
-      .select(row => ({ agentId: row.interval.agent_id, roomId: row.flow.room_id, sender: row.flow.sender_matrix_id, type: row.flow.message_type })).distinct().count(), parameters);
+      .select(row => ({ agentId: row.interval.agent_id, roomId: row.flow.room_id, sender: row.flow.sender_backend_user_id, type: row.flow.message_type })).distinct().count(), parameters);
     const traffic = executeSelect(database, schema, (query, params) => query.from('listener_stat_flow')
       .join(query.from('listener_stat_interval'), flow => flow.run_id, interval => interval.run_id, (flow, interval) => ({ flow, interval }))
       .where(row => row.flow.bucket_at === row.interval.bucket_at && params.agentIds.includes(row.interval.agent_id) && row.interval.captured_at >= params.since)
@@ -39,7 +39,7 @@ export function statisticsReader(database: Database.Database): StatisticsReposit
         output: group.sum(row => row.sample.output), reasoningOutput: group.sum(row => row.sample.reasoning_output ?? 0), unknownReasoning: group.sum(row => row.sample.reasoning_output === null ? 1 : 0), total: group.sum(row => row.sample.total) })), parameters);
     const empty = () => ({ observed: 0, delivered: 0, contentBytes: 0, deliveredBytes: 0, attachmentBytes: 0, largestBytes: 0 });
     const totals = empty(), perAgent = new Map(agentIds.map(id => [id, empty()]));
-    function add(target: ReturnType<typeof empty>, source: Omit<Flow, 'roomId' | 'senderMatrixId' | 'messageType'>) {
+    function add(target: ReturnType<typeof empty>, source: Omit<Flow, 'roomId' | 'senderBackendUserId' | 'messageType'>) {
       target.observed += source.observed; target.delivered += source.delivered; target.contentBytes += source.contentBytes;
       target.deliveredBytes += source.deliveredBytes; target.attachmentBytes += source.attachmentBytes; target.largestBytes = Math.max(target.largestBytes, source.largestBytes ?? 0);
     }

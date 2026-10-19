@@ -27,12 +27,12 @@ public static class StatisticsCommands
                 interval = new() { RunId = runId, BucketAt = bucket, AgentId = agentId, StartedAt = batch.StartedAt, EndedAt = batch.EndedAt, CapturedAt = now };
                 context.ListenerStatInterval.Add(interval); context.SaveChanges();
             }
-            var flows = context.ListenerStatFlow.Where(row => row.RunId == runId && row.BucketAt == bucket).ToArray().ToDictionary(row => (row.RoomId, row.SenderMatrixId, row.MessageType));
+            var flows = context.ListenerStatFlow.Where(row => row.RunId == runId && row.BucketAt == bucket).ToArray().ToDictionary(row => (row.RoomId, row.SenderBackendUserId, row.MessageType));
             foreach (var flow in batch.Flows)
             {
-                if (!flows.TryGetValue((flow.RoomId, flow.SenderMatrixId, flow.MessageType), out var stored))
+                if (!flows.TryGetValue((flow.RoomId, flow.SenderBackendUserId, flow.MessageType), out var stored))
                 {
-                    stored = new() { RunId = runId, BucketAt = bucket, RoomId = flow.RoomId, SenderMatrixId = flow.SenderMatrixId, MessageType = flow.MessageType }; context.ListenerStatFlow.Add(stored);
+                    stored = new() { RunId = runId, BucketAt = bucket, RoomId = flow.RoomId, SenderBackendUserId = flow.SenderBackendUserId, MessageType = flow.MessageType }; context.ListenerStatFlow.Add(stored);
                 }
                 stored.Observed = Add(stored.Observed, flow.Totals.Observed); stored.Delivered = Add(stored.Delivered, flow.Totals.Delivered);
                 stored.ContentBytes = Add(stored.ContentBytes, flow.Totals.ContentBytes); stored.DeliveredBytes = Add(stored.DeliveredBytes, flow.Totals.DeliveredBytes);

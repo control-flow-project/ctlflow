@@ -42,14 +42,14 @@ public static class FleetMaps
         var observers = connections.GroupBy(value => value.RoomId, StringComparer.Ordinal).Select(group => group.OrderByDescending(value => value.Application?.Membership == "join").First()).OrderBy(value => value.RoomId, Ordering).ToArray();
         if (observers.Length > 2000) return Results.Fail<FleetMap>("limit", "Fleet map exceeds the room limit");
         var active = ports.Identities(); if (!active.IsSuccess) return Result<FleetMap>.Fail(active.Error);
-        var activeByMatrix = active.Value.ToDictionary(value => value.Principal.MatrixUserId, value => value.Principal.Id, StringComparer.Ordinal);
+        var activeByBackend = active.Value.ToDictionary(value => value.Principal.BackendUserId, value => value.Principal.Id, StringComparer.Ordinal);
         var senders = relations.Value.Senders.ToLookup(value => value.AgentId, StringComparer.Ordinal); var sources = new Dictionary<string, FleetMapSource>(StringComparer.Ordinal); var agents = new List<FleetMapAgent>(); var principalIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var record in records.Value)
         {
             var selections = senders[record.Record.Principal.Id].Select(value => new WakeSelection(value.SenderPrincipalId, value.IncludeAgents)).OrderBy(value => value.PrincipalId, Ordering).ToArray();
             var selected = selections.Select(value => new WakeSender(value.PrincipalId, value.IncludeAgents)).ToArray(); var sourceId = SourceId(record.Record.Agent.WakeMode, selections);
             var eligible = sources.TryGetValue(sourceId, out var previous) ? previous.EligiblePrincipalIds.ToHashSet(StringComparer.Ordinal) : new HashSet<string>(StringComparer.Ordinal);
-            foreach (var matrixId in WakePolicy.SenderMatrixIds(record.Record, active.Value, selected)) eligible.Add(activeByMatrix[matrixId]);
+            foreach (var backendId in WakePolicy.SenderBackendUserIds(record.Record, active.Value, selected)) eligible.Add(activeByBackend[backendId]);
             var source = new FleetMapSource(sourceId, record.Record.Agent.WakeMode, selections, eligible.Order(StringComparer.Ordinal).ToArray()); sources[sourceId] = source;
             principalIds.UnionWith(selections.Select(value => value.PrincipalId)); principalIds.UnionWith(eligible); agents.Add(new(record, sourceId));
         }

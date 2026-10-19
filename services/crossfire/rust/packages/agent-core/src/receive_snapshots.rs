@@ -1,14 +1,16 @@
+use crate::history_resources::HISTORY_BYTES;
 use crate::{
     chat::{self, Artifacts},
     events::{Event, invalid},
     local_state::{self, LocalState},
-    matrix::{HISTORY_BYTES, Matrix},
     profile::Settings,
     receive_pages,
     receive_state::{self, Batch, Snapshot},
     unread::{self, HistoryEnd, Options, Window},
 };
 use crossfire_contracts::validation as check;
+use crossfire_domain::messaging_client::MessagingClient;
+use crossfire_domain::messaging_client::{Direction, EventFilter, EventType, MessagePageRequest};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -24,7 +26,7 @@ pub struct Wake {
 }
 impl Wake {
     pub fn validate(&self) -> Result<()> {
-        check::matrix_user_id(&json!(self.sender))?;
+        check::backend_user_id(&json!(self.sender))?;
         check::room_id(&json!(self.room))?;
         if self.ends.len() > 1000 {
             return Err(invalid("Excessive saved wake-up rooms"));
@@ -55,7 +57,7 @@ pub fn save_wake(storage: &impl LocalState, file: &str, wake: Option<&Wake>) -> 
     }
 }
 pub async fn capture(
-    matrix: &impl Matrix,
+    messaging: &impl MessagingClient,
     trigger: &Event,
     rooms: &BTreeSet<String>,
     boundary: &str,
@@ -65,14 +67,19 @@ pub async fn capture(
     let mut bytes = 128;
     for room in rooms {
         let mut page = receive_pages::history(
-            matrix,
+            messaging,
             room,
-            &BTreeMap::from([("dir".to_owned(), "b".to_owned())]),
-            1,
+            &MessagePageRequest {
+                direction: Direction::Backward,
+                limit: 1,
+                from: None,
+                to: None,
+                filter: None,
+            },
             stop.clone(),
         )
         .await?;
-        let event = page.chunk.pop();
+        let event = page.events.pop();
         if let Some(event) = &event {
             crate::events::view(event, room)?;
         }
@@ -148,7 +155,7 @@ pub fn retire(storage: &impl LocalState, file: &str, rooms: &BTreeSet<String>) -
 }
 pub async fn pending(
     storage: &impl LocalState,
-    matrix: &impl Matrix,
+    messaging: &impl MessagingClient,
     settings: &Settings,
     artifacts: &impl Artifacts,
     options: Options<'_>,
@@ -162,7 +169,7 @@ pub async fn pending(
                     && options.selector.is_none_or(|selector| selector == room)
             };
             if options.window.is_none() {
-                let added: BTreeSet<_> = receive_pages::joined(matrix, stop.clone())
+                let added: BTreeSet<_> = receive_pages::joined(messaging, stop.clone())
                     .await?
                     .into_iter()
                     .filter(|room| included(room) && !saved.batch.cursors.contains_key(room))
@@ -170,7 +177,7 @@ pub async fn pending(
                 if !added.is_empty() {
                     let initial = unread::read(
                         storage,
-                        matrix,
+                        messaging,
                         settings,
                         artifacts,
                         Options {
@@ -212,7 +219,7 @@ pub async fn pending(
         storage.remove(&format!("{}.snapshot", options.file))?;
     }
     let file = options.file;
-    let batch = unread::read(storage, matrix, settings, artifacts, options, stop).await?;
+    let batch = unread::read(storage, messaging, settings, artifacts, options, stop).await?;
     if batch.cursors.keys().any(|room| !base.contains_key(room)) {
         local_state::write(
             storage,
@@ -227,7 +234,7 @@ pub async fn pending(
     Ok(batch)
 }
 pub async fn wake(
-    matrix: &impl Matrix,
+    messaging: &impl MessagingClient,
     batch: &Batch,
     senders: &BTreeSet<String>,
     allowed: &BTreeSet<String>,
@@ -236,7 +243,9 @@ pub async fn wake(
     stop: CancellationToken,
 ) -> Result<Option<Event>> {
     let eligible = |event: &Event| {
-        event.kind == "m.room.message" && senders.contains(&event.sender) && accept(event)
+        event.kind == crossfire_domain::messaging_client::EventType::Message
+            && senders.contains(&event.sender)
+            && accept(event)
     };
     if let Some(event) = batch.events.iter().find(|event| eligible(event)) {
         return Ok(Some(event.clone()));
@@ -254,24 +263,25 @@ pub async fn wake(
             let mut visited = BTreeSet::new();
             loop {
                 let page = receive_pages::history(
-                    matrix,
+                    messaging,
                     room,
-                    &BTreeMap::from([
-                        ("from".to_owned(), from.clone()),
-                        ("dir".to_owned(), "f".to_owned()),
-                        (
-                            "filter".to_owned(),
-                            json!({"types":["m.room.message"],"senders":selected}).to_string(),
-                        ),
-                    ]),
-                    100,
+                    &MessagePageRequest {
+                        direction: Direction::Forward,
+                        limit: 100,
+                        from: Some(from.clone()),
+                        to: None,
+                        filter: Some(EventFilter {
+                            types: Some(vec![EventType::Message]),
+                            senders: Some(selected.iter().map(|value| (*value).clone()).collect()),
+                        }),
+                    },
                     stop.clone(),
                 )
                 .await?;
-                if page.chunk.is_empty() {
+                if page.events.is_empty() {
                     break;
                 }
-                for value in page.chunk {
+                for value in page.events {
                     let candidate = crate::events::take(value, room)?;
                     if eligible(&candidate) {
                         return Ok(Some(candidate));
@@ -291,7 +301,7 @@ pub async fn wake(
 }
 pub async fn collect(
     storage: &impl LocalState,
-    matrix: &impl Matrix,
+    messaging: &impl MessagingClient,
     settings: &Settings,
     artifacts: &impl Artifacts,
     mut batch: Batch,
@@ -323,7 +333,7 @@ pub async fn collect(
         let allowed = BTreeSet::from([room.clone()]);
         let next = unread::read(
             storage,
-            matrix,
+            messaging,
             settings,
             artifacts,
             Options {

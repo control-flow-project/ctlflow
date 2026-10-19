@@ -30,15 +30,15 @@ impl Scenario {
     pub fn create() -> std::result::Result<Self, Box<dyn std::error::Error>> {
         let prepared = PreparedDatabase::copy()?;
         let mut store = Store::open(prepared.path())?;
-        registration::initialize(&mut store, "@owner:example.test", NOW)?;
+        registration::initialize(&mut store, "@owner:example.test", "owner", NOW)?;
         let principal = store
-            .principal_by_matrix_id("@owner:example.test")?
+            .principal_by_backend_user_id("@owner:example.test")?
             .ok_or("Missing owner")?;
         let owner = Actor {
             principal_id: principal.id,
             kind: PrincipalKind::Human,
             authentication: Some(Authentication::Native {
-                matrix_user_id: "@owner:example.test".to_owned(),
+                backend_user_id: "@owner:example.test".to_owned(),
             }),
         };
         let fleet = Fleet {
@@ -56,7 +56,7 @@ impl Scenario {
         store.insert_fleet(&fleet)?;
         let principal = Principal {
             id: identity::id(),
-            matrix_user_id: "@agent:example.test".to_owned(),
+            backend_user_id: "@agent:example.test".to_owned(),
             kind: PrincipalKind::Agent,
             status: Status::Active,
             revision: 0,
@@ -87,7 +87,7 @@ impl Scenario {
             principal_id: principal.id.clone(),
             kind: PrincipalKind::Agent,
             authentication: Some(Authentication::Native {
-                matrix_user_id: principal.matrix_user_id,
+                backend_user_id: principal.backend_user_id,
             }),
         };
         let mut database = Database::open(&DatabaseConfig::Sqlite {
@@ -153,13 +153,13 @@ impl Scenario {
         })
     }
 
-    pub fn add_human(&mut self, matrix_id: &str) -> Result<Actor> {
-        if !matrix_id.starts_with('@') {
+    pub fn add_human(&mut self, backend_user_id: &str) -> Result<Actor> {
+        if !backend_user_id.starts_with('@') {
             return Err(Failure::new(ErrorCode::Invalid, "Invalid fixture identity"));
         }
         let principal = Principal {
             id: identity::id(),
-            matrix_user_id: matrix_id.to_owned(),
+            backend_user_id: backend_user_id.to_owned(),
             kind: PrincipalKind::Human,
             status: Status::Active,
             revision: 0,
@@ -182,7 +182,7 @@ impl Scenario {
             principal_id: principal.id,
             kind: PrincipalKind::Human,
             authentication: Some(Authentication::Native {
-                matrix_user_id: matrix_id.to_owned(),
+                backend_user_id: backend_user_id.to_owned(),
             }),
         })
     }

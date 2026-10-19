@@ -9,11 +9,11 @@ export const tokenCounts = check.refine(check.object({ input: count, cachedInput
   reasoningOutput: check.nullable(count), total: count }), value => value.cachedInput <= value.input && (value.cacheWriteInput ?? 0) <= value.input
     && (value.reasoningOutput ?? 0) <= value.output, 'Token subsets exceed their parent counts');
 export const usageSample = check.object({ runtime: check.text(100), sessionId: check.text(255), tokens: tokenCounts });
-export const trafficFlow = check.object({ roomId: check.roomId, senderMatrixId: check.matrixUserId,
+export const trafficFlow = check.object({ roomId: check.roomId, senderBackendUserId: check.backendUserId,
   messageType: check.text(100), observed: count, delivered: count, contentBytes: count, deliveredBytes: count, attachmentBytes: count, largestBytes: count });
 export const statisticsBatch = check.refine(check.object({ sequence: check.integer(1), startedAt: count, endedAt: count, dropped: count,
   flows: check.list(trafficFlow, STATISTICS_LIMITS.flows), usage: check.list(usageSample, STATISTICS_LIMITS.sessions) }),
-  value => value.endedAt >= value.startedAt && new Set(value.flows.map(flow => JSON.stringify([flow.roomId, flow.senderMatrixId, flow.messageType]))).size === value.flows.length
+  value => value.endedAt >= value.startedAt && new Set(value.flows.map(flow => JSON.stringify([flow.roomId, flow.senderBackendUserId, flow.messageType]))).size === value.flows.length
     && new Set(value.usage.map(sample => JSON.stringify([sample.runtime, sample.sessionId]))).size === value.usage.length, 'Invalid interval or duplicate summaries');
 export type TokenCounts = check.Parsed<typeof tokenCounts>;
 export type UsageSample = check.Parsed<typeof usageSample>;
@@ -30,9 +30,9 @@ export function statisticsQuery(input: unknown) {
 const totals = check.object({ observed: count, delivered: count, contentBytes: count, deliveredBytes: count, attachmentBytes: count, largestBytes: count });
 export const fleetStatistics = check.object({ capturedAt: count, since: count, retentionDays: count, intervals: count, dropped: count,
   firstReportAt: check.nullable(count), lastReportAt: check.nullable(count), totals,
-  agents: check.list(check.object({ agentId: check.identifier, displayName: check.text(255), matrixUserId: check.matrixUserId, totals,
+  agents: check.list(check.object({ agentId: check.identifier, displayName: check.text(255), backendUserId: check.backendUserId, totals,
     tokens: check.nullable(tokenCounts) }), 100),
-  flows: check.list(check.object({ agentId: check.identifier, senderMatrixId: check.matrixUserId, senderName: check.nullable(check.text(255)),
+  flows: check.list(check.object({ agentId: check.identifier, senderBackendUserId: check.backendUserId, senderName: check.nullable(check.text(255)),
     roomId: check.roomId, messageType: check.text(100), ...{ totals } }), 100),
   meta: check.object({ page: count, pageSize: count, totalItems: count, totalPages: count }),
   tokens: check.nullable(tokenCounts), spend: check.nullable(check.text(100)) });

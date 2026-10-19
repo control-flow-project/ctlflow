@@ -66,7 +66,7 @@ public sealed partial class ListenerReceiver
                 {
                     IReadOnlySet<string> valid; lock (gate) valid = value.Publication.Batch.Cursors.Keys.Where(room => !retiredRooms.Contains(room)).ToHashSet(StringComparer.Ordinal);
                     var acknowledgedBatch = value.Publication.Batch with { Cursors = ReceiveState.Filter(value.Publication.Batch.Cursors, valid), Latest = ReceiveState.Filter(value.Publication.Batch.Latest, valid) };
-                    await Work(token => ReceiveState.Acknowledge(Storage, options.Matrix, File, acknowledgedBatch, token)); Take(Runtime.Acknowledge(value.Publication.MessageIds)); Take(chat.Acknowledge()); completed = null;
+                    await Work(token => ReceiveState.Acknowledge(Storage, options.Messaging, File, acknowledgedBatch, token)); Take(Runtime.Acknowledge(value.Publication.MessageIds)); Take(chat.Acknowledge()); completed = null;
                     lock (gate)
                     {
                         if (value.Membership == membershipRevision)
@@ -108,13 +108,13 @@ public sealed partial class ListenerReceiver
         using var scope = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token, options.Control.Current().Generation, ordinaryToken, deadline.Token); ReceivedEvent? source = null;
         try
         {
-            var native = Take(await AgentIO.Request(options.Matrix, new("GET", AgentWire.Room(urgent.Room) + "/event/" + AgentWire.Segment(urgent.Event)), scope.Token)); if (WireJson.Text(native, "event_id") != urgent.Event) throw new InvalidDataException("Urgent event identity changed"); source = Take(ReceivedEvents.View(native, urgent.Room));
-            await Access(scope.Token); if (!joined.Contains(urgent.Room) || !allowed.Contains(urgent.Room) || !Take(await SteeringControl.Authorized(options.Matrix, options.Coordination, options.Profile, source, senders, scope.Token)))
+            var native = Take(await options.Messaging.Event(urgent.Room, urgent.Event, scope.Token)); if (native.EventId != urgent.Event) throw new InvalidDataException("Urgent event identity changed"); source = Take(ReceivedEvents.View(native, urgent.Room));
+            await Access(scope.Token); if (!joined.Contains(urgent.Room) || !allowed.Contains(urgent.Room) || !Take(await SteeringControl.Authorized(options.Messaging, options.Coordination, options.Profile, source, senders, scope.Token)))
             { receipts.Publish(source, "failed", "Source or room authority changed before native input"); lock (gate) { SetControl(urgent, urgent with { Status = "superseded" }); SaveControl(); } return; }
             if (controlling || state.Paused || Urgent() != urgent) return;
             if (!priorityChat.Pending)
             {
-                var events = Take(await ReceivePages.Origins(options.Matrix, options.Profile.Account.UserId, [source], scope.Token)); var identities = Take(await CoordinationValues.Senders(options.Coordination, events, scope.Token)); scope.Token.ThrowIfCancellationRequested(); Take(priorityChat.Prepare(new(events, new Dictionary<string, string>(), [], new Dictionary<string, string>()), events, identities));
+                var events = Take(await ReceivePages.Origins(options.Messaging, options.Profile.Account.UserId, [source], scope.Token)); var identities = Take(await CoordinationValues.Senders(options.Coordination, events, scope.Token)); scope.Token.ThrowIfCancellationRequested(); Take(priorityChat.Prepare(new(events, new Dictionary<string, string>(), [], new Dictionary<string, string>()), events, identities));
             }
             PublicationOutcome? result = null; await Send(async token => { result = Take(await priorityChat.Publish(CurrentRooms(), token)); return Results.Done(); }, true); if (result is not null) { Take(Runtime.Acknowledge(result.MessageIds)); Take(priorityChat.Acknowledge()); }
         }
@@ -128,18 +128,18 @@ public sealed partial class ListenerReceiver
         var membership = Interlocked.Read(ref membershipRevision); var original = ReceiveState.Load(Storage, File); lock (gate) acquiring = true;
         try
         {
-            var batch = await Work(token => ReceiveSnapshots.Pending(Storage, options.Matrix, options.Profile.Settings, File, options.Limit, options.Room, maximum, since, allowed, cycle, artifacts, token)); statistics.Record(batch.Events, false);
+            var batch = await Work(token => ReceiveSnapshots.Pending(Storage, options.Messaging, options.Profile.Settings, File, options.Limit, options.Room, maximum, since, allowed, cycle, artifacts, token)); statistics.Record(batch.Events, false);
             if (membership != Interlocked.Read(ref membershipRevision) || controlling || state.Paused || Urgent() is not null) return;
             if (senders.Count == 0) { windowEnd = 0; await Wait(previous); return; }
             var pending = batch.Events.Where(Accept).ToArray();
             if (cycle is null)
             {
-                var trigger = await Work(token => ReceiveSnapshots.Wake(options.Matrix, batch, senders, allowed, options.Room, Accept, token));
+                var trigger = await Work(token => ReceiveSnapshots.Wake(options.Messaging, batch, senders, allowed, options.Room, Accept, token));
                 if (trigger is not null)
                 {
                     if (windowEnd == 0) windowEnd = Now + options.DebounceMs; if (Now < windowEnd) { await Wait(previous, checked((int)(windowEnd - Now))); return; }
                     var rooms = batch.Cursors.Keys.Where(room => allowed.Contains(room) && (options.Room is null || room == options.Room) && (options.HistoryMode != NativeHistoryMode.PerRoom || room == trigger.RoomId)).ToHashSet(StringComparer.Ordinal);
-                    cycle = await Work(token => ReceiveSnapshots.Capture(options.Matrix, trigger, rooms, since ?? throw new InvalidOperationException("Wake capture requires a synchronized boundary"), token)); ReceiveSnapshots.SaveWake(Storage, File, cycle); windowEnd = 0;
+                    cycle = await Work(token => ReceiveSnapshots.Capture(options.Messaging, trigger, rooms, since ?? throw new InvalidOperationException("Wake capture requires a synchronized boundary"), token)); ReceiveSnapshots.SaveWake(Storage, File, cycle); windowEnd = 0;
                 }
                 else if (pending.Length != 0) { windowEnd = 0; await Wait(previous); return; }
             }
@@ -147,10 +147,10 @@ public sealed partial class ListenerReceiver
             {
                 var eligible = options.HistoryMode == NativeHistoryMode.PerRoom ? current.Ends.Keys.Where(allowed.Contains).ToHashSet(StringComparer.Ordinal) : allowed;
                 if (options.HistoryMode == NativeHistoryMode.PerRoom) batch = batch with { Events = batch.Events.Where(value => eligible.Contains(value.RoomId)).ToArray(), Cursors = ReceiveSnapshots.Merge(ReceiveState.Load(Storage, File), ReceiveState.Filter(batch.Cursors, eligible)), Latest = ReceiveState.Filter(batch.Latest, eligible), MoreRooms = batch.MoreRooms.Where(eligible.Contains).ToArray() };
-                batch = await Work(token => ReceiveSnapshots.Collect(Storage, options.Matrix, options.Profile.Settings, File, options.Limit, maximum, batch, current, eligible, artifacts, token));
+                batch = await Work(token => ReceiveSnapshots.Collect(Storage, options.Messaging, options.Profile.Settings, File, options.Limit, maximum, batch, current, eligible, artifacts, token));
             }
             if (membership != Interlocked.Read(ref membershipRevision) || controlling || state.Paused || Urgent() is not null) return;
-            var emitted = await Work(token => ReceivePages.Origins(options.Matrix, options.Profile.Account.UserId, batch.Events.Where(Accept).ToArray(), token)); var identities = await Work(token => CoordinationValues.Senders(options.Coordination, emitted, token));
+            var emitted = await Work(token => ReceivePages.Origins(options.Messaging, options.Profile.Account.UserId, batch.Events.Where(Accept).ToArray(), token)); var identities = await Work(token => CoordinationValues.Senders(options.Coordination, emitted, token));
             lock (gate)
             {
                 if (membership != membershipRevision || controlling || state.Paused || Urgent() is not null || queries.Pending || !ReceiveState.Same(original, ReceiveState.Load(Storage, File))) return; Take(chat.Prepare(batch, emitted, identities));

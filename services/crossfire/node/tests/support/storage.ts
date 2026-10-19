@@ -1,4 +1,3 @@
-import * as sqliteMetadata from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import Database from 'better-sqlite3';
 import knex from 'knex';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
@@ -6,11 +5,10 @@ import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
-import { admitDatabase, databaseConfiguration } from '@ctlflow/crossfire-data/management/sqlite/configuration';
+import { databaseConfiguration } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 import schemaDefinition from '@ctlflow/crossfire-data/management/sqlite/schema' with { type: 'json' };
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { validateSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/validate-schema';
-import { migrationChange, migrationQuery } from './migration-data.js';
 
 export const loggingSchema = schemaDefinition.parts.loggingSchema;
 export const statisticsSchema = schemaDefinition.parts.statisticsSchema;
@@ -49,17 +47,11 @@ export function applicationDatabase(scope: TestContext, path = ':memory:'): stri
   return path;
 }
 
-export function forgetFixtureMigrations(database: Database.Database): void {
-  migrationChange(database, migrationQuery('knex_migrations').delete());
-}
-
 export async function migrateFixture(database: Database.Database): Promise<void> {
-  admitDatabase(database);
-  const foreignKeys = sqliteMetadata.foreignKeys(database);
-  database.pragma('foreign_keys=OFF');
-  const fixtureKnex = knex({ ...databaseConfiguration(':memory:'), pool: { min: 0, max: 1 } });
-  fixtureKnex.client.acquireConnection = () => Promise.resolve(database);
-  fixtureKnex.client.releaseConnection = () => Promise.resolve();
-  try { await fixtureKnex.migrate.latest(); }
-  finally { await fixtureKnex.destroy(); database.pragma('foreign_keys=' + (foreignKeys === 1 ? 'ON' : 'OFF')); }
+  database.pragma('foreign_keys=ON');
+  const fixture = knex({ ...databaseConfiguration(':memory:'), pool: { min: 0, max: 1 } });
+  fixture.client.acquireConnection = () => Promise.resolve(database);
+  fixture.client.releaseConnection = () => Promise.resolve();
+  try { await fixture.migrate.latest(); }
+  finally { await fixture.destroy(); }
 }

@@ -1,4 +1,4 @@
-import type { Json } from '@ctlflow/crossfire-contracts/json';
+import type { Json } from '@ctlflow/crossfire-kernel/json';
 import type { NativeEvent } from './protocol.js';
 
 type ThreadStatus = { type: 'idle' | 'notLoaded' | 'systemError' }

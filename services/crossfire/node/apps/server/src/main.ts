@@ -2,14 +2,14 @@ import { once } from "node:events";
 import type { Server } from 'node:http';
 import { join } from "node:path";
 import { config } from "./config.js";
-import { bootstrap, bootstrapSecrets } from "./bootstrap.js";
+import { bootstrap, bootstrapSecrets } from '@ctlflow/crossfire-adapter-matrix/bootstrap';
+import { matrixConfiguration } from '@ctlflow/crossfire-adapter-matrix/config';
 import { createApplication } from './composition.js';
 import { createHttpServer } from './http/create-server.js';
 import { createWorker } from './worker.js';
 import { createContentServer } from './content-server.js';
 import { readJson } from "@ctlflow/crossfire-adapter-filesystem/index";
 import { loadRelease } from "@ctlflow/crossfire-adapter-filesystem/release";
-import type { ElementPresentation } from './element-configuration.js';
 import { createLoggingMaintenance } from '@ctlflow/crossfire-agent-core/logging-maintenance';
 import { maintainLogging } from '@ctlflow/crossfire-domain/maintenance/logging';
 import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
@@ -22,7 +22,7 @@ async function closeHttp(server: Server): Promise<void> {
   if (server.listening) await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
 }
 
-export async function serve(directory: string, releaseDirectory: string, port = 8080, presentation: ElementPresentation = {}, contentPort = 8082, contentAddress = '127.0.0.1', diagnostics?: DiagnosticLog) {
+export async function serve(directory: string, releaseDirectory: string, port = 8080, presentation: Record<string, unknown> = {}, contentPort = 8082, contentAddress = '127.0.0.1', diagnostics?: DiagnosticLog) {
   if (process.platform !== "linux" || Number(process.versions.node.split(".")[0]) < 26) throw new Error("Crossfire requires Linux and Node.js 26+");
   if (!Number.isSafeInteger(port) || port !== 0 && port < 1024 || port > 65535) throw new Error("Invalid private service port");
   if (!Number.isSafeInteger(contentPort) || contentPort < 1024 || contentPort > 65535 || contentPort === port) throw new Error('Invalid separate content port');
@@ -31,9 +31,10 @@ export async function serve(directory: string, releaseDirectory: string, port = 
   const secrets = bootstrapSecrets(readJson<unknown>(join(directory, "bootstrap.json")));
   if (!configuration.ok) throw new Error(configuration.error.message);
   if (!secrets.ok) throw new Error(secrets.error.message);
+  const messaging = matrixConfiguration(configuration.value.messaging); if (!messaging.ok) throw new Error(messaging.error.message);
   const application = createApplication(join(directory, 'management.sqlite'), configuration.value, diagnostics ? { diagnostics } : {});
   try {
-    const initialized = await bootstrap(configuration.value, secrets.value);
+    const initialized = await bootstrap({ ...messaging.value, instance: configuration.value.instance, administrator: configuration.value.administrator }, secrets.value);
     if (!initialized.ok) throw new Error(initialized.error.message);
   } catch (error) { application.close(); throw error; }
   const worker = createWorker(application.services, application.diagnostics);
@@ -46,7 +47,7 @@ export async function serve(directory: string, releaseDirectory: string, port = 
   const server = createHttpServer(application, worker, release, presentation);
   const contentServer = createContentServer(application);
   async function shutdown(): Promise<void> {
-    try { application.services.matrix.close(); }
+    try { application.services.messaging.close(); }
     finally {
       try { await Promise.all([closeHttp(contentServer), closeHttp(server)]); }
       finally { try { await logging.close(); await worker.stop(); } finally { application.close(); } }

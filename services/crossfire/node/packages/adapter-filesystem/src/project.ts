@@ -83,8 +83,8 @@ function assertIgnored(workspace: string, name: string): void {
 export function readProfile(path: string) {
   const result = profile(readJson<unknown>(path));
   if (!result.ok) throw new Error(result.error.message);
-  const origin = endpoint(result.value.settings.homeserver);
+  const origin = endpoint(result.value.settings.server);
   if (!origin.ok) throw new Error(origin.error.message);
-  result.value.settings.homeserver = origin.value;
+  result.value.settings.server = origin.value;
   return result.value;
 }

@@ -2,8 +2,8 @@ use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use crossfire_adapter_http::NativeHttp;
 use crossfire_contracts::origin::segment;
 use crossfire_contracts::validation;
-use crossfire_domain::matrix::Account;
-use crossfire_domain::port::MatrixIdentity;
+use crossfire_domain::messaging::Account;
+use crossfire_domain::port::BackendUserIdentity;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, secret::Secret};
 use hmac::{Hmac, Mac};
 use reqwest::Method;
@@ -14,12 +14,13 @@ use tokio_util::sync::CancellationToken;
 
 pub const API: &str = "/_matrix/client/v3";
 
+#[derive(Clone)]
 pub struct Configuration {
     pub origin: String,
     pub server_name: String,
     pub jwt_secret: Secret,
     pub registration_secret: Secret,
-    pub service_matrix_id: String,
+    pub service_backend_user_id: String,
 }
 
 pub struct Authority {
@@ -64,7 +65,7 @@ impl Authority {
     }
 
     pub async fn as_user(&self, id: &str) -> Result<Secret> {
-        if validation::matrix_user_id(&json!(id)).is_err()
+        if crate::syntax::user_id(&json!(id)).is_err()
             || !id.ends_with(&format!(":{}", self.configuration.server_name))
         {
             return Err(Failure::new(
@@ -119,7 +120,7 @@ impl Authority {
     }
 
     pub async fn profile_name(&self, id: &str) -> Result<Option<String>> {
-        validation::matrix_user_id(&json!(id))
+        crate::syntax::user_id(&json!(id))
             .map_err(|_| Failure::new(ErrorCode::Invalid, "Invalid native profile identity"))?;
         let body = self
             .http
@@ -140,8 +141,28 @@ impl Authority {
         }
     }
 
-    pub async fn provision(&self, id: &str, password: &Secret, device: &str) -> Result<Account> {
-        if validation::matrix_user_id(&json!(id)).is_err()
+    pub async fn provision(
+        &self,
+        id: &str,
+        password: &Secret,
+        native: &serde_json::Map<String, Value>,
+    ) -> Result<Account> {
+        if native.keys().any(|key| key != "deviceId") {
+            return Err(Failure::new(
+                ErrorCode::Invalid,
+                "Invalid Matrix account options",
+            ));
+        }
+        let device = native
+            .get("deviceId")
+            .map(|value| validation::text(value, 1, 100))
+            .transpose()?
+            .unwrap_or(if id.starts_with("@agent-") {
+                "CROSSFIRE_AGENT"
+            } else {
+                "CROSSFIRE_HUMAN"
+            });
+        if crate::syntax::user_id(&json!(id)).is_err()
             || !id.ends_with(&format!(":{}", self.configuration.server_name))
             || validation::text(&json!(password.expose()), 1, 1024).is_err()
             || validation::text(&json!(device), 1, 100).is_err()
@@ -217,7 +238,7 @@ impl Authority {
     }
 
     pub async fn exists(&self, id: &str) -> Result<bool> {
-        if validation::matrix_user_id(&json!(id)).is_err()
+        if crate::syntax::user_id(&json!(id)).is_err()
             || !id.ends_with(&format!(":{}", self.configuration.server_name))
         {
             return Err(Failure::new(
@@ -253,7 +274,7 @@ impl Authority {
     }
 }
 
-impl MatrixIdentity for Authority {
+impl BackendUserIdentity for Authority {
     async fn identify(&self, token: &Secret) -> Result<String> {
         let response = self
             .http
@@ -270,7 +291,7 @@ impl MatrixIdentity for Authority {
                 "Invalid native identity",
             ));
         };
-        let id = validation::matrix_user_id(id)
+        let id = crate::syntax::user_id(id)
             .map_err(|_| Failure::new(ErrorCode::Unauthorized, "Invalid native identity"))?;
         if response.status != 200 || !id.ends_with(&format!(":{}", self.configuration.server_name))
         {
@@ -296,7 +317,7 @@ pub(crate) fn credentials(body: &Value, expected: &str) -> Result<Account> {
             Ok(Account {
                 user_id: user.to_owned(),
                 access_token: Secret::new(token.to_owned()),
-                device_id: device.to_owned(),
+                native: serde_json::Map::from_iter([("deviceId".to_owned(), json!(device))]),
             })
         }
         _ => Err(Failure::new(

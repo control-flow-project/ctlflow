@@ -14,9 +14,9 @@ import { changeRoomGrant } from '@ctlflow/crossfire-domain/room-access/change-gr
 import { applicationFixture, secret, value } from './support/application.js';
 
 function request(fixture: Awaited<ReturnType<typeof applicationFixture>>, agent: Awaited<ReturnType<Awaited<ReturnType<typeof applicationFixture>>['agent']>>, name = 'ada-max') {
-  return { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: fixture.admin.member.principal.matrixUserId,
+  return { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: fixture.admin.member.principal.backendUserId,
     fleetKey: 'test-ada', controller: { name: 'Test controller' }, controllerCredential: agent.controller.credential,
-    instances: [{ instanceKey: 'ada', name, identity: { agentId: agent.id, accessToken: agent.token }, coordinationPolicy: defaultCoordinationPolicy(fixture.admin.member.principal.matrixUserId) }] };
+    instances: [{ instanceKey: 'ada', name, identity: { agentId: agent.id, accessToken: agent.token }, coordinationPolicy: defaultCoordinationPolicy(fixture.admin.member.principal.backendUserId) }] };
 }
 
 test('owner-reviewed names preserve accounts, grants, native histories and meaningful existing DM titles', async scope => {
@@ -40,7 +40,7 @@ test('owner-reviewed names preserve accounts, grants, native histories and meani
   const current = value(services.directory.agent(agent.id))!;
   assert.equal(current.name, 'ada-max');
   assert.equal(current.principal.id, before.principal.id);
-  assert.equal(current.principal.matrixUserId, before.principal.matrixUserId);
+  assert.equal(current.principal.backendUserId, before.principal.backendUserId);
   assert.equal(current.principal.revision, before.principal.revision + 1);
   assert.deepEqual(value(services.collection.roomGrants({ agentId: agent.id })), grants);
   assert.deepEqual(value(services.repositories.agentCredential.find({ agentId: agent.id })), credentials);
@@ -51,16 +51,16 @@ test('owner-reviewed names preserve accounts, grants, native histories and meani
   value(await reconcilePrincipal(services, agent.id));
   const ready = value(exchangeEnrollment(services, input.enrollmentId, input.claimSecret));
   assert.equal(ready.status, 'ready');
-  assert.equal(ready.instances[0]!.account!.matrixUserId, agent.matrixUserId);
+  assert.equal(ready.instances[0]!.account!.userId, agent.backendUserId);
   assert.equal(ready.instances[0]!.account!.accessToken, agent.token);
   assert.equal(fixture.native.rooms.get(room)!.name, 'ada-max (' + admin.member.member.displayName + ')');
   assert.equal(fixture.native.rooms.size, 1);
   assert.equal(value(services.repositories.ownerConversation.find({ agentId: agent.id }))!.roomId, room);
   const unchangedInput = request(fixture, agent), unchanged = value(await introduceEnrollment(services, unchangedInput));
   assert.equal(unchanged.request.status, 'approved');
-  const matter = value(await fixture.native.createRoom(admin.member.principal.matrixUserId, 'Matter'));
+  const matter = value(await fixture.native.createRoom(admin.member.principal.backendUserId, 'Matter'));
   value(await changeRoomGrant(services, admin.actor, { agentId: agent.id, roomId: matter.roomId, expectedRevision: current.principal.revision,
-    expectedGeneration: null, accessMode: 'reply', powerLevel: null, muted: false }, randomUUID()));
+    expectedGeneration: null, accessMode: 'reply', nativeAccess: null, muted: false }, randomUUID()));
   assert(value(services.directory.agent(agent.id))!.principal.revision > value(services.directory.agent(agent.id))!.application.appliedRevision!);
   assert.equal(value(exchangeEnrollment(services, unchanged.request.id, unchangedInput.claimSecret)).status, 'ready');
 });

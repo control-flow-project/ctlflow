@@ -16,10 +16,10 @@ import { createController } from '@ctlflow/fleetd-domain/controller';
 import type { Execution } from '@ctlflow/fleetd-domain/port';
 import { codexRuntime } from '@ctlflow/crossfire-adapter-codex/owned';
 import { piRuntime } from '@ctlflow/crossfire-adapter-pi/owned';
+import { connectMatrix } from '@ctlflow/crossfire-adapter-matrix/connection';
 import { createExecution } from '@ctlflow/fleetd-adapter-execution/execution';
 import { createDaemonHttp } from './http.js';
 import { nativeClock } from '@ctlflow/crossfire-adapter-runtime/clock';
-import { migrateControllerContexts } from './context-migration.js';
 import { readLoggingConfiguration } from '@ctlflow/fleetd-storage/logging';
 import { createDiagnosticLog } from '@ctlflow/crossfire-adapter-filesystem/logging';
 import { createLoggingMaintenance } from '@ctlflow/crossfire-agent-core/logging-maintenance';
@@ -61,7 +61,7 @@ export async function startDaemon(root: string, name?: string, execution?: Execu
       if (current.ino !== information.ino || current.dev !== information.dev) throw new Error('Controller socket changed during startup');
       unlinkSync(socketPath);
     }
-    const created = createController({ registry: createRegistry(root), execution: execution ?? createExecution({ codex: codexRuntime(), pi: piRuntime() },
+    const created = createController({ registry: createRegistry(root), execution: execution ?? createExecution({ codex: codexRuntime(), pi: piRuntime() }, connectMatrix,
       dirname(fileURLToPath(import.meta.resolve('@ctlflow/fleetd/artifacts'))), diagnostics.write), controller: parsed.value,
       loggingRetentionDays: loggingConfiguration.value.loggingRetentionDays, id: randomUUID, now: Date.now, delay: nativeClock.delay });
     if (!created.ok) throw new Error(created.error.message);
@@ -95,17 +95,12 @@ export async function startDaemon(root: string, name?: string, execution?: Execu
 }
 const invoked = process.argv[1] !== undefined && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
 if (invoked) {
-  const { values } = parseArgs({ options: { root: { type: 'string' }, name: { type: 'string' }, 'migrate-contexts': { type: 'boolean' } } });
+  const { values } = parseArgs({ options: { root: { type: 'string' }, name: { type: 'string' } } });
   if (!values.root) throw new Error('fleetd --root ABSOLUTE_DIRECTORY [--name NAME]');
-  if (values['migrate-contexts']) {
-    if (values.name !== undefined) throw new Error('Context migration retains the controller identity; do not supply --name');
-    console.log(JSON.stringify(await migrateControllerContexts(resolve(values.root))));
-  } else {
-    const daemon = await startDaemon(resolve(values.root), values.name);
-    console.log(JSON.stringify({ status: 'ready', controller: daemon.controller.status().controller, socket: daemon.socketPath }));
-    const fatal = (error: Error) => daemon.diagnostics.write('Fleet controller process failed: ' + error.message);
-    process.on('uncaughtExceptionMonitor', fatal);
-    process.on('warning', warning => daemon.diagnostics.write('Node warning: ' + warning.message));
-    for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(signal, () => { void daemon.close(); });
-  }
+  const daemon = await startDaemon(resolve(values.root), values.name);
+  console.log(JSON.stringify({ status: 'ready', controller: daemon.controller.status().controller, socket: daemon.socketPath }));
+  const fatal = (error: Error) => daemon.diagnostics.write('Fleet controller process failed: ' + error.message);
+  process.on('uncaughtExceptionMonitor', fatal);
+  process.on('warning', warning => daemon.diagnostics.write('Node warning: ' + warning.message));
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) process.once(signal, () => { void daemon.close(); });
 }

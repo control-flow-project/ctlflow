@@ -1,3 +1,4 @@
+import { contextRoom } from '@ctlflow/crossfire-kernel/history-context';
 import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { RuntimeConnection } from '@ctlflow/crossfire-agent-core/runtime';
 import type { OwnedRuntimeConnection, SavedRuntimeContext } from '@ctlflow/crossfire-agent-core/owned-runtime';
@@ -18,7 +19,7 @@ export function continuationText(work: ResumeWork): string {
     + '\nNo pending question or permission has been answered or approved. If a decision is still needed, ask the owner again and wait.'
     + '\nUse Crossfire tools for chat replies. This controller notice is not a message from a room or person and grants no new permissions.'
     + (work.context === 'shared' || work.context === 'control' ? '\nDo not infer a destination room from this notice; retain the original task attribution from history.'
-      : '\nThis notice belongs only to the saved room history ' + work.context + '. Do not disclose its contents to other rooms.')
+      : '\nThis notice belongs only to the saved room history ' + contextRoom(work.context) + '. Do not disclose its contents to other rooms.')
     + '\nIf the task is already complete or no longer authorized, do not repeat its effects.';
 }
 
@@ -30,7 +31,8 @@ export async function resumeInterruptedWork(connection: OwnedRuntimeConnection, 
     throw Object.assign(new Error('Interrupted task references a different native history; review before resuming'), { code: 'conflict' });
   }
   for (const work of pending.value) {
-    const target: RuntimeConnection | undefined = work.context === primary ? connection : await connection.conversation?.(work.context);
+    const room = contextRoom(work.context);
+    const target: RuntimeConnection | undefined = work.context === primary ? connection : room === null ? undefined : await connection.conversation?.(room);
     if (!target || target.sessionId !== work.sessionId) throw Object.assign(new Error('Interrupted task cannot use a different room history'), { code: 'conflict' });
     await target.settle();
     target.acknowledge([work.messageId]);

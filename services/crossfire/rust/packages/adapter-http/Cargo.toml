@@ -11,6 +11,7 @@ publish.workspace = true
 percent-encoding.workspace = true
 crossfire-kernel.workspace = true
 crossfire-contracts.workspace = true
+crossfire-domain.workspace = true
 crossfire-adapter-filesystem.workspace = true
 reqwest.workspace = true
 serde_json.workspace = true

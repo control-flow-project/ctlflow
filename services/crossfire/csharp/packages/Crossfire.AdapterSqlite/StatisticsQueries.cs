@@ -18,16 +18,16 @@ public static class StatisticsQueries
             var flows = context.ListenerStatFlow.AsNoTracking().Join(context.ListenerStatInterval,
                     flow => new { flow.RunId, flow.BucketAt }, interval => new { interval.RunId, interval.BucketAt }, (flow, interval) => new { flow, interval })
                 .Where(joined => agentIds.Contains(joined.interval.AgentId) && joined.interval.CapturedAt >= since)
-                .GroupBy(joined => new { joined.interval.AgentId, joined.flow.RoomId, joined.flow.SenderMatrixId, joined.flow.MessageType })
-                .OrderByDescending(group => group.Sum(joined => joined.flow.Observed)).ThenBy(group => group.Key.SenderMatrixId).ThenBy(group => group.Key.AgentId).ThenBy(group => group.Key.RoomId).ThenBy(group => group.Key.MessageType)
-                .Select(group => new StatisticsFlow(group.Key.AgentId, group.Key.RoomId, group.Key.SenderMatrixId, group.Key.MessageType,
+                .GroupBy(joined => new { joined.interval.AgentId, joined.flow.RoomId, joined.flow.SenderBackendUserId, joined.flow.MessageType })
+                .OrderByDescending(group => group.Sum(joined => joined.flow.Observed)).ThenBy(group => group.Key.SenderBackendUserId).ThenBy(group => group.Key.AgentId).ThenBy(group => group.Key.RoomId).ThenBy(group => group.Key.MessageType)
+                .Select(group => new StatisticsFlow(group.Key.AgentId, group.Key.RoomId, group.Key.SenderBackendUserId, group.Key.MessageType,
                     new TrafficTotals(group.Sum(joined => joined.flow.Observed), group.Sum(joined => joined.flow.Delivered), group.Sum(joined => joined.flow.ContentBytes),
                         group.Sum(joined => joined.flow.DeliveredBytes), group.Sum(joined => joined.flow.AttachmentBytes), group.Max(joined => joined.flow.LargestBytes))))
                 .Skip(offset).Take(pageSize).ToArray();
             var total = context.ListenerStatFlow.AsNoTracking().Join(context.ListenerStatInterval,
                     flow => new { flow.RunId, flow.BucketAt }, interval => new { interval.RunId, interval.BucketAt }, (flow, interval) => new { flow, interval })
                 .Where(joined => agentIds.Contains(joined.interval.AgentId) && joined.interval.CapturedAt >= since)
-                .Select(joined => new { joined.interval.AgentId, joined.flow.RoomId, joined.flow.SenderMatrixId, joined.flow.MessageType }).Distinct().LongCount();
+                .Select(joined => new { joined.interval.AgentId, joined.flow.RoomId, joined.flow.SenderBackendUserId, joined.flow.MessageType }).Distinct().LongCount();
             var traffic = context.ListenerStatFlow.AsNoTracking().Join(context.ListenerStatInterval,
                     flow => new { flow.RunId, flow.BucketAt }, interval => new { interval.RunId, interval.BucketAt }, (flow, interval) => new { flow, interval })
                 .Where(joined => agentIds.Contains(joined.interval.AgentId) && joined.interval.CapturedAt >= since).GroupBy(joined => joined.interval.AgentId)

@@ -1,3 +1,4 @@
+import { MAX_HISTORY_CONTEXT, validHistoryContext } from '@ctlflow/crossfire-kernel/history-context';
 import { createHash } from 'node:crypto';
 import { constants, openSync, closeSync, fsyncSync, fchmodSync, lstatSync } from 'node:fs';
 import { join } from 'node:path';
@@ -7,7 +8,7 @@ import { success, failureError } from '@ctlflow/crossfire-kernel/result';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { record } from './protocol.js';
 
-const binding = check.object({ context: check.text(255), file: check.refine(check.text(80), value => /^[a-f0-9]{64}\.jsonl$/u.test(value), 'Invalid Pi history allocation'),
+const binding = check.object({ context: check.refine(check.text(MAX_HISTORY_CONTEXT), validHistoryContext, 'Invalid native history context'), file: check.refine(check.text(80), value => /^[a-f0-9]{64}\.jsonl$/u.test(value), 'Invalid Pi history allocation'),
   sessionId: check.nullable(check.identifier), instructionsDigest: check.nullable(check.refine(check.text(64), value => /^[a-f0-9]{64}$/u.test(value), 'Invalid Pi instruction digest')) });
 const registry = check.object({ mode: check.choice('shared', 'per-room'), bindings: check.list(binding, 2002) });
 export type PiBinding = check.Parsed<typeof binding>;

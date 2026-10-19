@@ -1,9 +1,12 @@
+use crossfire_adapter_matrix::{
+    agent::Client,
+    protocol::{Protocol, Request, Response},
+};
 mod support;
 use crossfire_agent_core::{
     coordination::Coordination,
     decision_broker::Broker,
     local_state::LocalState,
-    matrix::{Matrix, Request, Response},
     profile::{Account, Profile, Settings},
     runtime::Decision,
 };
@@ -56,7 +59,7 @@ impl Coordination for Network {
         Ok(json!({"accepted":true}))
     }
 }
-impl Matrix for Network {
+impl Protocol for Network {
     async fn request(&self, _request: &Request, _stop: CancellationToken) -> Result<Response> {
         Err(failure())
     }
@@ -73,15 +76,21 @@ fn profile() -> Profile {
         workspace: PathBuf::from("/private/workarea"),
         settings: Settings {
             instance: "analyst".to_owned(),
-            homeserver: "http://localhost:3000".to_owned(),
-            server_name: "local".to_owned(),
+            server: "http://localhost:3000".to_owned(),
+            backend: crossfire_domain::messaging::BackendConfiguration {
+                backend_type: "matrix".to_owned(),
+                parameters: serde_json::Map::from_iter([
+                    ("origin".into(), json!("http://localhost:3000")),
+                    ("serverName".into(), json!("local")),
+                ]),
+            },
             owner: "@owner:local".to_owned(),
             max_upload_bytes: 1048576,
         },
         account: Account {
             user_id: "@agent:local".to_owned(),
             access_token: Secret::new("private".to_owned()),
-            device_id: "device".to_owned(),
+            native: serde_json::Map::from_iter([("deviceId".into(), json!("device"))]),
         },
     }
 }
@@ -114,7 +123,7 @@ async fn aborting_a_native_question_future_cancels_its_durable_receipt_instead_o
     let broker = Arc::new(Broker::open(
         storage.clone(),
         network.clone(),
-        network.clone(),
+        Arc::new(Client::from_protocol(network.clone(), "@agent:local")?),
         Time,
         profile(),
         "decisions",
@@ -161,7 +170,7 @@ async fn decisions_without_the_native_turn_and_item_are_rejected_before_any_ques
     let broker = Broker::open(
         storage,
         network.clone(),
-        network,
+        Arc::new(Client::from_protocol(network.clone(), "@agent:local")?),
         Time,
         profile(),
         "decisions",
@@ -192,7 +201,7 @@ async fn decision_expiry_includes_waiting_for_listener_registration_and_never_le
     let broker = Arc::new(Broker::open(
         storage,
         network.clone(),
-        network,
+        Arc::new(Client::from_protocol(network.clone(), "@agent:local")?),
         Time,
         profile(),
         "decisions",

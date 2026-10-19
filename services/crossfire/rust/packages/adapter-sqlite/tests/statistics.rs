@@ -18,7 +18,7 @@ fn batch(sequence: i64) -> Batch {
         dropped: 0,
         flows: vec![Flow {
             room_id: "!room:example.test".to_owned(),
-            sender_matrix_id: "@sender:example.test".to_owned(),
+            sender_backend_user_id: "@sender:example.test".to_owned(),
             message_type: "m.text".to_owned(),
             totals: Totals {
                 observed: 2,

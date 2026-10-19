@@ -11,21 +11,23 @@ publish.workspace = true
 crossfire-kernel.workspace = true
 crossfire-domain.workspace = true
 crossfire-contracts.workspace = true
-crossfire-agent-core.workspace = true
 crossfire-adapter-http.workspace = true
+crossfire-adapter-filesystem.workspace = true
+crossfire-adapter-process.workspace = true
+tempfile.workspace = true
 base64.workspace = true
 hmac.workspace = true
 reqwest.workspace = true
+hyper.workspace = true
 url.workspace = true
 serde_json.workspace = true
+serde.workspace = true
 sha2.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 
 [dev-dependencies]
 crossfire-test-support.workspace = true
-crossfire-adapter-filesystem.workspace = true
-serde.workspace = true
 zeroize.workspace = true
 
 [lints]

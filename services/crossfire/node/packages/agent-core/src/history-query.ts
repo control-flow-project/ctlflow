@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
-import type { LocalState, Transport } from './port.js';
+import type { LocalState, MessagingTransport } from './port.js';
 import type { Account, Settings } from '@ctlflow/crossfire-contracts/client';
 import type { Coordination } from './coordination.js';
-import { readUnread, loadCursors, sameCursors, acknowledge, acquisitionBytes, eventView, validatePage, joinedRooms, validReadBatch, validCursors, roomQuota, type ReadBatch } from './receive.js';
-import { historyPage, HISTORY_RESOURCE_BYTES } from './history-page.js';
+import { readUnread, loadCursors, sameCursors, acknowledge, acquisitionBytes, eventView, validatePage, validReadBatch, validCursors, roomQuota, type ReadBatch } from './receive.js';
+import { HISTORY_RESOURCE_BYTES } from './history-resources.js';
 import { eventOrigins } from './origins.js';
 import { resolveSenders } from './senders.js';
 import { deliveryEnvelope } from './receive.js';
@@ -26,7 +26,7 @@ function readPending(storage: LocalState, file: string): Pending {
     || !check.choice('prepared', 'acknowledging')(pending.stage).ok) throw new Error('Invalid pending unread query');
   return pending as Pending;
 }
-export function historyQueries(options: { storage: LocalState; file: string; transport: Transport; signal: AbortSignal; coordination: Coordination;
+export function historyQueries(options: { storage: LocalState; file: string; transport: MessagingTransport; signal: AbortSignal; coordination: Coordination;
   account: Account; settings: Settings; agentId: string; now: () => number; publishing: () => boolean; artifacts: MessageArtifacts;
   observed?: (events: readonly ReadBatch['events'][number][]) => void; delivered?: (events: readonly ReadBatch['events'][number][]) => void; acknowledged?: () => void }) {
   const pendingFile = options.file + '.query', artifacts = options.artifacts;
@@ -53,11 +53,11 @@ export function historyQueries(options: { storage: LocalState; file: string; tra
       const policy = await options.coordination.delivery(options.agentId, signal);
       signal.throwIfAborted();
       if (!policy.ok) return policy;
-      if (policy.value.matrixUserId !== options.account.user_id || policy.value.ownerMatrixId !== options.settings.owner
+      if (policy.value.backendUserId !== options.account.userId || policy.value.ownerBackendUserId !== options.settings.owner
         || policy.value.status !== 'active' || policy.value.ownerStatus !== 'active') return failure('forbidden', 'Agent access is no longer active');
-      const joined = new Set(await joinedRooms(client));
+      const joined = new Set(await client.joinedRooms());
       const allowed = new Set(policy.value.roomGrants.filter(grant => joined.has(grant.roomId)).map(grant => grant.roomId));
-      if (pending.batch.events.some(event => !allowed.has(event.room_id))) {
+      if (pending.batch.events.some(event => !allowed.has(event.roomId))) {
         options.storage.remove(pendingFile); artifacts.release([pending.messageId]);
         return failure('forbidden', 'Room access changed before query acknowledgment');
       }
@@ -74,7 +74,7 @@ export function historyQueries(options: { storage: LocalState; file: string; tra
     } finally { reading = false; }
   }
   return {
-    contentFiles: () => options.storage.exists(pendingFile) ? readPending(options.storage, pendingFile).batch.events.flatMap(event => event.content_file ? [event.content_file.file] : []) : [],
+    contentFiles: () => options.storage.exists(pendingFile) ? readPending(options.storage, pendingFile).batch.events.flatMap(event => event.contentFile ? [event.contentFile.file] : []) : [],
     async read(input: HistoryRequest, cancelled?: AbortSignal) {
       expire();
       if (reading || input.kind === 'unread' && options.publishing()) return failure('conflict', 'The receiver is settling another publication; use history browsing or retry catch-up after settlement');
@@ -85,9 +85,9 @@ export function historyQueries(options: { storage: LocalState; file: string; tra
         const policy = await options.coordination.delivery(options.agentId, signal);
         signal.throwIfAborted();
         if (!policy.ok) return policy;
-        if (policy.value.matrixUserId !== options.account.user_id || policy.value.ownerMatrixId !== options.settings.owner
+        if (policy.value.backendUserId !== options.account.userId || policy.value.ownerBackendUserId !== options.settings.owner
           || policy.value.status !== 'active' || policy.value.ownerStatus !== 'active') return failure('forbidden', 'Agent access is not active');
-        const joined = new Set(await joinedRooms(client));
+        const joined = new Set(await client.joinedRooms());
         const allowed = new Set(policy.value.roomGrants.filter(grant => joined.has(grant.roomId)).map(grant => grant.roomId));
         if (input.room && !allowed.has(input.room) || input.cursors.entries.some(entry => !allowed.has(entry.room))) return failure('forbidden', 'Requested room is outside current agent access');
         let batch: ReadBatch;
@@ -98,26 +98,26 @@ export function historyQueries(options: { storage: LocalState; file: string; tra
         } else {
           const rooms = input.room ? [input.room] : [...allowed].sort(), cursors = Object.fromEntries(input.cursors.entries.map(entry => [entry.room, entry.cursor]));
           let events: ReadBatch['events'] = [], fileMode = false;
-          const more_rooms: string[] = [], next: Record<string, string> = {};
+          const moreRooms: string[] = [], next: Record<string, string> = Object.create(null);
           for (const [position, room] of rooms.entries()) {
-            const page = await historyPage(client, room, { dir: input.direction, limit: roomQuota(input.limit, rooms.length, position),
+            const page = await client.history(room, { direction: input.direction === 'f' ? 'forward' : 'backward', limit: roomQuota(input.limit, rooms.length, position),
               ...(cursors[room] ? { from: cursors[room]! } : {}) });
             validatePage(page, page.requestedLimit, cursors[room]);
-            let messages = page.chunk.map(event => eventView(event, room));
+            let messages = page.events.map(event => eventView(event, room));
             if (fileMode || acquisitionBytes([...events, ...messages], options.settings) > policy.value.maxMessageBytes) {
               fileMode = true; events = artifacts.stage(events); messages = artifacts.stage(messages);
             }
             events.push(...messages);
             if (page.end) next[room] = page.end;
-            if (page.chunk.length >= page.requestedLimit) more_rooms.push(room);
+            if (page.events.length >= page.requestedLimit) moreRooms.push(room);
           }
-          batch = { events, cursors: next, more_rooms, latest: {} };
+          batch = { events, cursors: next, moreRooms, latest: {} };
         }
-        const events = await eventOrigins(client, options.account.user_id, batch.events);
+        const events = await eventOrigins(client, options.account.userId, batch.events);
         if (input.kind === 'unread') options.observed?.(events);
         const identities = await resolveSenders(options.coordination, events, signal);
         signal.throwIfAborted();
-        const envelope = { ...deliveryEnvelope(events, options.settings, identities), more_rooms: batch.more_rooms,
+        const envelope = { ...deliveryEnvelope(events, options.settings, identities), moreRooms: batch.moreRooms,
           continuation: { entries: Object.entries(batch.cursors).filter(([room]) => allowed.has(room)).map(([room, cursor]) => ({ room, cursor })) } };
         const id = randomUUID(), messageId = 'query-' + id;
         const maximum = Math.min(input.outputBytes - 1, policy.value.maxMessageBytes);

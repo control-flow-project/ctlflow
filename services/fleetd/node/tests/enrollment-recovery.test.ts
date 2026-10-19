@@ -19,7 +19,7 @@ for (const status of ['expired', 'rejected', 'pending', 'unauthorized'] as const
       for await (const part of request) assert(Buffer.isBuffer(part));
       let data: unknown;
       if (request.url?.endsWith('/exchange') && status !== 'unauthorized') {
-        data = { status, ownerMatrixId: '@owner:test', fleet: null, instances: [] };
+        data = { status, ownerBackendUserId: '@owner:test', fleet: null, instances: [] };
       } else if (request.url === '/api/enrollments/preflight') {
         data = { available: true, instances: 1 };
       }
@@ -35,14 +35,14 @@ for (const status of ['expired', 'rejected', 'pending', 'unauthorized'] as const
     cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
     mkdirSync(role, { recursive: true, mode: 0o700 });
     writeFileSync(join(role, 'agent.toml'), 'name = "Analyst"\nruntime = "codex"\n[runtime_options]\nmodel = "fixture"\n[coordination_options]\nwake_mode = "selected"\npermissions = ["room.agent.invite"]\n'
-      + '[[coordination_options.wake_senders]]\nmatrix_user_id = "@owner:test"\ninclude_agents = true\n', { mode: 0o600 });
+      + '[[coordination_options.wake_senders]]\nbackend_user_id = "@owner:test"\ninclude_agents = true\n', { mode: 0o600 });
     writeFileSync(join(role, 'AGENTS.md'), 'Role fixture.', { mode: 0o600 });
     const origin = 'http://127.0.0.1:' + address.port;
     writeFileSync(join(directory, 'runtime.toml'), 'fleet = "agreements"\n[coordination]\nadapter = "crossfire"\nserver = "' + origin + '"\nowner = "@owner:test"\n'
       + '[[instances]]\nkey = "ada"\nname = "ada"\ndefinition = "analyst"\nworkarea = "agents/analyst/workarea/ada"\n', { mode: 0o600 });
     const configuration = loadConfiguration(directory); if (!configuration.ok) assert.fail(configuration.error.message);
     const controller = { name: 'fixture-controller' }, loaded = loadBinding(configuration.value); assert(loaded.ok);
-    const input = { ownerMatrixId: '@owner:test', fleetKey: 'agreements', controller, instances: [
+    const input = { ownerBackendUserId: '@owner:test', fleetKey: 'agreements', controller, instances: [
       { instanceKey: 'ada', name: 'ada', coordinationPolicy: configuration.value.definitions.analyst!.coordinationPolicy },
     ] };
     const digest = createHash('sha256').update(JSON.stringify(input)).digest('hex');

@@ -29,7 +29,7 @@ try
     var matrixId = "@native-storage-test-" + ownerId + ":example.test";
     var created = Transactions.Run(context, () =>
     {
-        context.Principal.Add(new PrincipalRow { Id = ownerId, MatrixUserId = matrixId, Kind = "human", Status = "active", Revision = 0, CreatedAt = 1700000000000 });
+        context.Principal.Add(new PrincipalRow { Id = ownerId, BackendUserId = matrixId, Kind = "human", Status = "active", Revision = 0, CreatedAt = 1700000000000 });
         context.Member.Add(new MemberRow { PrincipalId = ownerId, PrincipalKind = "human", DisplayName = "Native storage verification" });
         context.PrincipalRole.Add(new PrincipalRoleRow { PrincipalId = ownerId, PrincipalKind = "human", RoleCode = "member", AssignedAt = 1700000000000 });
         context.PrincipalApplication.Add(new PrincipalApplicationRow { PrincipalId = ownerId, NextCheckAt = 1700000000000 });
@@ -37,9 +37,9 @@ try
     });
     Equal(created.IsSuccess, true, "foreign-key ordered EF insert");
     var principal = context.Principal.AsNoTracking().Single(value => value.Id == ownerId);
-    Equal(principal.MatrixUserId, matrixId, "exact text persistence");
+    Equal(principal.BackendUserId, matrixId, "exact text persistence");
     Equal(principal.CreatedAt, 1700000000000L, "integer timestamp persistence");
-    Equal(AuthorizationQueries.Principal(context, ownerId).Value?.MatrixUserId, matrixId, "precompiled context-parameter projection");
+    Equal(AuthorizationQueries.Principal(context, ownerId).Value?.BackendUserId, matrixId, "precompiled context-parameter projection");
     Equal(AuthorizationQueries.Principal(context, Identity.Identifier()).Value is null, true, "query parameters are not reused");
     Equal(AuthorizationQueries.Permissions(context, ownerId).Value.Contains("member.invite"), true, "precompiled role-permission join");
     StorageConcurrencyAcceptance.Verify(context, ownerId);
@@ -56,7 +56,7 @@ try
         "Native storage verification", "expected failures roll back flushed data");
     var collision = Transactions.Run(context, () =>
     {
-        context.Principal.Add(new PrincipalRow { Id = Identity.Identifier(), MatrixUserId = matrixId, Kind = "human", Status = "active", Revision = 0, CreatedAt = 1700000000000 });
+        context.Principal.Add(new PrincipalRow { Id = Identity.Identifier(), BackendUserId = matrixId, Kind = "human", Status = "active", Revision = 0, CreatedAt = 1700000000000 });
         return Results.Done();
     });
     Equal(collision.IsSuccess, false, "native uniqueness constraint");
@@ -85,6 +85,7 @@ try
     FilesystemAcceptance.Verify(directory);
     RoomAcceptance.Verify();
     WireAcceptance.Verify();
+    HistoryContextAcceptance.Verify();
     Console.WriteLine(JsonSerializer.Serialize(new StorageResult("passed", database, ownerId, matrixId,
         RuntimeFeature.IsDynamicCodeSupported, JsonSerializer.IsReflectionEnabledByDefault, Checks.Passed), StorageJson.Default.StorageResult));
 }
@@ -96,7 +97,7 @@ finally
 static string ArgumentsDatabase(string[] arguments)
     => arguments.Length switch { 1 when Path.IsPathFullyQualified(arguments[0]) => arguments[0], _ => throw new ArgumentException("Select an existing absolute Knex-migrated verification database") };
 
-sealed record StorageResult(string Status, string Database, string OwnerId, string MatrixId, bool DynamicCode, bool ReflectionJson, int Assertions);
+sealed record StorageResult(string Status, string Database, string OwnerId, string BackendUserId, bool DynamicCode, bool ReflectionJson, int Assertions);
 
 [JsonSerializable(typeof(StorageResult))]
 partial class StorageJson : JsonSerializerContext;

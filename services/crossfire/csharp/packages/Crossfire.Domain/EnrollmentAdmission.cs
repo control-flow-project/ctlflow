@@ -31,7 +31,7 @@ public static class EnrollmentAdmission
     {
         var valid = EnrollmentValidation.Roster(input);
         if (!valid.IsSuccess) return Result<VerifiedRoster>.Fail(valid.Error);
-        var owner = ports.PrincipalByMatrixId(input.OwnerMatrixId);
+        var owner = ports.PrincipalByBackendUserId(input.OwnerBackendUserId);
         if (!owner.IsSuccess) return Result<VerifiedRoster>.Fail(owner.Error);
         if (owner.Value is not { Kind: "human", Status: "active" }) return Results.Fail<VerifiedRoster>("forbidden", "An active human owner is required");
         var fleet = ports.ByKey(owner.Value.Id, input.FleetKey);
@@ -70,7 +70,7 @@ public static class EnrollmentAdmission
             {
                 var native = await ports.Identify(item.AccessToken ?? "", cancellation);
                 if (!native.IsSuccess) return Result<VerifiedRoster>.Fail(native.Error);
-                if (record.Value.Principal.MatrixUserId != native.Value) return Results.Fail<VerifiedRoster>("forbidden", "Native identity does not match this agent");
+                if (record.Value.Principal.BackendUserId != native.Value) return Results.Fail<VerifiedRoster>("forbidden", "Native identity does not match this agent");
             }
             if (current.Value is not null && (current.Value.FleetKey != input.FleetKey || current.Value.OwnerId != owner.Value.Id || current.Value.InstanceKey != item.InstanceKey))
                 return Results.Fail<VerifiedRoster>("conflict", "Agent already belongs to another fleet instance");
@@ -83,9 +83,9 @@ public static class EnrollmentAdmission
             var selections = new List<WakeSelection>();
             foreach (var sender in item.CoordinationPolicy.Senders)
             {
-                var selected = ports.PrincipalByMatrixId(sender.MatrixUserId);
+                var selected = ports.PrincipalByBackendUserId(sender.BackendUserId);
                 if (!selected.IsSuccess) return Result<VerifiedRoster>.Fail(selected.Error);
-                if (selected.Value is null) return Results.Fail<VerifiedRoster>("invalid", "Selected identity is not registered: " + sender.MatrixUserId);
+                if (selected.Value is null) return Results.Fail<VerifiedRoster>("invalid", "Selected identity is not registered: " + sender.BackendUserId);
                 selections.Add(new(selected.Value.Id, sender.IncludeAgents));
             }
             var proof = existing.FirstOrDefault(value => value.InstanceKey == item.InstanceKey);

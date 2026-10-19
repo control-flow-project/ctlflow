@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
-using Crossfire.AdapterMatrix;
 using Crossfire.AdapterSqlite;
 using Crossfire.Contracts;
 using Crossfire.Domain;
@@ -8,7 +7,7 @@ using Crossfire.Kernel;
 
 namespace Crossfire.Server.Http;
 
-public sealed record ApiState(ServerConfiguration Configuration, ManagementStorage Storage, Release Release, AccountAuthority Matrix, PublicationStorage Publications, PlatformDiagnostics Diagnostics, long StartedAt, Func<long> Now)
+public sealed record ApiState(ServerConfiguration Configuration, ManagementStorage Storage, Release Release, MessagingPorts Messaging, RoomOperation RoomOperation, PublicationStorage Publications, PlatformDiagnostics Diagnostics, long StartedAt, Func<long> Now)
 {
     public string Database => Storage.Database;
 }
@@ -18,8 +17,8 @@ public sealed record ApiContext(ApiState State, CrossfireDbContext Database, Htt
     public Actor Actor => Identity ?? throw new InvalidOperationException("Authenticated operation requires an actor");
     public FleetActor FleetActor => Controller is null ? new FleetPrincipalActor(Actor) : Controller;
     public AuthorizationPorts Authorization => AuthorizationQueries.Ports(Database, State.Now);
-    public SessionPorts Sessions => SessionCommands.Ports(Database, State.Now, State.Matrix.Identify);
-    public EnrollmentPorts Enrollments => EnrollmentCommands.Ports(Database, State.Now, State.Configuration.ServerName, State.Matrix.Identify, State.Matrix.Room);
+    public SessionPorts Sessions => SessionCommands.Ports(Database, State.Now, State.Messaging.Identify);
+    public EnrollmentPorts Enrollments => EnrollmentCommands.Ports(Database, State.Now, State.Messaging);
 }
 public sealed record ApiReply(JsonElement Data, ResponseMetadata? Pagination = null, string? SetCookie = null);
 public sealed record ApiEndpoint(string OperationName,

@@ -4,3 +4,4 @@ pub mod event_clock;
 pub mod history;
 pub mod journal;
 pub mod resumption;
+pub mod room_operations;

@@ -1,5 +1,6 @@
 import { createClient, type Client } from '@ctlflow/crossfire-client/client';
-import { nativeJson } from '@ctlflow/crossfire-adapter-matrix/http';
+import type { MessagingInspection } from '@ctlflow/crossfire-domain/port/messaging-inspection';
+import { inspectBackend } from './backend.js';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import type { SessionView } from '@ctlflow/crossfire-contracts/schema/response';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
@@ -15,22 +16,14 @@ export function operatorClient(options: ClientOptions): Client {
   } };
 }
 
-export const credentials = check.object({ matrixUserId: check.matrixUserId, password: check.text(8192) });
+export const credentials = check.object({ backendUserId: check.backendUserId, password: check.text(8192) });
 export type Credentials = check.Parsed<typeof credentials>;
-export type Human = { client: Client; viewer: SessionView; nativeAccessToken: string };
+export type Human = { client: Client; viewer: SessionView; nativeAccessToken: string; messaging: MessagingInspection; inspectToken(token: string): MessagingInspection };
 
 export async function withHuman<Value>(origin: string, account: Credentials, signal: AbortSignal,
   work: (human: Human) => Promise<Result<Value>>): Promise<Result<Value>> {
   const checked = endpoint(origin); if (!checked.ok) return checked;
   const base = checked.value;
-  const login = await nativeJson({ base, signal }, 'POST', '/_matrix/client/v3/login', {
-    type: 'm.login.password', identifier: { type: 'm.id.user', user: account.matrixUserId }, password: account.password,
-    initial_device_display_name: 'crossfire operator verification',
-  });
-  if (!login.ok) return login;
-  const body = login.value.body;
-  if (login.value.status !== 200 || !body || typeof body !== 'object' || Array.isArray(body) || typeof body.access_token !== 'string') return failure('unauthorized', 'Native login failed');
-  const nativeAccessToken = body.access_token;
   let cookie: string | undefined, csrf: string | undefined;
   let result: Result<Value> = failure('unavailable', 'Authenticated verification did not complete');
   const transport: typeof fetch = async (url, init) => {
@@ -46,19 +39,25 @@ export async function withHuman<Value>(origin: string, account: Credentials, sig
     }
     return response;
   };
+  const publicClient = operatorClient({ origin: base, signal, fetch: transport });
+  const description = await publicClient.call(operations.messagingBackend, {}, {}); if (!description.ok) return description;
+  const login = await publicClient.call(operations.authenticateBackend, {}, { username: account.backendUserId, password: account.password });
+  if (!login.ok) return login;
+  const nativeAccessToken = login.value.data.accessToken;
+  const inspectToken = (token: string) => inspectBackend(description.value.data.configuration, token);
+  const messaging = inspectToken(nativeAccessToken);
   try {
-    if (body.user_id !== account.matrixUserId) return failure('unauthorized', 'Native login returned a different account');
     const created = await operatorClient({ origin: base, signal, fetch: transport }).call(operations.createSession, {}, { nativeAccessToken });
     if (!created.ok) result = created;
     else {
       csrf = created.value.data.csrfSecret;
-      if (!cookie || created.value.data.member.matrixUserId !== account.matrixUserId) result = failure('unauthorized', 'Crossfire session identity does not match the requested human');
+      if (!cookie || created.value.data.member.backendUserId !== account.backendUserId) result = failure('unauthorized', 'Crossfire session identity does not match the requested human');
       else {
         const client = operatorClient({ origin: base, signal, csrf, fetch: transport });
         const current = await client.call(operations.currentSession, {}, {});
-        result = !current.ok ? current : current.value.data.member.matrixUserId !== account.matrixUserId
+        result = !current.ok ? current : current.value.data.member.backendUserId !== account.backendUserId
           ? failure('unauthorized', 'Crossfire current session has a different owner')
-          : await work({ client, viewer: current.value.data, nativeAccessToken });
+          : await work({ client, viewer: current.value.data, nativeAccessToken, messaging, inspectToken });
       }
     }
   } catch { result = failure('unavailable', 'Authenticated verification failed; private responses are not printed'); }
@@ -69,8 +68,8 @@ export async function withHuman<Value>(origin: string, account: Credentials, sig
         if (!ended.ok) result = failure('unavailable', 'Crossfire verification session cleanup failed');
       }
     } catch { result = failure('unavailable', 'Crossfire verification session cleanup failed'); }
-    const ended = await nativeJson({ base, token: nativeAccessToken }, 'POST', '/_matrix/client/v3/logout', {});
-    if (!ended.ok || ended.value.status !== 200) result = failure('unavailable', 'Native verification device logout failed');
+    const ended = await messaging.close();
+    if (!ended.ok) result = ended;
   }
   return result;
 }

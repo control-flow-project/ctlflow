@@ -116,38 +116,15 @@ pub fn name(value: &Value) -> Result<&str> {
 
 pub use crossfire_kernel::text::whitespace;
 
-pub fn matrix_user_id(value: &Value) -> Result<&str> {
-    value
-        .as_str()
-        .filter(|value| {
-            utf16_length(value) <= 255
-                && value.starts_with('@')
-                && !value.chars().any(whitespace)
-                && value[1..]
-                    .split_once(':')
-                    .is_some_and(|(local, host)| !local.is_empty() && !host.is_empty())
-        })
-        .ok_or_else(|| Failure::new(ErrorCode::Invalid, "Expected a Matrix user ID"))
-}
-
-fn native_id(value: &Value, prefix: char, message: &str) -> Result<String> {
-    value
-        .as_str()
-        .filter(|value| {
-            utf16_length(value) <= 255
-                && value.starts_with(prefix)
-                && value.len() > 1
-                && !value.chars().any(whitespace)
-        })
-        .map(str::to_owned)
-        .ok_or_else(|| Failure::new(ErrorCode::Invalid, message))
+pub fn backend_user_id(value: &Value) -> Result<&str> {
+    text(value, 1, 255)
 }
 
 pub fn room_id(value: &Value) -> Result<String> {
-    native_id(value, '!', "Expected an immutable Matrix room ID")
+    text(value, 1, 255).map(str::to_owned)
 }
 pub fn event_id(value: &Value) -> Result<String> {
-    native_id(value, '$', "Expected a Matrix event ID")
+    text(value, 1, 255).map(str::to_owned)
 }
 
 pub fn secret(value: &Value) -> Result<&str> {

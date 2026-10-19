@@ -20,8 +20,8 @@ import { runtimeRequest, runtimeOperation, runtimeReceipt } from '@ctlflow/cross
 
 async function enroll(fixture: Awaited<ReturnType<typeof applicationFixture>>, owner = fixture.admin, name = 'team') {
   const { services } = fixture;
-  const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: owner.member.principal.matrixUserId, fleetKey: name,
-    controller: { name: 'desktop' }, instances: [{ instanceKey: 'one', name: name + '-one', coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.matrixUserId) }, { instanceKey: 'two', name: name + '-two', coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.matrixUserId) }] };
+  const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: owner.member.principal.backendUserId, fleetKey: name,
+    controller: { name: 'desktop' }, instances: [{ instanceKey: 'one', name: name + '-one', coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.backendUserId) }, { instanceKey: 'two', name: name + '-two', coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.backendUserId) }] };
   const proposed = value(await introduceEnrollment(services, input));
   value(decideEnrollment(services, owner.actor, input.enrollmentId, { expectedRevision: 0, decision: 'approve', verificationCode: proposed.request.verificationCode }, randomUUID()));
   for (const item of value(services.collection.enrollmentItems({ requestId: input.enrollmentId }))) value(await reconcilePrincipal(services, item.agentId!));
@@ -71,7 +71,7 @@ test('fleet messages are durable, roster-snapshotted, bounded, idempotent and re
   const agentId = fleet.ready.instances[0]!.agentId!, otherId = fleet.ready.instances[1]!.agentId!;
   assert.equal(createFleetMessage(services, { principalId: agentId, kind: 'agent' }, fleet.fleetId, { ...input, messageId: randomUUID() }, randomUUID()).ok, false);
   const snapshot = value(readFleetControl(...params, connectionId)); assert(fleetControlSnapshot(snapshot).ok);
-  assert.deepEqual(snapshot.messages[0]!.sender, { kind: 'human', matrixUserId: admin.member.principal.matrixUserId });
+  assert.deepEqual(snapshot.messages[0]!.sender, { kind: 'human', backendUserId: admin.member.principal.backendUserId });
   const delivered = { status: 'delivered' as const, errorMessage: null };
   assert.equal(acknowledgeFleetMessage(services, admin.actor, fleet.fleetId, input.messageId, agentId, delivered).ok, false);
   value(acknowledgeFleetMessage(...params, input.messageId, agentId, delivered));

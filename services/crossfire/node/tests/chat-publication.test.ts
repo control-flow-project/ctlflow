@@ -1,3 +1,4 @@
+import { messageEvent } from '@ctlflow/crossfire-adapter-matrix/events';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { chatPublication } from '@ctlflow/crossfire-agent-core/chat-publication';
@@ -27,12 +28,12 @@ function fixture(mode: 'shared' | 'per-room' = 'per-room', maximum = 65536) {
     return selected;
   } };
   const owner = '@owner:test';
-  const identity: PrincipalIdentity = { matrixUserId: owner, kind: 'human', ownerMatrixId: null, displayName: 'Owner', ownerDisplayName: null };
-  const event = (room: string, id: string, body = 'task') => ({ ...eventView({ event_id: id, sender: owner, type: 'm.room.message',
-    origin_server_ts: 1700000000000, content: { body, msgtype: 'm.text' } }, room), origin: { kind: 'room' as const, name: room, alias: null } });
+  const identity: PrincipalIdentity = { backendUserId: owner, kind: 'human', ownerBackendUserId: null, displayName: 'Owner', ownerDisplayName: null };
+  const event = (room: string, id: string, body = 'task') => ({ ...eventView(messageEvent({ event_id: id, sender: owner, type: 'm.room.message',
+    origin_server_ts: 1700000000000, content: { body, msgtype: 'm.text' } }, room), room), origin: { kind: 'room' as const, name: room, alias: null } });
   const batch: ReadBatch = { events: [event('!alpha:test', '$alpha'), event('!beta:test', '$beta')],
-    cursors: { '!alpha:test': 'cursor-alpha', '!beta:test': 'cursor-beta' }, latest: { '!alpha:test': '$alpha', '!beta:test': '$beta' }, more_rooms: [] };
-  const options = { storage, file: 'publication', settings: { instance: 'proof', homeserver: 'https://matrix.test', server_name: 'test', owner, max_upload_bytes: 100000 },
+    cursors: { '!alpha:test': 'cursor-alpha', '!beta:test': 'cursor-beta' }, latest: { '!alpha:test': '$alpha', '!beta:test': '$beta' }, moreRooms: [] };
+  const options = { storage, file: 'publication', settings: { instance: 'proof', server: 'https://matrix.test', backend: { type: 'matrix', parameters: { origin: 'https://matrix.test', serverName: 'test' } }, owner: owner, maxUploadBytes: 100000 },
     runtime, mode, maximum, artifacts: messageArtifacts(storage, 'messages', Date.now), traffic: () => {},
     delivered: async (room: string) => { delivered.push(room); }, count: (count: number) => { messages += count; } };
   const create = () => chatPublication(options);
@@ -136,7 +137,7 @@ test('shared history keeps a single bounded input and file-backs complete oversi
 test('steering-confirmed events are removed from prepared ordinary input without skipping its acquisition checkpoint', async () => {
   const proof = fixture('shared');
   const accepted = new Set<string>();
-  const publisher = chatPublication({ ...proof.options, admit: event => !accepted.has(event.event_id) });
+  const publisher = chatPublication({ ...proof.options, admit: event => !accepted.has(event.eventId) });
   publisher.prepare(proof.batch, proof.batch.events, proof.identities);
   accepted.add('$alpha');
   const completed = await publisher.publish(new Set(Object.keys(proof.batch.cursors)), proof.signal);

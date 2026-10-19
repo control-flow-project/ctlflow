@@ -95,7 +95,7 @@ controller and `fleetd/artifacts` from that layout, not an npm installation.
 ```sh
 export PATH="/absolute/releases/csharp-nativeaot/fleet:/absolute/releases/csharp-nativeaot/fleetd:$PATH"
 fleet --help
-fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerMatrixId=%40member%3Aexample.test'
+fleet setup --descriptor 'https://example.test/onboarding/setup.json?ownerBackendUserId=%40member%3Aexample.test'
 fleet list
 ```
 

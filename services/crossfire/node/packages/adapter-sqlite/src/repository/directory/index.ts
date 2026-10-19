@@ -12,7 +12,7 @@ type MemberRow = {
   member_principal_kind: Tables['member']['principal_kind'];
   member_display_name: Tables['member']['display_name'];
   principal_id: Tables['principal']['id'];
-  principal_matrix_user_id: Tables['principal']['matrix_user_id'];
+  principal_backend_user_id: Tables['principal']['backend_user_id'];
   principal_kind: Tables['principal']['kind'];
   principal_status: Tables['principal']['status'];
   principal_revision: Tables['principal']['revision'];
@@ -39,7 +39,7 @@ type AgentRow = {
   agent_owner_id: Tables['agent']['owner_id'];
   agent_wake_mode: Tables['agent']['wake_mode'];
   principal_id: Tables['principal']['id'];
-  principal_matrix_user_id: Tables['principal']['matrix_user_id'];
+  principal_backend_user_id: Tables['principal']['backend_user_id'];
   principal_kind: Tables['principal']['kind'];
   principal_status: Tables['principal']['status'];
   principal_revision: Tables['principal']['revision'];
@@ -55,7 +55,7 @@ type AgentRow = {
   application_error_code: Tables['principal_application']['error_code'];
   application_error_message: Tables['principal_application']['error_message'];
   owner_id: Tables['principal']['id'];
-  owner_matrix_user_id: Tables['principal']['matrix_user_id'];
+  owner_backend_user_id: Tables['principal']['backend_user_id'];
   owner_kind: Tables['principal']['kind'];
   owner_status: Tables['principal']['status'];
   owner_revision: Tables['principal']['revision'];
@@ -67,15 +67,15 @@ type AgentRow = {
 };
 function memberRecord(row: MemberRow): MemberRecord { return {
     member: { principalId: row.member_principal_id, principalKind: row.member_principal_kind, displayName: row.member_display_name },
-    principal: { id: row.principal_id, matrixUserId: row.principal_matrix_user_id, kind: row.principal_kind, status: row.principal_status, revision: row.principal_revision, createdAt: row.principal_created_at },
+    principal: { id: row.principal_id, backendUserId: row.principal_backend_user_id, kind: row.principal_kind, status: row.principal_status, revision: row.principal_revision, createdAt: row.principal_created_at },
     role: { principalId: row.role_principal_id, principalKind: row.role_principal_kind, roleCode: row.role_role_code, assignedByMemberId: row.role_assigned_by_member_id, assignedAt: row.role_assigned_at },
     application: { principalId: row.application_principal_id, appliedRevision: row.application_applied_revision, appliedIntentHash: row.application_applied_intent_hash, appliedStatus: row.application_applied_status, nativeDisplayName: row.application_native_display_name, lastAttemptAt: row.application_last_attempt_at, lastSuccessAt: row.application_last_success_at, nextCheckAt: row.application_next_check_at, errorCode: row.application_error_code, errorMessage: row.application_error_message }
   }; }
 function agentRecord(row: AgentRow): AgentRecord { return {
     agent: { principalId: row.agent_principal_id, principalKind: row.agent_principal_kind, ownerId: row.agent_owner_id, wakeMode: row.agent_wake_mode },
-    principal: { id: row.principal_id, matrixUserId: row.principal_matrix_user_id, kind: row.principal_kind, status: row.principal_status, revision: row.principal_revision, createdAt: row.principal_created_at },
+    principal: { id: row.principal_id, backendUserId: row.principal_backend_user_id, kind: row.principal_kind, status: row.principal_status, revision: row.principal_revision, createdAt: row.principal_created_at },
     application: { principalId: row.application_principal_id, appliedRevision: row.application_applied_revision, appliedIntentHash: row.application_applied_intent_hash, appliedStatus: row.application_applied_status, nativeDisplayName: row.application_native_display_name, lastAttemptAt: row.application_last_attempt_at, lastSuccessAt: row.application_last_success_at, nextCheckAt: row.application_next_check_at, errorCode: row.application_error_code, errorMessage: row.application_error_message },
-    owner: { id: row.owner_id, matrixUserId: row.owner_matrix_user_id, kind: row.owner_kind, status: row.owner_status, revision: row.owner_revision, createdAt: row.owner_created_at },
+    owner: { id: row.owner_id, backendUserId: row.owner_backend_user_id, kind: row.owner_kind, status: row.owner_status, revision: row.owner_revision, createdAt: row.owner_created_at },
     ownerMember: { principalId: row.ownerMember_principal_id, principalKind: row.ownerMember_principal_kind, displayName: row.ownerMember_display_name }, name: row.name
   }; }
 export function page<T>(items: T[], totalItems: number, input: PageRequest): Page<T> {
@@ -94,7 +94,7 @@ function allAgents(database: Database.Database, filter: DirectoryFilter): Page<A
   .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id,
     (row, owner) => ({ ...row, owner }))
   .join(query.from('member'), row => row.agent.owner_id, ownerMember => ownerMember.principal_id,
-    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active'))).count(), params);
+    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.backend_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active'))).count(), params);
   const rows = executeSelect(database, schema, (query, params) => query.from('agent')
   .join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
   .join(query.from('fleet_instance'), row => row.agent.principal_id, instance => instance.agent_id, (row, instance) => ({ ...row, instance }))
@@ -105,14 +105,14 @@ function allAgents(database: Database.Database, filter: DirectoryFilter): Page<A
   .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id,
     (row, owner) => ({ ...row, owner }))
   .join(query.from('member'), row => row.agent.owner_id, ownerMember => ownerMember.principal_id,
-    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active')))
+    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.backend_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active')))
     .orderBy(row => row.principal.created_at).thenBy(row => row.principal.id).skip(params.offset).take(params.limit).select(row => ({
       agent_principal_id: row.agent.principal_id,
       agent_principal_kind: row.agent.principal_kind,
       agent_owner_id: row.agent.owner_id,
       agent_wake_mode: row.agent.wake_mode,
       principal_id: row.principal.id,
-      principal_matrix_user_id: row.principal.matrix_user_id,
+      principal_backend_user_id: row.principal.backend_user_id,
       principal_kind: row.principal.kind,
       principal_status: row.principal.status,
       principal_revision: row.principal.revision,
@@ -128,7 +128,7 @@ function allAgents(database: Database.Database, filter: DirectoryFilter): Page<A
       application_error_code: row.application.error_code,
       application_error_message: row.application.error_message,
       owner_id: row.owner.id,
-      owner_matrix_user_id: row.owner.matrix_user_id,
+      owner_backend_user_id: row.owner.backend_user_id,
       owner_kind: row.owner.kind,
       owner_status: row.owner.status,
       owner_revision: row.owner.revision,
@@ -153,7 +153,7 @@ function ownedAgents(database: Database.Database, filter: DirectoryFilter): Page
   .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id,
     (row, owner) => ({ ...row, owner }))
   .join(query.from('member'), row => row.agent.owner_id, ownerMember => ownerMember.principal_id,
-    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && row.agent.owner_id === params.ownerId && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active'))).count(), params);
+    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && row.agent.owner_id === params.ownerId && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.backend_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active'))).count(), params);
   const rows = executeSelect(database, schema, (query, params) => query.from('agent')
   .join(query.from('principal'), agent => agent.principal_id, principal => principal.id, (agent, principal) => ({ agent, principal }))
   .join(query.from('fleet_instance'), row => row.agent.principal_id, instance => instance.agent_id, (row, instance) => ({ ...row, instance }))
@@ -164,14 +164,14 @@ function ownedAgents(database: Database.Database, filter: DirectoryFilter): Page
   .join(query.from('principal'), row => row.agent.owner_id, owner => owner.id,
     (row, owner) => ({ ...row, owner }))
   .join(query.from('member'), row => row.agent.owner_id, ownerMember => ownerMember.principal_id,
-    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && row.agent.owner_id === params.ownerId && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.matrix_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active')))
+    (row, ownerMember) => ({ ...row, ownerMember })).where(row => row.instance.retired_at === null && row.fleet.archived_at === null && row.instance.fleet_key === row.fleet.fleet_key && row.agent.owner_id === params.ownerId && (params.filterIds === false || params.agentIds.includes(row.principal.id)) && params.statuses.includes(row.principal.status) && (row.name.name.includes(params.search) || row.principal.backend_user_id.includes(params.search)) && (params.activityMode === 'all' || params.activityMode === 'include' && params.activityIds.includes(row.principal.id) && row.principal.status === 'active' && row.owner.status === 'active' || params.activityMode === 'exclude' && (!params.activityIds.includes(row.principal.id) || row.principal.status !== 'active' || row.owner.status !== 'active')))
     .orderBy(row => row.principal.created_at).thenBy(row => row.principal.id).skip(params.offset).take(params.limit).select(row => ({
       agent_principal_id: row.agent.principal_id,
       agent_principal_kind: row.agent.principal_kind,
       agent_owner_id: row.agent.owner_id,
       agent_wake_mode: row.agent.wake_mode,
       principal_id: row.principal.id,
-      principal_matrix_user_id: row.principal.matrix_user_id,
+      principal_backend_user_id: row.principal.backend_user_id,
       principal_kind: row.principal.kind,
       principal_status: row.principal.status,
       principal_revision: row.principal.revision,
@@ -187,7 +187,7 @@ function ownedAgents(database: Database.Database, filter: DirectoryFilter): Page
       application_error_code: row.application.error_code,
       application_error_message: row.application.error_message,
       owner_id: row.owner.id,
-      owner_matrix_user_id: row.owner.matrix_user_id,
+      owner_backend_user_id: row.owner.backend_user_id,
       owner_kind: row.owner.kind,
       owner_status: row.owner.status,
       owner_revision: row.owner.revision,
@@ -209,9 +209,9 @@ export function createDirectoryRepository(database: Database.Database): Director
         .select(row => ({ agentId: row.instance.agent_id, fleetId: row.fleet.id, fleetKey: row.fleet.fleet_key, label: row.fleet.label,
           controllerName: row.fleet.controller_name, reportedAt: row.fleet.updated_at, instanceKey: row.instance.instance_key })), { agentIds })));
     },
-    principalByMatrixId(matrixUserId) {
+    principalByBackendUserId(backendUserId) {
       return stored(() => {
-        const row = executeSelect(database, schema, (query, params) => query.from('principal').where(row => row.matrix_user_id === params.matrixUserId).firstOrDefault(), { matrixUserId });
+        const row = executeSelect(database, schema, (query, params) => query.from('principal').where(row => row.backend_user_id === params.backendUserId).firstOrDefault(), { backendUserId });
         return success(row ? mapPrincipal(row) : null);
       });
     },
@@ -224,7 +224,7 @@ export function createDirectoryRepository(database: Database.Database): Director
       member_principal_kind: row.member.principal_kind,
       member_display_name: row.member.display_name,
       principal_id: row.principal.id,
-      principal_matrix_user_id: row.principal.matrix_user_id,
+      principal_backend_user_id: row.principal.backend_user_id,
       principal_kind: row.principal.kind,
       principal_status: row.principal.status,
       principal_revision: row.principal.revision,
@@ -262,7 +262,7 @@ export function createDirectoryRepository(database: Database.Database): Director
       agent_owner_id: row.agent.owner_id,
       agent_wake_mode: row.agent.wake_mode,
       principal_id: row.principal.id,
-      principal_matrix_user_id: row.principal.matrix_user_id,
+      principal_backend_user_id: row.principal.backend_user_id,
       principal_kind: row.principal.kind,
       principal_status: row.principal.status,
       principal_revision: row.principal.revision,
@@ -278,7 +278,7 @@ export function createDirectoryRepository(database: Database.Database): Director
       application_error_code: row.application.error_code,
       application_error_message: row.application.error_message,
       owner_id: row.owner.id,
-      owner_matrix_user_id: row.owner.matrix_user_id,
+      owner_backend_user_id: row.owner.backend_user_id,
       owner_kind: row.owner.kind,
       owner_status: row.owner.status,
       owner_revision: row.owner.revision,
@@ -302,7 +302,7 @@ export function createDirectoryRepository(database: Database.Database): Director
       member_principal_kind: row.member.principal_kind,
       member_display_name: row.member.display_name,
       principal_id: row.principal.id,
-      principal_matrix_user_id: row.principal.matrix_user_id,
+      principal_backend_user_id: row.principal.backend_user_id,
       principal_kind: row.principal.kind,
       principal_status: row.principal.status,
       principal_revision: row.principal.revision,
@@ -358,7 +358,7 @@ export function createDirectoryRepository(database: Database.Database): Director
       member_principal_kind: row.member.principal_kind,
       member_display_name: row.member.display_name,
       principal_id: row.principal.id,
-      principal_matrix_user_id: row.principal.matrix_user_id,
+      principal_backend_user_id: row.principal.backend_user_id,
       principal_kind: row.principal.kind,
       principal_status: row.principal.status,
       principal_revision: row.principal.revision,
@@ -394,7 +394,7 @@ export function createDirectoryRepository(database: Database.Database): Director
       agent_owner_id: row.agent.owner_id,
       agent_wake_mode: row.agent.wake_mode,
       principal_id: row.principal.id,
-      principal_matrix_user_id: row.principal.matrix_user_id,
+      principal_backend_user_id: row.principal.backend_user_id,
       principal_kind: row.principal.kind,
       principal_status: row.principal.status,
       principal_revision: row.principal.revision,
@@ -410,7 +410,7 @@ export function createDirectoryRepository(database: Database.Database): Director
       application_error_code: row.application.error_code,
       application_error_message: row.application.error_message,
       owner_id: row.owner.id,
-      owner_matrix_user_id: row.owner.matrix_user_id,
+      owner_backend_user_id: row.owner.backend_user_id,
       owner_kind: row.owner.kind,
       owner_status: row.owner.status,
       owner_revision: row.owner.revision,

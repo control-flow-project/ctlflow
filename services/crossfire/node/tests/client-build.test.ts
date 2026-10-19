@@ -12,7 +12,7 @@ test('private tools build one self-contained verified release without standalone
   scope.after(() => rmSync(directory, { recursive: true }));
   const release = await buildAgentArtifacts(directory, '0.1.0');
   assert.deepEqual(readdirSync(directory).sort(), ['manifest.json', ...ARTIFACTS].sort());
-  assert.deepEqual(ARTIFACTS, ['README.md', 'SKILL.md', 'crossfire-client.mjs', 'matrix-spec-LICENSE.txt']);
+  assert.deepEqual(ARTIFACTS, ['README.md', 'SKILL.md', 'crossfire-client.mjs', 'messaging-LICENSE.txt']);
   const client = join(directory, 'crossfire-client.mjs');
   const help = JSON.parse(execFileSync(process.execPath, [client, '--help'], { cwd: tmpdir(), encoding: 'utf8' })) as { agent: Record<string, unknown>; room: Record<string, unknown> };
   assert.deepEqual(Object.keys(help.agent).sort(), ['directory', 'history', 'read', 'status', 'test']);

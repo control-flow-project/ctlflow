@@ -101,6 +101,82 @@ type Fixture = (
     Arc<Host>,
     std::path::PathBuf,
 );
+
+#[tokio::test]
+async fn diagnostics_preserve_registry_and_activation_without_starting_native_work()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let (_root, registry, host, directory) = setup()?;
+    let current = controller(registry.clone(), host.clone())?;
+    current.ready().await?;
+    let fleet = current.add(&directory)?.registration.fleet_id;
+    let before = registry.desired()?;
+    let scope = fleetd_domain::diagnostics::Scope {
+        fleet_id: Some(fleet.clone()),
+        instance_key: None,
+    };
+    let report = current
+        .diagnostics(
+            scope,
+            crossfire_agent_core::synchronization::CancellationToken::new(),
+        )
+        .await?;
+    assert_eq!(
+        report
+            .checks
+            .iter()
+            .filter(|check| check.id == "agent.native")
+            .count(),
+        2
+    );
+    assert!(
+        report
+            .checks
+            .iter()
+            .filter(|check| check.id == "agent.native")
+            .all(|check| check.message == "Native state: stopped")
+    );
+    assert!(
+        report
+            .checks
+            .iter()
+            .filter(|check| check.id == "agent.provider")
+            .all(|check| check.status == "not-applicable")
+    );
+    assert_eq!(registry.desired()?, before);
+    assert_eq!(host.0.starts.load(Ordering::SeqCst), 0);
+    operate(
+        &current,
+        Target::Agent {
+            fleet: fleet.clone(),
+            instance: "alpha".to_owned(),
+        },
+        Action::Start,
+    )
+    .await?;
+    let before = registry.desired()?;
+    let report = current
+        .diagnostics(
+            fleetd_domain::diagnostics::Scope {
+                fleet_id: Some(fleet),
+                instance_key: Some("alpha".to_owned()),
+            },
+            crossfire_agent_core::synchronization::CancellationToken::new(),
+        )
+        .await?;
+    assert_eq!(
+        report
+            .checks
+            .iter()
+            .find(|check| check.id == "agent.native")
+            .map(|check| check.message.as_str()),
+        Some("Native state: idle")
+    );
+    assert_eq!(registry.desired()?, before);
+    assert_eq!(host.0.starts.load(Ordering::SeqCst), 1);
+    assert_eq!(host.0.closes.load(Ordering::SeqCst), 0);
+    current.close().await?;
+    Ok(())
+}
 fn setup() -> std::result::Result<Fixture, Box<dyn std::error::Error>> {
     let root = tempfile::tempdir()?;
     fs::set_permissions(root.path(), fs::Permissions::from_mode(0o700))?;

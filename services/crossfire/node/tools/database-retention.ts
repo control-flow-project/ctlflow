@@ -32,7 +32,7 @@ export function retentionProof(database: Database.Database, input?: RetentionPro
     if (table === 'fleet_native_stop') return typeof record.native_stopped_at === 'number' && record.native_stopped_at < cutoff
       && typeof record.sequence === 'number' && record.sequence < (latestStops.get(String(record.agent_id)) ?? 0);
     if (table === 'member_invitation') return typeof record.expires_at === 'number' && record.expires_at < cutoff
-      && (record.consumed_by_member_id !== null || record.claim_matrix_user_id === null);
+      && (record.consumed_by_member_id !== null || record.claim_backend_user_id === null);
     return false;
   } });
 }

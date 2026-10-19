@@ -26,6 +26,8 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
   });
   await scope.test('strict HTTP, cookies, CSRF and unchanged shared management assets', async () => {
     await fixture.operation(operations.health); await fixture.operation(operations.release); await fixture.operation(operations.currentSession);
+    const backend = await fixture.operation(operations.messagingBackend);
+    assert.equal(record(backend.data).type, 'matrix');
     await fixture.failure(await fixture.raw('/api/health?unknown=1'), 400, 'invalid'); await fixture.failure(await fixture.raw('/api/health', 'GET', undefined, { Origin: 'https://foreign.invalid' }), 403, 'forbidden');
     await fixture.failure(await fixture.raw('/api/member-invitations', 'POST', { roleCode: 'member', expiresSeconds: 600 }, { Cookie: fixture.owner.cookie, Origin: fixture.origin }), 403, 'forbidden');
     await fixture.failure(await fixture.raw('/api/agents?page=1&page=2', 'GET', undefined, fixture.headers()), 400, 'invalid'); await fixture.failure(await fixture.raw('/api/agents?after=removed', 'GET', undefined, fixture.headers()), 400, 'invalid');
@@ -34,8 +36,8 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
       const configuration = await fixture.raw(path); assert.equal(configuration.status, 200); assert.equal(record(configuration.body).brand, 'crossfire');
     }
     for (const path of ['/config.json/../bootstrap.json', '/manage/assets/%2e%2e%2fpackage.json', '/_coord/install.mjs']) assert.equal((await fixture.raw(path)).status, 404, 'Unsafe or removed public asset: ' + path);
-    const descriptor = await fixture.raw('/onboarding/setup.json?ownerMatrixId=' + encodeURIComponent(fixture.owner.matrixUserId), 'GET', undefined, fixture.headers()); assert.equal(descriptor.status, 200); assert.equal(record(descriptor.body).ownerMatrixId, fixture.owner.matrixUserId);
-    const guide = await fixture.raw('/onboarding/setup?ownerMatrixId=' + encodeURIComponent(fixture.owner.matrixUserId));
+    const descriptor = await fixture.raw('/onboarding/setup.json?ownerBackendUserId=' + encodeURIComponent(fixture.owner.backendUserId), 'GET', undefined, fixture.headers()); assert.equal(descriptor.status, 200); assert.equal(record(descriptor.body).ownerBackendUserId, fixture.owner.backendUserId);
+    const guide = await fixture.raw('/onboarding/setup?ownerBackendUserId=' + encodeURIComponent(fixture.owner.backendUserId));
     assert.equal(guide.status, 200);
     const instructions = text(guide.body);
     for (const required of ['Docker hosts the server only.', 'The selected Codex/Pi installation and native login must already exist there.',
@@ -67,12 +69,12 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
   const controller = { fleetId: agent.fleetId, connectionId: agent.connectionId, credential: agent.credential }, runId = randomUUID();
   await scope.test('enrollment identities, collisions, owner directory and scoped grants', async () => {
     assert.equal((await fixture.data(operations.agent, params)).name, agent.name); await fixture.operation(operations.fleetAgents, fleetParams, undefined, agent.credential); await fixture.operation(operations.deliveryPolicy, params, undefined, agent.token);
-    const conflict = await fixture.raw('/api/enrollments/preflight', 'POST', { ownerMatrixId: fixture.owner.matrixUserId, fleetKey: 'collision-check', controller: { name: 'Other controller' }, instances: [{ instanceKey: 'different', name: agent.name, coordinationPolicy: { wakeMode: 'selected', senders: [{ matrixUserId: fixture.owner.matrixUserId, includeAgents: false }], permissions: [] } }] }); contractError(conflict, 409, 'name_collision');
-    const room = await contractHttp(fixture.native.base, 'POST', '/_matrix/client/v3/createRoom', { name: 'Shared contract room', invite: [agent.matrixUserId] }, { Authorization: 'Bearer ' + fixture.owner.nativeToken }); assert.equal(room.status, 200); const roomId = text(record(room.body).room_id);
+    const conflict = await fixture.raw('/api/enrollments/preflight', 'POST', { ownerBackendUserId: fixture.owner.backendUserId, fleetKey: 'collision-check', controller: { name: 'Other controller' }, instances: [{ instanceKey: 'different', name: agent.name, coordinationPolicy: { wakeMode: 'selected', senders: [{ backendUserId: fixture.owner.backendUserId, includeAgents: false }], permissions: [] } }] }); contractError(conflict, 409, 'name_collision');
+    const room = await contractHttp(fixture.native.base, 'POST', '/_matrix/client/v3/createRoom', { name: 'Shared contract room', invite: [agent.backendUserId] }, { Authorization: 'Bearer ' + fixture.owner.nativeToken }); assert.equal(room.status, 200); const roomId = text(record(room.body).room_id);
     await fixture.operation(operations.acceptRoomInvitation, params, { roomId }, agent.token); const grant = await fixture.data(operations.grant, { ...params, roomId }); assert.equal(record(grant.grant).roomId, roomId);
     const conversation = await fixture.data(operations.ownerConversation, params, {}, agent.token); const ownerRoom = text(conversation.roomId); assert.notEqual(ownerRoom, roomId);
-    const membership = await contractHttp(fixture.native.base, 'GET', '/_matrix/client/v3/rooms/' + encodeURIComponent(ownerRoom) + '/joined_members', undefined, { Authorization: 'Bearer ' + agent.token }); assert.equal(membership.status, 200); assert.deepEqual(Object.keys(record(record(membership.body).joined)).sort(), [fixture.owner.matrixUserId, agent.matrixUserId].sort());
-    await fixture.operation(operations.grants, params); await fixture.operation(operations.wakePolicy, params); await fixture.operation(operations.resolvePrincipals, {}, { matrixUserIds: [agent.matrixUserId, fixture.owner.matrixUserId] }, agent.token);
+    const membership = await contractHttp(fixture.native.base, 'GET', '/_matrix/client/v3/rooms/' + encodeURIComponent(ownerRoom) + '/joined_members', undefined, { Authorization: 'Bearer ' + agent.token }); assert.equal(membership.status, 200); assert.deepEqual(Object.keys(record(record(membership.body).joined)).sort(), [fixture.owner.backendUserId, agent.backendUserId].sort());
+    await fixture.operation(operations.grants, params); await fixture.operation(operations.wakePolicy, params); await fixture.operation(operations.resolvePrincipals, {}, { backendUserIds: [agent.backendUserId, fixture.owner.backendUserId] }, agent.token);
   });
   await scope.test('controller leases, message receipts, runtime status and explicit owner answers', async () => {
     await fixture.operation(operations.reportFleetConnection, { ...fleetParams, connectionId: agent.connectionId }, { stopped: false }, agent.credential);
@@ -124,7 +126,7 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
   });
   await scope.test('every backend resumes the exact same SQLite file and canonical identities', async () => {
     const original = fixture.current();
-    for (const target of fixture.targets) { await fixture.restart(target); const current = await fixture.data(operations.agent, params); assert.equal(current.agentId, agent.id); assert.equal(current.matrixUserId, agent.matrixUserId); await fixture.operation(operations.currentSession); }
+    for (const target of fixture.targets) { await fixture.restart(target); const current = await fixture.data(operations.agent, params); assert.equal(current.agentId, agent.id); assert.equal(current.backendUserId, agent.backendUserId); await fixture.operation(operations.currentSession); }
     await fixture.restart(original);
   });
   await scope.test('wake schedules, revisions and deletion use one canonical API', async () => {

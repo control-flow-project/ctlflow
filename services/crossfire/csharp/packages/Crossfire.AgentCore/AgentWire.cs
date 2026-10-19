@@ -12,7 +12,7 @@ public static class AgentWire
         writer.WriteNumber("sequence", batch.Sequence); writer.WriteNumber("startedAt", batch.StartedAt); writer.WriteNumber("endedAt", batch.EndedAt); writer.WriteNumber("dropped", batch.Dropped); writer.WriteStartArray("flows");
         foreach (var flow in batch.Flows)
         {
-            writer.WriteStartObject(); writer.WriteString("roomId", flow.RoomId); writer.WriteString("senderMatrixId", flow.SenderMatrixId); writer.WriteString("messageType", flow.MessageType);
+            writer.WriteStartObject(); writer.WriteString("roomId", flow.RoomId); writer.WriteString("senderBackendUserId", flow.SenderBackendUserId); writer.WriteString("messageType", flow.MessageType);
             writer.WriteNumber("observed", flow.Totals.Observed); writer.WriteNumber("delivered", flow.Totals.Delivered); writer.WriteNumber("contentBytes", flow.Totals.ContentBytes); writer.WriteNumber("deliveredBytes", flow.Totals.DeliveredBytes); writer.WriteNumber("attachmentBytes", flow.Totals.AttachmentBytes); writer.WriteNumber("largestBytes", flow.Totals.LargestBytes); writer.WriteEndObject();
         }
         writer.WriteEndArray(); writer.WriteStartArray("usage");
@@ -58,5 +58,4 @@ public static class AgentWire
     });
     public static void Number(ProtocolWriter writer, string key, long? number) { if (number is { } present) writer.WriteNumber(key, present); else writer.WriteNull(key); }
     public static string Segment(string value) => Uri.EscapeDataString(value);
-    public static string Room(string room) => AgentIO.MatrixApi + "/rooms/" + Segment(room);
 }

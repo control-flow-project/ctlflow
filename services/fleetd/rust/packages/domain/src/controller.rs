@@ -1,4 +1,5 @@
 mod actions;
+mod diagnostics;
 mod operations;
 mod recovery;
 pub mod registry;

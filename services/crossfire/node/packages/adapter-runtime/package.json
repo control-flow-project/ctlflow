@@ -1,16 +1,25 @@
 {
   "name": "@ctlflow/crossfire-adapter-runtime",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=26.0.0", "npm": ">=11.17.0" },
-  "dependencies": {
-    "@ctlflow/crossfire-agent-core": "0.1.22",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.22",
-    "@ctlflow/crossfire-contracts": "0.1.22",
-    "@ctlflow/crossfire-kernel": "0.1.22"
+  "engines": {
+    "node": ">=26.0.0",
+    "npm": ">=11.17.0"
   },
-  "exports": { "./*": { "types": "./src/*.ts", "source": "./src/*.ts", "default": "./dist/*.js" } }
+  "dependencies": {
+    "@ctlflow/crossfire-agent-core": "0.1.23",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.23",
+    "@ctlflow/crossfire-contracts": "0.1.23",
+    "@ctlflow/crossfire-kernel": "0.1.23"
+  },
+  "exports": {
+    "./*": {
+      "types": "./src/*.ts",
+      "source": "./src/*.ts",
+      "default": "./dist/*.js"
+    }
+  }
 }

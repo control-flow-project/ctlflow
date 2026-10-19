@@ -96,6 +96,8 @@ struct State {
     observations: Mutex<Observers>,
     before_delivery: Mutex<Option<BeforeDelivery>>,
     inspection_gate: Mutex<Option<InspectionGate>>,
+    settlement_gate: Mutex<Option<InspectionGate>>,
+    acknowledgments: Mutex<Vec<String>>,
 }
 struct Adapter(Arc<State>);
 struct Native {
@@ -352,6 +354,16 @@ impl Connection for Native {
         Ok(())
     }
     async fn settle(&self, _stop: CancellationToken) -> Result<bool> {
+        let barrier = self
+            .state
+            .settlement_gate
+            .lock()
+            .map_err(|_| failed())?
+            .take();
+        if let Some((entered, release)) = barrier {
+            entered.notify_one();
+            release.notified().await;
+        }
         Ok(false)
     }
     async fn recover(&self, text: &str, message: &str, _stop: CancellationToken) -> Result<bool> {
@@ -363,7 +375,12 @@ impl Connection for Native {
             .iter()
             .any(|(id, content)| id == message && content == text))
     }
-    fn acknowledge(&self, _messages: &[String]) -> Result<()> {
+    fn acknowledge(&self, messages: &[String]) -> Result<()> {
+        self.state
+            .acknowledgments
+            .lock()
+            .map_err(|_| failed())?
+            .extend_from_slice(messages);
         Ok(())
     }
     async fn conversation(&self, room: &str, _admission: Option<&Admission>) -> Result<Self> {
@@ -373,7 +390,7 @@ impl Connection for Native {
             .lock()
             .map_err(|_| failed())?
             .iter()
-            .find(|value| value.context == room)
+            .find(|value| value.context == crossfire_kernel::history_context::for_room(room))
             .ok_or_else(failed)?
             .session_id
             .clone();
@@ -421,6 +438,12 @@ impl TurnControl for Native {
     }
 }
 impl OwnedConnection for Native {
+    async fn provider(
+        &self,
+        _cancellation: CancellationToken,
+    ) -> Result<crossfire_agent_core::owned_runtime::ProviderState> {
+        Ok(crossfire_agent_core::owned_runtime::ProviderState::Unknown)
+    }
     async fn activity(&self) -> Result<NativeActivity> {
         let busy = self.inspect().await?;
         let selected = self.state.context_busy.lock().map_err(|_| failed())?;
@@ -460,6 +483,70 @@ fn input() -> Input<Observer> {
         history_mode: HistoryMode::Shared,
         allow_new_history: true,
     }
+}
+
+#[tokio::test]
+async fn receipt_retirement_waits_for_complete_native_history_initialization()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let state = Arc::new(State::default());
+    state
+        .contexts
+        .lock()
+        .map_err(|_| failed())?
+        .push(SavedContext {
+            context: "shared".to_owned(),
+            runtime: "codex".to_owned(),
+            session_id: "saved".to_owned(),
+            workspace: PathBuf::from("/native/workspace"),
+        });
+    let work = Arc::new(Work::default());
+    let owner = Owner::open(
+        Arc::new(Adapter(state.clone())),
+        input(),
+        work.clone(),
+        Time(Arc::new(AtomicI64::new(1))),
+        Initial::ResumeSleeping,
+        CancellationToken::new(),
+        Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
+    )
+    .await?;
+    let logical = owner.runtime()?;
+    work.save_work(&[ResumeWork {
+        context: "shared".to_owned(),
+        session_id: "saved".to_owned(),
+        message_id: "00000000-0000-4000-8000-000000000001".to_owned(),
+        checkpointed_at: 1,
+    }])?;
+    let entered = Arc::new(tokio::sync::Notify::new());
+    let release = Arc::new(tokio::sync::Notify::new());
+    *state.settlement_gate.lock().map_err(|_| failed())? = Some((entered.clone(), release.clone()));
+    let resuming = tokio::spawn({
+        let owner = owner.clone();
+        async move { owner.resume().await }
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), entered.notified()).await?;
+    let retired = logical.acknowledge(&["producer-receipt".to_owned()]);
+    let retained = !state
+        .acknowledgments
+        .lock()
+        .map_err(|_| failed())?
+        .iter()
+        .any(|value| value == "producer-receipt");
+    release.notify_one();
+    resuming.await??;
+    logical.acknowledge(&["producer-receipt".to_owned()])?;
+    owner.close().await?;
+    assert!(retired.is_err_and(|error| error.code == ErrorCode::Unavailable));
+    assert!(retained);
+    assert!(
+        state
+            .acknowledgments
+            .lock()
+            .map_err(|_| failed())?
+            .iter()
+            .any(|value| value == "producer-receipt")
+    );
+    Ok(())
 }
 
 #[tokio::test]

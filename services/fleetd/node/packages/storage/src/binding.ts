@@ -8,7 +8,7 @@ import { success } from '@ctlflow/crossfire-kernel/result';
 import type { Configuration } from '@ctlflow/fleetd-domain/model';
 
 export const identity = check.object({ instanceKey: check.name, name: check.name, agentId: check.identifier, account });
-const parser = check.object({ server: check.text(2048), owner: check.matrixUserId, fleetKey: check.name, fleetId: check.nullable(check.identifier),
+const parser = check.object({ server: check.text(2048), owner: check.backendUserId, fleetKey: check.name, fleetId: check.nullable(check.identifier),
   controllerCredential: check.nullable(check.text(200)), request: check.nullable(check.object({ enrollmentId: check.identifier, claimSecret: check.secret, digest: check.text(64, 64) })), identities: check.list(identity, 100) });
 export type Binding = check.Parsed<typeof parser>;
 export function loadBinding(configuration: Configuration) {

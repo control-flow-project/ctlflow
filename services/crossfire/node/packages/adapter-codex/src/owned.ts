@@ -1,3 +1,4 @@
+import { roomContext } from '@ctlflow/crossfire-kernel/history-context';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { OwnedRuntimeAdapter, OwnedRuntimeConnection, OwnedRuntimeInput } from '@ctlflow/crossfire-agent-core/owned-runtime';
 import type { RuntimeAttachment } from '@ctlflow/crossfire-agent-core/terminal';
@@ -38,8 +39,8 @@ export function codexRuntime(binary = 'codex'): CodexAdapter {
       const contexts = histories;
       const primary = await contexts.open(input.listenerOptions?.historyMode === 'per-room' ? 'control' : 'shared');
       return success({ ...primary, signal: contexts.signal, attachment: { ...attachment, sessionId: primary.sessionId },
-        attachments: contexts.attachments, activity: contexts.activity, inspect: async () => ({ busy: (await contexts.activity()).busy }),
-        ...(input.listenerOptions?.historyMode === 'per-room' ? { conversation: contexts.open } : {}),
+        attachments: contexts.attachments, activity: contexts.activity, provider: contexts.provider, inspect: async () => ({ busy: (await contexts.activity()).busy }),
+        ...(input.listenerOptions?.historyMode === 'per-room' ? { conversation: (room, admission) => contexts.open(roomContext(room), admission) } : {}),
         settle: contexts.settle, acknowledge: contexts.acknowledge, turnControl: { activeTurn: contexts.activeTurn, interrupt: contexts.interrupt },
         close: async () => { try { await contexts.close(); } finally { await owner.close(); } } });
     } catch (error) { try { await histories?.close(); } finally { await process?.close(); }

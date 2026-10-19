@@ -1,18 +1,21 @@
 {
   "name": "@ctlflow/crossfire-data",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=26.0.0", "npm": ">=11.17.0" },
+  "engines": {
+    "node": ">=26.0.0",
+    "npm": ">=11.17.0"
+  },
   "dependencies": {
     "better-sqlite3": "13.0.3",
     "knex": "3.2.10"
   },
   "exports": {
     "./management/sqlite/contract": "./management/sqlite/contract.json",
-    "./management/sqlite/schema": "./management/sqlite/migrations/assets/schema-17.json",
+    "./management/sqlite/schema": "./management/sqlite/schema.json",
     "./management/sqlite/configuration": {
       "types": "./management/sqlite/configuration.d.mts",
       "source": "./management/sqlite/configuration.mjs",

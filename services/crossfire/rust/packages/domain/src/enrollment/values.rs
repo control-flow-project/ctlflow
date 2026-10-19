@@ -23,7 +23,7 @@ pub struct Controller {
 pub struct Roster {
     pub controller: Controller,
     pub controller_credential: Option<Secret>,
-    pub owner_matrix_id: String,
+    pub owner_backend_user_id: String,
     pub fleet_key: String,
     pub instances: Vec<Entry>,
 }
@@ -142,23 +142,17 @@ pub struct DecisionResult {
     pub revision: i64,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Account {
-    pub matrix_user_id: String,
-    pub access_token: Secret,
-    pub device_id: String,
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExchangedInstance {
     pub instance_key: String,
     pub name: String,
     pub agent_id: String,
     pub error_code: Option<String>,
-    pub account: Option<Account>,
+    pub account: Option<crate::messaging::Account>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Exchange {
     pub status: &'static str,
-    pub owner_matrix_id: String,
+    pub owner_backend_user_id: String,
     pub fleet: Option<(String, Option<Secret>)>,
     pub instances: Vec<ExchangedInstance>,
 }

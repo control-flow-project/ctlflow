@@ -12,12 +12,12 @@ public static class ChatPublicationAcceptance
         var values = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         var storage = new LocalState(values.ContainsKey, (file, _) => values[file], (file, bytes, _) => values[file] = bytes.ToArray(), file => values.Remove(file));
         await using var runtime = new MemoryRuntime();
-        var settings = new AgentSettings("proof", "https://matrix.test", "test", "@owner:test", 100000);
+        var settings = new ClientSettings("proof", "https://channel.test", new("fixture", WireJson.Object(_ => { })), "owner", 100000);
         var artifacts = new MessageArtifacts(storage, "messages", () => 0, () => false, () => new HashSet<string>());
         var publication = new ChatPublication(storage, "publication", settings, runtime, NativeHistoryMode.Shared, () => 65536, artifacts,
             _ => true, (_, _) => ValueTask.FromResult(Results.Done()), _ => { }, _ => { });
-        var events = new ReceivedEvent[] { new("!alpha:test", new("room", "Alpha", null), "$alpha", settings.Owner, "m.room.message",
-            WireJson.Object(writer => { writer.WriteString("msgtype", "m.text"); writer.WriteString("body", "Unread input"); }), "2026-10-15T00:00:00.000Z") };
+        var events = new ReceivedEvent[] { new("!alpha:test", new("room", "Alpha", null), "$alpha", settings.Owner, "message",
+            new("text", "Unread input", [], false, false, [], WireJson.Object(_ => { })), "2026-10-15T00:00:00.000Z", null) };
         var cursors = new Dictionary<string, string> { ["!alpha:test"] = "cursor-alpha" };
         var batch = new ReadBatch(events, cursors, [], new Dictionary<string, string> { ["!alpha:test"] = "$alpha" });
         var identities = new Dictionary<string, PrincipalIdentity> { [settings.Owner] = new(settings.Owner, "human", null, "Owner", null) };

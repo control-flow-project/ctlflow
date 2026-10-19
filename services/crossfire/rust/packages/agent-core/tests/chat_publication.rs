@@ -105,14 +105,17 @@ impl Connection for Native {
 fn settings() -> Settings {
     Settings {
         instance: "analyst".to_owned(),
-        homeserver: "http://localhost:3000".to_owned(),
-        server_name: "local".to_owned(),
+        server: "http://localhost:3000".to_owned(),
+        backend: crossfire_domain::messaging::BackendConfiguration {
+            backend_type: "fixture".to_owned(),
+            parameters: Default::default(),
+        },
         owner: "@owner:local".to_owned(),
         max_upload_bytes: 1048576,
     }
 }
 fn batch(rooms: &[&str]) -> Result<Batch> {
-    let events = rooms.iter().enumerate().map(|(index, room)| events::view(&json!({"event_id":format!("$event-{index}"),"sender":"@owner:local","type":"m.room.message","content":{"msgtype":"m.text","body":format!("Request in {room}")}}), room)).collect::<Result<Vec<_>>>()?;
+    let events = rooms.iter().enumerate().map(|(index, room)| events::view(&crossfire_adapter_matrix::message_events::parse(&json!({"event_id":format!("$event-{index}"),"sender":"@owner:local","type":"m.room.message","content":{"msgtype":"m.text","body":format!("Request in {room}")}}), room)?, room)).collect::<Result<Vec<_>>>()?;
     Ok(Batch {
         cursors: rooms
             .iter()
@@ -130,9 +133,9 @@ fn identities() -> BTreeMap<String, PrincipalIdentity> {
     BTreeMap::from([(
         "@owner:local".to_owned(),
         PrincipalIdentity {
-            matrix_user_id: "@owner:local".to_owned(),
+            backend_user_id: "@owner:local".to_owned(),
             kind: Some(PrincipalKind::Human),
-            owner_matrix_id: None,
+            owner_backend_user_id: None,
             display_name: Some("Owner".to_owned()),
             owner_display_name: None,
         },

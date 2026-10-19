@@ -1,6 +1,7 @@
 use crate::account::{API, Authority, OperationKey};
+use crate::room_state;
 use crossfire_contracts::origin::segment;
-use crossfire_contracts::{matrix_room, validation};
+use crossfire_contracts::validation;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, secret::Secret};
 use reqwest::Method;
 use serde_json::{Map, Value, json};
@@ -30,7 +31,7 @@ impl Authority {
                 )
             })?;
         for (identity, rooms) in rooms {
-            validation::matrix_user_id(&json!(identity)).map_err(|_| {
+            crate::syntax::user_id(&json!(identity)).map_err(|_| {
                 Failure::new(
                     ErrorCode::Native,
                     "Invalid native direct-message account data",
@@ -46,7 +47,7 @@ impl Authority {
                     )
                 })?;
             for room in rooms {
-                validation::room_id(room).map_err(|_| {
+                crate::syntax::room_id(room).map_err(|_| {
                     Failure::new(
                         ErrorCode::Native,
                         "Invalid native direct-message account data",
@@ -58,8 +59,8 @@ impl Authority {
     }
 
     pub async fn mark_direct(&self, user: &str, counterpart: &str, room: &str) -> Result<()> {
-        validation::matrix_user_id(&json!(counterpart))?;
-        validation::room_id(&json!(room))?;
+        crate::syntax::user_id(&json!(counterpart))?;
+        crate::syntax::room_id(&json!(room))?;
         let _guard = self
             .exclusive(OperationKey::AccountData(user.to_owned()))
             .await?;
@@ -92,16 +93,16 @@ impl Authority {
         agent: &str,
         room: &str,
     ) -> Result<()> {
-        validation::matrix_user_id(&json!(owner))?;
-        validation::matrix_user_id(&json!(agent))?;
-        validation::room_id(&json!(room))?;
+        crate::syntax::user_id(&json!(owner))?;
+        crate::syntax::user_id(&json!(agent))?;
+        crate::syntax::room_id(&json!(room))?;
         if owner == agent {
             return Err(Failure::new(
                 ErrorCode::Invalid,
                 "Invalid owner conversation identities",
             ));
         }
-        matrix_room::owner_conversation(&self.state(owner, room).await?, owner, agent)
+        room_state::owner_conversation(&self.state(owner, room).await?, owner, agent)
     }
 
     async fn conversation_name(&self, agent: &str) -> Result<String> {
@@ -120,12 +121,12 @@ impl Authority {
         selected: Option<&str>,
         previous_name: Option<&str>,
     ) -> Result<String> {
-        if validation::matrix_user_id(&json!(owner)).is_err()
-            || validation::matrix_user_id(&json!(agent)).is_err()
+        if crate::syntax::user_id(&json!(owner)).is_err()
+            || crate::syntax::user_id(&json!(agent)).is_err()
             || owner == agent
             || !owner.ends_with(&format!(":{}", self.configuration.server_name))
             || !agent.ends_with(&format!(":{}", self.configuration.server_name))
-            || selected.is_some_and(|room| validation::room_id(&json!(room)).is_err())
+            || selected.is_some_and(|room| crate::syntax::room_id(&json!(room)).is_err())
         {
             return Err(Failure::new(
                 ErrorCode::Invalid,
@@ -147,7 +148,7 @@ impl Authority {
                 .flatten()
                 .filter_map(Value::as_str)
             {
-                match matrix_room::owner_conversation(
+                match room_state::owner_conversation(
                     &self.state_with_token(&owner_token, candidate).await?,
                     owner,
                     agent,
@@ -184,8 +185,10 @@ impl Authority {
                         "room_alias_name":local_alias,"invite":[agent],"power_level_content_override":{"invite":100}}))).await?;
                 if response.status == 200 {
                     selected = Some(
-                        validation::room_id(response.body.get("room_id").unwrap_or(&Value::Null))
-                            .map_err(|_| {
+                        crate::syntax::room_id(
+                            response.body.get("room_id").unwrap_or(&Value::Null),
+                        )
+                        .map_err(|_| {
                             Failure::new(
                                 ErrorCode::Native,
                                 "Native owner conversation creation was not confirmed",
@@ -214,7 +217,7 @@ impl Authority {
                     ));
                 }
                 selected = Some(
-                    validation::room_id(existing.body.get("room_id").unwrap_or(&Value::Null))
+                    crate::syntax::room_id(existing.body.get("room_id").unwrap_or(&Value::Null))
                         .map_err(|_| {
                             Failure::new(
                                 ErrorCode::Native,
@@ -231,7 +234,7 @@ impl Authority {
             )
         })?;
         let events = self.state_with_token(&owner_token, &room).await?;
-        matrix_room::owner_conversation(&events, owner, agent)?;
+        room_state::owner_conversation(&events, owner, agent)?;
         let title = events
             .iter()
             .find(|event| event.event_type == "m.room.name" && event.state_key.is_empty())
@@ -296,7 +299,7 @@ impl Authority {
                     .await?;
             }
         }
-        matrix_room::owner_conversation(
+        room_state::owner_conversation(
             &self.state_with_token(&owner_token, &room).await?,
             owner,
             agent,

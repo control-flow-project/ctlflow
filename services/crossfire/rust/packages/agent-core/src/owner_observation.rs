@@ -2,17 +2,12 @@ use crate::{
     coordination::Coordination,
     events::invalid,
     local_state::{self, LocalState},
-    matrix::{self, API, Matrix, Request},
     owner_authority, owner_notices,
     profile::Profile,
     runtime::{ObservationEvent, SessionState},
 };
-use crossfire_contracts::{
-    call::Call,
-    operations::{Method, OperationId},
-    origin::segment,
-    runtime as wire,
-};
+use crossfire_contracts::{call::Call, operations::OperationId, runtime as wire};
+use crossfire_domain::messaging_client::MessagingClient;
 use crossfire_domain::runtime::values::{HistoryMode, State};
 use crossfire_kernel::{Result, failure::ErrorCode, time::Clock};
 use serde::{Deserialize, Serialize};
@@ -54,7 +49,7 @@ struct StateJournal {
 pub struct Observer<S, C, M, T> {
     storage: Arc<S>,
     coordination: Arc<C>,
-    matrix: Arc<M>,
+    messaging: Arc<M>,
     clock: T,
     profile: Profile,
     file: String,
@@ -69,18 +64,20 @@ pub struct Options {
     pub file: String,
     pub history_mode: HistoryMode,
 }
-impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> owner_notices::Sink
+impl<S: LocalState, C: Coordination, M: MessagingClient, T: Clock + Send + Sync> owner_notices::Sink
     for Observer<S, C, M, T>
 {
     fn notice(&self, identity: &str, text: &str) -> Result<()> {
         Observer::notice(self, identity, text)
     }
 }
-impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Observer<S, C, M, T> {
+impl<S: LocalState, C: Coordination, M: MessagingClient, T: Clock + Send + Sync>
+    Observer<S, C, M, T>
+{
     pub fn open(
         storage: Arc<S>,
         coordination: Arc<C>,
-        matrix: Arc<M>,
+        messaging: Arc<M>,
         clock: T,
         options: Options,
         reporting: watch::Receiver<Option<String>>,
@@ -90,7 +87,7 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Observer
         let mut sources = BTreeSet::new();
         for output in &journal.output {
             if output.id.is_empty()
-                || output.text.len() > owner_notices::BYTES
+                || !messaging.notice_fits(&output.text)
                 || output.sources.is_empty()
                 || output
                     .sources
@@ -112,7 +109,7 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Observer
         Ok(Self {
             storage,
             coordination,
-            matrix,
+            messaging,
             clock,
             profile: options.profile,
             file: options.file,
@@ -154,7 +151,7 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Observer
             .state
             .lock()
             .map_err(|_| invalid("Observation ownership failed"))?;
-        for (position, text) in owner_notices::chunks(text).enumerate() {
+        for (position, text) in self.messaging.notice_chunks(text).into_iter().enumerate() {
             let id = owner_notices::identity(&json!(["listener-notice", identity, position]))?;
             if state.sources.insert(id.clone()) {
                 state.journal.output.push(Output {
@@ -219,7 +216,8 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Observer
             } => {
                 state.last_activity = Some(self.clock.now()?);
                 let stream = stream_id.map(|stream| json!([session_id, stream]).to_string());
-                for (position, part) in owner_notices::chunks(&text).enumerate() {
+                for (position, part) in self.messaging.notice_chunks(&text).into_iter().enumerate()
+                {
                     let source = owner_notices::identity(&json!([session_id, id, position]))?;
                     if !state.sources.insert(source.clone()) {
                         continue;
@@ -228,9 +226,9 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Observer
                         && stream.is_some()
                         && previous.stream_id == stream
                         && !previous.sealed
-                        && previous.text.len() + part.len() <= owner_notices::BYTES
+                        && self.messaging.notice_fits(&(previous.text.clone() + &part))
                     {
-                        previous.text.push_str(part);
+                        previous.text.push_str(&part);
                         previous.sources.push(source);
                     } else {
                         state.journal.output.push(Output {
@@ -247,21 +245,9 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Observer
         self.save(&state)
     }
     async fn typing(&self, room: &str, enabled: bool, stop: CancellationToken) -> Result<()> {
-        let mut request = Request::new(
-            Method::Put,
-            format!(
-                "{API}/rooms/{}/typing/{}",
-                segment(room),
-                segment(&self.profile.account.user_id)
-            ),
-        );
-        request.body = Some(if enabled {
-            json!({"typing":true,"timeout":30000})
-        } else {
-            json!({"typing":false})
-        });
-        matrix::request(self.matrix.as_ref(), &request, stop).await?;
-        Ok(())
+        self.messaging
+            .thinking(room, &self.profile.account.user_id, enabled, 30000, stop)
+            .await
     }
     pub async fn delivered(
         &self,
@@ -395,21 +381,19 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Observer
             };
             let room = owner_authority::conversation(
                 self.coordination.as_ref(),
-                self.matrix.as_ref(),
+                self.messaging.as_ref(),
                 &self.profile,
                 stop.clone(),
             )
             .await?;
-            let mut send = Request::new(
-                Method::Put,
-                format!(
-                    "{API}/rooms/{}/send/m.room.message/observation-{}",
-                    segment(&room),
-                    output.id
-                ),
-            );
-            send.body = Some(owner_notices::content(&output.text));
-            matrix::request(self.matrix.as_ref(), &send, stop.clone()).await?;
+            self.messaging
+                .send_notice(
+                    &room,
+                    &format!("observation-{}", output.id),
+                    &output.text,
+                    stop.clone(),
+                )
+                .await?;
             let mut state = self
                 .state
                 .lock()

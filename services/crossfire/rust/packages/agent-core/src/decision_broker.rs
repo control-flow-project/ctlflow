@@ -2,17 +2,15 @@ use crate::{
     coordination::Coordination,
     events::invalid,
     local_state::{self, LocalState},
-    matrix::{self, API, Matrix, Request},
     owner_authority,
     profile::Profile,
     runtime::Decision,
 };
+use crossfire_contracts::origin::segment;
 use crossfire_contracts::{
-    call::Call,
-    operations::{Method, OperationId},
-    origin::segment,
-    runtime as wire, validation as check,
+    call::Call, operations::OperationId, runtime as wire, validation as check,
 };
+use crossfire_domain::messaging_client::MessagingClient;
 use crossfire_domain::runtime::values::{OptionChoice, Question};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, time::Clock};
 use serde::{Deserialize, Serialize};
@@ -74,7 +72,7 @@ impl<S: LocalState> Drop for Pending<'_, S> {
 pub struct Broker<S, C, M, T> {
     pub storage: Arc<S>,
     pub coordination: Arc<C>,
-    pub matrix: Arc<M>,
+    pub messaging: Arc<M>,
     pub clock: T,
     pub profile: Profile,
     file: String,
@@ -90,11 +88,13 @@ fn key(decision: &Decision) -> String {
     ])
     .to_string()
 }
-impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Broker<S, C, M, T> {
+impl<S: LocalState, C: Coordination, M: MessagingClient, T: Clock + Send + Sync>
+    Broker<S, C, M, T>
+{
     pub fn open(
         storage: Arc<S>,
         coordination: Arc<C>,
-        matrix: Arc<M>,
+        messaging: Arc<M>,
         clock: T,
         profile: Profile,
         file: &str,
@@ -120,7 +120,7 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Broker<S
         Ok(Self {
             storage,
             coordination,
-            matrix,
+            messaging,
             clock,
             profile,
             file: file.to_owned(),
@@ -329,7 +329,7 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Broker<S
         };
         owner_authority::authorize(
             self.coordination.as_ref(),
-            self.matrix.as_ref(),
+            self.messaging.as_ref(),
             &self.profile,
             stop.clone(),
         )
@@ -361,7 +361,7 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Broker<S
         self.coordination.call(&create, stop.clone()).await?;
         let room = owner_authority::conversation(
             self.coordination.as_ref(),
-            self.matrix.as_ref(),
+            self.messaging.as_ref(),
             &self.profile,
             stop.clone(),
         )
@@ -390,26 +390,15 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Broker<S
                 .collect::<Vec<_>>()
                 .join("\n\n")
         );
-        let mut position = 0;
-        let mut remainder = notice.as_str();
-        while !remainder.is_empty() {
-            let mut end = remainder.len().min(12000);
-            while !remainder.is_char_boundary(end) {
-                end -= 1;
-            }
-            let mut message = Request::new(
-                Method::Put,
-                format!(
-                    "{API}/rooms/{}/send/m.room.message/{id}-{position}",
-                    segment(&room)
-                ),
-            );
-            message.body = Some(
-                json!({"msgtype":"m.notice","body":&remainder[..end],"org.crossfire.listener_notice":true}),
-            );
-            matrix::request(self.matrix.as_ref(), &message, stop.clone()).await?;
-            remainder = &remainder[end..];
-            position += 1;
+        for (position, part) in self
+            .messaging
+            .notice_chunks(&notice)
+            .into_iter()
+            .enumerate()
+        {
+            self.messaging
+                .send_notice(&room, &format!("{id}-{position}"), &part, stop.clone())
+                .await?;
         }
         loop {
             if let Some(expiry) = expires_at
@@ -428,7 +417,7 @@ impl<S: LocalState, C: Coordination, M: Matrix, T: Clock + Send + Sync> Broker<S
                 Some("answered") => {
                     owner_authority::authorize(
                         self.coordination.as_ref(),
-                        self.matrix.as_ref(),
+                        self.messaging.as_ref(),
                         &self.profile,
                         stop,
                     )

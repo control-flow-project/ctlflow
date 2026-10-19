@@ -9,8 +9,8 @@ namespace Crossfire.Server.Http;
 
 public static class RoomRoutes
 {
-    private static RoomGrantPorts Grants(ApiContext context) => RoomGrantCommands.Ports(context.Database, context.State.Now, context.State.Matrix.Room);
-    private static OwnerConversationPorts Conversations(ApiContext context) => OwnerConversationCommands.Ports(context.Database, context.State.Now, context.State.Matrix.Ports(), context.State.Matrix.RoomOperation);
+    private static RoomGrantPorts Grants(ApiContext context) => RoomGrantCommands.Ports(context.Database, context.State.Now, context.State.Messaging);
+    private static OwnerConversationPorts Conversations(ApiContext context) => OwnerConversationCommands.Ports(context.Database, context.State.Now, context.State.Messaging, context.State.RoomOperation);
     public static IReadOnlyList<ApiEndpoint> Endpoints() =>
     [
         new("ownerConversation", Owner), new("acceptRoomInvitation", Accept), new("rooms", Rooms, ["page", "pageSize", "agentId", "search"]), new("room", Room, ["agentId"]),
@@ -31,7 +31,7 @@ public static class RoomRoutes
     {
         var fields = Validation.Fields(input, ["roomId"]); if (!fields.IsSuccess) return Result<ApiReply>.Fail(fields.Error);
         var room = Validation.Text(input.GetProperty("roomId")); if (!room.IsSuccess || !Validation.RoomId(room.Value)) return Results.Fail<ApiReply>("invalid", "Invalid invited room");
-        return Replies.Of((await RoomInvitations.Accept(Conversations(context), id => MemberQueries.ByMatrixId(context.Database, id), context.Actor, parameters["agentId"], room.Value, context.RequestId, context.Http.RequestAborted))
+        return Replies.Of((await RoomInvitations.Accept(Conversations(context), id => MemberQueries.ByBackendUserId(context.Database, id), context.Actor, parameters["agentId"], room.Value, context.RequestId, context.Http.RequestAborted))
             .Map(accepted => JsonValues.Object(writer => writer.WriteBoolean("accepted", accepted))));
     }
 
@@ -40,13 +40,13 @@ public static class RoomRoutes
         var page = Transport.Page(context.Query); if (!page.IsSuccess) return Result<ApiReply>.Fail(page.Error);
         var agent = context.Query.GetValueOrDefault("agentId"); var search = context.Query.GetValueOrDefault("search", "");
         if (agent is not null && !Validation.Identifier(agent) || search.Length > 200 || search.Any(value => value is <= '\u001f' or '\u007f')) return Results.Fail<ApiReply>("invalid", "Invalid room filters");
-        return Replies.Paged(await RoomReads.List(Grants(context), context.State.Matrix.Ports(), context.Actor, page.Value.Page, page.Value.PageSize, search, agent, context.Http.RequestAborted), context.RequestId, RoomViews.Room);
+        return Replies.Paged(await RoomReads.List(Grants(context), context.State.Messaging, context.Actor, page.Value.Page, page.Value.PageSize, search, agent, context.Http.RequestAborted), context.RequestId, RoomViews.Room);
     }
 
     private static async ValueTask<Result<ApiReply>> Room(ApiContext context, IReadOnlyDictionary<string, string> parameters, JsonElement input)
     {
         var agent = context.Query.GetValueOrDefault("agentId"); if (agent is not null && !Validation.Identifier(agent)) return Results.Fail<ApiReply>("invalid", "Invalid room agent context");
-        return Replies.Of((await RoomReads.Read(Grants(context), context.State.Matrix.Ports(), context.Actor, parameters["roomId"], agent, context.Http.RequestAborted)).Map(value => JsonValues.Value(writer => RoomViews.Room(writer, value))));
+        return Replies.Of((await RoomReads.Read(Grants(context), context.State.Messaging, context.Actor, parameters["roomId"], agent, context.Http.RequestAborted)).Map(value => JsonValues.Value(writer => RoomViews.Room(writer, value))));
     }
 
     private static Result<IReadOnlyList<string>?> Filter(string? value)
@@ -66,7 +66,7 @@ public static class RoomRoutes
     {
         var page = Transport.Page(context.Query); if (!page.IsSuccess) return Replies.Ready(Result<ApiReply>.Fail(page.Error));
         var filter = Filter(context.Query.GetValueOrDefault("roomIds"));
-        return Replies.Ready(filter.IsSuccess ? Replies.Paged(RoomGrantReads.List(RoomGrantReadQueries.Ports(context.Database, context.State.Now, context.State.Matrix.Room), context.Actor, parameters["agentId"], page.Value.Page, page.Value.PageSize, filter.Value), context.RequestId, RoomViews.View) : Result<ApiReply>.Fail(filter.Error));
+        return Replies.Ready(filter.IsSuccess ? Replies.Paged(RoomGrantReads.List(RoomGrantReadQueries.Ports(context.Database, context.State.Now, context.State.Messaging), context.Actor, parameters["agentId"], page.Value.Page, page.Value.PageSize, filter.Value), context.RequestId, RoomViews.View) : Result<ApiReply>.Fail(filter.Error));
     }
 
     private static async ValueTask<Result<ApiReply>> Read(ApiContext context, IReadOnlyDictionary<string, string> parameters, JsonElement input)
@@ -74,10 +74,10 @@ public static class RoomRoutes
 
     private static async ValueTask<Result<ApiReply>> Change(ApiContext context, IReadOnlyDictionary<string, string> parameters, JsonElement input, bool remove)
     {
-        var fields = Validation.Fields(input, remove ? ["expectedRevision", "expectedGeneration"] : ["expectedRevision", "expectedGeneration", "accessMode", "powerLevel", "muted"]); if (!fields.IsSuccess) return Result<ApiReply>.Fail(fields.Error);
+        var fields = Validation.Fields(input, remove ? ["expectedRevision", "expectedGeneration"] : ["expectedRevision", "expectedGeneration", "accessMode", "nativeAccess", "muted"]); if (!fields.IsSuccess) return Result<ApiReply>.Fail(fields.Error);
         var revision = Validation.Integer(input.GetProperty("expectedRevision")); var generation = Validation.NullableText(input.GetProperty("expectedGeneration"));
         var access = remove ? Result<string>.Success("none") : Validation.Choice(input.GetProperty("accessMode"), "read", "reply", "custom");
-        var power = remove ? Result<long?>.Success(null) : Validation.NullableInteger(input.GetProperty("powerLevel"), -Validation.MaxWireInteger);
+        var power = remove ? Result<JsonElement?>.Success(null) : MessagingContract.NativeAccess(input.GetProperty("nativeAccess"));
         var muted = remove ? Result<bool>.Success(false) : Validation.Boolean(input.GetProperty("muted"));
         if (!revision.IsSuccess || !generation.IsSuccess || generation.Value is not null && !Validation.Identifier(generation.Value) || !access.IsSuccess || !power.IsSuccess || !muted.IsSuccess) return Results.Fail<ApiReply>("invalid", "Invalid room access change");
         var changed = await RoomGrantChanges.Change(Grants(context), context.Actor, new(parameters["agentId"], parameters["roomId"], revision.Value, generation.Value, access.Value, power.Value, muted.Value), context.RequestId, cancellation: context.Http.RequestAborted);

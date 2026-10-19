@@ -1,10 +1,10 @@
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import type { Services } from '../port/services.js';
-export async function createSession(services: Pick<Services, 'matrix' | 'directory' | 'repositories' | 'collection' | 'unitOfWork' | 'identity' | 'clock'>, nativeAccessToken: string) {
-  const identity = await services.matrix.identify(nativeAccessToken);
+export async function createSession(services: Pick<Services, 'messaging' | 'directory' | 'repositories' | 'collection' | 'unitOfWork' | 'identity' | 'clock'>, nativeAccessToken: string) {
+  const identity = await services.messaging.identify(nativeAccessToken);
   if (!identity.ok) return identity;
   return services.unitOfWork.run(() => {
-    const principal = services.directory.principalByMatrixId(identity.value);
+    const principal = services.directory.principalByBackendUserId(identity.value);
     if (!principal.ok) return principal;
     if (!principal.value || principal.value.kind !== 'human' || principal.value.status !== 'active') return failure('forbidden', 'An active human membership is required');
     const member = services.directory.member(principal.value.id);

@@ -11,7 +11,7 @@ test('controller listener admission rejects superseded artifacts before native s
   const installed = builtRelease().release;
   const current = updatedRelease(installed, 'README.md', '# Updated instructions\n');
   fixture.reporting.current = current.manifest;
-  const notice = updateNotice(fixture.settings.homeserver, installed.manifest.release, current.manifest, installed.manifest.artifacts['SKILL.md'].sha256);
+  const notice = updateNotice(fixture.settings.server, installed.manifest.release, current.manifest, installed.manifest.artifacts['SKILL.md'].sha256);
   assert.match(notice, /skill content is unchanged/u);
   assert.match(notice, /consent before updating the owning fleet controller/u);
   assert.match(notice, /Never start a competing listener/u);

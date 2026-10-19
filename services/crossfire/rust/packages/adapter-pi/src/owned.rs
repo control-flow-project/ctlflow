@@ -278,7 +278,7 @@ impl<H: Hooks + 'static> Connection for PiOwnedConnection<H> {
             connection: self
                 .owner
                 .histories
-                .open(self.owner.histories.context(Some(room)), admission)
+                .open(&self.owner.histories.context(Some(room)), admission)
                 .await?,
             root: false,
         })
@@ -298,6 +298,12 @@ impl<H: Hooks + 'static> Connection for PiOwnedConnection<H> {
     }
 }
 impl<H: Hooks + 'static> OwnedConnection for PiOwnedConnection<H> {
+    async fn provider(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Result<crossfire_agent_core::owned_runtime::ProviderState> {
+        self.connection.provider(cancellation).await
+    }
     async fn activity(&self) -> Result<NativeActivity> {
         self.owner.histories.activity().await
     }
@@ -314,11 +320,13 @@ impl<H: Hooks + 'static> TurnControl for PiOwnedConnection<H> {
         room: Option<&str>,
         admission: Option<&Admission>,
     ) -> Result<Option<String>> {
-        let context = self.owner.histories.context(room.or(Some(&self.context)));
+        let context = room
+            .map(|room| self.owner.histories.context(Some(room)))
+            .unwrap_or_else(|| self.context.clone());
         let connection = if admission.is_some() {
-            Some(self.owner.histories.open(context, admission).await?)
+            Some(self.owner.histories.open(&context, admission).await?)
         } else {
-            self.owner.histories.existing(context)?
+            self.owner.histories.existing(&context)?
         };
         let turn = match connection {
             Some(connection) => connection.active_turn(None, admission).await?,

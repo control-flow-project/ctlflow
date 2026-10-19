@@ -14,6 +14,10 @@ public static class WireJson
     { var bytes = new ArrayBufferWriter<byte>(); using (var writer = new Utf8JsonWriter(bytes)) write(new ProtocolWriter(writer)); using var document = JsonDocument.Parse(bytes.WrittenMemory); return document.RootElement.Clone(); }
     public static JsonElement Object(Action<ProtocolWriter> write) => Build(writer => { writer.WriteStartObject(); write(writer); writer.WriteEndObject(); });
     public static JsonElement Array(Action<ProtocolWriter> write) => Build(writer => { writer.WriteStartArray(); write(writer); writer.WriteEndArray(); });
+    public static JsonElement Array<T>(IReadOnlyList<T> values, Action<ProtocolWriter, T> write)
+        => Array(writer => { foreach (var value in values) write(writer, value); });
+    public static void Strings(ProtocolWriter writer, string name, IReadOnlyList<string> values)
+    { writer.WriteStartArray(name); foreach (var value in values) writer.WriteStringValue(value); writer.WriteEndArray(); }
     public static JsonElement Parse(ReadOnlyMemory<byte> bytes)
     { using var document = Document(bytes); return document.RootElement.Clone(); }
     public static string? Text(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object && value.TryGetProperty(name, out var field) && field.ValueKind == JsonValueKind.String ? ProtocolJson.Unquote(field.GetRawText()).Value : null;

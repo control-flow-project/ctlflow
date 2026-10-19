@@ -61,32 +61,6 @@ pub fn verify(connection: &mut SqliteConnection) -> Result<()> {
     ))
 }
 
-pub fn empty(connection: &mut SqliteConnection) -> Result<bool> {
-    let count: i64 = sqlite_schema::table
-        .filter(sqlite_schema::kind.eq("table"))
-        .filter(sqlite_schema::name.not_like("sqlite_%"))
-        .filter(sqlite_schema::name.ne_all(["knex_migrations", "knex_migrations_lock"]))
-        .count()
-        .get_result(connection)
-        .map_err(super::error::failure)?;
-    if count != 0 {
-        return Ok(false);
-    }
-    let has_migrations = diesel::select(diesel::dsl::exists(
-        sqlite_schema::table
-            .filter(sqlite_schema::kind.eq("table"))
-            .filter(sqlite_schema::name.eq("knex_migrations")),
-    ))
-    .get_result::<bool>(connection)
-    .map_err(super::error::failure)?;
-    Ok(!has_migrations
-        || knex_migrations::table
-            .count()
-            .get_result::<i64>(connection)
-            .map_err(super::error::failure)?
-            == 0)
-}
-
 pub fn valid(connection: &mut SqliteConnection) -> Result<bool> {
     let checks = pragma_integrity_check::table
         .select(pragma_integrity_check::integrity_check)

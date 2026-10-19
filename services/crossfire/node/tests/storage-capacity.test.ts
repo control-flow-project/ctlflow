@@ -105,7 +105,7 @@ test('a full 256 MiB management store reopens and registers listeners without lo
 test('native storage exhaustion is retryable and rolls back the complete transaction', async scope => {
   const database = openTestStore(join(directory(scope), 'management.sqlite')); cleanup(scope, () => database.close());
   const repositories = createRepositories(database), unit = createUnitOfWork(database);
-  const principal = { id: 'capacity-owner', matrixUserId: '@capacity-owner:test', kind: 'human' as const,
+  const principal = { id: 'capacity-owner', backendUserId: '@capacity-owner:test', kind: 'human' as const,
     status: 'active' as const, revision: 0, createdAt: 1 };
   value(repositories.principal.insert(principal));
   const maximum = sqliteMetadata.maximumPageCount(database);
@@ -134,7 +134,7 @@ for (const stage of ['start', 'finish']) {
   test('transaction-level capacity failure at ' + stage + ' preserves the original state', async scope => {
     const database = openTestStore(join(directory(scope), 'management.sqlite')); cleanup(scope, () => database.close());
     const repositories = createRepositories(database), unit = createUnitOfWork(database);
-    const principal = { id: 'transaction-owner', matrixUserId: '@transaction-owner:test', kind: 'human' as const,
+    const principal = { id: 'transaction-owner', backendUserId: '@transaction-owner:test', kind: 'human' as const,
       status: 'active' as const, revision: 0, createdAt: 1 };
     value(repositories.principal.insert(principal));
     const nativeTransaction = database.transaction.bind(database);

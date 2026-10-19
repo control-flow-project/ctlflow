@@ -1,3 +1,4 @@
+import { matrixPublicRoutes } from '@ctlflow/crossfire-adapter-matrix/web/router';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -27,7 +28,7 @@ test('operator browser captures native login before navigation, checks real view
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const routes = { publicOrigin: 'http://127.0.0.1', matrixOrigin: fixture.origin, service: fixture.server,
     web: join(process.cwd(), 'dist/web'), element: join(process.cwd(), 'dist/web') };
-  const { origin } = await secureRouter(scope, publicRouter(routes));
+  const { origin } = await secureRouter(scope, publicRouter({ get publicOrigin() { return routes.publicOrigin; }, service: routes.service, web: routes.web, backend: matrixPublicRoutes(routes) }));
   routes.publicOrigin = origin;
   fixture.application.config.publicOrigin = origin;
   fixture.services.instance.publicOrigin = origin;
@@ -55,7 +56,7 @@ test('operator browser captures native login before navigation, checks real view
   const observed = await verifyBrowser(origin, fixture.account, browserExecutable(scope), directory, new AbortController().signal);
   if (!observed.ok && existsSync(join(directory, 'failure.json'))) scope.diagnostic(readFileSync(join(directory, 'failure.json'), 'utf8'));
   const report = value(observed);
-  assert.equal(report.human, fixture.account.matrixUserId);
+  assert.equal(report.human, fixture.account.backendUserId);
   assert.equal(report.managementRoutes, views.length * managementViewports.length);
   assert.equal(report.wakePickerViewports, 2);
   assert.equal(report.modelCalls, 0);

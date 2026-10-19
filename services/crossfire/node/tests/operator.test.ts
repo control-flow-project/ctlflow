@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { main } from '../apps/server/src/operator.js';
@@ -21,6 +21,9 @@ test('initialization is private, explicit, non-destructive and rejects unrelated
   for (const action of ['reset', 'install', 'run', 'kill']) await assert.rejects(main([action]), /Use init or start/);
   for (const repeated of [['--instance', 'preview'], ['--instance', 'other'], ['--instance=other']])
     await assert.rejects(main([...args, ...repeated]), /Duplicated option --instance/u);
+  const invalidBackend = [...args]; invalidBackend[invalidBackend.indexOf('--server-name') + 1] = 'bad/host';
+  await assert.rejects(main(invalidBackend), /Matrix server configuration/u);
+  assert.deepEqual(readdirSync(directory), [], 'Invalid backend parameters cannot write configuration or credentials');
   await main(args);
   const configurationArguments = args.slice(1).filter((value, index, values) => value !== '--administrator' && values[index - 1] !== '--administrator');
   const configuration = readFileSync(join(directory, 'config.json'), 'utf8');

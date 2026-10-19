@@ -1,0 +1,1 @@
+export const HISTORY_RESOURCE_BYTES = 64 * 1024 * 1024;

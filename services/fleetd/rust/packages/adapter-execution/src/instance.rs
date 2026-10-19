@@ -10,7 +10,6 @@ use crossfire_adapter_crossfire::{
 use crossfire_adapter_filesystem::{
     absolute_state::AbsoluteState, agent_projects, lock::StateLock,
 };
-use crossfire_adapter_matrix::agent::Client as MatrixClient;
 use crossfire_agent_core::{
     coordination::Coordination,
     listener::{self, Factory, Options, Resources},
@@ -22,6 +21,7 @@ use crossfire_agent_core::{
     runtime::SessionState,
 };
 use crossfire_contracts::{call::Call, operations::OperationId};
+use crossfire_domain::messaging_client::{MessagingClient, MessagingConnector};
 use crossfire_domain::runtime::values::HistoryMode;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use fleetd_domain::{
@@ -43,12 +43,12 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-type Startup = RuntimeStart<AgentHooks, Work, Clock>;
-type RuntimeOwner = NativeOwner<AgentHooks, Work, Clock>;
+type Startup<M> = RuntimeStart<AgentHooks<M>, Work, Clock>;
+type RuntimeOwner<M> = NativeOwner<AgentHooks<M>, Work, Clock>;
 type ActivityReporter = Reporter<crossfire_adapter_crossfire::Connection, Clock>;
-struct Agent {
+struct Agent<M: MessagingClient + 'static> {
     session: String,
-    native: Startup,
+    native: Startup<M>,
     stop: CancellationToken,
     control: Arc<Control>,
     connection: Arc<BoundFleet>,
@@ -61,15 +61,19 @@ struct Agent {
     close_owner: AsyncMutex<()>,
     reported_closed: AtomicBool,
 }
-struct Start {
-    inner: Startup,
+struct Start<M: MessagingClient + 'static> {
+    inner: Startup<M>,
     reporter: Arc<Mutex<Option<Arc<ActivityReporter>>>>,
     initialization: Arc<crossfire_adapter_filesystem::local_state::State>,
     id: String,
 }
-impl Factory<AgentHooks> for Start {
-    type Native = <Startup as Factory<AgentHooks>>::Native;
-    async fn start(&self, hooks: Arc<AgentHooks>, stop: CancellationToken) -> Result<Self::Native> {
+impl<M: MessagingClient + 'static> Factory<AgentHooks<M>> for Start<M> {
+    type Native = <Startup<M> as Factory<AgentHooks<M>>>::Native;
+    async fn start(
+        &self,
+        hooks: Arc<AgentHooks<M>>,
+        stop: CancellationToken,
+    ) -> Result<Self::Native> {
         *self
             .reporter
             .lock()
@@ -82,8 +86,8 @@ impl Factory<AgentHooks> for Start {
         Ok(native)
     }
 }
-impl Agent {
-    fn owner(&self) -> Result<Arc<RuntimeOwner>> {
+impl<M: MessagingClient + 'static> Agent<M> {
+    fn owner(&self) -> Result<Arc<RuntimeOwner<M>>> {
         self.native
             .owner()?
             .ok_or_else(|| unavailable("Native startup is not complete"))
@@ -152,7 +156,13 @@ impl Agent {
         Ok(())
     }
 }
-impl RunningAgent for Agent {
+impl<M: MessagingClient + 'static> RunningAgent for Agent<M> {
+    fn diagnostics(
+        &self,
+        cancellation: CancellationToken,
+    ) -> Response<'_, crossfire_agent_core::owned_runtime::NativeDiagnostic> {
+        Box::pin(async move { self.owner()?.diagnostics(cancellation).await })
+    }
     fn session_id(&self) -> &str {
         &self.session
     }
@@ -192,7 +202,7 @@ impl RunningAgent for Agent {
         Box::pin(self.shutdown())
     }
 }
-impl Host {
+impl<C: MessagingConnector> Host<C> {
     pub(crate) async fn start_instance(
         &self,
         configuration: &Configuration,
@@ -238,13 +248,12 @@ impl Host {
                     .as_str()
                     .ok_or_else(|| unavailable("Crossfire did not identify its instance"))?
                     .to_owned(),
-                homeserver: saved.server.clone(),
-                server_name: saved
-                    .owner
-                    .split_once(':')
-                    .ok_or_else(|| unavailable("Invalid enrolled owner"))?
-                    .1
-                    .to_owned(),
+                server: saved.server.clone(),
+                backend: crossfire_contracts::messaging::configuration(
+                    &client
+                        .call(&Call::new(OperationId::MessagingBackend), stop.clone())
+                        .await?["configuration"],
+                )?,
                 owner: saved.owner.clone(),
                 max_upload_bytes: 16777216,
             },
@@ -293,7 +302,12 @@ impl Host {
             host.budget.clone(),
         )?;
         let stop = stop.child_token();
-        let matrix = Arc::new(MatrixClient::new(&profile, stop.clone())?);
+        let messaging = Arc::new(self.messaging.connect(
+            &profile.settings.backend,
+            &profile.account,
+            profile.settings.max_upload_bytes,
+            stop.clone(),
+        )?);
         let control = connection.control.bind(&identity.agent_id)?;
         let binding = match host.bind(listener_host::Options {
             name: format!("fleet-{}", identity.agent_id),
@@ -318,7 +332,7 @@ impl Host {
         let resource = Resources {
             storage: self.storage.clone(),
             coordination: client,
-            matrix,
+            messaging,
             acknowledgment: Arc::new(Acknowledger {
                 fleet: connection.control.clone(),
                 agent: identity.agent_id.clone(),

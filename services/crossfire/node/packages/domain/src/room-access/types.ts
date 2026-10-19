@@ -1,3 +1,5 @@
+import type { JsonObject } from '@ctlflow/crossfire-kernel/json';
+
 export type AgentRoomGrant = {
   agentId: string;
   roomId: string;
@@ -7,7 +9,7 @@ export type AgentRoomGrant = {
   invitationEventId: string | null;
   admissionKind: 'managed' | 'invitation';
   accessMode: 'none' | 'read' | 'reply' | 'custom';
-  powerLevel: number | null;
+  nativeAccess: JsonObject | null;
   muted: boolean;
   revision: number;
   accessRevision: number;
@@ -31,8 +33,7 @@ export type RoomGrantApplication = {
   appliedRevision: number | null;
   appliedAccessRevision: number | null;
   membership: 'join' | 'leave' | 'invite' | 'ban' | null;
-  creator: boolean;
-  powerLevel: number | null;
+  nativeAccess: JsonObject | null;
   lastAttemptAt: number | null;
   lastSuccessAt: number | null;
   nextCheckAt: number;

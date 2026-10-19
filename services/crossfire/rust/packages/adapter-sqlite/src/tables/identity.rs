@@ -34,7 +34,7 @@ diesel::table! {
         expires_at -> BigInt,
         consumed_by_member_id -> Nullable<Text>,
         revoked_at -> Nullable<BigInt>,
-        claim_matrix_user_id -> Nullable<Text>,
+        claim_backend_user_id -> Nullable<Text>,
         claim_display_name -> Nullable<Text>,
         claim_fingerprint -> Nullable<Text>,
     }
@@ -62,7 +62,7 @@ diesel::table! {
 diesel::table! {
     principal (id) {
         id -> Text,
-        matrix_user_id -> Text,
+        backend_user_id -> Text,
         kind -> Text,
         status -> Text,
         revision -> BigInt,

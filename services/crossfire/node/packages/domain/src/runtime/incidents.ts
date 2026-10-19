@@ -90,10 +90,10 @@ export async function reconcileRuntime(services: Services, stopped: () => boolea
     const previous = services.runtime.conversation(owner.value.id);
     if (!previous.ok) return previous;
     if (!previous.value) {
-      const named = await services.matrix.setDisplayName(services.instance.serviceMatrixId, 'crossfire');
+      const named = await services.messaging.setDisplayName(services.messaging.serviceUserId(), 'crossfire');
       if (!named.ok) continue;
     }
-    const conversation = await services.matrix.ownerConversation(owner.value.matrixUserId, services.instance.serviceMatrixId, previous.value?.roomId ?? null, null);
+    const conversation = await services.messaging.ownerConversation(owner.value.backendUserId, services.messaging.serviceUserId(), previous.value?.roomId ?? null, null);
     if (!conversation.ok) {
       const saved = services.unitOfWork.run(() => services.runtime.saveNotification({ ...notice, nextAttemptAt: services.clock.now() + 30000 }));
       if (!saved.ok) return saved;
@@ -103,7 +103,7 @@ export async function reconcileRuntime(services: Services, stopped: () => boolea
       const saved = services.unitOfWork.run(() => services.runtime.insertConversation({ ownerId: owner.value!.id, roomId: conversation.value, createdAt: services.clock.now() }));
       if (!saved.ok) continue;
     }
-    const sent = await services.matrix.sendNotice(services.instance.serviceMatrixId, conversation.value, 'incident-' + notice.incidentId + '-' + notice.phase, notice.body, owner.value.matrixUserId);
+    const sent = await services.messaging.sendNotice(services.messaging.serviceUserId(), conversation.value, 'incident-' + notice.incidentId + '-' + notice.phase, notice.body, owner.value.backendUserId);
     const saved = services.unitOfWork.run(() => services.runtime.saveNotification({ ...notice, nextAttemptAt: services.clock.now() + 30000, eventId: sent.ok ? sent.value : null }));
     if (!saved.ok) return saved;
   }

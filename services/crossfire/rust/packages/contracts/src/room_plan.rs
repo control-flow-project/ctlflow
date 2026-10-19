@@ -1,10 +1,7 @@
 use crate::{enrollment::Digest, room_access, validation as check};
-use crossfire_domain::{
-    matrix::RoomPower,
-    room_access::{
-        plan::*,
-        values::{Access, Change},
-    },
+use crossfire_domain::room_access::{
+    plan::*,
+    values::{Access, Change},
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
 use serde::{Serialize, Serializer, ser::SerializeStruct};
@@ -18,7 +15,11 @@ pub fn plan(value: &Value) -> Result<Plan> {
             let grants = check::list(&value["grants"], 0, 100)?
                 .iter()
                 .map(|value| {
-                    check::object(value, &["roomId", "accessMode", "powerLevel", "muted"], &[])?;
+                    check::object(
+                        value,
+                        &["roomId", "accessMode", "nativeAccess", "muted"],
+                        &[],
+                    )?;
                     Ok(ProposedGrant {
                         room_id: check::room_id(&value["roomId"])?.to_owned(),
                         intent: room_access::intent(value, false)?,
@@ -67,9 +68,8 @@ pub fn preview(value: &Preview) -> Value {
     json!({"digest":value.digest,"snapshots":value.snapshots.iter().map(snapshot).collect::<Vec<_>>(),"changes":value.changes.iter().map(|value| {
         let proof=&value.authorization;let input=&proof.input;
         json!({"agentId":input.agent_id,"roomId":input.room_id,"agentName":value.agent_name,"instanceKey":value.instance_key,"roomName":value.room_name,"roomAlias":value.room_alias,
-            "before":proof.previous.as_ref().map(room_access::grant),"after":if input.intent.access==Access::None{None}else{Some(json!({"roomId":input.room_id,"accessMode":input.intent.access.code(),"powerLevel":input.intent.power,"muted":input.intent.muted}))},
-            "changed":proof.changed,"authorizerId":proof.authorizer_id,"nativePowerLevel":proof.native.as_ref().and_then(|facts|match facts.power{RoomPower::Creator=>None,RoomPower::Level(level)=>Some(level)}),
-            "nativeCreator":proof.native.as_ref().is_some_and(|facts|facts.power==RoomPower::Creator)})
+            "before":proof.previous.as_ref().map(room_access::grant),"after":if input.intent.access==Access::None{None}else{Some(json!({"roomId":input.room_id,"accessMode":input.intent.access.code(),"nativeAccess":input.intent.native_access,"muted":input.intent.muted}))},
+            "changed":proof.changed,"authorizerId":proof.authorizer_id,"authority":proof.native.as_ref().map(room_access::authority)})
     }).collect::<Vec<_>>()})
 }
 #[derive(Serialize)]
@@ -95,7 +95,7 @@ impl Serialize for InputWire<'_> {
             value.serialize_field("roomId", &input.room_id)?;
         }
         value.serialize_field("accessMode", input.intent.access.code())?;
-        value.serialize_field("powerLevel", &input.intent.power)?;
+        value.serialize_field("nativeAccess", &input.intent.native_access)?;
         value.serialize_field("muted", &input.intent.muted)?;
         value.serialize_field("agentId", &input.agent_id)?;
         if input.intent.access == Access::None {
@@ -108,18 +108,10 @@ impl Serialize for InputWire<'_> {
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct NativeWire {
-    power_level: Option<i64>,
-    creator: bool,
-    read_level: i64,
-    reply_level: i64,
-}
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
 struct ChangeWire<'a> {
     input: InputWire<'a>,
     authorizer_id: &'a str,
-    native: Option<NativeWire>,
+    native: Option<&'a crossfire_domain::messaging::RoomFacts>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -156,15 +148,7 @@ pub fn digest_document(preview: &Preview) -> Result<String> {
             .map(|value| ChangeWire {
                 input: InputWire(&value.authorization.input),
                 authorizer_id: &value.authorization.authorizer_id,
-                native: value.authorization.native.as_ref().map(|facts| NativeWire {
-                    power_level: match facts.power {
-                        RoomPower::Creator => None,
-                        RoomPower::Level(level) => Some(level),
-                    },
-                    creator: facts.power == RoomPower::Creator,
-                    read_level: facts.read_level,
-                    reply_level: facts.reply_level,
-                }),
+                native: value.authorization.native.as_ref(),
             })
             .collect(),
     };

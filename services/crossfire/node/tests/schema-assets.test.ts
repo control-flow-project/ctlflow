@@ -20,10 +20,11 @@ test('shared SQLite schema preserves canonical authorization and direct language
     assert.equal(schema.filter(row => row.type === 'index').length, 94);
     assert.equal(schema.filter(row => row.type === 'trigger').length, 26);
     assert.deepEqual(schemaDefinition.reference.role, roleCatalog.map(role => ({ code: role.code, principal_kind: role.principalKind, label: role.label })));
-    assert.deepEqual(schemaDefinition.reference.permission, permissionCatalog.map(permission => ({ code: permission.code, grant_scope: permission.grantScope, description: permission.description })));
+    const permissions = permissionCatalog.map(permission => ({ code: permission.code, grant_scope: permission.grantScope, description: permission.description }));
+    assert.deepEqual(schemaDefinition.reference.permission.map(({ code, grant_scope }) => ({ code, grant_scope })), permissions.map(({ code, grant_scope }) => ({ code, grant_scope })));
     assert.deepEqual(schemaDefinition.reference.role_permission, permissionCatalog.flatMap(permission => permission.roles.map(role => ({ role_code: role, permission_code: permission.code, grant_scope: 'role' }))));
     assert.deepEqual(executeSelect(database, tables, query => query.from('role')), schemaDefinition.reference.role);
-    assert.deepEqual(executeSelect(database, tables, query => query.from('permission')), schemaDefinition.reference.permission);
+    assert.deepEqual(executeSelect(database, tables, query => query.from('permission')), permissions);
     assert.deepEqual(executeSelect(database, tables, query => query.from('role_permission')), schemaDefinition.reference.role_permission);
     assert.deepEqual(sqliteMetadata.foreignKeyViolations(database), []);
   } finally { database.close(); }

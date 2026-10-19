@@ -31,7 +31,7 @@ export function accessLabel(connection: MapConnection): string {
     case 'none': return 'No access';
     case 'read': return 'Read only';
     case 'reply': return 'Read & reply';
-    case 'custom': return 'Level ' + connection.grant!.powerLevel;
+    case 'custom': return 'Custom access · ' + JSON.stringify(connection.grant!.nativeAccess);
   }
 }
 export function filterMap(map: FleetMapView, filters: MapFilters): FleetMapView {
@@ -43,7 +43,7 @@ export function filterMap(map: FleetMapView, filters: MapFilters): FleetMapView 
     const names = roomSearchByAgent.get(connection.agentId) ?? []; names.push(roomNames.get(connection.roomId) ?? ''); roomSearchByAgent.set(connection.agentId, names);
   }
   const agents = map.agents.filter(agent => (filters.listener === 'all' || agent.listener === filters.listener)
-    && (!search || [agent.displayName, agent.instanceKey, agent.matrixUserId, sourceNames.get(agent.sourceId), ...(roomSearchByAgent.get(agent.agentId) ?? [])]
+    && (!search || [agent.displayName, agent.instanceKey, agent.backendUserId, sourceNames.get(agent.sourceId), ...(roomSearchByAgent.get(agent.agentId) ?? [])]
       .join(' ').toLocaleLowerCase().includes(search)));
   const agentIds = new Set(agents.map(agent => agent.agentId)), sourceIds = new Set(agents.map(agent => agent.sourceId));
   const connections = map.connections.filter(connection => agentIds.has(connection.agentId)), roomIds = new Set(connections.map(connection => connection.roomId));

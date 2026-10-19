@@ -11,7 +11,7 @@ public class MemberInvitationRow
     public long ExpiresAt { get; set; }
     public string? ConsumedByMemberId { get; set; }
     public long? RevokedAt { get; set; }
-    public string? ClaimMatrixUserId { get; set; }
+    public string? ClaimBackendUserId { get; set; }
     public string? ClaimDisplayName { get; set; }
     public string? ClaimFingerprint { get; set; }
 }

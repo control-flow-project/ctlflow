@@ -8,6 +8,7 @@ import { piInput, type PiInput } from './input.js';
 import { record, type PiProcess } from './protocol.js';
 import { verifyPiHistory } from './state.js';
 import { piReceipt } from './receipt.js';
+import { providerState } from './provider.js';
 
 export function piDelivery(native: PiProcess, options: { sessionId: string; workspace: string; history: string; receiptFile: string; hooks: RuntimeHooks }) {
   const { sessionId } = options;
@@ -73,6 +74,6 @@ export function piDelivery(native: PiProcess, options: { sessionId: string; work
       changed(); return response.interrupted ? 'interrupted' : 'inactive';
     },
   };
-  return { ...delivery, turnControl, changed };
+  return { ...delivery, turnControl, changed, provider: (signal: AbortSignal) => providerState(native, signal) };
 }
 export type PiConnection = ReturnType<typeof piDelivery>;

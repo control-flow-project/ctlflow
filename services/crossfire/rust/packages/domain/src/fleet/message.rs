@@ -56,7 +56,7 @@ pub struct Summary {
 }
 pub struct Command {
     pub message: Message,
-    pub sender_matrix_id: Option<String>,
+    pub sender_backend_user_id: Option<String>,
     pub agent_ids: Vec<String>,
 }
 pub struct Snapshot {
@@ -320,20 +320,20 @@ pub fn control(
         .fleet_message(&id)?
         .ok_or_else(|| Failure::new(ErrorCode::Unavailable, "Fleet message is missing"))?;
     let deliveries = repo.fleet_message_deliveries(std::slice::from_ref(&id))?;
-    let sender_matrix_id = if let Some(id) = &message.author_principal_id {
+    let sender_backend_user_id = if let Some(id) = &message.author_principal_id {
         Some(
             repo.principal(id)?
                 .ok_or_else(|| {
                     Failure::new(ErrorCode::Unavailable, "Fleet message sender is missing")
                 })?
-                .matrix_user_id,
+                .backend_user_id,
         )
     } else {
         None
     };
     snapshot.messages.push(Command {
         message,
-        sender_matrix_id,
+        sender_backend_user_id,
         agent_ids: deliveries
             .into_iter()
             .filter(|delivery| delivery.state == DeliveryState::Pending)

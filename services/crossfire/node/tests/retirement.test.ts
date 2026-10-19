@@ -58,7 +58,7 @@ test('one pure retirement predicate requires exact stopped latest-run proof and 
 
 test('hundred-agent management pages and archive use the same single batched retirement read', async scope => {
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
-  const fleet = await mapFleet(services, admin.actor, admin.member.principal.matrixUserId, 100);
+  const fleet = await mapFleet(services, admin.actor, admin.member.principal.backendUserId, 100);
   let reads = 0;
   const original = services.listenerRead.retirement;
   const observed = { ...services, listenerRead: { ...services.listenerRead, retirement(...parameters: Parameters<typeof original>) {

@@ -1,3 +1,5 @@
+import { matrixPublicRoutes } from '@ctlflow/crossfire-adapter-matrix/web/router';
+import { matrixSettings } from './support/matrix-config.js';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -7,7 +9,7 @@ import test from 'node:test';
 import { chromium, expect } from '@playwright/test';
 import { browserOptions, secureRouter } from '@ctlflow/crossfire-test-support/tls';
 import { publicRouter } from '../apps/server/src/router.js';
-import { readElementPresentation } from '../apps/server/src/element-configuration.js';
+import { readElementPresentation } from '@ctlflow/crossfire-adapter-matrix/web/element-configuration';
 import { nativeServer } from './support/native-server.js';
 import { releaseFixture } from './release-fixture.js';
 import { applicationFixture, value } from './support/application.js';
@@ -19,8 +21,8 @@ test('default Element and shared management UI branding use the crossfire produc
   const { application, admin } = await applicationFixture(scope);
   const backend = await httpFixture(scope, application, await releaseFixture());
   const web = join(process.cwd(), 'dist/web');
-  const routes = { publicOrigin: backend.origin, service: backend.server, matrixOrigin: application.config.matrixOrigin, web, element: web };
-  const { origin } = await secureRouter(scope, publicRouter(routes));
+  const routes = { publicOrigin: backend.origin, service: backend.server, matrixOrigin: matrixSettings(application.config).matrixOrigin, web, element: web };
+  const { origin } = await secureRouter(scope, publicRouter({ get publicOrigin() { return routes.publicOrigin; }, service: routes.service, web: routes.web, backend: matrixPublicRoutes(routes) }));
   routes.publicOrigin = origin; application.config.publicOrigin = origin; application.services.instance.publicOrigin = origin;
   for (const path of ['/config.json', '/config.' + new URL(origin).hostname + '.json']) {
     const response = await fetch(origin + path); assert.equal(response.status, 200);
@@ -70,7 +72,7 @@ test('both Element configuration URLs preserve branding and reflect enforced sig
     assert.equal(body.custom_translations_url, '/manage/assets/element-translations.json');
     assert.equal(body.disable_registration, disabled);
     assert.equal(body.disable_custom_urls, true);
-    assert.deepEqual(body.default_server_config, { 'm.homeserver': { base_url: origin, server_name: services.instance.serverName } });
+    assert.deepEqual(body.default_server_config, { 'm.homeserver': { base_url: origin, server_name: services.messaging.serviceUserId().split(':').slice(1).join(':') } });
   };
   const paths = ['/config.json', '/config.' + new URL(origin).hostname + '.json'];
   for (const path of paths) await configuration(path, true);

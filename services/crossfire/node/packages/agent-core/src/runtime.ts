@@ -1,4 +1,4 @@
-import type { Json } from '@ctlflow/crossfire-contracts/json';
+import type { Json } from '@ctlflow/crossfire-kernel/json';
 import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { DecisionCreation, RuntimeObservation } from '@ctlflow/crossfire-contracts/runtime';
 import type { UsageSample } from '@ctlflow/crossfire-contracts/statistics';

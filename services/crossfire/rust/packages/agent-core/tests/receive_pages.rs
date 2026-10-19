@@ -1,7 +1,9 @@
-use crossfire_agent_core::{
-    matrix::{Matrix, Request, Response},
-    receive_pages,
+use crossfire_adapter_matrix::{
+    agent::Client,
+    protocol::{Protocol, Request, Response},
 };
+use crossfire_agent_core::receive_pages;
+use crossfire_domain::messaging_client::{Direction, MessagePageRequest};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use serde_json::json;
 use std::{collections::BTreeMap, sync::Mutex};
@@ -16,7 +18,7 @@ struct Fixture {
     calls: Mutex<Vec<Observed>>,
     too_large: bool,
 }
-impl Matrix for Fixture {
+impl Protocol for Fixture {
     async fn request(&self, request: &Request, _stop: CancellationToken) -> Result<Response> {
         let mut calls = self
             .calls
@@ -31,7 +33,7 @@ impl Matrix for Fixture {
             return Err(Failure::new(ErrorCode::BodyTooLarge, "Large fixture page"));
         }
         let body = if request.path.ends_with("/messages") {
-            json!({"chunk":[{"event_id":"$native"}],"start":"old","end":"new"})
+            json!({"chunk":[{"event_id":"$native","sender":"@owner:local","type":"m.room.message","content":{"msgtype":"m.text","body":"native"}}],"start":"old","end":"new"})
         } else if request.path.ends_with("/sync") {
             json!({"next_batch":"new","rooms":{"join":{}}})
         } else {
@@ -47,15 +49,17 @@ async fn adaptive_pages_keep_the_same_cursor_and_use_the_declared_byte_budget()
         calls: Mutex::new(Vec::new()),
         too_large: true,
     };
-    let query = BTreeMap::from([
-        ("from".to_owned(), "old".to_owned()),
-        ("dir".to_owned(), "f".to_owned()),
-    ]);
+    let query = MessagePageRequest {
+        direction: Direction::Forward,
+        from: Some("old".to_owned()),
+        to: None,
+        limit: 2,
+        filter: None,
+    };
     let page = receive_pages::history(
-        &source,
+        &Client::from_protocol(&source, "@agent:local")?,
         "!native/a:local",
         &query,
-        2,
         CancellationToken::new(),
     )
     .await?;
@@ -80,9 +84,14 @@ async fn native_sync_and_joined_rooms_preserve_exact_authority_inputs()
         calls: Mutex::new(Vec::new()),
         too_large: true,
     };
-    let result =
-        receive_pages::sync(&source, Some("same-cursor"), 0, CancellationToken::new()).await?;
-    assert_eq!(result["next_batch"], "new");
+    let result = receive_pages::sync(
+        &Client::from_protocol(&source, "@agent:local")?,
+        Some("same-cursor"),
+        0,
+        CancellationToken::new(),
+    )
+    .await?;
+    assert_eq!(result.cursor, "new");
     {
         let calls = source.calls.lock().map_err(|_| "test ownership")?;
         assert_eq!(calls.len(), 2);
@@ -100,9 +109,12 @@ async fn native_sync_and_joined_rooms_preserve_exact_authority_inputs()
         assert_eq!(second["room"]["timeline"]["limit"], 50);
     }
     assert_eq!(
-        receive_pages::joined(&source, CancellationToken::new())
-            .await?
-            .len(),
+        receive_pages::joined(
+            &Client::from_protocol(&source, "@agent:local")?,
+            CancellationToken::new()
+        )
+        .await?
+        .len(),
         2
     );
     Ok(())

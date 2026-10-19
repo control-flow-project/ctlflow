@@ -14,16 +14,17 @@ import type { Parser } from '@ctlflow/crossfire-contracts/schema/validation';
 import { conduitFixture } from '../../node/scripts/architecture-proof/conduit-fixture.js';
 import { builtRelease } from '../../node/scripts/test-support/release.js';
 import { secureProxy } from '@ctlflow/crossfire-test-support/tls';
+import type { Config } from '../../node/apps/server/src/config.js';
 
 type ContractOperation = { method: string; path: string; status: number; collection: boolean; output: Parser<unknown> };
-export type ContractSession = { nativeToken: string; cookie: string; csrf: string; matrixUserId: string; memberId: string };
+export type ContractSession = { nativeToken: string; cookie: string; csrf: string; backendUserId: string; memberId: string };
 export type ContractStack = Awaited<ReturnType<typeof contractClient>>;
 export async function contractStack(scope: TestContext, initial: ContractTarget, targets: readonly ContractTarget[]) {
   const secret = () => randomBytes(32).toString('base64url'); const jwtSecret = secret(); const native = await conduitFixture(scope, { jwtSecret }); const serverName = 'architecture.localhost';
   const directory = mkdtempSync(join(tmpdir(), 'cf-')); cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const state = join(directory, 'state'); mkdirSync(state, { mode: 0o700 }); const [port, contentPort] = await freePorts(scope); const { origin } = await secureProxy(scope, 'http://127.0.0.1:' + port); const contentOrigin = 'http://localhost:' + contentPort;
-  const bootstrap = { servicePassword: secret(), administratorPassword: secret() }; const configuration = { instance: 'contracts', serverName, publicOrigin: origin, contentOrigin, matrixOrigin: native.base,
-    administrator: '@admin:' + serverName, jwtSecret, registrationSecret: native.registrationToken, trustedProxyAddresses: ['127.0.0.1'] };
+  const bootstrap = { servicePassword: secret(), administratorPassword: secret() }; const configuration = { instance: 'contracts', publicOrigin: origin, contentOrigin,
+    administrator: '@admin:' + serverName, messaging: { type: 'matrix', parameters: { serverName, origin: native.base, jwtSecret, registrationSecret: native.registrationToken } }, trustedProxyAddresses: ['127.0.0.1'] };
   writeFileSync(join(state, 'config.json'), JSON.stringify(configuration), { mode: 0o600 }); writeFileSync(join(state, 'bootstrap.json'), JSON.stringify(bootstrap), { mode: 0o600 }); await migrateDatabase(join(state, 'management.sqlite'));
   const release = builtRelease(); const web = join(process.cwd(), 'dist/web'); const element = join(directory, 'element'); mkdirSync(element, { mode: 0o700 }); writeFileSync(join(element, 'index.html'), '<!doctype html><title>Isolated Element asset fixture</title>');
   let selected = initial, running: ContractProcess | undefined;
@@ -39,7 +40,7 @@ export async function contractStack(scope: TestContext, initial: ContractTarget,
 
 type ContractHost = {
   directory: string; state: string; origin: string; contentOrigin: string; native: { base: string };
-  configuration: { instance: string; serverName: string; publicOrigin: string; contentOrigin: string; matrixOrigin: string; administrator: string; jwtSecret: string; registrationSecret: string };
+  configuration: Pick<Config, 'instance' | 'publicOrigin' | 'contentOrigin' | 'messaging' | 'administrator'>;
   bootstrap: { administratorPassword: string }; targets: readonly ContractTarget[]; release: ReturnType<typeof builtRelease>;
   restart(target?: ContractTarget): Promise<void>; close(): Promise<void>; current(): ContractTarget;
 };
@@ -54,9 +55,10 @@ export async function contractClient(host: ContractHost) {
     return parsed.value;
   }
   async function login(username: string, password: string): Promise<ContractSession> {
-    const nativeLogin = await contractHttp(native.base, 'POST', '/_matrix/client/v3/login', { type: 'm.login.password', identifier: { type: 'm.id.user', user: username }, password }); assert.equal(nativeLogin.status, 200, JSON.stringify(nativeLogin.body)); const account = record(nativeLogin.body);
-    const sessionReply = await contractHttp(origin, 'POST', '/api/sessions', { nativeAccessToken: text(account.access_token) }, { Origin: origin }); const data = contractData(sessionReply, 201); observed(operations.createSession, sessionReply); const member = record(data.member); const cookie = sessionReply.headers['set-cookie']; assert(Array.isArray(cookie) && cookie.length === 1); assert.match(cookie[0]!, /HttpOnly; SameSite=Strict; Secure/u); assert(!cookie[0]!.toLowerCase().includes('domain='));
-    return { nativeToken: text(account.access_token), cookie: cookie[0]!.split(';')[0]!, csrf: text(data.csrfSecret), matrixUserId: text(account.user_id), memberId: text(member.memberId) };
+    const authenticated = await contractHttp(origin, 'POST', operations.authenticateBackend.path, { username, password }, { Origin: origin });
+    const account = contractData(authenticated, 200); observed(operations.authenticateBackend, authenticated);
+    const sessionReply = await contractHttp(origin, 'POST', '/api/sessions', { nativeAccessToken: text(account.accessToken) }, { Origin: origin }); const data = contractData(sessionReply, 201); observed(operations.createSession, sessionReply); const member = record(data.member); const cookie = sessionReply.headers['set-cookie']; assert(Array.isArray(cookie) && cookie.length === 1); assert.match(cookie[0]!, /HttpOnly; SameSite=Strict; Secure/u); assert(!cookie[0]!.toLowerCase().includes('domain='));
+    return { nativeToken: text(account.accessToken), cookie: cookie[0]!.split(';')[0]!, csrf: text(data.csrfSecret), backendUserId: text(member.backendUserId), memberId: text(member.memberId) };
   }
   const owner = await login('admin', bootstrap.administratorPassword);
   const headers = (session = owner) => ({ Cookie: session.cookie, Origin: origin, 'X-Crossfire-CSRF': session.csrf });
@@ -74,12 +76,12 @@ export async function contractClient(host: ContractHost) {
     const accepted = await contractHttp(origin, 'POST', fallback, 'nonce=' + encodeURIComponent(nonce), { Origin: origin, Cookie: cookie, 'Content-Type': 'application/x-www-form-urlencoded' }); assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
     const complete = await contractHttp(origin, 'POST', '/_matrix/client/v3/register', { auth: { type: 'org.crossfire.login.registration', session } }, { Origin: origin }); assert.equal(complete.status, 200, JSON.stringify(complete.body)); return login(username, password);
   }
-  async function agent(name = 'contract-analyst') {
-    const enrollmentId = randomUUID(), claimSecret = secret(); const introduced = record((await operation(operations.introduceEnrollment, {}, { enrollmentId, claimSecret, ownerMatrixId: owner.matrixUserId,
-      fleetKey: name, controller: { name: 'Shared contracts' }, instances: [{ instanceKey: name, name, coordinationPolicy: { wakeMode: 'selected', senders: [{ matrixUserId: owner.matrixUserId, includeAgents: true }], permissions: ['room.agent.invite'] } }] })).data);
-    await operation(operations.decideEnrollment, { enrollmentId }, { expectedRevision: 0, decision: 'approve', verificationCode: text(record(record(introduced.enrollment).enrollment).verificationCode) });
+  async function agent(name = 'contract-analyst', agentOwner: ContractSession = owner) {
+    const enrollmentId = randomUUID(), claimSecret = secret(); const introduced = record((await operation(operations.introduceEnrollment, {}, { enrollmentId, claimSecret, ownerBackendUserId: agentOwner.backendUserId,
+      fleetKey: name, controller: { name: 'Shared contracts' }, instances: [{ instanceKey: name, name, coordinationPolicy: { wakeMode: 'selected', senders: [{ backendUserId: agentOwner.backendUserId, includeAgents: true }], permissions: ['room.agent.invite'] } }] })).data);
+    await operation(operations.decideEnrollment, { enrollmentId }, { expectedRevision: 0, decision: 'approve', verificationCode: text(record(record(introduced.enrollment).enrollment).verificationCode) }, agentOwner);
     let ready: Record<string, unknown> = {}; await observe(async () => { ready = record((await operation(operations.exchangeEnrollment, { enrollmentId }, { claimSecret })).data); return ready.status === 'ready'; }, 'Approved enrollment must reconcile through actual Matrix');
-    const enrolled = record(list(ready.instances)[0]); const account = record(enrolled.account); const fleet = record(ready.fleet); return { id: text(enrolled.agentId), name, matrixUserId: text(account.matrixUserId), token: text(account.accessToken), fleetId: text(fleet.fleetId), credential: text(fleet.controllerCredential), connectionId: randomUUID(), enrollmentId, claimSecret };
+    const enrolled = record(list(ready.instances)[0]); const account = record(enrolled.account); const fleet = record(ready.fleet); return { id: text(enrolled.agentId), name, backendUserId: text(account.userId), token: text(account.accessToken), fleetId: text(fleet.fleetId), credential: text(fleet.controllerCredential), connectionId: randomUUID(), enrollmentId, claimSecret };
   }
   return { directory, state, origin, contentOrigin, native, configuration, owner, targets, release, releaseDirectory: release.directory, headers, operation, login, member, agent, failure, restart,
     assertOperationCoverage() { assert.deepEqual(Object.entries(operations).filter(([_name, operation]) => !successful.has(operation.method + ' ' + operation.path)).map(([name]) => name), [], 'Every canonical operation needs a successful wire-schema-validated shared scenario'); },

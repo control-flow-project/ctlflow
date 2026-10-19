@@ -89,7 +89,7 @@ test('saved Pi contexts inspect an incomplete allocation without creating native
 test('Pi registry rejects an allocation pointing to another context even with a unique native identity', scope => {
   const directory = mkdtempSync(join(process.cwd(), '.temp/pi-context-identity-'));
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
-  const stored = piState(directory), original = allocatePi('!original:fixture'), other = allocatePi('!other:fixture');
+  const stored = piState(directory), original = allocatePi('room/control'), other = allocatePi('room/other');
   stored.state.mode = 'per-room'; stored.state.bindings.push(original); stored.save();
   assert.deepEqual(piState(directory).state.bindings, [original]);
   original.file = other.file; stored.save();

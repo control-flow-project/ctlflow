@@ -26,9 +26,9 @@ public static class RoomPlanRoutes
 
     private static Result<PlannedGrant> Grant(JsonElement input)
     {
-        var fields = Validation.Fields(input, ["roomId", "accessMode", "powerLevel", "muted"]); if (!fields.IsSuccess) return Result<PlannedGrant>.Fail(fields.Error);
+        var fields = Validation.Fields(input, ["roomId", "accessMode", "nativeAccess", "muted"]); if (!fields.IsSuccess) return Result<PlannedGrant>.Fail(fields.Error);
         var room = Validation.Text(input.GetProperty("roomId")); var mode = Validation.Choice(input.GetProperty("accessMode"), "read", "reply", "custom");
-        var power = Validation.NullableInteger(input.GetProperty("powerLevel"), -Validation.MaxWireInteger); var muted = Validation.Boolean(input.GetProperty("muted"));
+        var power = MessagingContract.NativeAccess(input.GetProperty("nativeAccess")); var muted = Validation.Boolean(input.GetProperty("muted"));
         return room.IsSuccess && Validation.RoomId(room.Value) && mode.IsSuccess && power.IsSuccess && muted.IsSuccess
             ? Result<PlannedGrant>.Success(new(room.Value, mode.Value, power.Value, muted.Value)) : Results.Fail<PlannedGrant>("invalid", "Invalid planned room access");
     }
@@ -50,7 +50,7 @@ public static class RoomPlanRoutes
     {
         var fields = Validation.Fields(input, ["plan"]); if (!fields.IsSuccess) return Result<ApiReply>.Fail(fields.Error);
         var plan = Plan(input.GetProperty("plan")); if (!plan.IsSuccess) return Result<ApiReply>.Fail(plan.Error);
-        return Replies.Of((await RoomPlans.Preview(FleetCommands.Ports(context.Database, context.State.Now), RoomGrantCommands.Ports(context.Database, context.State.Now, context.State.Matrix.Room), context.State.Matrix.Ports(), context.Actor, plan.Value, context.Http.RequestAborted)).Map(View));
+        return Replies.Of((await RoomPlans.Preview(FleetCommands.Ports(context.Database, context.State.Now), RoomGrantCommands.Ports(context.Database, context.State.Now, context.State.Messaging), context.State.Messaging, context.Actor, plan.Value, context.Http.RequestAborted)).Map(View));
     }
 
     private static async ValueTask<Result<ApiReply>> Apply(ApiContext context, IReadOnlyDictionary<string, string> parameters, JsonElement input)
@@ -58,7 +58,7 @@ public static class RoomPlanRoutes
         var fields = Validation.Fields(input, ["plan", "digest", "snapshots"]); if (!fields.IsSuccess) return Result<ApiReply>.Fail(fields.Error);
         var plan = Plan(input.GetProperty("plan")); var digest = Validation.Text(input.GetProperty("digest"), 64, 64); var snapshots = Validation.List(input.GetProperty("snapshots"), Snapshot, 100, 1);
         if (!plan.IsSuccess || !digest.IsSuccess || !snapshots.IsSuccess) return Results.Fail<ApiReply>("invalid", "Invalid reviewed room plan");
-        return Replies.Of((await RoomPlans.Apply(FleetCommands.Ports(context.Database, context.State.Now), RoomGrantCommands.Ports(context.Database, context.State.Now, context.State.Matrix.Room), context.State.Matrix.Ports(), context.Actor, plan.Value, digest.Value, snapshots.Value, context.RequestId, context.Http.RequestAborted))
+        return Replies.Of((await RoomPlans.Apply(FleetCommands.Ports(context.Database, context.State.Now), RoomGrantCommands.Ports(context.Database, context.State.Now, context.State.Messaging), context.State.Messaging, context.Actor, plan.Value, digest.Value, snapshots.Value, context.RequestId, context.Http.RequestAborted))
             .Map(agents => JsonValues.Object(writer => { writer.WriteBoolean("accepted", true); JsonValues.Strings(writer, "agents", agents); })));
     }
 
@@ -80,8 +80,9 @@ public static class RoomPlanRoutes
             writer.WritePropertyName("before"); if (proof.Previous is null) writer.WriteNullValue(); else RoomViews.Grant(writer, proof.Previous);
             writer.WritePropertyName("after");
             if (grant.AccessMode == "none") writer.WriteNullValue();
-            else { writer.WriteStartObject(); writer.WriteString("roomId", grant.RoomId); writer.WriteString("accessMode", grant.AccessMode); JsonValues.Number(writer, "powerLevel", grant.PowerLevel); writer.WriteBoolean("muted", grant.Muted); writer.WriteEndObject(); }
-            writer.WriteBoolean("changed", proof.Changed); writer.WriteString("authorizerId", proof.AuthorizerId); JsonValues.Number(writer, "nativePowerLevel", proof.Native?.PowerLevel); writer.WriteBoolean("nativeCreator", proof.Native?.Creator ?? false); writer.WriteEndObject();
+            else { writer.WriteStartObject(); writer.WriteString("roomId", grant.RoomId); writer.WriteString("accessMode", grant.AccessMode); RoomViews.NativeAccess(writer, grant.NativeAccess); writer.WriteBoolean("muted", grant.Muted); writer.WriteEndObject(); }
+            writer.WriteBoolean("changed", proof.Changed); writer.WriteString("authorizerId", proof.AuthorizerId); writer.WritePropertyName("authority");
+            if (proof.Native is { } authority) { writer.WriteStartObject(); MessagingJson.WriteAuthority(writer, authority); writer.WriteEndObject(); } else writer.WriteNullValue(); writer.WriteEndObject();
         }
         writer.WriteEndArray();
     });

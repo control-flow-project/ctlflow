@@ -9,10 +9,10 @@ import { authenticateController } from '@ctlflow/crossfire-domain/fleet/authorit
 import { reportFleetConnection } from '@ctlflow/crossfire-domain/fleet/control';
 import { value, secret } from './application.js';
 
-export async function mapFleet(services: Services, owner: Actor, ownerMatrixId: string, count = 24) {
-  const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId, fleetKey: 'map-fleet',
+export async function mapFleet(services: Services, owner: Actor, ownerBackendUserId: string, count = 24) {
+  const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId, fleetKey: 'map-fleet',
     controller: { name: 'Map workstation', metadata: {} },
-    instances: Array.from({ length: count }, (_, index) => ({ instanceKey: 'worker-' + String(index).padStart(2, '0'), name: 'map-worker-' + index, coordinationPolicy: defaultCoordinationPolicy(ownerMatrixId) })) };
+    instances: Array.from({ length: count }, (_, index) => ({ instanceKey: 'worker-' + String(index).padStart(2, '0'), name: 'map-worker-' + index, coordinationPolicy: defaultCoordinationPolicy(ownerBackendUserId) })) };
   const introduced = value(await introduceEnrollment(services, input));
   value(decideEnrollment(services, owner, input.enrollmentId,
     { expectedRevision: 0, verificationCode: introduced.request.verificationCode, decision: 'approve' }, randomUUID()));

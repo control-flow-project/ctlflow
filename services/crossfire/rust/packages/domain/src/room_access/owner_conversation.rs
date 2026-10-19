@@ -4,23 +4,23 @@ use super::{
 };
 use crate::{
     identity::{Actor, Authentication, PrincipalKind, Status},
-    matrix::{MatrixAuthority, Membership, RoomInvitation, RoomPower},
+    messaging::{Membership, MessagingAuthority, RoomInvitation},
     port::{AgentRepository, Audit, CoreRepository, RepositoryAccess, UnitOfWork},
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, time::Clock};
 
-async fn verify_invitation<M: MatrixAuthority>(
-    matrix: &M,
+async fn verify_invitation<M: MessagingAuthority>(
+    messaging: &M,
     user: &str,
     invitation: &RoomInvitation,
 ) -> Result<()> {
-    if matrix
+    if messaging
         .invitation(user, &invitation.room_id)
         .await?
         .is_none_or(|current| {
             !current.direct
                 || current.event_id != invitation.event_id
-                || current.sender_matrix_id != invitation.sender_matrix_id
+                || current.sender_backend_user_id != invitation.sender_backend_user_id
         })
     {
         return Err(Failure::new(
@@ -30,9 +30,9 @@ async fn verify_invitation<M: MatrixAuthority>(
     }
     Ok(())
 }
-pub async fn ensure<A: RepositoryAccess, M: MatrixAuthority, O: RoomOperations, C: Clock>(
+pub async fn ensure<A: RepositoryAccess, M: MessagingAuthority, O: RoomOperations, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     operations: &O,
     clock: &C,
     agent: &str,
@@ -64,7 +64,7 @@ where
     })?;
     if let Some(invitation) = invitation {
         if !invitation.direct
-            || invitation.sender_matrix_id != target.owner.matrix_user_id
+            || invitation.sender_backend_user_id != target.owner.backend_user_id
             || previous
                 .as_ref()
                 .is_some_and(|previous| previous.room_id != invitation.room_id)
@@ -74,24 +74,24 @@ where
                 "The invitation does not identify this agent’s private owner conversation",
             ));
         }
-        verify_invitation(matrix, &target.principal.matrix_user_id, invitation).await?;
+        verify_invitation(messaging, &target.principal.backend_user_id, invitation).await?;
     }
     let room = match invitation {
         Some(invitation) => {
-            matrix
+            messaging
                 .verify_owner_conversation(
-                    &target.owner.matrix_user_id,
-                    &target.principal.matrix_user_id,
+                    &target.owner.backend_user_id,
+                    &target.principal.backend_user_id,
                     &invitation.room_id,
                 )
                 .await?;
             invitation.room_id.clone()
         }
         None => {
-            matrix
+            messaging
                 .owner_conversation(
-                    &target.owner.matrix_user_id,
-                    &target.principal.matrix_user_id,
+                    &target.owner.backend_user_id,
+                    &target.principal.backend_user_id,
                     previous.as_ref().map(|value| value.room_id.as_str()),
                     None,
                 )
@@ -111,7 +111,7 @@ where
         principal_id: target.owner.id.clone(),
         kind: PrincipalKind::Human,
         authentication: Some(Authentication::Native {
-            matrix_user_id: target.owner.matrix_user_id.clone(),
+            backend_user_id: target.owner.backend_user_id.clone(),
         }),
     };
     let input = repository.with(|repo| {
@@ -122,7 +122,7 @@ where
             expected_generation: repo.room_grant(agent, &room)?.map(|grant| grant.generation),
             intent: Intent {
                 access: Access::Reply,
-                power: None,
+                native_access: None,
                 muted: false,
             },
         })
@@ -130,18 +130,18 @@ where
     let (mut proof, owner, _) = repository
         .with(|repo| authority::prepare(repo, &actor, &input, invitation, clock.now()?))?;
     if authority::needs_native(&proof, &actor) {
-        let facts = matrix.room(&owner, &room).await?;
-        authority::requested_power(&facts, &input.intent)?;
-        if matches!(facts.power,RoomPower::Level(level) if level < facts.reply_level) {
-            return Err(Failure::new(
-                ErrorCode::Forbidden,
-                "The owner cannot authorize room replies",
-            ));
-        }
+        let facts = messaging
+            .authorize_room_access(
+                &owner,
+                &target.principal.backend_user_id,
+                &room,
+                &input.intent,
+            )
+            .await?;
         proof.native = Some(facts);
     }
     if let Some(invitation) = invitation {
-        verify_invitation(matrix, &target.principal.matrix_user_id, invitation).await?;
+        verify_invitation(messaging, &target.principal.backend_user_id, invitation).await?;
     }
     let (saved, revision) = repository.with(|repo| {
         repo.transaction(|repo| {
@@ -204,7 +204,7 @@ where
             Ok((grant, principal.revision))
         })
     })?;
-    reconcile::reconcile(repository, matrix, operations, clock, agent, &room).await?;
+    reconcile::reconcile(repository, messaging, operations, clock, agent, &room).await?;
     repository.with(|repo| {
         let observation = repo.room_application(agent, &room)?;
         if observation.as_ref().is_none_or(|observation| {
@@ -219,10 +219,10 @@ where
         }
         Ok(())
     })?;
-    if matrix
+    if messaging
         .owner_conversation(
-            &target.owner.matrix_user_id,
-            &target.principal.matrix_user_id,
+            &target.owner.backend_user_id,
+            &target.principal.backend_user_id,
             Some(&room),
             None,
         )

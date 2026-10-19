@@ -28,7 +28,7 @@ export const permissionCatalog = [
   { code: 'enrollment.reject.any', grantScope: 'role', description: 'Reject any pending enrollment', roles: ['administrator'] },
   { code: 'enrollment.read.owned', grantScope: 'role', description: 'Review own enrollment requests', roles: ['member', 'administrator'] },
   { code: 'enrollment.read.any', grantScope: 'role', description: 'Review every enrollment request', roles: ['administrator'] },
-  { code: 'room.manage.native', grantScope: 'role', description: 'Manage rooms within native Matrix authority', roles: ['member', 'administrator'] },
+  { code: 'room.manage.native', grantScope: 'role', description: 'Manage rooms within backend authority', roles: ['member', 'administrator'] },
   { code: 'member.manage', grantScope: 'role', description: 'Manage human memberships', roles: ['administrator'] },
   { code: 'member.invite', grantScope: 'role', description: 'Issue invitations within instance policy', roles: ['member', 'administrator'] },
   { code: 'policy.manage', grantScope: 'role', description: 'Manage instance policy and instruction copy', roles: ['administrator'] },

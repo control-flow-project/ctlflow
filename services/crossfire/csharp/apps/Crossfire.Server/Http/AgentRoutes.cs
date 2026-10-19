@@ -8,7 +8,7 @@ namespace Crossfire.Server.Http;
 
 public static class AgentRoutes
 {
-    private static AgentRoutingPorts Routing(ApiContext context) => AgentRoutingQueries.Ports(context.Database, context.State.Now, context.State.Matrix.Room);
+    private static AgentRoutingPorts Routing(ApiContext context) => AgentRoutingQueries.Ports(context.Database, context.State.Now, context.State.Messaging);
     public static IReadOnlyList<ApiEndpoint> Endpoints() =>
     [
         new("agents", List, ["page", "pageSize", "ownerId", "status", "listener", "search"]),

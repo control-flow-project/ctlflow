@@ -1,17 +1,14 @@
 use crate::account::{API, Authority};
+use crate::room_state::{self, StateEvent};
 use crossfire_adapter_http::JsonLimits;
 use crossfire_contracts::origin::segment;
-use crossfire_contracts::{
-    matrix_room::{self, StateEvent},
-    validation,
-};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, secret::Secret};
 use reqwest::Method;
 use serde_json::{Value, json};
 
 impl Authority {
     pub async fn state(&self, user: &str, room: &str) -> Result<Vec<StateEvent>> {
-        validation::room_id(&json!(room))?;
+        crate::syntax::room_id(&json!(room))?;
         let token = self.as_user(user).await?;
         self.state_with_token(&token, room).await
     }
@@ -21,7 +18,7 @@ impl Authority {
         token: &Secret,
         room: &str,
     ) -> Result<Vec<StateEvent>> {
-        validation::room_id(&json!(room))?;
+        crate::syntax::room_id(&json!(room))?;
         let response = self
             .http
             .json(
@@ -38,7 +35,7 @@ impl Authority {
                 "Native room state could not be read",
             ));
         }
-        matrix_room::state(&response.body)
+        room_state::state(&response.body)
     }
 
     pub async fn joined(&self, user: &str) -> Result<Vec<String>> {
@@ -60,14 +57,14 @@ impl Authority {
         rooms
             .iter()
             .map(|room| {
-                validation::room_id(room)
+                crate::syntax::room_id(room)
                     .map_err(|_| Failure::new(ErrorCode::Native, "Invalid native joined-room list"))
             })
             .collect()
     }
 
     pub async fn leave(&self, user: &str, room: &str) -> Result<()> {
-        validation::room_id(&json!(room))?;
+        crate::syntax::room_id(&json!(room))?;
         let token = self.as_user(user).await?;
         self.http
             .ok(
@@ -81,8 +78,8 @@ impl Authority {
     }
 
     pub async fn invite(&self, user: &str, room: &str, target: &str) -> Result<()> {
-        validation::room_id(&json!(room))?;
-        validation::matrix_user_id(&json!(target))?;
+        crate::syntax::room_id(&json!(room))?;
+        crate::syntax::user_id(&json!(target))?;
         let token = self.as_user(user).await?;
         self.http
             .ok(

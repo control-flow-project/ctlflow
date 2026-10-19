@@ -1,18 +1,23 @@
-use crate::{
-    application, assets::Assets, bootstrap, configuration, content,
-    http::public_request_budget::RequestBudget, registration::Registration, state::State, worker,
-};
+use crate::{application, assets::Assets, configuration, content, state::State, worker};
 use crossfire_adapter_filesystem::{
     PrivateDirectory, lock::StateLock, logging, publication, release,
 };
 use crossfire_adapter_http::{
     NativeHttp,
+    public_request_budget::RequestBudget,
     server::{self, Limits, Listener},
 };
 use crossfire_adapter_matrix::{
-    account::{Authority, Configuration},
-    room_operations::Operations,
+    account::Authority,
+    bootstrap,
+    element::Element,
+    settings,
+    web::{
+        registration::Registration,
+        services::{WebConfiguration, WebServices},
+    },
 };
+use crossfire_adapter_runtime::room_operations::Operations;
 use crossfire_adapter_sqlite::store::{SharedStore, Store};
 use crossfire_contracts::enrollment::Digest;
 use crossfire_domain::{port::RepositoryAccess, registration};
@@ -104,25 +109,34 @@ pub async fn run(
     let repository = SharedStore::new(Store::open(&input.directory.join("management.sqlite"))?);
     let configuration = configuration::load(&input.directory)?;
     let release = release::load(&input.release)?;
-    let assets = Assets::load(
-        &input.web,
-        &input.element,
-        configuration
-            .public_origin
-            .host_str()
-            .ok_or_else(|| invalid("Public hostname required"))?,
+    let assets = Assets::load(&input.web)?;
+    let native = settings::read(
+        &configuration.messaging,
+        &configuration.instance,
+        &configuration.administrator,
     )?;
+    let native_origin =
+        url::Url::parse(&native.origin).map_err(|_| invalid("Invalid Matrix origin"))?;
+    if configuration.content_origin.host_str() == native_origin.host_str() {
+        return Err(invalid("Publications require a separate backend hostname"));
+    }
     let credentials = bootstrap::load(&input.directory)?;
-    let matrix = Authority::new(Configuration {
-        origin: configuration.matrix_origin.to_string(),
-        server_name: configuration.server_name.clone(),
-        jwt_secret: configuration.jwt_secret.clone(),
-        registration_secret: configuration.registration_secret.clone(),
-        service_matrix_id: configuration.service_matrix_id(),
-    })?;
-    bootstrap::apply(&configuration, &credentials, &matrix, stop.child_token()).await?;
+    let messaging = Arc::new(Authority::new(native.clone())?);
+    bootstrap::apply(
+        &native,
+        &configuration.administrator,
+        &credentials,
+        &messaging,
+        stop.child_token(),
+    )
+    .await?;
     repository.with(|repo| {
-        registration::initialize(repo, &configuration.administrator, identity::now()?)
+        registration::initialize(
+            repo,
+            &configuration.administrator,
+            &messaging.local_label(&configuration.administrator)?,
+            identity::now()?,
+        )
     })?;
     let public = TcpListener::bind(input.public).await.map_err(|_| {
         Failure::new(
@@ -133,25 +147,48 @@ pub async fn run(
     let content = TcpListener::bind(input.content)
         .await
         .map_err(|_| Failure::new(ErrorCode::Unavailable, "Content listener could not bind"))?;
+    let rate = Arc::new(RequestBudget::new(&configuration.trusted_proxy_addresses));
+    let changed = Arc::new(Notify::new());
+    let room_operations = Operations::default();
+    let backend = Arc::new(WebServices {
+        configuration: WebConfiguration {
+            public_origin: configuration.public_origin.clone(),
+            server_name: native.server_name,
+        },
+        repository: repository.clone(),
+        messaging: messaging.clone(),
+        room_operations: room_operations.clone(),
+        registration: Registration::default(),
+        changed: changed.clone(),
+        rate: rate.clone(),
+        proxy: NativeHttp::new(&native.origin, stop.child_token())?,
+        element: Element::load(
+            &input.element,
+            configuration
+                .public_origin
+                .host_str()
+                .ok_or_else(|| invalid("Public hostname required"))?,
+        )?,
+        stop: stop.clone(),
+    });
     let state = Arc::new(State {
-        matrix_proxy: NativeHttp::new(configuration.matrix_origin.as_str(), stop.child_token())?,
+        backend,
         publications: publication::Store::open(
             &input.directory.join("management.sqlite.publications"),
             configuration.publication_budget.uploads,
         )?,
         public_reads: Arc::new(Semaphore::new(32)),
         diagnostics,
-        rate: RequestBudget::new(&configuration.trusted_proxy_addresses),
+        rate,
         configuration,
         repository,
-        matrix,
-        room_operations: Operations::default(),
+        messaging,
+        room_operations,
         release,
         assets,
         digest: Digest::new()?,
         started_at: identity::now()?,
-        registration: Registration::default(),
-        changed: Notify::new(),
+        changed,
         stop: stop.clone(),
     });
     let mut tasks = JoinSet::new();
@@ -190,7 +227,7 @@ pub async fn run(
         },
     };
     stop.cancel();
-    state.matrix.close();
+    state.messaging.close();
     state.room_operations.close();
     state.publications.close();
     while let Some(completed) = tasks.join_next().await {

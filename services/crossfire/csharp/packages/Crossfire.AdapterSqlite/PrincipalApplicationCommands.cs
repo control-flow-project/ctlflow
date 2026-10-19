@@ -33,8 +33,8 @@ public static class PrincipalApplicationCommands
         => Stored.Read<IReadOnlyList<string>>(() => context.PrincipalApplication.AsNoTracking().Where(row => row.NextCheckAt <= now)
             .OrderBy(row => row.NextCheckAt).ThenBy(row => row.PrincipalId).Take(limit).Select(row => row.PrincipalId).ToArray());
 
-    public static PrincipalApplyPorts Ports(CrossfireDbContext context, Func<long> now, MatrixPorts matrix, RoomOperation operation)
-        => new(AuthorizationQueries.Ports(context, now), new SqliteUnitOfWork(context), matrix, operation,
+    public static PrincipalApplyPorts Ports(CrossfireDbContext context, Func<long> now, MessagingPorts messaging, RoomOperation operation)
+        => new(AuthorizationQueries.Ports(context, now), new SqliteUnitOfWork(context), messaging, operation,
             () => PolicyQueries.Find(context), id => MemberQueries.Find(context, id), id => Find(context, id), value => Save(context, value),
-            id => EnrollmentQueries.Credential(context, id), value => Credential(context, value), RoomGrantCommands.Ports(context, now, matrix.Room));
+            id => EnrollmentQueries.Credential(context, id), value => Credential(context, value), RoomGrantCommands.Ports(context, now, messaging));
 }

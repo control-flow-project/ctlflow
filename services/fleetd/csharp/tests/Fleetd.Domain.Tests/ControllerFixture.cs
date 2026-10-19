@@ -24,6 +24,8 @@ public sealed class ControllerFixture : IAsyncDisposable
     public CancellationToken Starting { get; private set; }
     public FleetController Controller { get; }
     public ProbeAgent First { get; } = new();
+    public Action<FleetOperation>? Completed { get; set; }
+    public Exception? StartFailure { get; set; }
     public ControllerFixture()
     {
         var instance = new FleetInstance("analyst", "Analyst", "analyst", "workarea", null, null);
@@ -56,13 +58,14 @@ public sealed class ControllerFixture : IAsyncDisposable
     {
         var count = Interlocked.Increment(ref starts);
         if (count == 1) { Starting = cancellation; Entered.TrySetResult(); return Result<RunningAgent>.Success(await release.Task); }
+        if (StartFailure is { } error) throw error;
         var agent = new ProbeAgent(); lock (gate) agents.Add(agent); return Result<RunningAgent>.Success(agent);
     }
     private Result<Unit> Save(FleetOperation operation)
     {
         TaskCompletionSource<FleetOperation>? completion;
         lock (gate) { operations[operation.Request.OperationId] = operation; completion = completions.GetValueOrDefault(operation.Request.OperationId); }
-        if (operation.CompletedAt is not null) completion?.TrySetResult(operation); return Results.Done();
+        if (operation.CompletedAt is not null) { Completed?.Invoke(operation); completion?.TrySetResult(operation); } return Results.Done();
     }
     public void Release() => release.TrySetResult(First);
     public Task<FleetOperation> Completion(string id)
@@ -97,6 +100,7 @@ public sealed class ProbeAgent : RunningAgent
         lifetimeToken = lifetime.Token; Control = new(() => new(ControllerFixture.FleetId, "connection", "credential"), (_, _, _, _) => ValueTask.FromResult(Results.Done())); Control.Update(true, true, null);
     }
     public NativeSessionState NativeState() => new("sleeping", 0, true);
+    public ValueTask<NativeDiagnostic> Diagnostics(CancellationToken cancellation) => ValueTask.FromResult(new NativeDiagnostic("sleeping", 0, ProviderState.Unknown, null, false, false, 1));
     public ValueTask<Result<Unit>> Resume() => ValueTask.FromResult(Results.Done());
     public ValueTask<Result<RuntimeAttachment>> Attachment(string? context = null)
         => ValueTask.FromResult(Result<RuntimeAttachment>.Success(new("codex", SessionId, "/isolated/controller-fixture", new Dictionary<string, string>())));

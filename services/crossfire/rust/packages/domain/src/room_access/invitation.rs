@@ -5,7 +5,7 @@ use super::{
 use crate::{
     authorization::authorize,
     identity::{Actor, Authentication, PrincipalKind},
-    matrix::{MatrixAuthority, Membership},
+    messaging::{Membership, MessagingAuthority},
     permission::Permission,
     port::{AgentRepository, AuthorizationRepository, RepositoryAccess},
 };
@@ -17,9 +17,9 @@ pub struct Request<'a> {
     pub room: &'a str,
     pub request_id: &'a str,
 }
-pub async fn accept<A: RepositoryAccess, M: MatrixAuthority, O: RoomOperations, C: Clock>(
+pub async fn accept<A: RepositoryAccess, M: MessagingAuthority, O: RoomOperations, C: Clock>(
     repository: &A,
-    matrix: &M,
+    messaging: &M,
     operations: &O,
     clock: &C,
     input: Request<'_>,
@@ -49,20 +49,20 @@ where
         repo.agent_view(agent)?
             .ok_or_else(|| Failure::new(ErrorCode::Missing, "Invited agent not found"))
     })?;
-    let Some(invitation) = matrix
-        .invitation(&target.principal.matrix_user_id, room)
+    let Some(invitation) = messaging
+        .invitation(&target.principal.backend_user_id, room)
         .await?
     else {
         return Ok(false);
     };
     let bound = repository.with(|repo| repo.owner_conversation(agent))?;
     if invitation.direct
-        && invitation.sender_matrix_id == target.owner.matrix_user_id
+        && invitation.sender_backend_user_id == target.owner.backend_user_id
         && bound.as_ref().is_none_or(|bound| bound.room_id == room)
     {
         owner_conversation::ensure(
             repository,
-            matrix,
+            messaging,
             operations,
             clock,
             agent,
@@ -73,7 +73,7 @@ where
     }
     let (inviter, grant) = repository.with(|repo| {
         let sender = repo
-            .principal_by_matrix_id(&invitation.sender_matrix_id)?
+            .principal_by_backend_user_id(&invitation.sender_backend_user_id)?
             .ok_or_else(|| {
                 Failure::new(
                     ErrorCode::Forbidden,
@@ -85,7 +85,7 @@ where
                 principal_id: sender.id,
                 kind: sender.kind,
                 authentication: Some(Authentication::Native {
-                    matrix_user_id: invitation.sender_matrix_id.clone(),
+                    backend_user_id: invitation.sender_backend_user_id.clone(),
                 }),
             },
             repo.room_grant(agent, room)?,
@@ -107,7 +107,7 @@ where
     } else {
         let service = Service {
             repository,
-            matrix,
+            messaging,
             clock,
         };
         service
@@ -120,7 +120,7 @@ where
                     expected_generation: grant.map(|grant| grant.generation),
                     intent: Intent {
                         access: Access::Reply,
-                        power: None,
+                        native_access: None,
                         muted: false,
                     },
                 },
@@ -129,7 +129,7 @@ where
             )
             .await?;
     }
-    reconcile::reconcile(repository, matrix, operations, clock, agent, room).await?;
+    reconcile::reconcile(repository, messaging, operations, clock, agent, room).await?;
     let accepted = repository.with(|repo| {
         let observation = repo.room_application(agent, room)?;
         if let Some(value) = &observation
@@ -150,10 +150,10 @@ where
         Ok(observation.is_some_and(|value| value.membership == Some(Membership::Join)))
     })?;
     if accepted && invitation.direct {
-        matrix
+        messaging
             .mark_direct(
-                &target.principal.matrix_user_id,
-                &invitation.sender_matrix_id,
+                &target.principal.backend_user_id,
+                &invitation.sender_backend_user_id,
                 room,
             )
             .await?;

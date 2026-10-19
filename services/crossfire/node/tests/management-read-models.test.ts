@@ -19,8 +19,8 @@ test('management read models hydrate recognizable identities in one batch after 
   const fixture = await applicationFixture(scope), { services, admin } = fixture;
   const alice = await fixture.member('alice'), bob = await fixture.member('bob'), agent = await fixture.agent(alice.actor, 'bea');
   for (const owner of [alice, bob]) value(await introduceEnrollment(services, {
-    enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: owner.member.principal.matrixUserId,
-    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending-' + owner.member.member.displayName, name: 'pending-' + owner.member.member.displayName, coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.matrixUserId) }],
+    enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: owner.member.principal.backendUserId,
+    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending-' + owner.member.member.displayName, name: 'pending-' + owner.member.member.displayName, coordinationPolicy: defaultCoordinationPolicy(owner.member.principal.backendUserId) }],
   }));
   const calls: string[][] = [];
   const projected = { ...services, discovery: { ...services.discovery, selected(ids: string[]) { calls.push(ids); return services.discovery.selected(ids); } } };
@@ -67,11 +67,11 @@ test('canonical enrollment and activity HTTP contracts expose identities without
   const client = (session: { secret: string }) => createClient({ origin, fetch: (input, options) => fetch(input, {
     ...options, headers: { ...options?.headers, Cookie: '__Host-crossfire=' + session.secret },
   }) });
-  const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerMatrixId: alice.member.principal.matrixUserId,
-    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending', name: 'pending', coordinationPolicy: defaultCoordinationPolicy(alice.member.principal.matrixUserId) }] };
+  const input = { enrollmentId: randomUUID(), claimSecret: secret(), ownerBackendUserId: alice.member.principal.backendUserId,
+    fleetKey: 'pending-fleet', controller: { name: 'Pending computer' }, instances: [{ instanceKey: 'pending', name: 'pending', coordinationPolicy: defaultCoordinationPolicy(alice.member.principal.backendUserId) }] };
   const introduced = value(await client(alice).call(operations.introduceEnrollment, {}, input)).data;
   assert.equal(introduced.enrollment.enrollment.owner.displayName, 'alice');
-  assert.equal(introduced.enrollment.enrollment.owner.matrixUserId, alice.member.principal.matrixUserId);
+  assert.equal(introduced.enrollment.enrollment.owner.backendUserId, alice.member.principal.backendUserId);
   assert.deepEqual(value(await client(alice).call(operations.enrollment, { enrollmentId: input.enrollmentId }, {})).data, introduced.enrollment);
   const listed = value(await client(admin).call(operations.enrollments, {}, {})).data;
   assert.equal(listed[0]?.owner.displayName, 'alice');

@@ -8,7 +8,7 @@ namespace Crossfire.Server.Http;
 
 public static class RuntimeRoutes
 {
-    private static RuntimePorts Ports(ApiContext context) => RuntimeCommands.Ports(context.Database, context.State.Now, context.State.Matrix.Ports(), context.State.Configuration.PublicOrigin, context.State.Configuration.ServiceMatrixId);
+    private static RuntimePorts Ports(ApiContext context) => RuntimeCommands.Ports(context.Database, context.State.Now, context.State.Messaging, context.State.Configuration.PublicOrigin, context.State.Messaging.ServiceUserId());
 
     public static IReadOnlyList<ApiEndpoint> Endpoints() =>
     [

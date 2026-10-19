@@ -1,9 +1,10 @@
 use super::*;
+use crossfire_domain::messaging_client::MessagingClient;
 
 impl<
     S: LocalState,
     C: Coordination,
-    M: Matrix,
+    M: MessagingClient + crossfire_domain::messaging_client::InvitationReader,
     N: Connection + TurnControl + Lifecycle + 'static,
     A: Acknowledgment,
     T: Clock + Clone + Send + Sync + 'static,

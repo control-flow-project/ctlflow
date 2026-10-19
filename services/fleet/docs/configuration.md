@@ -88,7 +88,7 @@ wake_mode = "selected"
 permissions = ["room.agent.invite"]
 
 [[coordination_options.wake_senders]]
-matrix_user_id = "@member:example.test"
+backend_user_id = "@member:example.test"
 include_agents = true
 ```
 
