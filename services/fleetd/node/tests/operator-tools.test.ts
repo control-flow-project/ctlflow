@@ -45,7 +45,7 @@ test('fleet growth preserves every earlier account, exact history and provider f
   assert.equal(verifyRetainedState({ ...previous, files: [credential, credential] }, current).ok, false);
 });
 
-test('fleet verification uses only daemon GETs, exact native identities and the actual ancestor Git skill boundary', async scope => {
+test('fleet verification retains TOML instance overrides through JSON and uses only daemon GETs and exact native identities', async scope => {
   const directory = mkdtempSync(join(tmpdir(), 'fleetd-operator-')), root = join(directory, 'controller'), fleetDirectory = join(directory, 'fleet');
   const previousConfiguration = process.env.XDG_CONFIG_HOME;
   process.env.XDG_CONFIG_HOME = join(directory, 'config');
@@ -57,13 +57,14 @@ test('fleet verification uses only daemon GETs, exact native identities and the 
   execFileSync('git', ['init', '-q', directory]);
   writeFileSync(join(definition, 'agent.toml'), 'name="Analyst"\nruntime="codex"\n[runtime_options]\nmodel="gpt-5.2"\n', { mode: 0o600 });
   writeFileSync(join(definition, 'AGENTS.md'), 'Operator fixture.', { mode: 0o600 });
-  writeFileSync(join(fleetDirectory, 'runtime.toml'), 'fleet="research"\n[coordination]\nadapter="crossfire"\nserver="https://example.test"\nowner="@owner:test"\n[[instances]]\nkey="helper"\nname="helper"\ndefinition="analyst"\nworkarea="agents/analyst/workarea/helper"\n', { mode: 0o600 });
+  writeFileSync(join(fleetDirectory, 'runtime.toml'), 'fleet="research"\n[coordination]\nadapter="crossfire"\nserver="https://example.test"\nowner="@owner:test"\n[[instances]]\nkey="helper"\nname="helper"\ndefinition="analyst"\nworkarea="agents/analyst/workarea/helper"\n[instances.runtime_options]\nmodel_reasoning_effort="high"\n[instances.listener_options]\nhistory_mode="shared"\n', { mode: 0o600 });
   const skill = join(directory, '.agents', 'skills', 'search', 'SKILL.md');
   mkdirSync(join(directory, '.agents', 'skills', 'search'), { recursive: true, mode: 0o700 }); writeFileSync(skill, 'fixture');
   const agentId = randomUUID(), fleetId = randomUUID(), sessionId = randomUUID();
   saveBinding(fleetDirectory, { server: 'https://example.test', owner: '@owner:test', fleetKey: 'research', fleetId, controllerCredential: 'private-controller', request: null,
     identities: [{ instanceKey: 'helper', name: 'helper', agentId, account: { userId: '@helper:test', accessToken: 'private-agent', native: { deviceId: 'fixture' } } }] });
-  const instance = { key: 'helper', name: 'helper', definition: 'analyst', workarea: 'agents/analyst/workarea/helper' };
+  const instance = { key: 'helper', name: 'helper', definition: 'analyst', workarea: 'agents/analyst/workarea/helper',
+    runtimeOptions: { model_reasoning_effort: 'high' }, listenerOptions: { historyMode: 'shared' as const } };
   const view: FleetView = { fleetId, fleetKey: 'research', label: 'Research', directory: fleetDirectory, revision: 0, controller: { name: 'laptop' }, phase: 'running', error: null, resumeInstanceKeys: null,
     connection: { connected: true, deliveryEnabled: true, revision: 0, error: null },
     instances: [{ instance, phase: 'running', listenerActive: true, desiredActive: true, lastActivityAt: 1, historyAvailable: true,
@@ -81,7 +82,10 @@ test('fleet verification uses only daemon GETs, exact native identities and the 
   const socket = join(root, 'fleetd.sock'); server.listen(socket); await once(server, 'listening'); chmodSync(socket, 0o600);
   cleanup(scope, async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
   const called: Attachment[] = [];
-  const inspect: NativeInspector = async input => { called.push(input.attachment); return success({ sessionId, status: 'idle', authenticated: true, configuredModel: 'gpt-5.2', configuredReasoning: null, projectSkills: [{ name: 'search', path: skill }], turns: 0 }); };
+  const inspect: NativeInspector = async input => {
+    assert.equal(input.options.model_reasoning_effort, 'high'); called.push(input.attachment);
+    return success({ sessionId, status: 'idle', authenticated: true, configuredModel: 'gpt-5.2', configuredReasoning: 'high', projectSkills: [{ name: 'search', path: skill }], turns: 0 });
+  };
   const input = { root, directory: fleetDirectory, running: true, fresh: true, noRooms: false, skills: ['search'] };
   const first = value(await verifyFleet(input, new AbortController().signal, connectMatrix, inspect));
   assert(first && typeof first === 'object' && 'preservation' in first);
@@ -90,6 +94,9 @@ test('fleet verification uses only daemon GETs, exact native identities and the 
   assert(requests.every(request => request.startsWith('GET ')));
   assert(called.every(current => current.sessionId === sessionId && current.workspace === workspace));
   assert(!JSON.stringify(first).includes('private-agent') && !JSON.stringify(first).includes('private-controller'));
+  instance.runtimeOptions.model_reasoning_effort = 'medium';
+  assert.equal((await verifyFleet(input, new AbortController().signal, connectMatrix, inspect)).ok, false);
+  instance.runtimeOptions.model_reasoning_effort = 'high';
   assert.equal((await verifyFleet({ ...input, previous: { ...previous, identities: [{ instanceKey: 'helper', agentId: randomUUID(), contexts: [] }] } }, new AbortController().signal, connectMatrix, inspect)).ok, false);
   assert.equal((await verifyFleet(input, new AbortController().signal, connectMatrix, async input => success({ sessionId: input.attachment.sessionId, status: 'idle', authenticated: true, configuredModel: null, configuredReasoning: null, projectSkills: [], turns: 0 }))).ok, false);
   view.instances[0]!.listenerActive = false;
