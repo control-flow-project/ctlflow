@@ -21,18 +21,20 @@ Docker socket into the server. The server neither installs nor runs a harness.
 
 ## Start a new server
 
-The [published 0.1.22 release](releases/0.1.22.md) provides the immutable references
-below. They select the tested NativeAOT server and its matching migration image,
-not a mutable tag or an arbitrary build of main. Registry credentials, if needed,
-stay on the host outside containers.
+Select a current coordinated runtime and migration package as described in
+[container packages](container-packages.md). Set `CROSSFIRE_RUNTIME_IMAGE` and
+`CROSSFIRE_MIGRATION_IMAGE` to its verified immutable image references. Registry
+references use `ghcr.io/control-flow-project/<image>@sha256:<manifest-digest>`;
+local imported packages use their verified Docker image IDs. Do not use `latest`
+or mix releases. Registry credentials stay on the host outside containers.
+
+The current source is 0.1.23. The retained published 0.1.22 inventory is historical,
+not a current-contract quickstart. No 0.1.23 registry digest is claimed here;
+build the current package or obtain verified current references from its publisher.
 
 ```sh
-export CROSSFIRE_RUNTIME_IMAGE=ghcr.io/control-flow-project/crossfire-csharp-nativeaot@sha256:f658c1bdaddd30f58edf2d0421ef4b6204f9b2f25254b435a8c3d6c0d975a826
-export CROSSFIRE_MIGRATION_IMAGE=ghcr.io/control-flow-project/crossfire-migrations@sha256:a2e3723374b19f386a33d6f8062306df6efc46809228149060cfde60bfc62bc3
-docker pull \
-  "$CROSSFIRE_RUNTIME_IMAGE"
-docker pull \
-  "$CROSSFIRE_MIGRATION_IMAGE"
+: "${CROSSFIRE_RUNTIME_IMAGE:?Set the verified current runtime image reference}"
+: "${CROSSFIRE_MIGRATION_IMAGE:?Set its matching current migration image reference}"
 ```
 
 From this checkout's root:
