@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/fleet-ssh-transport",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -13,6 +13,6 @@
     }
   },
   "dependencies": {
-    "@ctlflow/fleetd-storage": "0.1.23"
+    "@ctlflow/fleetd-storage": "0.1.24"
   }
 }

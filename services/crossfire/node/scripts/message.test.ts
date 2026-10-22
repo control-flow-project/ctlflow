@@ -94,11 +94,14 @@ test('inline and indented code do not evaluate HTML or Markdown', () => {
 
 for (const body of ['<script>alert(1)</script>', '<img src=x onerror=alert(1)>',
   '<svg><script>alert(1)</script></svg>', '<iframe src="https://example.org"></iframe>',
-  '<a href="javascript:alert(1)">click</a>', '<style>body { display: none; }</style>']) {
+  '<a href="javascript:alert(1)">click</a>', '<style>body { display: none; }</style>',
+  '<noscript><p>discard</noscript><img src=x onerror=alert(1)>',
+  '<svg><animate attributeName="xlink:href" values="javascript:alert(1)" /></svg>',
+  '<meta http-equiv="refresh" content="0;url=javascript:alert(1)">']) {
   test(`authored HTML remains visible text: ${body.split('>')[0]}>`, () => {
     const content = markdownMessage(body);
     assert.equal(content.body, body);
-    assert(!/<(?:script|img|svg|iframe|a|style)\b/i.test(content.formatted_body));
+    assert(!/<(?:script|img|svg|iframe|a|style|noscript|animate|meta)\b/i.test(content.formatted_body));
     assert(content.formatted_body.includes('&lt;'));
   });
 }
