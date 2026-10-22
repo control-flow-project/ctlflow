@@ -79,6 +79,8 @@ test('local Docker server and host fleet retain exact histories, stop intent and
       return { digest: createHash('sha256').update(bytes).digest('hex'), mode: information.mode & 0o777, uid: information.uid };
     };
     let browser;
+    let setupRequested = false;
+    const failures = [];
     try {
       await scope.test('the selected runtime and common Knex images agree on backend and release identity', async () => {
         const runtime = json(await command('docker', ['image', 'inspect', environment.CROSSFIRE_RUNTIME_IMAGE]).ended)[0];
@@ -109,7 +111,7 @@ test('local Docker server and host fleet retain exact histories, stop intent and
         browser = await chromium.launch({ executablePath: process.env.CROSSFIRE_BROWSER ?? '/usr/bin/google-chrome', headless: true });
         context = await browser.newContext(); page = await context.newPage();
         await page.goto(origin + '/manage/');
-        await page.getByLabel('Matrix username').fill('@admin:local.test');
+        await page.getByLabel('Username', { exact: true }).fill('@admin:local.test');
         await page.getByLabel('Password', { exact: true }).fill(bootstrap.administratorPassword);
         await page.getByRole('button', { name: 'Sign in', exact: true }).click();
         await expect(page.getByRole('link', { name: 'Fleets', exact: true }).first()).toBeVisible();
@@ -144,6 +146,7 @@ test('local Docker server and host fleet retain exact histories, stop intent and
       };
       for (const [path, contents] of Object.entries(files)) { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, contents); }
       await scope.test('ordinary host setup waits for owner approval and starts separate native histories', async () => {
+        setupRequested = true;
         const setup = fleetCommand(['setup', '--config', join(project, 'runtime.toml')]);
         void setup.ended.catch(() => {});
         let request;
@@ -197,15 +200,21 @@ test('local Docker server and host fleet retain exact histories, stop intent and
         assert.deepEqual(authentication(), credential);
         assert.equal(provider.requests.length, 0, 'Idle history restoration sends no synthetic model assignment');
       });
+    } catch (error) {
+      failures.push(error);
+      throw error;
     } finally {
-      try { await fleet(['daemon', 'stop']); }
-      finally {
-        try { await browser?.close(); }
-        finally {
-          try { await compose(['down', '--volumes', '--remove-orphans']); }
-          finally { for (const child of children) child.kill('SIGTERM'); }
-        }
+      const primaryFailureCount = failures.length;
+      async function dispose(operation) {
+        try { await operation(); }
+        catch (error) { failures.push(error); }
       }
+      if (setupRequested) await dispose(() => fleet(['daemon', 'stop']));
+      await dispose(() => browser?.close());
+      await dispose(() => compose(['down', '--volumes', '--remove-orphans']));
+      for (const child of children) child.kill('SIGTERM');
+      if (failures.length > primaryFailureCount) throw new AggregateError(failures,
+        'Local Docker verification cleanup failed');
     }
   });
 });

@@ -28,8 +28,8 @@ references use `ghcr.io/control-flow-project/<image>@sha256:<manifest-digest>`;
 local imported packages use their verified Docker image IDs. Do not use `latest`
 or mix releases. Registry credentials stay on the host outside containers.
 
-The current source is 0.1.23. The retained published 0.1.22 inventory is historical,
-not a current-contract quickstart. No 0.1.23 registry digest is claimed here;
+The current source is 0.1.24. The retained published 0.1.22 inventory is historical,
+not a current-contract quickstart. No 0.1.24 registry digest is claimed here;
 build the current package or obtain verified current references from its publisher.
 
 ```sh

@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/fleetd-contracts",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -13,8 +13,8 @@
     }
   },
   "dependencies": {
-    "@ctlflow/crossfire-contracts": "0.1.23",
-    "@ctlflow/crossfire-kernel": "0.1.23",
+    "@ctlflow/crossfire-contracts": "0.1.24",
+    "@ctlflow/crossfire-kernel": "0.1.24",
     "smol-toml": "1.9.0"
   }
 }

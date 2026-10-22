@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/fleetd-adapter-execution",
-  "version": "0.1.23",
+  "version": "0.1.24",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -13,15 +13,15 @@
     }
   },
   "dependencies": {
-    "@ctlflow/crossfire-adapter-crossfire": "0.1.23",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.23",
-    "@ctlflow/crossfire-domain": "0.1.23",
-    "@ctlflow/crossfire-adapter-runtime": "0.1.23",
-    "@ctlflow/crossfire-agent-core": "0.1.23",
-    "@ctlflow/crossfire-client": "0.1.23",
-    "@ctlflow/crossfire-contracts": "0.1.23",
-    "@ctlflow/crossfire-kernel": "0.1.23",
-    "@ctlflow/fleetd-domain": "0.1.23",
-    "@ctlflow/fleetd-storage": "0.1.23"
+    "@ctlflow/crossfire-adapter-crossfire": "0.1.24",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.24",
+    "@ctlflow/crossfire-domain": "0.1.24",
+    "@ctlflow/crossfire-adapter-runtime": "0.1.24",
+    "@ctlflow/crossfire-agent-core": "0.1.24",
+    "@ctlflow/crossfire-client": "0.1.24",
+    "@ctlflow/crossfire-contracts": "0.1.24",
+    "@ctlflow/crossfire-kernel": "0.1.24",
+    "@ctlflow/fleetd-domain": "0.1.24",
+    "@ctlflow/fleetd-storage": "0.1.24"
   }
 }

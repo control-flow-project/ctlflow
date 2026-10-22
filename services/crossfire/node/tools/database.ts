@@ -2,8 +2,9 @@ import Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { lstatSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { executeSelect } from '@tinqerjs/better-sqlite3-adapter';
-import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
+import { schema, type Tables } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
 import { databaseIdentity, databaseTables, databaseValid, tableMetadata } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { failure, success } from '@ctlflow/crossfire-kernel/result';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
@@ -122,28 +123,59 @@ export async function verifyPreservation(before: string, after: string, retentio
     return firstDatabase.transaction(() => secondDatabase.transaction(() => {
       const proof = retentionProof(firstDatabase, retention); if (!proof.ok) return proof;
       const previous = protectedRecords(firstDatabase), next = protectedRecords(secondDatabase), preserved: Record<string, number> = {}, expired: Record<string, number> = {};
+      const conflicts = new Set<string>();
+      let nativeStopsInvalidated = 0;
       for (const name of Object.keys(previous) as (keyof typeof previous)[]) {
         const existing = previous[name](), actual = next[name]();
         if (existing.length > 100000 || actual.length > 100000) return failure('limit', 'Protected-record verification exceeds its 100000-row per-relation bound');
+        let expected: readonly object[] = existing;
+        if (name === 'fleet_native_stop') {
+          const checked = resumedNativeStops(secondDatabase, existing as Tables['fleet_native_stop'][], actual as Tables['fleet_native_stop'][]);
+          if (!checked.ok) return checked;
+          expected = checked.value.rows; nativeStopsInvalidated = checked.value.invalidated;
+        }
         const identity = recordIdentity(firstDatabase, name), identities = new Set(actual.map(identity));
         const rowHash = (row: object) => createHash('sha256').update(JSON.stringify(Object.entries(row).sort(([left], [right]) => left.localeCompare(right)))).digest('hex');
         const available = new Map<string, number>();
         for (const row of actual) { const key = rowHash(row); available.set(key, (available.get(key) ?? 0) + 1); }
-        for (const row of existing) {
+        for (const row of expected) {
           if (!identities.has(identity(row)) && proof.value.eligible(name, row)) { expired[name] = (expired[name] ?? 0) + 1; continue; }
           const key = rowHash(row), count = available.get(key) ?? 0;
-          if (!count) return failure('conflict', 'Existing protected domain data changed or disappeared in ' + name);
+          if (!count) { conflicts.add(name); continue; }
           available.set(key, count - 1);
         }
         preserved[name] = existing.length - (expired[name] ?? 0);
       }
-      return success({ beforeSchema: first.value.schemaVersion, afterSchema: second.value.schemaVersion, preserved,
+      if (conflicts.size) return failure('conflict', 'Existing protected domain data changed or disappeared in ' + [...conflicts].join(', '));
+      return success({ beforeSchema: first.value.schemaVersion, afterSchema: second.value.schemaVersion, preserved, nativeStopsInvalidated,
         expired, loggingRetention: retention ?? null, beforeCounts: first.value.counts, afterCounts: second.value.counts });
     })())();
   } catch { return failure('invalid', 'Cannot inspect protected records using the current schema'); }
   finally {
     original?.close(); current?.close();
   }
+}
+
+function resumedNativeStops(database: Database.Database, before: Tables['fleet_native_stop'][], after: Tables['fleet_native_stop'][]) {
+  const runs = executeSelect(database, schema, query => query.from('listener_run').select(row => ({
+    id: row.id, agentId: row.agent_id, fleetId: row.controller_fleet_id, startedAt: row.started_at,
+  })).take(100001));
+  if (runs.length > 100000) return failure('limit', 'Native-stop preservation exceeds its finite listener-run bound');
+  const current = new Map(after.map(row => [row.agent_id + ':' + row.receipt_id, row]));
+  let invalidated = 0;
+  const rows = before.map(row => {
+    const changed = current.get(row.agent_id + ':' + row.receipt_id);
+    if (row.invalidated_at !== null || !changed || changed.invalidated_at === null
+      || changed.invalidated_at < row.native_stopped_at
+      || !isDeepStrictEqual({ ...row, invalidated_at: changed.invalidated_at }, changed)) return row;
+    const invalidatedAt = changed.invalidated_at;
+    const resumed = runs.some(run => run.agentId === row.agent_id && run.fleetId === row.fleet_id && run.id !== row.run_id
+      && run.startedAt >= row.native_stopped_at && run.startedAt <= invalidatedAt);
+    if (!resumed) return row;
+    invalidated++;
+    return changed;
+  });
+  return success({ rows, invalidated });
 }
 
 function protectedRecords(database: Database.Database) {
