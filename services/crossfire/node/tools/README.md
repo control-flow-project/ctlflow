@@ -80,7 +80,7 @@ quiescent procedure. Do not copy only a live main file while ignoring WAL.
 Reads do not create schemas, migrate or print stored credentials.
 
 ```json
-{"schemaVersion":17,"counts":{"agent":2,"agent_owner_conversation":0}}
+{"schemaVersion":1,"counts":{"agent":2,"agent_owner_conversation":0}}
 ```
 
 Expectations are optional exact values. Schema mode includes columns, keys and
@@ -91,6 +91,16 @@ under its contract. Credential-refresh times and schedule deadlines are not
 immutable state. Old logging may be absent only with both actual retention days
 and the exact canonical UTC cleanup timestamp. Surviving rows, pending work and
 current authority remain protected.
+
+Capture migration snapshots while writers are stopped, before enrollment, room
+grants or acceptance probes make intentional domain changes. Principal revisions
+remain protected; an authorized room-access change is not byte preservation.
+During a resume, a stop receipt may become invalidated only from its initial
+null state, with every other receipt field unchanged and a later listener run
+for that same agent/fleet starting between the stop and invalidation timestamps.
+The report counts these transitions in `nativeStopsInvalidated`. Missing receipts,
+unproved invalidation, reactivation and changes to existing invalidation times
+still fail the check.
 
 - [Logging families and cutoff rules](../../docs/logging.md)
 

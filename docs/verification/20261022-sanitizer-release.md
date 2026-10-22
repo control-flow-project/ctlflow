@@ -53,3 +53,28 @@ aggregate Docker/process resource limits. No production timeout was increased.
 This record does not claim a new full cross-target/performance bank, live
 provider authentication or model-task completion. Deployment evidence belongs
 to the deployment repositories after activation and live verification.
+
+## Shared operator comparison
+
+The preservation check now distinguishes receipt destruction from a proven
+current-contract resume. It permits only an initial null-to-invalidated
+transition with every other native-stop field unchanged and a later listener
+generation for the same agent/fleet within the stop/invalidation interval.
+Unproved invalidation, changed receipt facts, reactivation, timestamp changes
+and missing unexpired evidence still fail. All conflicting relation names are
+reported rather than stopping at the first one. Principal revisions and grants
+remain strict; this is not a blanket operational-change allowance.
+
+The affected operator, retention, controller-authority and stop tests pass all
+35 tests with no skips. The first direct invocation used the repository root
+instead of the service's documented test working directory, so its browser
+fixture could not locate the web build. The unchanged assertions pass from the
+correct service directory in 6.843 seconds. This correction changes shared Node
+operator tooling, not the published server/fleet executables; rebuilding the
+onboarding artifacts produces the same release ID and hashes. The earlier
+981-test run remains evidence for the release source, not a claim that the
+entire bank was repeated after this operator-only change.
+Final workspace typechecking, structure/documentation checks and the 33-test
+architecture proof pass. The first final architecture invocation followed
+disposable Docker-store cleanup and could not prepare its pinned Conduit image;
+the rerun used an explicitly selected, bounded disposable daemon and passed.

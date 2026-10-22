@@ -38,6 +38,11 @@ Retain exact existing identities, credentials, context IDs, grants, receipts and
 desired/stopped selections. Appended records are allowed only under the selected
 check's documented rules. Logging expiry requires the actual configured policy
 and exact cleanup time; it never excuses changed survivors or lost authority.
+Snapshot stopped-writer migration boundaries before operational checks change
+domain records. A resume may monotonically invalidate an otherwise unchanged
+native-stop receipt when a later listener generation proves the same agent/fleet
+has resumed; the report counts that transition. This does not permit changed
+receipt facts, reactivation, arbitrary invalidation or lost unexpired receipts.
 
 A file hash establishes byte equality, not provider behavior, document correctness
 or restorable backup semantics. Archive listing is not safe extraction proof.
