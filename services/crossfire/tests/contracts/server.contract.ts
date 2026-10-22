@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { TestContext } from 'node:test';
 import Database from 'better-sqlite3';
 import { join } from 'node:path';
-import { contractError, contractHttp } from '@ctlflow/crossfire-test-support/contract-http';
+import { contractError, contractHttp, type ContractReply } from '@ctlflow/crossfire-test-support/contract-http';
 import { integer, list, observe, record, text } from '@ctlflow/crossfire-test-support/contract-process';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import type { ContractStack } from './fixture.js';
@@ -15,7 +15,17 @@ import { executeSelect, toSql } from '@tinqerjs/better-sqlite3-adapter';
 import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
 import { metadataSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 
+export async function managementDocumentContracts(request: (path: string, method: string) => Promise<ContractReply>): Promise<void> {
+  for (const path of ['/manage', '/manage/', '/manage/fleets']) for (const method of ['GET', 'HEAD']) {
+    const response = await request(path, method), label = method + ' ' + path;
+    assert.equal(response.status, 200, label);
+    assert.equal(response.headers['referrer-policy'], 'no-referrer', label + ' retains one private referrer policy');
+    assert.equal(response.headers['x-frame-options'], 'DENY', label + ' rejects embedding');
+  }
+}
+
 export async function serverContracts(scope: TestContext, fixture: ContractStack): Promise<void> {
+  await scope.test('management documents retain private referrer and framing headers', () => managementDocumentContracts(fixture.raw));
   await paginationContracts(scope, query => fixture.raw('/api/fleets' + query, 'GET', undefined, fixture.headers()));
   await scope.test('every protected canonical route authenticates before exposing resources', async () => {
     for (const [name, operation] of Object.entries(operations)) {

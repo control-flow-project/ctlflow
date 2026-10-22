@@ -38,7 +38,11 @@ public static class PublicApplication
                 var path = target.Value.Path;
                 if (path.StartsWith("/api/", StringComparison.Ordinal) || path.StartsWith("/onboarding/", StringComparison.Ordinal)) { await api(http); return; }
                 var management = path == "/manage" || path.StartsWith("/manage/", StringComparison.Ordinal);
-                if (management) http.Response.Headers.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+                if (management)
+                {
+                    http.Response.Headers["Referrer-Policy"] = "no-referrer"; http.Response.Headers.XFrameOptions = "DENY";
+                    http.Response.Headers.ContentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+                }
                 var asset = management ? path.StartsWith("/manage/assets/", StringComparison.Ordinal) ? path[8..] : "/index.html" : path;
                 if (management) { if (http.Request.Method is not ("GET" or "HEAD")) { http.Response.StatusCode = 405; return; } await Static(http, web, asset); }
                 else await backend(http, path, target.Value.Raw, api, Static);
