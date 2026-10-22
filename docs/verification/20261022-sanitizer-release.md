@@ -26,7 +26,30 @@ Verification on the release source:
   local Docker socket had no running daemon. The complete rerun used the explicit
   disposable rootless Docker socket and passed. No assertion was waived.
 
-The C# and Rust source changes only their coordinated version metadata. This
-record does not claim a new full native-target/performance bank, deployment,
-provider account authentication or model-task completion. Deployment evidence is
-recorded separately after activation and live verification.
+## Native package verification
+
+The C# and Rust source changes only their coordinated version metadata. The
+managed/NativeAOT core gate completed all 20 steps, including 5,300 assertions per
+storage acceptance run, actual Conduit authority checks, calendar cases, schema
+constraints, backups, locking and cross-target SQLite interchange. NativeAOT
+publication succeeds. Existing EF trimming/AOT diagnostics remain visible.
+Rust's locked workspace metadata validates; this is not a new Rust runtime bank.
+
+The actual NativeAOT Docker server and Node host-fleet acceptance run passes all
+seven tests with no skips. It covers common Knex release identity, isolated
+server ports/state, real Element/management browser login, owner-approved host
+setup, content-origin isolation and retained histories/credentials/stopped
+selections across controller restart. The separate local-Docker contract tests
+also pass all four assertions.
+
+Earlier container attempts exposed a stale browser label in the test and cleanup
+that could mask the primary failure. The test now uses the shared UI's neutral
+`Username` label, stops fleetd only after setup was attempted, and reports all
+cleanup failures without discarding the original error. Separately, Conduit
+database startup blocked on the test HDD's filesystem journal. The passing run
+used disposable NVMe storage with the original readiness deadline and finite
+aggregate Docker/process resource limits. No production timeout was increased.
+
+This record does not claim a new full cross-target/performance bank, live
+provider authentication or model-task completion. Deployment evidence belongs
+to the deployment repositories after activation and live verification.
