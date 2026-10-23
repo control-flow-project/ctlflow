@@ -185,6 +185,19 @@ Preserve excluded projects, shared work, production data and histories, delibera
 stopped selections and all quality gates. Report genuinely unavailable external
 dependencies; provide manual PR links and never create PRs automatically.
 
+On 2026-10-23 the owner required every publish/release to cover the complete
+affected distribution, not just source, npm packages or a live deployment.
+Keep repository/installed/website documentation, setup instructions, shared UI,
+package versions, server and Knex images, GHCR publication, deployment bundles
+and release references consistent across all affected supported targets.
+Verify actual registry downloads/pulls and the documented versions/digests;
+local builds and deployed containers do not prove registry publication. Reuse
+verified unchanged artifacts; never overwrite an immutable release or publish
+internal packages, site-specific images/configuration or credentials. List each
+required surface as verified current or explicitly blocked, and do not report
+the release complete with an unfinished surface. Existing scope and deployment
+restrictions still apply. Follow docs/specification.md, section 3.
+
 For isolated changes with confidently local impact, run the affected tests and
 necessary targeted checks. Run the full quality gates for cross-layer changes
 or whenever the impact is uncertain. Never weaken a gate or claim verification
