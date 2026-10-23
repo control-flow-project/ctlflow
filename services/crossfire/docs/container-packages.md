@@ -53,7 +53,7 @@ code; the archive checksum is not authentication of this helper.
 
 ## Format and image contract
 
-The [published 0.1.22 release](releases/0.1.22.md) provides immutable references for
+The [published 0.1.24 release](releases/0.1.24.md) provides immutable references for
 the generic images under
 `ghcr.io/control-flow-project/crossfire-node`, `crossfire-csharp-managed`,
 `crossfire-csharp-nativeaot`, `crossfire-rust` and `crossfire-migrations`.

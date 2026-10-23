@@ -11,6 +11,7 @@ install a harness or move credentials into Docker. Native fleet distributions
 listed here are explicit packaging choices, not a second onboarding workflow.
 
 - [Local Docker server and host-native fleet](../../services/crossfire/docs/local-docker.md)
+- [Published 0.1.24 server and migration images](../../services/crossfire/docs/releases/0.1.24.md)
 
 | Target | Server installation | Fleet/controller installation | Build command |
 | --- | --- | --- | --- |

@@ -149,6 +149,21 @@ Products have one coordinated exact version; fleet pins fleetd exactly.
 Public builds bundle internal modules and install outside the monorepo without
 publishing private modules or resolving workspace source.
 
+Publishing is a coordinated release of every affected distribution surface:
+source, shared UI, public packages, supported server images, shared Knex image,
+GHCR references, deployment bundles and release metadata. Repository, installed,
+setup and affected website documentation must describe those same artifacts and
+versions across Node, managed C#, NativeAOT and Rust. Check each required surface
+before handoff; an unpublished image or stale installation reference prevents a
+complete-release claim even when a live deployment succeeds.
+
+Verify registry downloads/pulls and immutable versions/digests, not merely local
+builds or image labels. Reuse verified unchanged artifacts without unnecessary
+republication; different published bytes require a new immutable release version.
+Keep internal packages, site-specific images/configuration and credentials
+private. Identify blocked surfaces explicitly. This requirement does not expand
+authorized deployment scope or override excluded projects and stopped selections.
+
 Install scripts do not start processes. The seven-day npm release-age policy
 retains only its recorded exact named exceptions. Dependency updates do not
 grant new exceptions. Lockfile ownership and installed bytes are verified.

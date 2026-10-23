@@ -7,7 +7,7 @@ The default server image is C# NativeAOT; the host does not need .NET.
 
 ## Requirements
 
-- Docker with Compose v2 and Linux amd64 containers. Native ARM64 images and
+- Docker with the Compose plugin (`docker compose`) and Linux amd64 containers. Native ARM64 images and
   emulation are not verified.
 - The matching checkout and trusted immutable server/migration image references.
   Node, managed C#, NativeAOT C# and Rust server packages use the same Compose file.
@@ -21,21 +21,28 @@ Docker socket into the server. The server neither installs nor runs a harness.
 
 ## Start a new server
 
-Select a current coordinated runtime and migration package as described in
-[container packages](container-packages.md). Set `CROSSFIRE_RUNTIME_IMAGE` and
-`CROSSFIRE_MIGRATION_IMAGE` to its verified immutable image references. Registry
-references use `ghcr.io/control-flow-project/<image>@sha256:<manifest-digest>`;
-local imported packages use their verified Docker image IDs. Do not use `latest`
-or mix releases. Registry credentials stay on the host outside containers.
+The [published 0.1.24 release](releases/0.1.24.md) contains the four runtime choices
+and their matching migration image. Its access section describes the required
+host-side registry login for private packages. Registry credentials never enter
+the server container.
 
-The current source is 0.1.24. The retained published 0.1.22 inventory is historical,
-not a current-contract quickstart. No 0.1.24 registry digest is claimed here;
-build the current package or obtain verified current references from its publisher.
+For the default NativeAOT server, select and pull these immutable references:
 
 ```sh
-: "${CROSSFIRE_RUNTIME_IMAGE:?Set the verified current runtime image reference}"
-: "${CROSSFIRE_MIGRATION_IMAGE:?Set its matching current migration image reference}"
+export \
+  CROSSFIRE_RUNTIME_IMAGE=ghcr.io/control-flow-project/crossfire-csharp-nativeaot@sha256:37dc1f30ac1cd7cdf9b1cefc2a8bc65a81a546e3f7842a742797daea4a187f42 \
+  CROSSFIRE_MIGRATION_IMAGE=ghcr.io/control-flow-project/crossfire-migrations@sha256:254a215b8d7fbb6e8d82b1dfec3fe5d930f259ad35a75ee8ac6100e82982cf3c
+docker pull \
+  "$CROSSFIRE_RUNTIME_IMAGE"
+docker pull \
+  "$CROSSFIRE_MIGRATION_IMAGE"
 ```
+
+Use the release inventory to select Node, managed C# or Rust instead, retaining
+the same migration reference. Do not use `latest` or mix releases. An explicitly
+imported current [container package](container-packages.md) uses its verified
+local Docker image IDs; a failed registry pull never switches to a source build.
+The old 0.1.22 image inventory is historical, not this quickstart's release.
 
 From this checkout's root:
 

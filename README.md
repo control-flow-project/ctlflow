@@ -39,7 +39,7 @@ Other messaging backends are not implemented.
 - [Installation and packaging by target](docs/distributions/README.md)
 - [crossfire installation](services/crossfire/docs/getting-started.md)
 - [Local Docker server and host-native fleet](services/crossfire/docs/local-docker.md)
-- [Published 0.1.22 container images](services/crossfire/docs/releases/0.1.22.md)
+- [Published 0.1.24 container images](services/crossfire/docs/releases/0.1.24.md)
 - [Agent and fleet setup](services/fleet/docs/getting-started.md)
 - [Controller operation](services/fleetd/docs/operations.md)
 - [Architecture and contracts](docs/specification.md)
