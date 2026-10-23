@@ -5,8 +5,8 @@
 The previous live deployment used current source/version 0.1.24, but the five
 generic GHCR packages contained only 0.1.22. This publication closes that version
 gap and replaces current installation references with verified 0.1.24 digests.
-It does not change GAAP, Bad Bets, Turbine, existing histories, data or desired
-agent selections. Site images, credentials and domain fleet material were not
+It does not change deployed sites, execution hosts, existing histories, data or
+desired agent selections. Site images, credentials and domain fleet material were not
 published. There is no fleet container.
 
 The runtime source is commit
