@@ -43,4 +43,3 @@ test('explicit container budgets use the exact existing slice without provisioni
   assert.deepEqual(cgroupArguments('app-test.slice'), ['--cgroup-parent', 'app-test.slice']);
   for (const parent of ['', 'app-test.scope', '/app.slice', '../app.slice', '--privileged.slice']) assert.throws(() => cgroupArguments(parent), /existing systemd slice/u);
 });
-

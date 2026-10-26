@@ -86,4 +86,3 @@ test('Knex recovers clean initial migration failure without a reset or another c
   await migrateDatabase(path);
   const ready = openStore(path); ready.close();
 });
-
