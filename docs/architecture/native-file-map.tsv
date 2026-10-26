@@ -3,10 +3,7 @@ services/crossfire/csharp/Dockerfile	services/crossfire/rust/Dockerfile	native c
 services/crossfire/csharp/README.md	services/crossfire/rust/README.md	implementation guide
 services/crossfire/csharp/apps/Crossfire.Server/ApiApplication.cs	services/crossfire/rust/apps/server	application
 services/crossfire/csharp/apps/Crossfire.Server/ApiWorker.cs	services/crossfire/rust/apps/server	application
-services/crossfire/csharp/apps/Crossfire.Server/ContainerCommands.cs	services/crossfire/rust/apps/server	application
 services/crossfire/csharp/apps/Crossfire.Server/ContainerHealth.cs	services/crossfire/rust/apps/server	application
-services/crossfire/csharp/apps/Crossfire.Server/ContainerLifecycle.cs	services/crossfire/rust/apps/server	application
-services/crossfire/csharp/apps/Crossfire.Server/ContainerPackage.cs	services/crossfire/rust/apps/server	application
 services/crossfire/csharp/apps/Crossfire.Server/ContentApplication.cs	services/crossfire/rust/apps/server	application
 services/crossfire/csharp/apps/Crossfire.Server/Crossfire.Server.csproj	services/crossfire/rust/apps/server	application
 services/crossfire/csharp/apps/Crossfire.Server/Http/AgentRoutes.cs	services/crossfire/rust/apps/server	application
@@ -186,7 +183,6 @@ services/crossfire/csharp/packages/Crossfire.AdapterSqlite/ContactQueries.cs	ser
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/Crossfire.AdapterSqlite.csproj	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/CrossfireDbContext.cs	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/DatabaseConnections.cs	services/crossfire/rust/packages/adapter-sqlite	native library
-services/crossfire/csharp/packages/Crossfire.AdapterSqlite/DatabaseUpgrade.cs	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/DecisionCommands.cs	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/DecisionQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSqlite/DiscoveryQueries.cs	services/crossfire/rust/packages/adapter-sqlite	native library
@@ -505,13 +501,9 @@ services/crossfire/node/apps/server/package.json	services/crossfire/rust/apps/se
 services/crossfire/node/apps/server/src/artifacts.ts	services/crossfire/rust/apps/server	application
 services/crossfire/node/apps/server/src/composition.ts	services/crossfire/rust/apps/server	application
 services/crossfire/node/apps/server/src/config.ts	services/crossfire/rust/apps/server	application
-services/crossfire/node/apps/server/src/container-commands.ts	services/crossfire/rust/apps/server	application
 services/crossfire/node/apps/server/src/container-health.ts	services/crossfire/rust/apps/server	application
-services/crossfire/node/apps/server/src/container-lifecycle.ts	services/crossfire/rust/apps/server	application
-services/crossfire/node/apps/server/src/container-package.ts	services/crossfire/rust/apps/server	application
 services/crossfire/node/apps/server/src/container.ts	services/crossfire/rust/apps/server	application
 services/crossfire/node/apps/server/src/content-server.ts	services/crossfire/rust/apps/server	application
-services/crossfire/node/apps/server/src/database-upgrade.ts	services/crossfire/rust/apps/server	application
 services/crossfire/node/apps/server/src/http/binary.ts	services/crossfire/rust/apps/server	application
 services/crossfire/node/apps/server/src/http/bind.ts	services/crossfire/rust/apps/server	application
 services/crossfire/node/apps/server/src/http/create-server.ts	services/crossfire/rust/apps/server	application
@@ -1019,7 +1011,9 @@ services/crossfire/node/scripts/build-web.ts	scripts/verify-rust.mjs	target buil
 services/crossfire/node/scripts/codex-history.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/codex.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/container-configuration.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/container-docker.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/container-package-tool.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
+services/crossfire/node/scripts/container-package.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/container-packages.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/control.test.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/crossfire/node/scripts/generate-matrix-api.ts	scripts/verify-rust.mjs	target build/verification; native equivalent uses workspace coordinators
@@ -1071,7 +1065,6 @@ services/crossfire/node/tests/codex-version.test.ts	services/crossfire/tests/con
 services/crossfire/node/tests/connection-flow.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/container-health.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/container-package.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
-services/crossfire/node/tests/container-removal.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/contract-process.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/contracts.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/node/tests/controller-authority.test.ts	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank

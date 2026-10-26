@@ -38,8 +38,7 @@ paths. Public behavior uses one external assertion bank.
 | History inspection | Synchronous maintenance never claims an active query slot; real unread ownership remains exclusive | Deterministic mutex/lease regression and unchanged four-target room/global history contracts |
 | Telemetry | Atomic bounded summaries; safe labels; invalid input does not poison counters or heartbeats | Cross-language collector and overflow regressions |
 | Lifecycle | fleetd alone owns execution; saved history, explicit operation identity and native writer locks | Actual Codex/Pi inert-provider, restart, terminal, steering and process-group proofs |
-| Operator | One SQLite lifetime lock, inspect both exact container identities, ordered backup/Knex/start | Concurrent/crashed/operator-orphan and installed container assertions |
-| Removal | One finite 120-second removal budget; observe in-progress deletion; retain primary and cleanup errors | Injected dual-failure tests and real Docker/Knex scenarios |
+| Server deployment | One common Compose kit, explicit writer stop and fresh migration job; optional operator backups | Shared real-container API/UI/data bank, migration-failure gating and restart persistence |
 | Packaging | Immutable source/image/release identity, bounded manifests/archives, no source-built activation fallback | Fingerprint mutation, export/import, corrupt archive and mismatched-label tests |
 | Calendar | Shared checksum-pinned IANA archive and canonical compiler, independent of host timezone data | Generated-table checks and cross-target calendar comparisons |
 | Dependency security | Narrow patched rustls lock entry; strict TLS remains enabled | RustSec audit without ignored advisories plus native HTTP/runtime tests |

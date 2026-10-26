@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, lstatSync, readFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { captureDocker, runDocker } from './container-commands.js';
+import { captureDocker, runDocker } from './container-docker.js';
 
 export type PackageImage = { reference: string; configDigest: string; descriptorDigest: string };
 export type ContainerPackage = { schemaVersion: 2; version: string; sourceDigest: string; backend: string; platform: 'linux/amd64'; archiveSha256: string; runtime: PackageImage; migration: PackageImage };

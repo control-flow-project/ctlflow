@@ -2,42 +2,33 @@
 
 ## Deploy or upgrade
 
-1. Obtain the exact trusted Docker package; identify its source digest/backend,
-   instance directory and endpoints.
-2. Verify a private backup of configuration, credentials, management SQLite and
-   report storage. A SQLite backup must include committed WAL state; do not copy
-   only a live main file.
-3. Stop any live operator normally. A second live operator is refused.
-4. Start the selected release using --package against the same private directory.
-5. The operator validates and removes exact owned runtime/migration orphans,
-   stops writers, verifies the required upgrade backup, runs Knex, then starts
-   the selected application.
-6. Check API/native readiness, source and tool provenance, database integrity,
-   retained identities and intended controller/session state.
+1. Obtain and verify the exact trusted Docker package or pull its immutable
+   matching runtime/migration references. Record source, backend, Compose project,
+   private state and endpoints.
+2. Choose the operator's backup policy. A SQLite backup must include committed
+   WAL state; copying a live main file alone is insufficient.
+3. With the same project/state selection, stop existing writers:
+   `docker compose ... stop crossfire`.
+4. Remove the completed migration job: `docker compose ... rm -f migrate`.
+5. Start the release: `docker compose ... up -d --no-build --wait`. The
+   service_completed_successfully dependency gates runtime startup on Knex.
+6. Check readiness, source/tool provenance, database integrity, retained identities
+   and intended controller/session state. Verify affected browser flows.
 7. If controller updates are authorized, update explicit targets from verified
-   installed assets, restart that controller and inspect its actual bindings.
-8. Verify affected user flows in a real browser.
+   installed assets, restart that controller and inspect actual bindings.
 
-No phase silently substitutes another runtime or schema.
-A successful image build or migration does not establish browser or fleet health.
-Website deployment, npm publication and starting fleets are separate actions.
+Compose owns lifecycle and project isolation. Deployment serialization and
+backups belong to the operator; crossfire has no custom lifetime Docker launcher,
+mandatory backup gate or orphan-takeover protocol. Use one project and state
+selection consistently. Dependency ordering alone does not stop a previous
+runtime or guarantee a fresh migration job.
 
-## Operator ownership
-
-The Node, C# and Rust operators share the private `operator.lock` inode and exclusive
-SQLite locking protocol. The lock spans package verification/import, reconciliation, backup, migration,
-runtime execution and cleanup. It is not an expiring PID lease; process death
-releases the lock. Never delete its inode to bypass a live owner.
-
-Runtime and migration container names derive from the exact state directory.
-Both carry `org.crossfire.directory`. Before stopping anything, takeover
-verifies every matching container's exact ID and ownership label.
-It then stops/removes those IDs and confirms absence.
-
-A running or exited orphan can be reconciled. Foreign/missing ownership labels,
-ambiguous inspection, Docker failure or incomplete removal block startup.
-Do not add `--rm`, remove a container by a guessed name or treat an inspect error
-as proof that no writer exists. Concurrent starts cannot overlap migrations.
+A migration failure blocks activation. Inspect the migrate service logs, correct
+the failure and repeat the explicit upgrade sequence. Never delete persistent
+volumes as a restart or migration-recovery procedure. No phase silently
+substitutes another runtime or schema. A successful image build or migration
+does not establish browser or fleet health. Website deployment, npm publication
+and starting fleets remain separate actions.
 
 ## Persistent data
 
@@ -69,7 +60,7 @@ import/export management data.
 | History resume fails | Exact saved binding and native writer lock; never substitute a new history |
 | Retirement unavailable | Current exact native-stop evidence and unsettled work |
 | HTTP 429 during signup | Client attribution and quota; not token exhaustion |
-| Container name conflict | Operator ownership/reconciliation evidence, not production data reset |
+| Container name conflict | Actual Compose project/container ownership and deployment concurrency |
 
 `fleet test` performs model-free checks. For running Codex, attachment prints the
 exact current terminal command. A stale pointer must be replaced after restart.

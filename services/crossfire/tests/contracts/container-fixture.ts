@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
-import { contractProcess, freePorts, observe, record, text, type ContractProcess, type ContractTarget } from '@ctlflow/crossfire-test-support/contract-process';
+import { contractProcess, freePorts, observe, record, text, type ContractTarget } from '@ctlflow/crossfire-test-support/contract-process';
 import { contractHttp } from '@ctlflow/crossfire-test-support/contract-http';
 import { secureProxy } from '@ctlflow/crossfire-test-support/tls';
 import { builtRelease } from '../../node/scripts/test-support/release.js';
+import { prepareContainerPackage } from '../../node/scripts/container-package.js';
 import { contractClient } from './fixture.js';
 import { config as parseConfiguration } from '../../node/apps/server/src/config.js';
 
@@ -26,48 +26,36 @@ export async function containerStack(scope: TestContext, initial: ContractTarget
   const parsed = parseConfiguration(JSON.parse(readFileSync(join(state, 'config.json'), 'utf8')) as unknown);
   assert(parsed.ok, parsed.ok ? '' : parsed.error.message);
   const configuration = parsed.value;
-  const bootstrap = record(JSON.parse(readFileSync(join(state, 'bootstrap.json'), 'utf8')) as unknown), containerName = 'crossfire-' + createHash('sha256').update(state).digest('hex').slice(0, 16);
-  let selected = initial, running: ContractProcess | undefined;
-  const abandoned = new Set<string>();
-  cleanup(scope, () => {
-    for (const identity of abandoned) {
-      const present = execFileSync('docker', ['container', 'ls', '--all', '--no-trunc', '--filter', 'id=' + identity, '--format', '{{.ID}}'], { encoding: 'utf8', timeout: 30000 }).trim();
-      if (present) { assert.equal(present, identity); execFileSync('docker', ['rm', '--force', identity], { timeout: 30000 }); }
-    }
-  });
-  async function close() {
-    const owned = running; running = undefined; if (!owned) return;
-    let failure: unknown;
-    try { await owned.close(); assert.equal(await owned.ended, 0, owned.errors() + '\n' + owned.output()); }
-    catch (error) { failure = error; }
-    try {
-      if (spawnSync('docker', ['inspect', containerName], { stdio: 'ignore' }).status === 0) {
-        execFileSync('docker', ['rm', '--force', containerName], { timeout: 30000 });
-        assert.fail('Orderly operator shutdown must remove its exact owned container');
-      }
-    } catch (error) { failure ??= error; }
-    if (failure !== undefined) throw failure;
+  const bootstrap = record(JSON.parse(readFileSync(join(state, 'bootstrap.json'), 'utf8')) as unknown);
+  const project = 'crossfire-test-' + randomUUID().slice(0, 12), containerName = project + '-crossfire-1';
+  let selected = initial, composeFile = join(packages, initial.name, 'compose.yaml');
+  let environment: NodeJS.ProcessEnv | undefined;
+  async function compose(arguments_: string[], override?: string) {
+    assert(environment, 'Compose images and state must be explicitly selected');
+    const command = contractProcess(scope, { binary: 'docker', arguments: [] }, ['compose', '--project-name', project, '-f', composeFile,
+      ...(override ? ['-f', override] : []), ...arguments_], directory, environment, 300000);
+    const status = await command.ended;
+    assert.equal(status, 0, command.errors() + '\n' + command.output());
+    return command.output().trim();
   }
-  cleanup(scope, close);
-  function launch(target: ContractTarget, packageDirectory = join(packages, target.name)) {
-    return contractProcess(scope, target.server, ['start', '--directory', state, '--package', packageDirectory, '--port', String(port), '--content-port', String(contentPort), '--cgroup-parent', parent!], directory, process.env, 300000);
-  }
+  const close = () => environment ? compose(['stop', 'crossfire']).then(() => {}) : Promise.resolve();
+  cleanup(scope, () => environment ? compose(['down', '--remove-orphans']).then(() => {}) : undefined);
   async function start(target: ContractTarget, packageDirectory = join(packages, target.name)) {
-    selected = target; running = launch(target, packageDirectory);
+    // Verify transferred artifacts before stopping any current writer.
+    const prepared = await prepareContainerPackage(packageDirectory, scope.signal);
+    await close();
+    composeFile = join(packageDirectory, 'compose.yaml'); selected = target;
+    environment = { ...process.env, CTLFLOW_CGROUP_PARENT: parent, CROSSFIRE_STATE: state,
+      CROSSFIRE_RUNTIME_IMAGE: prepared.runtimeImage, CROSSFIRE_MIGRATION_IMAGE: prepared.migrationImage,
+      CROSSFIRE_PORT: String(port), CROSSFIRE_CONTENT_PORT: String(contentPort) };
+    await compose(['rm', '-f', 'migrate']);
+    await compose(['up', '-d', '--no-build', '--wait', '--wait-timeout', '180']);
     await observe(async () => {
-      assert.equal(running?.alive(), true, 'Container operator must remain running\n' + running?.errors() + '\n' + running?.output());
-      if (!running?.output().includes('Public: ' + origin + '/')) return false;
       try { return (await contractHttp(origin, 'GET', '/api/health')).status === 200; } catch { return false; }
-    }, 'Owned container must become ready: ' + target.name, 1800000);
+    }, 'Compose runtime must become ready: ' + target.name, 180000);
   }
   await start(initial);
   const client = await contractClient({ directory, state, origin, contentOrigin, configuration, bootstrap: { administratorPassword: text(bootstrap.administratorPassword) }, native: { base: origin }, targets, release: builtRelease(),
-    restart: async (target = selected) => { await close(); await start(target); }, close, current: () => selected });
-  return { ...client, port, contentPort, containerName, launch, start, packages,
-    async abandon() {
-      const owned = running; assert(owned, 'The fixture must own its launcher'); assert(owned.alive(), 'Only the fixture-owned live launcher can be terminated');
-      const identity = execFileSync('docker', ['inspect', '--format', '{{.Id}}', containerName], { encoding: 'utf8', timeout: 30000 }).trim();
-      assert.match(identity, /^[a-f0-9]{64}$/u); abandoned.add(identity);
-      owned.child.kill('SIGKILL'); await owned.ended; running = undefined;
-    } };
+    restart: (target = selected) => start(target), close, current: () => selected });
+  return { ...client, port, contentPort, containerName, start, compose, packages };
 }

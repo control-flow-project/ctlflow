@@ -93,7 +93,13 @@ test('local Docker server and host fleet retain exact histories, stop intent and
       });
       await compose(['--profile', 'maintenance', 'run', '--rm', 'initialize']);
       await assert.rejects(compose(['--profile', 'maintenance', 'run', '--rm', 'initialize']), /Command failed/u);
-      await compose(['--profile', 'maintenance', 'run', '--rm', 'migrate']);
+      await scope.test('a failed migration blocks application startup', async () => {
+        const override = join(directory, 'migration-failure.yaml');
+        writeFileSync(override, 'services:\n  migrate:\n    entrypoint: [node, -e, "process.exit(23)"]\n    command: []\n');
+        await assert.rejects(command('docker', [...composeArguments, '-f', override, 'up', '-d', '--no-build', '--wait', '--wait-timeout', '30']).ended, /Command failed/u);
+        assert.equal((await compose(['ps', '--status', 'running', '--services'])).trim(), '');
+        await compose(['rm', '-f', 'migrate']);
+      });
       await compose(['up', '-d', '--no-build', '--wait', '--wait-timeout', '180']);
       const bootstrap = json(await compose(['--profile', 'maintenance', 'run', '--rm', '--no-deps', '--entrypoint', 'node', 'initialize',
         '-e', 'process.stdout.write(require("node:fs").readFileSync("/runtime/bootstrap.json","utf8"))']));
@@ -199,6 +205,19 @@ test('local Docker server and host fleet retain exact histories, stop intent and
         assert.deepEqual(await contexts('alpha'), before.alpha); assert.deepEqual(await contexts('bravo'), before.bravo);
         assert.deepEqual(authentication(), credential);
         assert.equal(provider.requests.length, 0, 'Idle history restoration sends no synthetic model assignment');
+      });
+      await scope.test('an upgrade stops writers and runs a fresh migration job before activation', async () => {
+        const previous = (await compose(['ps', '-a', '-q', 'migrate'])).trim();
+        assert(previous);
+        await compose(['stop', 'crossfire']);
+        await compose(['rm', '-f', 'migrate']);
+        await compose(['up', '-d', '--no-build', '--wait', '--wait-timeout', '180']);
+        const current = (await compose(['ps', '-a', '-q', 'migrate'])).trim();
+        assert(current); assert.notEqual(current, previous);
+        assert.equal((await fetch(origin + '/api/health')).status, 200);
+        assert(Array.isArray(await api('/api/fleets')));
+        assert.deepEqual(await contexts('alpha'), before.alpha);
+        assert.deepEqual(await contexts('bravo'), before.bravo);
       });
     } catch (error) {
       failures.push(error);

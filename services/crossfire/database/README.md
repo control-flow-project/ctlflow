@@ -40,8 +40,10 @@ migration list without modifying them.
 
 Database paths are absolute, private, owned files in private non-symlink directories.
 SQLite uses WAL, full synchronization, foreign keys and a busy timeout. Backups
-include committed WAL data through native SQLite backup operations. Before an
-explicit database operation, stop writers and verify its backup. Resets are never
+must include committed WAL data through native SQLite backup operations or a
+quiescent procedure. Backups are optional and operator-managed. Stop application
+writers before an explicit migration; Compose starts the runtime only after the
+one-shot Knex job succeeds. Resets are never
 automatic. Credentials and saved native histories are outside reset authorization.
 
 Every SQL store follows database/<database>/<backend>/{migrations,seeds}, with a

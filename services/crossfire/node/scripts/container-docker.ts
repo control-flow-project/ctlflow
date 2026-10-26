@@ -1,5 +1,4 @@
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 
 type CommandOutput = { code: number | null; output: string; errors: string };
 function command(args: string[], capture: boolean, signal?: AbortSignal): Promise<CommandOutput> {
@@ -29,11 +28,8 @@ function command(args: string[], capture: boolean, signal?: AbortSignal): Promis
     signal?.addEventListener('abort', stop, { once: true }); if (signal?.aborted) stop();
   });
 }
-export function dockerCaptureTimeout(args: readonly string[]): number {
-  return args[0] === 'create' || args[0] === 'stop' || args[0] === 'rm' ? 120000 : 30000;
-}
 export async function captureDocker(args: string[], signal?: AbortSignal): Promise<CommandOutput> {
-  const deadline = AbortSignal.timeout(dockerCaptureTimeout(args));
+  const deadline = AbortSignal.timeout(30000);
   try { return await command(args, true, signal ? AbortSignal.any([signal, deadline]) : deadline); }
   catch (error) { if (signal?.aborted) throw error; throw new Error('Docker ' + args[0] + ' failed: ' + (error instanceof Error ? error.message : String(error)), { cause: error }); }
 }
@@ -45,20 +41,4 @@ export function cgroupArguments(parent?: string): string[] {
   if (parent === undefined) return [];
   if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,180}\.slice$/u.test(parent)) throw new Error('Cgroup parent must be an existing systemd slice unit name');
   return ['--cgroup-parent', parent];
-}
-export function containerNames(directory: string): { runtime: string; migration: string } {
-  const digest = createHash('sha256').update(directory).digest('hex').slice(0, 16);
-  return { runtime: 'crossfire-' + digest, migration: 'crossfire-migration-' + digest };
-}
-export function runArguments(directory: string, image: string, port: number, contentPort: number, cgroupParent?: string): string[] {
-  const name = containerNames(directory).runtime;
-  return ['run', '--name', name, '--label', 'org.crossfire.directory=' + directory,
-    '--publish', '127.0.0.1:' + port + ':8080', '--publish', '127.0.0.1:' + contentPort + ':8082', '--mount', 'type=bind,"source=' + directory.replaceAll('"', '""') + '",target=/runtime',
-    ...cgroupArguments(cgroupParent), '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=128m', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', image];
-}
-export function migrationArguments(directory: string, image: string, cgroupParent?: string): string[] {
-  const name = containerNames(directory).migration;
-  return ['run', '--name', name, '--label', 'org.crossfire.directory=' + directory, '--mount', 'type=bind,"source=' + directory.replaceAll('"', '""') + '",target=/runtime',
-    ...cgroupArguments(cgroupParent), '--network', 'none', '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=128m',
-    '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', image];
 }

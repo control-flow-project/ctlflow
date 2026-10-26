@@ -2,10 +2,10 @@
 
 crossfire packages a selected server backend and the common Knex migration image.
 For a local Docker server and host-native fleet, see the [local Docker quickstart](local-docker.md).
-The deployment host needs rootless Docker and an installed crossfire operator;
-it does not build source or install that server backend's language runtime.
-Node, C# and Rust operators consume the same format and can run any server backend.
-The operator's implementation does not select the server's implementation.
+The deployment host needs rootless Docker with Compose. Trusted package
+verification/export tooling requires Node.js 26; the server backend does not
+require a host language runtime or a source checkout. All four backends use the
+same Compose definition and one-shot migration dependency.
 
 Build targets are Node, C# managed, C# NativeAOT and Rust on Linux amd64.
 The Rust image contains its native server, not a substituted Node process.
@@ -28,10 +28,10 @@ constructs cached common assets/migrations, then the four runtime images:
 
 ```text
 new-packages/
-  node/{release.json,images.tar,package-tool.mjs}
-  csharp-managed/{release.json,images.tar,package-tool.mjs}
-  csharp-nativeaot/{release.json,images.tar,package-tool.mjs}
-  rust/{release.json,images.tar,package-tool.mjs}
+  node/{release.json,images.tar,package-tool.mjs,compose.yaml}
+  csharp-managed/{release.json,images.tar,package-tool.mjs,compose.yaml}
+  csharp-nativeaot/{release.json,images.tar,package-tool.mjs,compose.yaml}
+  rust/{release.json,images.tar,package-tool.mjs,compose.yaml}
 ```
 
 Each directory transfers independently. The archive contains one runtime image
@@ -46,7 +46,7 @@ First-party code in these packages is MIT-licensed; dependencies retain their
 separate licenses and notices.
 The bundled package-tool.mjs is trusted Node.js 26 maintenance tooling for verifying
 and exporting branded derivatives without a source checkout. It is not executed
-by the server or required by the C# operator. A site activation script can run its
+by the server. A site activation script can run its
 pure `identities` command in the shared migration image without installing Node
 or mounting a Docker socket. Trust its publisher as executable
 code; the archive checksum is not authentication of this helper.
@@ -88,7 +88,7 @@ references so the OCI index retains both images; saving untagged IDs can lose
 the second index entry.
 
 Docker's current classic and containerd image stores expose different objects as
-their native image ID. All three operator adapters verify the current store's
+their native image ID. The package tool verifies the current store's
 exact configuration or descriptor identity, plus platform and release labels,
 then execute its immutable native handle. A malformed descriptor is rejected;
 there is no retry using another identity, old schema reader or host-store change.
@@ -96,8 +96,9 @@ Registry manifests and configuration digests are also distinct in
 [Docker's manifest documentation](https://docs.docker.com/reference/cli/docker/manifest/).
 
 `images.tar` is a regular Docker-save archive, nonempty and at most 16 GiB.
-All three operators verify the archive even when images are cached, load it when
-required, and inspect exact OCI identities/platform/labels before stopping any writer.
+The package tool verifies the archive even when images are cached, loads it when
+required, and inspects exact OCI identities/platform/labels. Run verification
+before stopping any current writer.
 `package-tool.mjs verify DIR` emits `{package, runtimeImage, migrationImage}`:
 the package definition and the two resolved immutable handles on that host.
 `package-tool.mjs identities DIR` accepts the ordered runtime/migration output
@@ -123,29 +124,61 @@ dependency; the managed image contains its required .NET runtime.
 
 ## Deploy or switch backends
 
-Retain the existing private state and configuration. For an initialized instance:
+Retain existing private state and configuration. Trust the package publisher,
+then verify/import the selected backend package before stopping any writer:
 
 ```sh
-/absolute/distribution/crossfire/Crossfire.Server start \
-  --directory /absolute/private/state \
-  --package /absolute/packages/csharp-nativeaot \
-  --port 8080 --content-port 8082
+node /absolute/packages/csharp-nativeaot/package-tool.mjs verify \
+  /absolute/packages/csharp-nativeaot > /absolute/private/verified-images.json
+export CROSSFIRE_RUNTIME_IMAGE=$(jq -r .runtimeImage /absolute/private/verified-images.json)
+export CROSSFIRE_MIGRATION_IMAGE=$(jq -r .migrationImage /absolute/private/verified-images.json)
+export CROSSFIRE_STATE=/absolute/private/state
+export CROSSFIRE_PORT=8080 CROSSFIRE_CONTENT_PORT=8082
 ```
 
-The Node and Rust operators accept the identical start options. Select another package
-directory to select another backend. The same directory lock, exact container
-ownership checks, writer shutdown, verified pre-migration backup and one-shot Knex
-migration run before activation. A failed phase blocks subsequent phases.
-Existing SQL data, Matrix rooms, credentials and publications are retained. Agent
-native processes and histories remain fleetd-owned, not server-image contents.
-Switching backends never authorizes a schema downgrade or production reset.
+The maintenance tool needs Node.js 26 and the example extraction uses jq. The
+returned image handles are immutable on the receiving Docker engine. Registry
+consumers can instead pull the exact matching published digests; both artifact
+transports feed the same Compose workflow. A failed pull or verification stops
+there, without switching transport or backend automatically.
 
-Shutdown confirms the absence of each exact owned container ID. If Docker is
-already removing it, the operator observes completion rather than issuing
-competing stop/delete requests. All three implementations use a two-minute complete
-cleanup bound and retain failures when absence cannot be established. The shared
-container harness gives operators three minutes to finish stop, detach and cleanup;
-the ordinary process default remains ten seconds. This is not a cleanup waiver.
+For a NEW empty state directory, set its identity and initialize once:
+
+```sh
+export CROSSFIRE_INSTANCE=team CROSSFIRE_SERVER_NAME=example.test
+export CROSSFIRE_ORIGIN=https://example.test
+export CROSSFIRE_CONTENT_ORIGIN=https://content.example.test
+export CROSSFIRE_ADMINISTRATOR=admin
+docker compose -p team -f /absolute/packages/csharp-nativeaot/compose.yaml \
+  --profile maintenance run --rm initialize
+```
+
+For an initialized instance, or after that initialization:
+
+```sh
+docker compose -p team -f /absolute/packages/csharp-nativeaot/compose.yaml stop crossfire
+docker compose -p team -f /absolute/packages/csharp-nativeaot/compose.yaml rm -f migrate
+docker compose -p team -f /absolute/packages/csharp-nativeaot/compose.yaml up -d --no-build --wait
+```
+
+Use the same project name and state for every command. Compose starts the runtime
+only after the migration job succeeds. On an upgrade, stop writers and remove
+the completed job to guarantee a fresh run; dependency ordering alone does neither.
+Inspect `docker compose ... logs migrate` after a failure and correct it before
+retrying. Backups are optional and operator-managed. If taking one, include
+committed SQLite WAL state, private configuration, credentials and other owned
+persistent data. Do not delete volumes to recover a failed migration.
+
+The default state is the project's named `server-state` volume. An absolute
+CROSSFIRE_STATE selects a private bind directory instead. Ports default to
+8080/8082 on loopback; public HTTPS and ingress remain site-owned. Use an explicit
+Compose override for site resource/networking policy. The image owns its
+entrypoint and readiness; do not inject backend-specific probes.
+
+Switching packages changes the selected backend while retaining current SQL
+data, Matrix rooms, credentials and publications. Native agent processes and
+histories remain fleetd-owned. There is no `crossfire start` Docker operator,
+automatic backend fallback, schema downgrade or data reset.
 
 GAAP and Bad Bets select csharp-nativeaot in their site deployment profiles and
 retain their separate DNS/TLS/nginx, origins, ports, private
@@ -174,8 +207,8 @@ node /absolute/packages/csharp-managed/package-tool.mjs export \
 The two IDs must be complete 64-character lowercase digests. This export function
 also packages ordinary build outputs; it is not another deployment path. It checks
 the inherited release labels and refuses mismatched runtime/migration releases.
-Site-specific initialization must invoke the installed operator's init command,
-not import Node application source from an arbitrary runtime image. Configuration
+Site-specific initialization uses the common maintenance image or Compose
+initialize service, never application-source imports from a selected runtime. Configuration
 updates must be validated outside language-specific image internals. All SQL
 changes remain in the shared Knex image, never EF/Node runtime startup.
 
@@ -193,8 +226,8 @@ Use init only on a new empty directory. On existing state, run
 `/app/services/crossfire/dist/scripts/container-configuration.js` in that same
 maintenance image with `--directory`, `--instance`, `--origin`, `--content-origin`
 and `--server-name`, mounting state read-only. It validates without rewriting or
-printing secrets. Then stop writers, verify the full backup and run the migration
-image's default command before starting the selected runtime. Apply the documented
+printing secrets. Then use the same Compose project to stop writers, remove the completed migrate
+job and start the selected release. Backups remain operator-managed. Apply the documented
 read-only filesystem, dropped-capability, no-new-privileges and resource controls
 to maintenance containers as well.
 
@@ -206,8 +239,8 @@ fleet attachment and no existing coding conversation is adopted.
 ## Verification and Rust integration
 
 The shared actual-container bank builds packages once and then runs identical
-API/UI/data assertions on each backend. It additionally crosses operator/backend
-selection, runs image-owned readiness probes, tests transfer/import and rejects
+API/UI/data assertions on each backend. It uses the same Compose kit, runs
+image-owned readiness probes, tests transfer/import and rejects
 corrupt archives/mismatched labels before touching a running instance.
 The installed-products and current-schema migration banks remain required.
 
@@ -216,7 +249,7 @@ Rust-owned image producer. Rust reuses the common asset/migration Dockerfile,
 package exporter and label validation; only its runtime build is target-owned.
 The same container assertion bank covers all selected distributions. Rust's
 separate release gate runs its actual image through this bank; the full matrix
-also crosses all installed operators and backend packages. A passing build is not
+uses the same deployment assertions for all backend packages. A passing build is not
 an end-to-end certification; current evidence and unresolved owner findings are
 recorded in the native review.
 

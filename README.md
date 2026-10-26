@@ -21,7 +21,9 @@ Personalized setup always installs pinned npm fleet and Node fleetd, independent
 of server implementation. Setup hosts do not need .NET or Rust. fleetd creates a private
 OS-native authentication file automatically; fleet reads it.
 Docker runs the server side only: crossfire, Matrix, Element, management and
-content. fleetd and its agents run on the user's execution host with an existing
+content, plus one-shot Knex migrations. Standard Docker Compose gates runtime
+startup on migration success; upgrades stop writers and replace the completed
+migration job. Backups are operator-managed. fleetd and its agents run on the user's execution host with an existing
 Codex/Pi installation and native login. Setup installs fleet/fleetd, not a harness.
 
 Node, C# and Rust implement the same products. C# targets .NET 11 with managed and

@@ -42,13 +42,10 @@ try {
     const before = snapshot(path), bytes = readFileSync(path);
     assert.equal(invoke(native, '--validate', path).Status, 'passed');
     assert.deepEqual(readFileSync(path), bytes, 'Runtime validation does not alter schema or source records');
-    const backup = invoke(native, '--backup', root);
-    assert.equal(typeof backup.File, 'string'); assert.equal(resolve(backup.File, '..'), join(root, 'backups'));
-    assert.deepEqual(snapshot(backup.File), before, 'Backup contains every current record and relationship');
     await migrateDatabase(path);
     assert.deepEqual(snapshot(path), before, 'Repeated Knex initialization does not rewrite current data');
     assert.equal(invoke(!native, '--validate', path).Status, 'passed');
     assert.deepEqual(snapshot(path), before, 'The other implementation consumes the exact same schema');
   }
-  console.log(JSON.stringify({ scope: 'current schema, native validation, constraints and backups', status: 'passed', implementations: ['managed', 'NativeAOT'] }));
+  console.log(JSON.stringify({ scope: 'current schema, native validation, constraints and interchange', status: 'passed', implementations: ['managed', 'NativeAOT'] }));
 } finally { rmSync(directory, { recursive: true }); }

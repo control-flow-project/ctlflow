@@ -5,9 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withDockerTestResources } from '../../../scripts/docker-test-resources.mjs';
 import { containerSourceDigest } from '../dist/scripts/container-packages.js';
-import { packageLabels } from '../dist/apps/server/src/container-package.js';
-import { migrationArguments } from '../dist/apps/server/src/container-commands.js';
-import { ownedDocker } from '../dist/apps/server/src/container-lifecycle.js';
+import { packageLabels } from '../dist/scripts/container-package.js';
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
 import { databaseIdentity, foreignKeyViolations, integrityResult } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 
@@ -36,7 +34,9 @@ try {
     const selected = join(directory, 'current'); mkdirSync(selected, { mode: 0o700 });
     const path = join(selected, 'management.sqlite');
     for (const phase of ['initialize', 'repeat']) {
-      await ownedDocker(migrationArguments(selected, image, parent), AbortSignal.timeout(60000));
+      execFileSync('docker', ['run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+        '--cgroup-parent', parent, '--memory', '2g', '--pids-limit', '512', '--tmpfs', '/tmp:rw,nosuid,nodev,size=256m',
+        '--mount', 'type=bind,source=' + selected + ',target=/runtime', image], { stdio: 'inherit', timeout: 60000 });
       const database = openStore(path);
       try {
         assert.equal(databaseIdentity(database).version, 1);

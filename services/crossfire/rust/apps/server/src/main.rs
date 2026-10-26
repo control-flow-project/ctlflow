@@ -19,7 +19,7 @@ async fn main() -> std::process::ExitCode {
                 },
                 "container" if values.len()==1 => container::run(stop.clone()).await,
                 "health" if values.len()==1 => crossfire_server::container_health::run(stop.clone()).await,
-                "init" | "start" => operator::run(&values,stop.clone()).await,
+                "init" => operator::run(&values),
                 _ => Err(crossfire_kernel::Failure::new(crossfire_kernel::failure::ErrorCode::Invalid,operator::USAGE)),
             }
         };

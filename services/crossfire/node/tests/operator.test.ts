@@ -3,8 +3,7 @@ import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } f
 import { join } from 'node:path';
 import test from 'node:test';
 import { main } from '../apps/server/src/operator.js';
-import { runArguments, cgroupArguments } from '../apps/server/src/container-commands.js';
-import { ownedDocker } from '../apps/server/src/container-lifecycle.js';
+import { cgroupArguments } from '../scripts/container-docker.js';
 import { checkContainerConfiguration } from '../scripts/container-configuration.js';
 
 test('initialization is private, explicit, non-destructive and rejects unrelated options', async context => {
@@ -14,11 +13,11 @@ test('initialization is private, explicit, non-destructive and rejects unrelated
   const args = ['init', '--directory', directory, '--instance', 'preview', '--origin', 'http://127.0.0.1:8098',
     '--content-origin', 'http://localhost:8099',
     '--server-name', 'preview.localhost', '--administrator', 'admin'];
-  await assert.rejects(main([...args, '--package', '/package']), /Invalid option/);
-  for (const option of ['--compile', '--source', '--runtime']) await assert.rejects(main(['start', option, 'old']), /Unknown option/);
-  await assert.rejects(main([...args, '--cgroup-parent', 'app-test.slice']), /Invalid option/);
-  await assert.rejects(main(['start', '--directory', directory, '--instance', 'ignored']), /Invalid option/);
-  for (const action of ['reset', 'install', 'run', 'kill']) await assert.rejects(main([action]), /Use init or start/);
+  await assert.rejects(main([...args, '--package', '/package']), /Invalid option|Unknown option/u);
+  for (const option of ['--compile', '--source', '--runtime', '--package']) await assert.rejects(main(['start', option, 'old']), /Unknown option/);
+  await assert.rejects(main([...args, '--cgroup-parent', 'app-test.slice']), /Invalid option|Unknown option/u);
+  await assert.rejects(main(['start', '--directory', directory, '--instance', 'ignored']), /Use init or serve/);
+  for (const action of ['reset', 'install', 'run', 'kill', 'start']) await assert.rejects(main([action]), /Use init or serve/);
   for (const repeated of [['--instance', 'preview'], ['--instance', 'other'], ['--instance=other']])
     await assert.rejects(main([...args, ...repeated]), /Duplicated option --instance/u);
   const invalidBackend = [...args]; invalidBackend[invalidBackend.indexOf('--server-name') + 1] = 'bad/host';
@@ -42,28 +41,5 @@ test('initialization is private, explicit, non-destructive and rejects unrelated
 test('explicit container budgets use the exact existing slice without provisioning host services', () => {
   assert.deepEqual(cgroupArguments(), []);
   assert.deepEqual(cgroupArguments('app-test.slice'), ['--cgroup-parent', 'app-test.slice']);
-  const args = runArguments('/example', 'fixture-image', 8098, 8099, 'app-test.slice');
-  assert.equal(args[args.indexOf('--cgroup-parent') + 1], 'app-test.slice');
   for (const parent of ['', 'app-test.scope', '/app.slice', '../app.slice', '--privileged.slice']) assert.throws(() => cgroupArguments(parent), /existing systemd slice/u);
-});
-
-test('container arguments expose only loopback and this explicit state directory', () => {
-  const directory = '/example/space , and "quote"';
-  const args = runArguments(directory, 'fixture-image', 8098, 8099);
-  assert.equal(args[args.indexOf('--publish') + 1], '127.0.0.1:8098:8080');
-  assert(args.includes('127.0.0.1:8099:8082'));
-  assert.equal(args[args.indexOf('--mount') + 1], 'type=bind,"source=/example/space , and ""quote""",target=/runtime');
-  assert(args.includes('--read-only'));
-  assert.equal(args[args.indexOf('--cap-drop') + 1], 'ALL');
-  assert.equal(args[args.indexOf('--security-opt') + 1], 'no-new-privileges');
-  assert.equal(args.at(-1), 'fixture-image');
-  for (const forbidden of ['--rm', '--privileged', '--network=host', '--pid=host', '/var/run/docker.sock']) assert(!args.includes(forbidden));
-  const other = runArguments('/different', 'fixture-image', 8098, 8099);
-  assert.notEqual(args[args.indexOf('--name') + 1], other[other.indexOf('--name') + 1]);
-});
-
-test('one container lifecycle owner rejects automatic removal and cancellation before creation', async () => {
-  const args = runArguments('/private/example', 'fixture-image', 8098, 8099), stop = new AbortController();
-  for (const option of ['--rm', '--rm=true', '--rm=false']) await assert.rejects(ownedDocker(['run', option, ...args.slice(1)], stop.signal), /without automatic removal/u);
-  stop.abort(); await assert.rejects(ownedDocker(args, stop.signal), { name: 'AbortError' });
 });

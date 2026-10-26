@@ -51,28 +51,20 @@ The selected implementation never invokes another backend as a fallback.
 The shared JavaScript agent tool and Pi extension are declared runtime assets;
 the common Knex image is an explicit migration dependency.
 
-## Server operator
+## Server deployment
 
-All three implementations reject repeated options, including identical values, and
-accept explicit ports only as canonical ASCII decimal integers in 1024..65535.
-Argument rejection precedes state-lock creation and native engine operations.
-Operator failures use a standard-error diagnostic and normal exit code 1, not a
-native abort or crash dump.
-The same external operator scenarios exercise all three boundaries.
+All four server targets use the same standard Docker Compose kit and common
+one-shot Knex image. Compose owns lifecycle and project isolation; runtime
+startup depends on successful migration. Upgrades stop crossfire writers, remove
+the completed migrate job and start the selected release with the same project
+and private state. Backups are optional and operator-managed.
 
-One cross-language private SQLite lock owns an instance's entire operator
-lifetime. A competing live start fails before touching containers or data.
-All three operator implementations consume --package. The package selects the runtime
-independently of the operator language. Source compilation is a build step, not
-another deployment path. Exact archive/image/source identities and release labels
-are verified before stopping writers. Current packages target Linux amd64 only.
-After launcher death, the next owner inspects both deterministic container names,
-validates their directory labels, then stops and removes their exact IDs.
-Foreign ownership or unconfirmed cleanup blocks migration and replacement.
-
-Backup, migration and runtime startup are ordered phases. Docker automatic
-removal is not used. The instance lock is retained through runtime cleanup.
-A native agent's process/history ownership is a separate controller concern.
+The trusted package tool validates/imports exact archive/image/source identities
+and release labels before stopping writers. Backend selection is explicit and
+independent of native configuration/serve executables. There is no custom
+Node/C#/Rust Docker lifetime operator, orphan-takeover protocol or mandatory
+backup gate. Current images target Linux amd64. Native agent process/history
+ownership remains a separate fleetd concern.
 
 - [Docker package format and site integration](../../services/crossfire/docs/container-packages.md)
 

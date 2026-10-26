@@ -11,7 +11,7 @@ this is not a static or musl distribution.
 Installed products need no Rust toolchain. Fleet agents still require Node for
 the shared tool client, the selected Codex or verified Pi 1.0.0 executable and an
 authorized native provider login. Remote commands require SSH. The server
-operator requires rootless Docker and an explicit verified container package.
+deployment requires rootless Docker with Compose and a verified image kit.
 The deployment host does not need source or build dependencies. Public use needs operator-owned
 DNS, HTTPS and separate application/content hostnames.
 
@@ -50,48 +50,64 @@ Node build, the root command builds Node, managed C#, NativeAOT C# and Rust pack
 npm run package:containers -- --output /absolute/packages/release
 ```
 
-Each backend directory contains `release.json`, `images.tar` and trusted build-side
-`package-tool.mjs`. Copy the chosen complete package to the deployment host. The
+Each backend directory contains `release.json`, `images.tar`, `compose.yaml` and
+trusted build-side `package-tool.mjs`. Copy the chosen complete package to the deployment host. The
 archive contains its runtime and the common Knex image, selected by immutable IDs.
 
 ## Install and run the server
 
-Copy the entire completed directory to its selected release location. Preserve
-sibling products, native guards, timezone data and notices. Do not copy only the
-three main executables or merge files over an active release.
+Server deployment uses Docker Compose with the selected rust image and
+matching one-shot Knex image. Build the four backend kits from source with
+`npm run package:containers -- --output /absolute/packages`. Copy the complete
+selected directory, including release.json, images.tar, package-tool.mjs and
+compose.yaml, to the deployment host. The trusted maintenance helper requires
+Node.js 26; these examples also use jq. No host SDK is required to run an image.
 
-For a new local instance:
+Verify/import trusted artifacts before stopping any current writer:
 
 ```sh
-/absolute/releases/rust/crossfire/crossfire init \
-  --directory /absolute/private/crossfire-state --instance team \
-  --origin http://127.0.0.1:8098 --content-origin http://localhost:8099 \
-  --server-name team.localhost --administrator admin
-/absolute/releases/rust/crossfire/crossfire start \
-  --directory /absolute/private/crossfire-state --package /absolute/packages/release/rust \
-  --port 8098 --content-port 8099
+set -eu
+node /absolute/packages/rust/package-tool.mjs verify \
+  /absolute/packages/rust > /absolute/private/verified-images.json
+export CROSSFIRE_RUNTIME_IMAGE=$(jq -r .runtimeImage /absolute/private/verified-images.json)
+export CROSSFIRE_MIGRATION_IMAGE=$(jq -r .migrationImage /absolute/private/verified-images.json)
+export CROSSFIRE_STATE=/absolute/private/crossfire-state
+export CROSSFIRE_PORT=8098 CROSSFIRE_CONTENT_PORT=8099
+export CROSSFIRE_INSTANCE=team CROSSFIRE_SERVER_NAME=team.localhost
+export CROSSFIRE_ORIGIN=http://127.0.0.1:8098
+export CROSSFIRE_CONTENT_ORIGIN=http://localhost:8099
+export CROSSFIRE_ADMINISTRATOR=admin
+docker compose -p team -f /absolute/packages/rust/compose.yaml \
+  --profile maintenance run --rm initialize
+docker compose -p team -f /absolute/packages/rust/compose.yaml \
+  up -d --no-build --wait
 ```
 
-Initialization refuses nonempty state. The initial password is in private
-`bootstrap.json`, field `administratorPassword`. The package selects its server
-implementation independently of the operator language. Rust can run any verified implementation package,
-and Node/C# operators can run the Rust package. The operator verifies exclusive
-ownership, archive bytes, image platform/release labels and exact owned orphan
-cleanup, verifies a required upgrade backup and runs Knex before startup.
-The superseded `--source`, `--compile` and `--runtime` flags are rejected.
-There is no implementation fallback. Ctrl+C stops the owned container and
-retains persistent data.
+Run initialize only for new empty state. It refuses nonempty state and writes
+the initial administratorPassword in private bootstrap.json. Compose starts the
+runtime only after the common Knex job succeeds. Existing configuration,
+credentials, Matrix data and publications remain in the selected state directory.
+The server never migrates at startup. There is no `crossfire start` Docker
+operator or automatic backend fallback.
 
-The example serves Element at `http://127.0.0.1:8098/` and management at
-`http://127.0.0.1:8098/manage/`. The separate content port serves report files
-only. Public deployment needs exact HTTPS origins, trusted ingress and separate
-proxy routes. These example addresses are not live deployments.
+For upgrades, verify/select the matching release, use the SAME project/state,
+stop writers and remove the completed job before starting:
 
-The image's native `health` command probes both application and Matrix readiness
-over loopback with the configured public Host, three-second request bounds and no
-redirects. It does not need Node, curl or a shell-based HTTP client in the Rust
-runtime. Removal observes an already-removing exact container for at most two
-minutes; failure to confirm absence blocks replacement.
+```sh
+docker compose -p team -f /absolute/packages/rust/compose.yaml stop crossfire
+docker compose -p team -f /absolute/packages/rust/compose.yaml rm -f migrate
+docker compose -p team -f /absolute/packages/rust/compose.yaml up -d --no-build --wait
+```
+
+A failed migration blocks activation. Inspect the migrate service logs and
+correct its failure before retrying; never delete state or volumes to recover.
+Backups are optional and operator-managed. SQLite backups must include committed
+WAL state through its backup API or a quiescent procedure.
+
+The example serves Element at http://127.0.0.1:8098/ and management at
+http://127.0.0.1:8098/manage/. Reports use the separate content origin. Public
+hosting needs exact HTTPS origins, separate proxy routes and trusted ingress.
+These are local example addresses, not live deployment evidence.
 
 ## Install and connect fleet and fleetd
 
@@ -141,11 +157,12 @@ that escape that group are not contained by this mechanism.
 
 ## Upgrade and verify
 
-Record the exact source revision and distribution manifest. Back up server,
-controller and fleet state, credentials and native histories, including a
-WAL-consistent SQLite backup. Stop the old operator normally, then use the new
-release with the same private directory. Knex is the only migration owner and
-all implementations open the same database; changing backend is not a reset.
+Record the exact source revision and distribution manifest. Use the server's
+Compose upgrade sequence above; switching backend preserves the common
+Knex-created database. Operator backup policy covers server/controller/fleet
+state, credentials and histories; a live main-file copy omits committed WAL data.
+Do not merge files over an active executable release directory. Stop the old
+controller normally before selecting a new executable with its original root.
 
 Use the installed new CLI for `fleet update FLEET` or
 `fleet agent update FLEET INSTANCE`, then restart fleetd with its original root.

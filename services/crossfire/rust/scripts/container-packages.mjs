@@ -1,8 +1,8 @@
 import { readFileSync, existsSync, lstatSync } from 'node:fs';
 import { isAbsolute, dirname, join } from 'node:path';
 import { containerSourceDigest, auditContainerDependencies, exportContainerPackage } from '../../dist/scripts/container-packages.js';
-import { packageLabels } from '../../dist/apps/server/src/container-package.js';
-import { cgroupArguments, captureDocker, runDocker } from '../../dist/apps/server/src/container-commands.js';
+import { packageLabels } from '../../dist/scripts/container-package.js';
+import { cgroupArguments, captureDocker, runDocker } from '../../dist/scripts/container-docker.js';
 
 export async function buildRustContainerPackage(source, output, parent) {
   if (!isAbsolute(source) || !isAbsolute(output) || existsSync(output) || !lstatSync(dirname(output)).isDirectory()) throw new Error('Use an absolute source and a new package output in an existing directory');
@@ -21,5 +21,5 @@ export async function buildRustContainerPackage(source, output, parent) {
   const migrations = await build('services/crossfire/node/Dockerfile', 'migrations', 'crossfire-migrations:' + suffix, 'migrations');
   const runtime = await build('services/crossfire/rust/Dockerfile', 'production', 'crossfire-rust:' + suffix, 'rust', ['--build-arg', 'CROSSFIRE_ASSETS_IMAGE=' + assets]);
   if (containerSourceDigest(source) !== sourceDigest) throw new Error('Container source changed during package construction');
-  await exportContainerPackage(runtime, migrations, output, readFileSync(join(source, 'services/crossfire/dist/container-package-tool.mjs')));
+  await exportContainerPackage(runtime, migrations, output, readFileSync(join(source, 'services/crossfire/dist/container-package-tool.mjs')), readFileSync(join(source, 'services/crossfire/docker/local/compose.yaml')));
 }

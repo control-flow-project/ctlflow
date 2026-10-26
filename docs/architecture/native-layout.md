@@ -103,7 +103,8 @@ Knex alone creates and migrates databases. Tinqer, EF and Diesel own their
 respective application queries over the exact same schema. Generated entities,
 tables and precompiled queries remain inside the SQLite adapter. No native ORM
 creates a schema or silently migrates on startup. The shared one-shot migration
-container runs after writers stop and a required backup is verified.
+container runs after writers stop; Compose activates the runtime only after
+migration succeeds. Backups are optional and operator-managed.
 Filesystem state has one current reader and writer per selected implementation.
 There are no historical conversion commands or alternate runtime readers.
 

@@ -1,9 +1,9 @@
 using Crossfire.Server;
 
-if (args is ["health"]) await ContainerHealth.Verify();
-else if (args.Length == 0 || args[0] is "init" or "start" or "--help")
+try
 {
-    try { await ServerOperator.Run(args); }
-    catch (Exception error) { Console.Error.WriteLine(error.Message); Environment.ExitCode = 1; }
+    if (args is ["health"]) await ContainerHealth.Verify();
+    else if (args.Length == 0 || args[0] is "init" or "--help") await ServerOperator.Run(args);
+    else await ServerHost.Run(ServerHost.Arguments(args));
 }
-else await ServerHost.Run(ServerHost.Arguments(args));
+catch (Exception error) { Console.Error.WriteLine(error.Message); Environment.ExitCode = 1; }

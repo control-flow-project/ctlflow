@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
-import { observe } from '@ctlflow/crossfire-test-support/contract-process';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import type { ContainerStack } from './container-fixture.js';
@@ -17,7 +16,6 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
     assert.equal(command.status, 0, command.stderr); return command.stdout.trim();
   }
   const inspect = (identity: string, format: string) => docker(['inspect', '--format', format, identity]);
-  const exists = (identity: string) => docker(['container', 'ls', '--all', '--no-trunc', '--filter', 'id=' + identity, '--format', '{{.ID}}']) !== '';
   await scope.test('a transferred derivative package imports its missing image and retains image-owned readiness', async child => {
     const original = fixture.current(), parent = inspect(fixture.containerName, '{{.Config.Image}}');
     assert.match(parent, /^sha256:[a-f0-9]{64}$/u);
@@ -46,7 +44,7 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
     assert.equal((JSON.parse(verified.stdout) as { runtimeImage: string }).runtimeImage, derivative, 'The standalone package tool resolves no monorepo source');
     const health = JSON.parse(inspect(fixture.containerName, '{{json .Config.Healthcheck.Test}}')) as string[]; assert.equal(health[0], 'CMD'); docker(['exec', fixture.containerName, ...health.slice(1)]);
   });
-  await scope.test('the selected installed operator runs every backend package without a source checkout or data conversion', async child => {
+  await scope.test('the same Compose kit runs every selected backend without data conversion', async child => {
     const original = fixture.current();
     for (const backend of fixture.targets) {
       await fixture.close(); await fixture.start(original, join(fixture.packages, backend.name));
@@ -56,71 +54,50 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
       const health = JSON.parse(inspect(fixture.containerName, '{{json .Config.Healthcheck.Test}}')) as string[];
       assert.equal(health[0], 'CMD'); docker(['exec', fixture.containerName, ...health.slice(1)]);
     }
-    child.diagnostic(JSON.stringify({ operator: original.name, backends: fixture.targets.map(backend => backend.name) }));
+    child.diagnostic(JSON.stringify({ configuration: original.name, backends: fixture.targets.map(backend => backend.name) }));
     await fixture.restart(original);
   });
-  await scope.test('corrupt archives and mismatched image labels cannot stop an existing runtime orphan', async () => {
-    const original = fixture.current(), temporary = mkdtempSync(join(fixture.directory, 'bad-package-'));
+  await scope.test('package validation fails before stopping the running Compose service', async () => {
+    const temporary = mkdtempSync(join(fixture.directory, 'bad-package-'));
     try {
-      for (const operator of fixture.targets) for (const failure of ['archive', 'labels', 'schema']) {
-        const path = join(temporary, operator.name + '-' + failure); mkdirSync(path);
-        try {
-          const source = join(fixture.packages, operator.name), manifest = JSON.parse(readFileSync(join(source, 'release.json'), 'utf8')) as Record<string, unknown>;
-          if (failure === 'archive') writeFileSync(join(path, 'images.tar'), 'corrupt archive');
-          else {
-            copyFileSync(join(source, 'images.tar'), join(path, 'images.tar'));
-            if (failure === 'labels') manifest.backend = 'incorrect-backend'; else manifest.schemaVersion = 1;
-          }
-          writeFileSync(join(path, 'release.json'), JSON.stringify(manifest));
-          const identity = inspect(fixture.containerName, '{{.Id}}'); await fixture.abandon();
-          const contender = fixture.launch(operator, path); await observe(() => !contender.alive(), 'Invalid package fails before stopping writers', 60000);
-          assert.notEqual(await contender.ended, 0); assert.match(contender.errors(), failure === 'archive' ? /SHA-256/u : failure === 'labels' ? /release labels/u : /Invalid container package/u);
-          assert.equal(inspect(identity, '{{.State.Status}}'), 'running'); await fixture.start(operator);
-        } finally { rmSync(path, { recursive: true, force: true }); }
+      for (const target of fixture.targets) for (const failure of ['archive', 'labels', 'schema']) {
+        const path = join(temporary, target.name + '-' + failure); mkdirSync(path);
+        const source = join(fixture.packages, target.name), manifest = JSON.parse(readFileSync(join(source, 'release.json'), 'utf8')) as Record<string, unknown>;
+        if (failure === 'archive') writeFileSync(join(path, 'images.tar'), 'corrupt archive');
+        else {
+          copyFileSync(join(source, 'images.tar'), join(path, 'images.tar'));
+          if (failure === 'labels') manifest.backend = 'incorrect-backend'; else manifest.schemaVersion = 1;
+        }
+        writeFileSync(join(path, 'release.json'), JSON.stringify(manifest));
+        const identity = inspect(fixture.containerName, '{{.Id}}');
+        await assert.rejects(fixture.start(target, path), failure === 'archive' ? /SHA-256/u : failure === 'labels' ? /release labels/u : /Invalid container package/u);
+        assert.equal(inspect(fixture.containerName, '{{.Id}}'), identity);
+        assert.equal(inspect(identity, '{{.State.Status}}'), 'running');
+        await fixture.operation(operations.currentSession);
       }
-    } finally { rmSync(temporary, { recursive: true, force: true }); await fixture.restart(original); }
+    } finally { rmSync(temporary, { recursive: true, force: true }); }
   });
-  await scope.test('a second live operator cannot stop, migrate or replace this instance', async () => {
+  await scope.test('failed one-shot migration prevents activation and a fresh successful job restores the retained data', async () => {
+    const override = join(fixture.directory, 'failed-migration.yaml');
+    writeFileSync(override, 'services:\n  migrate:\n    entrypoint: [node, -e, "process.exit(23)"]\n    command: []\n');
+    await fixture.close();
+    const previous = await fixture.compose(['ps', '-a', '-q', 'migrate']); assert(previous);
+    await fixture.compose(['rm', '-f', 'migrate']);
+    await assert.rejects(fixture.compose(['up', '-d', '--no-build', '--wait', '--wait-timeout', '30'], override));
+    assert.equal(await fixture.compose(['ps', '--status', 'running', '--services']), '');
+    await fixture.start(fixture.current());
+    const current = await fixture.compose(['ps', '-a', '-q', 'migrate']); assert(current); assert.notEqual(current, previous);
+    assert.equal(inspect(current, '{{.State.ExitCode}}'), '0');
+    await fixture.operation(operations.currentSession);
+  });
+  await scope.test('an independent Compose project cannot replace this project’s running containers', async () => {
     const identity = inspect(fixture.containerName, '{{.Id}}');
-    for (const target of fixture.targets) {
-      const contender = fixture.launch(target); await observe(() => !contender.alive(), 'Concurrent start must fail promptly');
-      assert.notEqual(await contender.ended, 0); assert.match(contender.errors(), /already owns this private state/u);
-      assert.equal(inspect(fixture.containerName, '{{.Id}}'), identity); await fixture.operation(operations.currentSession);
-    }
-  });
-  await scope.test('a killed launcher leaves an exact running or exited runtime that another implementation reconciles', async () => {
-    const original = fixture.current();
-    for (const state of ['running', 'exited']) for (const target of fixture.targets) {
-      const identity = inspect(fixture.containerName, '{{.Id}}'); await fixture.abandon();
-      if (state === 'exited') docker(['stop', '--timeout', '15', identity]);
-      assert.equal(inspect(identity, '{{.State.Status}}'), state);
-      await fixture.start(target); assert.equal(exists(identity), false); assert.notEqual(inspect(fixture.containerName, '{{.Id}}'), identity);
-      await fixture.operation(operations.currentSession);
-    }
-    await fixture.restart(original);
-  });
-  await scope.test('running and exited migration orphans are removed before the same database restarts', async () => {
-    const image = inspect(fixture.containerName, '{{.Config.Image}}');
-    const name = 'crossfire-migration-' + createHash('sha256').update(fixture.state).digest('hex').slice(0, 16);
-    const resources = ['--cgroup-parent', process.env.CROSSFIRE_TEST_CGROUP_PARENT!];
-    for (const state of ['running', 'exited']) {
-      await fixture.close();
-      const identity = docker(['create', '--name', name, '--label', 'org.crossfire.directory=' + fixture.state, ...resources, '--network', 'none', '--read-only', '--entrypoint', '/bin/sh', image, '-c', state === 'running' ? 'exec tail -f /dev/null' : 'exit 0']);
-      try {
-        docker(['start', identity]); await observe(() => inspect(identity, '{{.State.Status}}') === state, 'Migration fixture reaches its selected orphan state');
-        await fixture.start(fixture.current()); assert.equal(exists(identity), false); await fixture.operation(operations.currentSession);
-      } finally { if (exists(identity)) docker(['rm', '--force', identity]); }
-    }
-  });
-  await scope.test('foreign migration ownership refuses takeover without stopping an owned runtime orphan', async () => {
-    const runtime = inspect(fixture.containerName, '{{.Id}}'), image = inspect(runtime, '{{.Config.Image}}');
-    const name = 'crossfire-migration-' + createHash('sha256').update(fixture.state).digest('hex').slice(0, 16);
-    await fixture.abandon();
-    const foreign = docker(['create', '--name', name, '--label', 'org.crossfire.directory=/foreign-instance', '--cgroup-parent', process.env.CROSSFIRE_TEST_CGROUP_PARENT!, '--network', 'none', '--read-only', '--entrypoint', '/bin/true', image]);
-    try {
-      const contender = fixture.launch(fixture.current()); await observe(() => !contender.alive(), 'Foreign ownership must fail explicitly');
-      assert.notEqual(await contender.ended, 0); assert.match(contender.errors(), /different ownership/u);
-      assert.equal(inspect(runtime, '{{.State.Status}}'), 'running'); assert.equal(exists(foreign), true);
-    } finally { docker(['rm', foreign]); await fixture.start(fixture.current()); }
+    const other = 'crossfire-isolation-' + randomUUID().slice(0, 8);
+    assert.equal(docker(['ps', '-a', '--filter', 'label=com.docker.compose.project=' + other, '--format', '{{.ID}}']), '');
+    const command = spawnSync('docker', ['compose', '--project-name', other, '-f', join(fixture.packages, fixture.current().name, 'compose.yaml'), 'down'],
+      { encoding: 'utf8', timeout: 30000, env: { ...process.env, CROSSFIRE_RUNTIME_IMAGE: inspect(identity, '{{.Config.Image}}'), CROSSFIRE_MIGRATION_IMAGE: (JSON.parse(readFileSync(join(fixture.packages, fixture.current().name, 'release.json'), 'utf8')) as { migration: { reference: string } }).migration.reference } });
+    assert.equal(command.status, 0, command.stderr);
+    assert.equal(inspect(fixture.containerName, '{{.Id}}'), identity);
+    await fixture.operation(operations.currentSession);
   });
 }
