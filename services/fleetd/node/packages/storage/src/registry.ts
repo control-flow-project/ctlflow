@@ -53,7 +53,8 @@ export function createRegistry(root: string): Registry {
       return attempt(() => {
         const wire = { ...roster, instances: roster.instances.map(({ listenerOptions, runtimeOptions, ...instance }) => ({ ...instance,
           ...(runtimeOptions ? { runtime_options: runtimeOptions } : {}),
-          ...(listenerOptions ? { listener_options: listenerOptions.historyMode === undefined ? {} : { history_mode: listenerOptions.historyMode } } : {}) })) };
+          ...(listenerOptions ? { listener_options: { ...(listenerOptions.historyMode === undefined ? {} : { history_mode: listenerOptions.historyMode }),
+            ...(listenerOptions.mirrorOutput === undefined ? {} : { mirror_output: listenerOptions.mirrorOutput }) } } : {}) })) };
         const valid = validateRoster(wire);
         if (!valid.ok) return valid;
         const current = loadConfiguration(configuration.directory);

@@ -8,7 +8,7 @@ export type { DecisionCreation, DecisionView, DecisionSummary, DecisionAnswer, R
 export const runtimeState = check.choice('idle', 'working', 'waiting-approval', 'waiting-answer', 'failed', 'unavailable', 'sleeping', 'waking');
 export const nativeRuntimeSummary = check.object({ state: check.choice('idle', 'working', 'waiting-approval', 'waiting-answer', 'failed', 'unavailable', 'sleeping', 'waking', 'stopped'), observedAt: check.integer(),
   lastActivityAt: check.nullable(check.integer()), historyAvailable: check.nullable(check.boolean) });
-export const listenerOptions = check.object({ history_mode: check.optional(check.choice('shared', 'per-room')) });
+export const listenerOptions = check.object({ history_mode: check.optional(check.choice('shared', 'per-room')), mirror_output: check.optional(check.boolean) });
 const option = check.object({ id: check.text(255), label: check.text(1000), description: check.plainText(4000) });
 export const decisionQuestion = check.object({ id: check.text(255), title: check.text(1000), prompt: check.plainText(16000),
   secret: check.boolean, allowText: check.boolean, options: check.list(option, 100) });

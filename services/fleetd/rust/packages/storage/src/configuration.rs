@@ -146,7 +146,11 @@ pub fn roster_wire(roster: &Roster) -> Value {
         "instances":roster.instances.iter().map(|instance| {
             let mut value = json!({"key":instance.key,"name":instance.name,"definition":instance.definition,"workarea":instance.workarea});
             if let Some(workspace) = &instance.workspace { value["workspace"] = json!(workspace); }
-            if let Some(mode) = instance.history_mode { value["listener_options"] = json!({"history_mode":mode.code()}); }
+            if instance.history_mode.is_some() || instance.mirror_output.is_some() {
+                value["listener_options"] = json!({});
+                if let Some(mode) = instance.history_mode { value["listener_options"]["history_mode"] = json!(mode.code()); }
+                if let Some(mirror) = instance.mirror_output { value["listener_options"]["mirror_output"] = json!(mirror); }
+            }
             if let Some(options) = &instance.runtime_options { value["runtime_options"] = json!(options); }
             value
         }).collect::<Vec<_>>() })

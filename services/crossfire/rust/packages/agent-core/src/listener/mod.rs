@@ -59,6 +59,7 @@ pub struct Options {
     pub file: String,
     pub release: String,
     pub history_mode: HistoryMode,
+    pub mirror_output: bool,
     pub room: Option<String>,
     pub limit: usize,
     pub poll_ms: u64,
@@ -187,6 +188,7 @@ where
             profile: options.profile.clone(),
             file: format!("{}.observation", options.file),
             history_mode: options.history_mode,
+            mirror_output: options.mirror_output,
         },
         reporter.ready(),
     )?);

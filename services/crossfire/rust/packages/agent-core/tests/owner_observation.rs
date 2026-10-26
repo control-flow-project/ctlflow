@@ -103,6 +103,7 @@ fn options() -> Result<Options> {
         )?,
         file: "observation".to_owned(),
         history_mode: HistoryMode::Shared,
+        mirror_output: true,
     })
 }
 fn working() -> ObservationEvent {
@@ -230,6 +231,45 @@ async fn thinking_moves_to_only_the_latest_room_and_expires_after_thirty_seconds
         vec![json!(true), json!(false), json!(true), json!(false)]
     );
     assert!(sent[3].0.contains("second"));
+    assert_eq!(network.observations.lock().map_err(|_| failure())?.len(), 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn quiet_output_preserves_telemetry_and_explicit_important_notices()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let network = Arc::new(Network::new());
+    let (_reporting, ready) =
+        watch::channel(Some("00000000-0000-4000-8000-000000000001".to_owned()));
+    let mut selected = options()?;
+    selected.mirror_output = false;
+    let observer = Observer::open(
+        Arc::new(Memory::default()),
+        network.clone(),
+        Arc::new(Client::from_protocol(network.clone(), "@agent:local")?),
+        Time(Arc::new(AtomicI64::new(1))),
+        selected,
+        ready,
+    )?;
+    observer.observe(working(), 65536, None)?;
+    for index in 0..500 {
+        observer.observe(
+            ObservationEvent::Output {
+                session_id: "saved".to_owned(),
+                id: format!("fetch-{index}"),
+                stream_id: None,
+                text: format!("Fetched item {index}"),
+            },
+            65536,
+            None,
+        )?;
+    }
+    assert!(observer.busy()?);
+    observer.notice("important", "Owner action required")?;
+    observer.flush(CancellationToken::new()).await?;
+    let sent = network.sent.lock().map_err(|_| failure())?;
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].1["body"], "Owner action required");
     assert_eq!(network.observations.lock().map_err(|_| failure())?.len(), 1);
     Ok(())
 }

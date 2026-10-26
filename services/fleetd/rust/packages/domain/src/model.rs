@@ -13,6 +13,7 @@ pub struct Instance {
     pub workarea: String,
     pub workspace: Option<PathBuf>,
     pub history_mode: Option<HistoryMode>,
+    pub mirror_output: Option<bool>,
     pub runtime_options: Option<RuntimeOptions>,
 }
 #[derive(Debug, Clone, PartialEq, Eq)]

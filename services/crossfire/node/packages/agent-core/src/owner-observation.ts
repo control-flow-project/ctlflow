@@ -10,7 +10,7 @@ type Output = { id: string; text: string; sources: string[]; streamId: string | 
 type Journal = { output: Output[]; observations: RuntimeObservation[] };
 export function ownerObservation(options: { agentId: string; userId: string; file: string; storage: LocalState; clock: Clock;
   transport: MessagingTransport; coordination: Coordination; historyMode: 'shared' | 'per-room'; maximum: number;
-  native?: () => NativeSessionState | undefined }, stop: AbortSignal) {
+  mirrorOutput?: boolean; native?: () => NativeSessionState | undefined }, stop: AbortSignal) {
   const journalBytes = 64 * 1024 * 1024;
   const codec = options.transport(stop, 15000);
   let journal: Journal;
@@ -87,6 +87,7 @@ export function ownerObservation(options: { agentId: string; userId: string; fil
       journal.observations.push(value);
     } else {
       lastActivityAt = options.clock.now();
+      if (options.mirrorOutput === false) return;
       let position = 0;
       const streamId = event.streamId === null ? null : JSON.stringify([event.sessionId, event.streamId]);
       for (const part of codec.noticeChunks(event.text)) {

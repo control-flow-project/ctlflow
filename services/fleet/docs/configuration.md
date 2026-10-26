@@ -58,6 +58,7 @@ model_reasoning_effort = "high"
 
 [instances.listener_options]
 history_mode = "per-room"
+mirror_output = false
 ```
 
 Fleet/definition/instance keys and registered names begin with a lowercase letter,
@@ -70,6 +71,15 @@ A definition supplies defaults. Each provided top-level native instance value
 replaces its default; nested tables replace whole values, not recursive fields.
 The adapter validates the same result during inspection, start/resume, recovery
 and reset. Changes apply at a stopped-to-running transition.
+
+`mirror_output` defaults to true. Set it to false for quiet agents that should
+keep tool/fetch output local and send only selected results through explicit
+chat tools. The JSON controller field is `listenerOptions.mirrorOutput`.
+Approvals, required decisions, runtime state/usage, saved native histories and
+important listener notices remain available. Terminal final answers are also
+quiet; important results must be sent intentionally. Stop/resume using the same
+history to apply a changed listener selection. This setting is independent of
+`history_mode` and native runtime options.
 
 ## Role
 

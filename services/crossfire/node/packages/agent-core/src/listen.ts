@@ -54,6 +54,7 @@ export type ListenerOptions = {
   room?: string;
   limit: number;
   historyMode?: 'shared' | 'per-room';
+  mirrorOutput?: boolean;
   pollMs: number;
   debounceMs: number;
   runtime: RuntimeAdapter;
@@ -70,6 +71,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   const storage = options.storage;
   const budget = options.budget ?? createListenerBudget();
   if (!options.control || typeof options.control.binding !== 'function') throw new Error('Listeners require an authenticated fleet controller binding');
+  if (options.mirrorOutput !== undefined && typeof options.mirrorOutput !== 'boolean') throw new Error('Listener output mirroring must be a boolean');
   if (!Number.isSafeInteger(options.pollMs) || options.pollMs < 100 || options.pollMs > 30_000) throw new Error('Listener polling interval must be 100..30000 ms');
   if (!Number.isSafeInteger(options.debounceMs) || options.debounceMs < 0 || options.debounceMs > 60_000) throw new Error('Listener collection interval must be 0..60000 ms');
   if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 100) throw new Error('Listener message page must contain 1..100 records');
@@ -89,7 +91,7 @@ export async function listen(options: ListenerOptions, stop: AbortSignal): Promi
   let runReady!: () => void;
   const reporting = new Promise<void>(resolve => { runReady = resolve; });
   const observer = ownerObservation({ agentId: options.id, userId: options.account.userId, file: options.cursorFile + '.observation', storage,
-    clock: options.clock, transport: options.transport, coordination: options.coordination, historyMode: options.historyMode ?? 'shared', get maximum() { return maximum; },
+    clock: options.clock, transport: options.transport, coordination: options.coordination, historyMode: options.historyMode ?? 'shared', mirrorOutput: options.mirrorOutput ?? true, get maximum() { return maximum; },
     native: () => destination?.lifecycle?.current() }, lifetime);
   const approval = decisions({
     client: options.transport(lifetime, 45_000),

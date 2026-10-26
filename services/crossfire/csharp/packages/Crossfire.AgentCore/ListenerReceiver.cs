@@ -9,7 +9,7 @@ public sealed record ListenerOptions(AgentProfile Profile, LocalState Storage, M
     ListenerBudget Budget, TimeProvider Clock, string CursorFile, string Release, Func<RuntimeHooks, CancellationToken, ValueTask<Result<RuntimeConnection>>> Runtime,
     Func<CancellationToken, ValueTask<Result<IReadOnlyList<string>>>> Invitations, Action<string> Log,
     NativeHistoryMode HistoryMode = NativeHistoryMode.Shared, string? Room = null, int Limit = 100, int PollMs = 1000, int DebounceMs = 1000, int ReconcileMs = 30000,
-    Action<string, ListenerController>? Activity = null, Action<Func<CancellationToken, ValueTask<Result<JsonElement>>>, HistoryQueries>? Ready = null);
+    Action<string, ListenerController>? Activity = null, Action<Func<CancellationToken, ValueTask<Result<JsonElement>>>, HistoryQueries>? Ready = null, bool MirrorOutput = true);
 
 public sealed partial class ListenerReceiver
 {
@@ -87,7 +87,7 @@ public sealed partial class ListenerReceiver
     {
         await options.Control.WaitForActivation(lifetime.Token); var release = Take(await options.Coordination.Call(new("release", new Dictionary<string, string>()), lifetime.Token));
         if (WireJson.Text(release, "release") is not { } available || !ReleaseValues.Identity(available) || !ReleaseValues.Identity(options.Release)) throw new ReceiverFailure(new("invalid", "Crossfire software release identity is invalid"));
-        observer = new(Storage, File + ".observation", options.Profile, options.Messaging, options.Coordination, options.Clock, options.HistoryMode, () => Volatile.Read(ref maximum), () => destination?.Lifecycle?.Current(), Fail, lifetime.Token);
+        observer = new(Storage, File + ".observation", options.Profile, options.Messaging, options.Coordination, options.Clock, options.HistoryMode, () => Volatile.Read(ref maximum), () => destination?.Lifecycle?.Current(), Fail, lifetime.Token, options.MirrorOutput);
         approval = new(options.Profile, options.Coordination, options.Messaging, Storage, File + ".decisions", options.Clock, activity.Ready, lifetime.Token);
         destination = Take(await options.Runtime(new(approval.Request, statistics.Usage, approval.Responded, () => approval.Unresolved, PendingInput, observer.Observe), lifetime.Token));
         nativeFailure = Runtime.Lifetime.Register(() => Fail(new("unavailable", "Owned native runtime connection stopped; exact saved histories and original pending input remain retained")));

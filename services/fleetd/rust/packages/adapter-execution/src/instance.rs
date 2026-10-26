@@ -357,6 +357,7 @@ impl<C: MessagingConnector> Host<C> {
             file: text(&paths.cursors)?.to_owned(),
             release: software.release.manifest.release,
             history_mode: instance.history_mode.unwrap_or(HistoryMode::Shared),
+            mirror_output: instance.mirror_output.unwrap_or(true),
             room: None,
             limit: 100,
             poll_ms: 10000,

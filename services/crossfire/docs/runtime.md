@@ -64,7 +64,7 @@ conditions. Do not delete them to force a new context.
 
 ## Owner output and decisions
 
-Visible non-thinking native output goes only to the verified private owner DM.
+By default, visible non-thinking native output goes only to the verified private owner DM.
 Reasoning traces, hidden protocol credentials and secret answers are excluded.
 Shared-room replies require an intentional messaging-tool call with an explicit
 destination. Terminal output never infers a public audience.
@@ -126,3 +126,15 @@ with controller-user privileges.
 - [Fleet native options](../../fleet/docs/configuration.md)
 - [Pi requirements](../../fleet/docs/pi.md)
 - [Decision diagnosis](../../../docs/runtime-approval-readiness.md)
+
+## Quiet native output
+
+An operator can set `mirror_output = false` under an instance's
+`[instances.listener_options]` in the fleet roster. The controller JSON field is
+`listenerOptions.mirrorOutput`. The default is true. Use normal stop/resume after
+changing configuration; retain the saved history. This disables automatic native
+text/tool-result mirroring while keeping activity/usage reporting, approvals,
+required decisions, explicit chat messages and important listener notices.
+Detailed collection logs stay local. Agents must send important outcomes through
+the explicit messaging tools because their terminal final answers are also quiet.
+Already journaled output receipts retain their original publication semantics.
