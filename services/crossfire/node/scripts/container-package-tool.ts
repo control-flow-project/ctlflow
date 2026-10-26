@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
-import { packageImageIdentities, prepareContainerPackage, readContainerPackage } from '../apps/server/src/container-package.js';
+import { packageImageIdentities, prepareContainerPackage, readContainerPackage } from './container-package.js';
 import { exportContainerPackage } from './container-packages.js';
 
 if (Number(process.versions.node.split('.')[0]) < 26) throw new Error('Container build tools require Node.js 26+');
@@ -24,5 +24,5 @@ if (action === 'verify') {
 } else if (action === 'export') {
   const { values, positionals } = parseArgs({ args: arguments_, options: { runtime: { type: 'string' }, migrations: { type: 'string' }, output: { type: 'string' } }, allowPositionals: true });
   if (positionals.length || !values.runtime || !values.migrations || !values.output) throw new Error('Use package-tool.mjs export --runtime sha256:ID --migrations sha256:ID --output /absolute/new-package');
-  await exportContainerPackage(values.runtime, values.migrations, values.output, readFileSync(fileURLToPath(import.meta.url)));
+  await exportContainerPackage(values.runtime, values.migrations, values.output, readFileSync(fileURLToPath(import.meta.url)), readFileSync(new URL('./compose.yaml', import.meta.url)));
 } else throw new Error('Use package-tool.mjs verify, identities or export');

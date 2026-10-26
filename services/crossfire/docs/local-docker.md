@@ -9,7 +9,7 @@ The default server image is C# NativeAOT; the host does not need .NET.
 
 - Docker with the Compose plugin (`docker compose`) and Linux amd64 containers. Native ARM64 images and
   emulation are not verified.
-- The matching checkout and trusted immutable server/migration image references.
+- The matching Compose kit and trusted immutable server/migration image references.
   Node, managed C#, NativeAOT C# and Rust server packages use the same Compose file.
 - Available loopback ports 8080 and 8082. This is local HTTP, not public hosting.
 - On the fleet execution host: Linux/macOS, Node.js 26+, npm 11.17+, Git, Bash
@@ -52,15 +52,14 @@ docker compose \
   --profile maintenance run --rm initialize
 docker compose \
   -f services/crossfire/docker/local/compose.yaml \
-  --profile maintenance run --rm migrate
-docker compose \
-  -f services/crossfire/docker/local/compose.yaml \
   up --no-build --wait
 ```
 
 Initialization is for a new empty server volume only. It generates private
 credentials and refuses to overwrite an initialized instance. Initialization and
-migration must succeed before startup. The running server never migrates itself.
+migration must succeed before startup. Compose runs the one-shot migration job
+automatically and waits for success before starting crossfire. The running server
+never migrates itself.
 
 Read the generated administrator password privately in your terminal:
 
@@ -140,9 +139,17 @@ use management session controls or the existing host `fleet stop`/`fleet start`
 commands. Normal resume preserves exact histories; explicitly stopped selections
 remain stopped. Do not repeat initialization or request fresh history to restart.
 
-For an upgrade, stop server writers, verify a private backup, select coordinated
-images, run the matching one-shot migration and restart the server. Back up host
-fleet state separately before updating fleet/fleetd. See the
+For an upgrade, select coordinated images, stop server writers and remove the
+completed migration job before starting the release:
+
+```sh
+docker compose -f services/crossfire/docker/local/compose.yaml stop crossfire
+docker compose -f services/crossfire/docker/local/compose.yaml rm -f migrate
+docker compose -f services/crossfire/docker/local/compose.yaml up -d --no-build --wait
+```
+
+Use the same Compose project and state throughout. Backups are optional and
+operator-managed; SQLite backups must include committed WAL state. See the
 [package upgrade procedure](container-packages.md). No host boot service or
 automatic software upgrade is installed by this quickstart.
 

@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { containerPackage, fileDigest, nativeImageIdentity, packageLabels, prepareContainerPackage } from '../apps/server/src/container-package.js';
+import { containerPackage, fileDigest, nativeImageIdentity, packageLabels, prepareContainerPackage } from '../scripts/container-package.js';
 import { archiveImages, auditContainerDependencies, containerSourceDigest } from '../scripts/container-packages.js';
 
 const runtime = { reference: 'crossfire-package:' + 'c'.repeat(64), configDigest: 'sha256:' + 'c'.repeat(64), descriptorDigest: 'sha256:' + 'e'.repeat(64) };

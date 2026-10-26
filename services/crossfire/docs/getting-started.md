@@ -2,59 +2,39 @@
 
 ## Requirements
 
-Use Linux, an installed crossfire operator and an existing rootless Docker engine.
-The Node operator needs Node.js 26+. Packaged C# operators include their runtime
-or are NativeAOT. Rust operators are native executables. Select Node, C# managed,
-C# NativeAOT or Rust explicitly. The selected Docker package carries the server dependencies.
-Source builds additionally need npm 11.17+, Git and the pinned .NET/native tools.
-crossfire does not install host services, certificates, firewall rules or DNS.
+Use Linux amd64, rootless Docker with the Compose plugin and exact matching
+server/migration images. Choose Node, C# managed, C# NativeAOT or Rust explicitly.
+The server runs in its selected image; no host SDK is required. Trusted archive
+verification/export tooling uses Node.js 26. Source builds additionally require
+the pinned tools documented for the selected target. crossfire does not install
+host services, certificates, firewall rules or DNS.
 
-Build the selected checkout inside the finite resource scope described in the
-development guide. Do not use an active test output tree for deployment.
-
-- [Development prerequisites](../../../docs/development.md)
+- [Local Docker server and host-native fleet](local-docker.md)
+- [Build, verify and transfer a server kit](container-packages.md)
 - [Node installation and packaging](../../../docs/distributions/node.md)
 - [C# managed installation and packaging](../../../docs/distributions/csharp-managed.md)
 - [C# NativeAOT installation and packaging](../../../docs/distributions/csharp-nativeaot.md)
 - [Rust installation and packaging](../../../docs/distributions/rust.md)
-- [C# operator](../csharp/README.md)
-- [Build and transfer Docker packages](container-packages.md)
 
-## Initialize a local instance
+## Initialize and start
 
-For the Node source installation, from `services/crossfire`:
+Select trusted matching runtime/migration images and the same Compose project
+and private state for every command. The local guide provides complete commands.
+For a new empty state, run the maintenance-profile initialize service once,
+then `docker compose ... up -d --no-build --wait`. Compose runs Knex and starts
+crossfire only after migration succeeds. Initialization refuses nonempty state;
+the initial administrator password is in private bootstrap.json. Restarting
+does not reset a password changed through Matrix.
 
-```sh
-node crossfire init --directory /absolute/private/crossfire-state \
-  --instance team --origin http://127.0.0.1:8098 \
-  --content-origin http://localhost:8099 \
-  --server-name team.localhost --administrator admin
-./start.sh --directory /absolute/private/crossfire-state \
-  --package /absolute/packages/node --port 8098 --content-port 8099
-```
-
-The other guides use their installed native operator with an explicit package.
-The package selects the server implementation independently of the operator's language.
-The deployment host does not need a source checkout or build toolchain.
-
-Initialization refuses a nonempty directory. The initial password is the
-`administratorPassword` value in private `bootstrap.json`.
-Restart does not reset a password changed through Matrix.
+For an upgrade, verify/select matching images, stop crossfire writers, remove
+the completed migrate service and run up again. Backups are optional and
+operator-managed. Use `docker compose ... stop crossfire` to stop the server;
+preserve its volume or bind directory. There is no custom crossfire Docker
+deployment command.
 
 The application port serves Element, management and the API. The separate
-content port serves committed public reports only; its root returns 404.
-Host port publication is loopback-only. Public use requires HTTPS.
-
-The operator acquires exclusive instance ownership, verifies and imports the
-selected package, reconciles abandoned owned containers, verifies an upgrade backup
-when needed, runs Knex and starts the runtime only after success.
-It never builds source or substitutes another implementation. Ctrl+C stops and removes the owned
-container while retaining state.
-
-A live competing launcher is refused. If a launcher dies, start the instance
-again with the same directory. Takeover validates exact ownership and cleanup;
-foreign labels, an unavailable Docker daemon or unconfirmed removal remain
-errors, not permission to delete guessed containers.
+content port serves committed reports only; its root returns 404. Default
+publication is loopback-only. Public use requires HTTPS.
 
 ## Public deployment
 

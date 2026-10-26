@@ -188,12 +188,13 @@ crossfire-client.mjs and messaging-LICENSE.txt. One private build export
 produces the server/fleetd bytes. Activation verifies the complete local release.
 Recovery and wake do not download or silently install software.
 
-Server deployment uses a transferable per-backend Docker package: bounded
-release.json plus images.tar, containing an exact runtime image and the common
-Knex image. All three operators use --package; image construction belongs to the build,
-not a source-dependent deployment mode. Archive/image digests, platform and release
-labels are checked before touching writers. Backend selection is explicit, never
-chosen from the operator's language or substituted after failure.
+Server deployment uses one standard Docker Compose kit for all four backends.
+A transferable per-backend package contains bounded release.json, images.tar,
+package-tool.mjs and compose.yaml. The archive contains one exact runtime and the
+common Knex image. The trusted Node maintenance tool checks archive/image digests,
+platform and release labels before operators stop writers. It does not run a
+server deployment lifecycle. Image construction belongs to the build. Backend
+selection is explicit, never substituted after failure.
 Package schema 2 records named transport references and the exact OCI configuration
 and root-descriptor digests for each image. The producer exports named images so
 both remain present in the OCI index. Current Docker classic/containerd stores
@@ -216,18 +217,12 @@ installation and native provider login. Setup never installs or upgrades those
 harnesses or copies host credentials into a container. There is no fleet image,
 fleet Compose service or container relay. Server and host fleet use the same
 public origin; native Matrix/backend listeners remain private to the server.
-Container removal is complete only after the exact immutable container identity
-is absent. An already-removing container is observed, not stopped/deleted again.
-All three operators bound that observation and preserve explicit cleanup failures.
-Their command adapter owns the deadline policy: lifecycle mutations (create,
-stop and remove) use 120 seconds; metadata commands use 30 seconds. Removal has
-one overall 120-second deadline, including its stop and metadata observations;
-the container's graceful-stop allowance remains 15 seconds. Cancellation and
-normal exit both delegate to that single stop/removal owner, not a separate stop
-command with a competing deadline. Callers cannot substitute a conflicting
-capture deadline. A cancelled creation returns its exact identity before cleanup.
-Primary execution and cleanup failures both remain available when they occur
-together; command failures name the operation.
+Docker Compose owns container lifecycle and project isolation. There is no
+Node/C#/Rust lifetime deployment operator, private deployment lock or custom
+orphan-takeover protocol. Operators use one project/state selection consistently,
+stop writers before an upgrade, remove the completed migration job and start the
+selected release. Migration failure prevents application activation. Backup
+policy belongs to the operator; no backup gate or automatic reset is imposed.
 Test-process guards allow the complete creation/removal budget plus process-stream
 teardown before killing their owned launcher. No presence/ownership assertion is
 waived for slow I/O; scenario, target and bank deadlines remain unchanged.
@@ -1019,39 +1014,31 @@ lease, lock-inode deletion or external lock executable supplies another owner.
 
 - [Migration and backup procedures](../services/crossfire/database/README.md)
 
-## 18. Container operator
+## 18. Container deployment
 
-Rootless Docker and explicit private instance configuration are required.
-No host services or machine-wide permission changes are installed.
-Initialization and startup reject repeated options, including identical values,
-before using their values or touching instance state. Explicit application and
-content ports are canonical ASCII decimal integers in 1024..65535: no leading
-zeros, signs, whitespace, fractions, exponent notation or alternate numeric bases.
-The two ports must differ. Invalid arguments cannot acquire the instance lock,
-invoke Docker or rewrite configuration/credentials.
-Operator failures report their diagnostic on standard error and exit with code 1;
-expected input rejection must not abort the process or trigger a crash dump.
-One operator owns the directory for its complete lifetime: package verification/import,
-reconciliation, backup, migration, runtime attachment and cleanup.
-A second live operator fails before those actions.
+Rootless Docker with the Compose plugin and explicit private instance state are
+required. No host services or machine-wide permissions are installed.
+The common Compose definition is exported byte-for-byte in every backend package.
+It runs the selected runtime and one-shot Knex job with a
+service_completed_successfully dependency. Initialization is an explicit
+maintenance-profile operation for empty state only; it never overwrites existing
+configuration or credentials. Application runtimes validate, never migrate.
 
-Runtime/migration names derive from that exact directory. Before stopping either,
-list both names, resolve IDs and validate every directory label.
-Foreign/malformed/ambiguous/unobservable ownership fails without stopping an
-already inspected owned peer. Inspection failure is not proof of absence.
+Initial workflow: select exact matching images, initialize empty state, then
+`docker compose up -d --no-build --wait`. Upgrades use the same project and state:
+verify/select matching artifacts, `docker compose stop crossfire`,
+`docker compose rm -f migrate`, then `docker compose up -d --no-build --wait`.
+Stopping writers and replacing the completed job are both required: dependency
+ordering alone does not stop a previous runtime or guarantee a new job.
+A failed job blocks activation; inspect its logs and correct the failure before
+retrying. Never use volume deletion as restart or upgrade recovery.
 
-Under the same lock, stop prior exact owned IDs, remove them and confirm absence
-before backup/migration/replacement. Exited containers still own names.
-A dead launcher has no surviving cleanup owner to rely on.
-
-Upgrade order is stop writers, verify private backup, run Knex, then start the
-selected runtime. Failure blocks later phases. Newly created containers are
-attached/stopped/removed by exact returned ID, without competing automatic Docker
-removal. Cancellation cleanup is bounded; unconfirmed cleanup is failure.
-Release the lock only after cleanup settles. Never target unrelated containers,
-shared images or other instance state.
-
-DNS/TLS/nginx and resource provisioning remain deployment-owned.
+The operator chooses backup policy. If taking a SQLite backup, include committed
+WAL state through SQLite's backup API or a quiescent procedure. Preserve private
+configuration, credentials, Matrix data, publications and native histories.
+All selected implementations open the identical current Knex-created schema.
+There is no custom `crossfire start` Docker operator or deployment framework.
+DNS/TLS/nginx, deployment serialization and resource provisioning are site-owned.
 
 ## 19. Management UI
 

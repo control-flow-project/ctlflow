@@ -24,7 +24,7 @@ test('shared container contracts: ' + selected.name, { timeout: 3600000 }, async
   await scope.test('actual Element, artifacts and container contract', child => containerContracts(child, platform));
   await scope.test('identical Crossfire API and same-file contracts', child => serverContracts(child, platform));
   await scope.test('identical React contract', child => browserContracts(child, platform));
-  assert.equal(platform.current().name, selected.name, 'Every target worker verifies its own installed operator');
-  await scope.test('exclusive operator and abandoned container recovery', child => containerRecoveryContracts(child, platform));
+  assert.equal(platform.current().name, selected.name, 'Every target worker verifies its selected backend');
+  await scope.test('Compose migration gating, artifact transfer and project isolation', child => containerRecoveryContracts(child, platform));
   await platform.close();
 });

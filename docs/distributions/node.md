@@ -4,8 +4,7 @@
 
 Use Linux for server building/verification, Node.js 26+, npm 11.17+ and an authorized checkout of the selected
 ctlflow revision. Dependency versions and install policy come from its
-lockfile and `.npmrc`; install scripts are disabled. The server operator also
-requires an existing rootless Docker engine. Public deployment requires
+lockfile and `.npmrc`; install scripts are disabled. Server deployment requires rootless Docker with Compose. Public deployment requires
 operator-configured DNS, HTTPS and separate application/content hostnames.
 
 Installed npm fleet/controllers support Linux and macOS. They require the selected Codex or Earendil Pi executable and an
@@ -40,31 +39,58 @@ of an internal workspace as a standalone server distribution.
 
 ## Install and run the server
 
-For a new local instance:
+Server deployment uses Docker Compose with the selected node image and
+matching one-shot Knex image. Build the four backend kits from source with
+`npm run package:containers -- --output /absolute/packages`. Copy the complete
+selected directory, including release.json, images.tar, package-tool.mjs and
+compose.yaml, to the deployment host. The trusted maintenance helper requires
+Node.js 26; these examples also use jq. No host SDK is required to run an image.
+
+Verify/import trusted artifacts before stopping any current writer:
 
 ```sh
-node /absolute/ctlflow/services/crossfire/crossfire init \
-  --directory /absolute/private/crossfire-state --instance team \
-  --origin http://127.0.0.1:8098 --content-origin http://localhost:8099 \
-  --server-name team.localhost --administrator admin
-node /absolute/ctlflow/services/crossfire/crossfire start \
-  --directory /absolute/private/crossfire-state --package /absolute/packages/node \
-  --port 8098 --content-port 8099
+set -eu
+node /absolute/packages/node/package-tool.mjs verify \
+  /absolute/packages/node > /absolute/private/verified-images.json
+export CROSSFIRE_RUNTIME_IMAGE=$(jq -r .runtimeImage /absolute/private/verified-images.json)
+export CROSSFIRE_MIGRATION_IMAGE=$(jq -r .migrationImage /absolute/private/verified-images.json)
+export CROSSFIRE_STATE=/absolute/private/crossfire-state
+export CROSSFIRE_PORT=8098 CROSSFIRE_CONTENT_PORT=8099
+export CROSSFIRE_INSTANCE=team CROSSFIRE_SERVER_NAME=team.localhost
+export CROSSFIRE_ORIGIN=http://127.0.0.1:8098
+export CROSSFIRE_CONTENT_ORIGIN=http://localhost:8099
+export CROSSFIRE_ADMINISTRATOR=admin
+docker compose -p team -f /absolute/packages/node/compose.yaml \
+  --profile maintenance run --rm initialize
+docker compose -p team -f /absolute/packages/node/compose.yaml \
+  up -d --no-build --wait
 ```
 
-Initialization refuses a nonempty directory. The initial password is the
-`administratorPassword` field in private `bootstrap.json`; do not print or
-commit it. Build transferable server packages with `npm run package:containers --
---output /absolute/packages` before deployment. The operator verifies the selected
-package's archive and immutable image identities, confirms exclusive ownership, verifies any
-required upgrade backup, runs the shared Knex image and then starts the server.
-Ctrl+C stops its owned container without deleting persistent state.
+Run initialize only for new empty state. It refuses nonempty state and writes
+the initial administratorPassword in private bootstrap.json. Compose starts the
+runtime only after the common Knex job succeeds. Existing configuration,
+credentials, Matrix data and publications remain in the selected state directory.
+The server never migrates at startup. There is no `crossfire start` Docker
+operator or automatic backend fallback.
 
-The example serves Element at `http://127.0.0.1:8098/`, management at
-`http://127.0.0.1:8098/manage/` and report files on the separate content port.
-These are local examples, not deployment endpoints. Public use needs exact
-HTTPS origins, explicit trusted ingress and separate proxy routes. crossfire
-does not configure the host's DNS, TLS, firewall or boot services.
+For upgrades, verify/select the matching release, use the SAME project/state,
+stop writers and remove the completed job before starting:
+
+```sh
+docker compose -p team -f /absolute/packages/node/compose.yaml stop crossfire
+docker compose -p team -f /absolute/packages/node/compose.yaml rm -f migrate
+docker compose -p team -f /absolute/packages/node/compose.yaml up -d --no-build --wait
+```
+
+A failed migration blocks activation. Inspect the migrate service logs and
+correct its failure before retrying; never delete state or volumes to recover.
+Backups are optional and operator-managed. SQLite backups must include committed
+WAL state through its backup API or a quiescent procedure.
+
+The example serves Element at http://127.0.0.1:8098/ and management at
+http://127.0.0.1:8098/manage/. Reports use the separate content origin. Public
+hosting needs exact HTTPS origins, separate proxy routes and trusted ingress.
+These are local example addresses, not live deployment evidence.
 
 ## Install and connect fleet and fleetd
 
@@ -124,10 +150,13 @@ stopped bindings remain stopped. The installed controller owns tool assets under
 
 ## Upgrade and verify
 
-Keep the old installation until the selected replacement has passed verification.
-Back up private server/controller/fleet state, credentials, histories and SQLite
-WAL-consistent data before an upgrade. Stop the previous operator/controller
-normally, then use the selected new executable with the same state root.
+Record the exact source revision and distribution manifest. Use the server's
+Compose upgrade sequence above; switching backend preserves the common
+Knex-created database. Operator backup policy covers server/controller/fleet
+state, credentials and histories; a live main-file copy omits committed WAL data.
+Do not merge files over an active executable release directory. Stop the old
+controller normally before selecting a new executable with its original root.
+
 For fleet assets, run the new CLI's `fleet update FLEET` or
 `fleet agent update FLEET INSTANCE`, then `fleet daemon restart` with that root.
 Updates preserve the existing enabled/stopped selection and histories.

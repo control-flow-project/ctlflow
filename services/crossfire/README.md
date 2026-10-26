@@ -26,7 +26,7 @@ The React project, database migrations and external test scenarios are shared.
 
 The service is private. Only fleet and fleetd may be public npm packages.
 Production data, credentials and saved native histories are retained across
-supported upgrades. Schema changes use verified backups and forward Knex
+supported upgrades. Schema changes use explicit forward Knex
 migrations, never runtime resets.
 
 - [Architecture contract](../../docs/specification.md)

@@ -3,8 +3,8 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative } from 'node:path';
-import { cgroupArguments, captureDocker, runDocker } from '../apps/server/src/container-commands.js';
-import { containerPackage, fileDigest, packageLabels, type PackageImage } from '../apps/server/src/container-package.js';
+import { cgroupArguments, captureDocker, runDocker } from './container-docker.js';
+import { containerPackage, fileDigest, packageLabels, type PackageImage } from './container-package.js';
 
 export const containerBackends = ['node', 'csharp-managed', 'csharp-nativeaot'] as const;
 
@@ -54,7 +54,7 @@ export async function archiveImages(archive: string, references: readonly string
   return result;
 }
 
-export async function exportContainerPackage(runtimeImage: string, migrationImage: string, output: string, tool: Uint8Array): Promise<void> {
+export async function exportContainerPackage(runtimeImage: string, migrationImage: string, output: string, tool: Uint8Array, compose: Uint8Array): Promise<void> {
   if (!isAbsolute(output) || existsSync(output) || !lstatSync(dirname(output)).isDirectory()) throw new Error('Use a new absolute package output in an existing directory');
   async function inspect(identity: string): Promise<{ Id: string; Os: string; Architecture: string; Config: { Labels: Record<string, string> } }> {
     if (!/^sha256:[a-f0-9]{64}$/u.test(identity)) throw new Error('Package exact immutable image IDs, not mutable tags');
@@ -79,6 +79,7 @@ export async function exportContainerPackage(runtimeImage: string, migrationImag
       archiveSha256: await fileDigest(archive), runtime: images[0], migration: images[1] });
     writeFileSync(join(stage, 'release.json'), JSON.stringify(value, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
     writeFileSync(join(stage, 'package-tool.mjs'), tool, { mode: 0o600, flag: 'wx' });
+    writeFileSync(join(stage, 'compose.yaml'), compose, { mode: 0o600, flag: 'wx' });
     renameSync(stage, output);
   } finally { rmSync(stage, { recursive: true, force: true }); }
 }
@@ -118,7 +119,7 @@ export async function buildContainerPackages(source: string, output: string, par
     for (const backend of containerBackends) {
       const runtimeImage = await build(backend === 'node' ? dockerfile : join(source, 'services/crossfire/csharp/Dockerfile'), backend === 'node' ? 'production' : backend.slice('csharp-'.length),
         'crossfire-' + backend + ':' + suffix, backend, backend === 'node' ? [] : ['--build-arg', 'CROSSFIRE_ASSETS_IMAGE=' + assets]);
-      await exportContainerPackage(runtimeImage, migrationImage, join(stage, backend), readFileSync(join(source, 'services/crossfire/dist/container-package-tool.mjs')));
+      await exportContainerPackage(runtimeImage, migrationImage, join(stage, backend), readFileSync(join(source, 'services/crossfire/dist/container-package-tool.mjs')), readFileSync(join(source, 'services/crossfire/docker/local/compose.yaml')));
     }
     if (containerSourceDigest(source) !== sourceDigest) throw new Error('Container source changed during package construction');
     renameSync(stage, output);

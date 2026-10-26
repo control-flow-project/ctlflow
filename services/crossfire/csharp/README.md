@@ -36,26 +36,19 @@ assets, web assets, licenses and `distribution.json`.
 Managed output includes its runtime/apphosts. NativeAOT output is native.
 Keep sibling directories together so the CLI resolves its installed controller.
 
-## Run the operator
+## Deploy the server
 
-```sh
-/absolute/distribution/crossfire/Crossfire.Server init \
-  --directory /absolute/private/state --instance team \
-  --origin https://example.test --content-origin https://content.example.test \
-  --server-name example.test --administrator admin
-/absolute/distribution/crossfire/Crossfire.Server start \
-  --directory /absolute/private/state \
-  --package /absolute/packages/csharp-managed --port 8080 --content-port 8082
-```
-
-The package explicitly selects Node, C# managed, C# NativeAOT or Rust, independently
-of the installed operator's language. There is no automatic fallback or source
-build during deployment. The operator requires rootless Docker and verifies/imports
-the selected runtime image and common Knex migration image.
-Instance ownership, orphan reconciliation and backup/migration order are the
-same as Node. Private state and backend selection are independent.
+Use the common Docker Compose kit with the selected managed or NativeAOT image
+and matching Knex image. No host .NET installation is required for these images.
+The maintenance initialize service creates private configuration only for empty
+state; Compose gates runtime startup on successful migration. Upgrades stop the
+crossfire service, remove the completed migrate job and start the release with
+the same project/state. Backups are optional and operator-owned. C# has no
+custom Docker lifetime operator or migration fallback.
 
 - [Build, transfer and deploy Docker packages](../docs/container-packages.md)
+- [Standalone managed installation guide](../../../docs/distributions/csharp-managed.md)
+- [Standalone NativeAOT installation guide](../../../docs/distributions/csharp-nativeaot.md)
 
 Installed fleet and fleetd use the same commands/configuration/private API.
 Setup keeps the invoking coding conversation independent.

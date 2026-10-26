@@ -1,7 +1,7 @@
 name: ctlflow-local
 
 x-server-state: &server-state
-  - server-state:/runtime
+  - ${CROSSFIRE_STATE:-server-state}:/runtime
 
 x-server-resources: &server-resources
   platform: linux/amd64
@@ -23,11 +23,10 @@ services:
     network_mode: none
     volumes: *server-state
     entrypoint: [node, /app/services/crossfire/crossfire]
-    command: [init, --directory, /runtime, --instance, local, --origin, "http://127.0.0.1:8080", --content-origin, "http://localhost:8082", --server-name, local.test, --administrator, admin]
+    command: [init, --directory, /runtime, --instance, "${CROSSFIRE_INSTANCE:-local}", --origin, "${CROSSFIRE_ORIGIN:-http://127.0.0.1:8080}", --content-origin, "${CROSSFIRE_CONTENT_ORIGIN:-http://localhost:8082}", --server-name, "${CROSSFIRE_SERVER_NAME:-local.test}", --administrator, "${CROSSFIRE_ADMINISTRATOR:-admin}"]
 
   migrate:
     <<: *server-resources
-    profiles: [maintenance]
     image: ${CROSSFIRE_MIGRATION_IMAGE:?Set the exact matching migration image}
     network_mode: none
     volumes: *server-state
@@ -35,10 +34,13 @@ services:
   crossfire:
     <<: *server-resources
     image: ${CROSSFIRE_RUNTIME_IMAGE:?Set the exact selected runtime image}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     volumes: *server-state
     ports:
-      - "127.0.0.1:8080:8080"
-      - "127.0.0.1:8082:8082"
+      - "127.0.0.1:${CROSSFIRE_PORT:-8080}:8080"
+      - "127.0.0.1:${CROSSFIRE_CONTENT_PORT:-8082}:8082"
     stop_grace_period: 30s
 
 volumes:

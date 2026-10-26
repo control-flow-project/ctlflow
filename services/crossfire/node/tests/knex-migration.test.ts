@@ -10,8 +10,6 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { databaseConfiguration, migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 import contract from '@ctlflow/crossfire-data/management/sqlite/contract' with { type: 'json' };
 import { openStore } from '@ctlflow/crossfire-adapter-sqlite/open-store';
-import { backupBeforeMigration, prepareDatabaseUpgrade } from '../apps/server/src/database-upgrade.js';
-import { migrationArguments } from '../apps/server/src/container-commands.js';
 import { createRepositories } from '@ctlflow/crossfire-adapter-sqlite/create-repositories';
 import { appliedMigrations, metadataSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
 import { defineSelect } from '@tinqerjs/tinqer';
@@ -89,37 +87,3 @@ test('Knex recovers clean initial migration failure without a reset or another c
   const ready = openStore(path); ready.close();
 });
 
-test('upgrade backs up a deployed store and verifies it before Knex mutation', async scope => {
-  const root = directory(scope), path = join(root, 'management.sqlite');
-  await migrateDatabase(path);
-  const before = readFileSync(path), backup = await backupBeforeMigration(root);
-  assert(backup); assert.deepEqual(readFileSync(path), before);
-  const copy = new Database(backup, { readonly: true });
-  try {
-    assert.equal(sqliteMetadata.integrityResult(copy), 'ok');
-    assert.deepEqual(sqliteMetadata.foreignKeyViolations(copy), []);
-    assert.equal(executeSelect(copy, schema, query => query.from('permission').count()), 36);
-  } finally { copy.close(); }
-  await migrateDatabase(path);
-  const current = openStore(path);
-  try { assert.equal(sqliteMetadata.databaseIdentity(current).version, contract.version); } finally { current.close(); }
-});
-
-test('every upgrade phase blocks later phases on failure, with no automatic fallback', async () => {
-  for (const failure of ['stop', 'backup', 'migrate', null]) {
-    const events: string[] = [];
-    const step = async (name: string) => { events.push(name); if (name === failure) throw new Error(name + ' failed'); };
-    const run = () => prepareDatabaseUpgrade({ stopWriters: () => step('stop'), backup: () => step('backup'), migrate: () => step('migrate') });
-    if (failure) await assert.rejects(run, new RegExp(failure + ' failed', 'u')); else await run();
-    assert.deepEqual(events, failure === 'stop' ? ['stop'] : failure === 'backup' ? ['stop', 'backup'] : ['stop', 'backup', 'migrate']);
-  }
-});
-
-test('one migration image and isolated container serve every selected backend implementation', () => {
-  const image = 'sha256:' + 'a'.repeat(64);
-  const args = migrationArguments('/private/current', image, 'crossfire-tests.slice');
-  assert.equal(args.at(-1), image); assert.equal(args.includes('--rm'), false); assert(args.includes('--read-only'));
-  assert.equal(args[args.indexOf('--network') + 1], 'none');
-  assert.equal(args[args.indexOf('--cgroup-parent') + 1], 'crossfire-tests.slice');
-  assert.equal(args.includes('--publish'), false);
-});

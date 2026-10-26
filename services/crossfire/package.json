@@ -44,7 +44,6 @@
     "test:browser": "node ../../scripts/test.mjs crossfire browser",
     "test:integration": "node ../../scripts/test.mjs crossfire integration",
     "generate:matrix": "npm run build && node dist/scripts/generate-matrix-api.js",
-    "start": "node crossfire start",
     "crossfire": "node crossfire",
     "tools": "node dist/tools/main.js",
     "verify:architecture": "node node/scripts/verify-architecture.ts",

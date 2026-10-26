@@ -75,7 +75,7 @@ try {
   await command(process.execPath, ['services/crossfire/csharp/tests/sqlite-parity.mjs', join(publish, 'Crossfire.Storage.Tests'),
     join(root, project, 'bin/Release/net11.0/Crossfire.Storage.Tests.dll'), dotnet], 'same-file SQLite interchange');
   await command(process.execPath, ['services/crossfire/csharp/tests/schema-parity.mjs', join(publish, 'Crossfire.Storage.Tests'),
-    join(root, project, 'bin/Release/net11.0/Crossfire.Storage.Tests.dll'), dotnet], 'current schema constraints, validation and backup parity');
+    join(root, project, 'bin/Release/net11.0/Crossfire.Storage.Tests.dll'), dotnet], 'current schema constraints, validation and interchange parity');
   console.log(JSON.stringify({ scope: 'implemented C# core, not full product parity', status: 'passed', resources, events }));
 } finally {
   delete process.env.CROSSFIRE_TLS_TEST_ORIGIN;

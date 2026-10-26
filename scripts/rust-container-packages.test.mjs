@@ -14,6 +14,8 @@ function fixture() {
   writeFileSync(join(source, 'package.json'), JSON.stringify({ version: '0.1.20' }));
   mkdirSync(join(source, 'scripts')); mkdirSync(join(source, 'services/crossfire/dist'), { recursive: true });
   writeFileSync(join(source, 'services/crossfire/dist/container-package-tool.mjs'), '// opaque trusted build tool fixture\n');
+  mkdirSync(join(source, 'services/crossfire/docker/local'), { recursive: true });
+  writeFileSync(join(source, 'services/crossfire/docker/local/compose.yaml'), readFileSync(new URL('../services/crossfire/docker/local/compose.yaml', import.meta.url)));
   writeFileSync(join(binaries, 'npm'), '#!' + process.execPath + '\nimport {appendFileSync} from "node:fs";appendFileSync(process.env.FIXTURE_CALLS,JSON.stringify(["npm",...process.argv.slice(2)])+"\\n");process.exit(process.env.FIXTURE_AUDIT_FAILURE ? 17 : 0);\n', { mode: 0o700 });
   writeFileSync(join(binaries, 'docker'), '#!' + process.execPath + '\n' + `
 import {readFileSync,writeFileSync,appendFileSync,mkdirSync,mkdtempSync,rmSync} from 'node:fs';
@@ -61,6 +63,7 @@ test('Rust image builder reuses the canonical package format, common images, aud
   try {
     const output = join(selected.directory, 'rust');
     execFileSync(process.execPath, ['--input-type=module', '-e', `import {buildRustContainerPackage} from ${JSON.stringify(new URL('../services/crossfire/rust/scripts/container-packages.mjs', import.meta.url).href)};await buildRustContainerPackage(${JSON.stringify(selected.source)},${JSON.stringify(output)},'verification.slice');`], { cwd: root, env: selected.environment, timeout: 30000, maxBuffer: 65536 });
+    assert.equal(readFileSync(join(output, 'compose.yaml'), 'utf8'), readFileSync(join(selected.source, 'services/crossfire/docker/local/compose.yaml'), 'utf8'));
     const manifest = JSON.parse(readFileSync(join(output, 'release.json'), 'utf8'));
     assert.equal(manifest.backend, 'rust'); assert.equal(manifest.platform, 'linux/amd64');
     assert.equal(manifest.version, '0.1.20'); assert.equal(manifest.schemaVersion, 2); assert.notEqual(manifest.runtime.reference, manifest.migration.reference);

@@ -20,17 +20,18 @@ test('local Docker runs only the server and the common one-shot maintenance owne
   assert.deepEqual(service('initialize').entrypoint, ['node', '/app/services/crossfire/crossfire']);
   assert.equal(service('migrate').command, undefined);
   for (const property of ['command', 'entrypoint', 'build']) assert.equal(service('crossfire')[property], undefined);
-  for (const name of ['initialize', 'migrate', 'crossfire']) assert.deepEqual(service(name).volumes, ['server-state:/runtime']);
+  for (const name of ['initialize', 'migrate', 'crossfire']) assert.deepEqual(service(name).volumes, ['${CROSSFIRE_STATE:-server-state}:/runtime']);
 });
 
 test('the host browser and fleet use the public loopback origin with a separate content host', () => {
-  assert.deepEqual(service('crossfire').ports, ['127.0.0.1:8080:8080', '127.0.0.1:8082:8082']);
+  assert.deepEqual(service('crossfire').ports, ['127.0.0.1:${CROSSFIRE_PORT:-8080}:8080', '127.0.0.1:${CROSSFIRE_CONTENT_PORT:-8082}:8082']);
   const command = service('initialize').command; assert(Array.isArray(command));
-  assert.equal(command[command.indexOf('--origin') + 1], 'http://127.0.0.1:8080');
-  assert.equal(command[command.indexOf('--content-origin') + 1], 'http://localhost:8082');
+  assert.equal(command[command.indexOf('--origin') + 1], '${CROSSFIRE_ORIGIN:-http://127.0.0.1:8080}');
+  assert.equal(command[command.indexOf('--content-origin') + 1], '${CROSSFIRE_CONTENT_ORIGIN:-http://localhost:8082}');
   assert.equal(service('crossfire').network_mode, undefined);
   assert.equal(service('crossfire').extra_hosts, undefined);
-  assert.equal(service('crossfire').depends_on, undefined);
+  assert.deepEqual(service('crossfire').depends_on, { migrate: { condition: 'service_completed_successfully' } });
+  assert.equal(service('migrate').profiles, undefined);
 });
 
 test('the server volume and containers exclude host logins, fleet state and daemon access', () => {
