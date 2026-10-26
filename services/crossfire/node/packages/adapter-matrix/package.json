@@ -12,7 +12,7 @@
   "dependencies": {
     "marked": "18.0.13",
     "sanitize-html": "2.18.1",
-    "undici": "8.11.2",
+    "undici": "8.12.2",
     "@ctlflow/crossfire-kernel": "0.1.24",
     "@ctlflow/crossfire-contracts": "0.1.24",
     "@ctlflow/crossfire-domain": "0.1.24"
