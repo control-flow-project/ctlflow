@@ -17,6 +17,7 @@ public sealed class OwnerObservation : IAsyncDisposable
     private readonly Coordination coordination;
     private readonly TimeProvider clock;
     private readonly NativeHistoryMode mode;
+    private readonly bool mirrorOutput;
     private readonly Func<int> maximum;
     private readonly Func<NativeSessionState?> native;
     private readonly Action<Failure> failed;
@@ -35,9 +36,9 @@ public sealed class OwnerObservation : IAsyncDisposable
     private long typingGeneration;
     private Task? running, closing;
     private bool clearTyping;
-    public OwnerObservation(LocalState storage, string file, AgentProfile profile, MessagingClient messaging, Coordination coordination, TimeProvider clock, NativeHistoryMode mode, Func<int> maximum, Func<NativeSessionState?> native, Action<Failure> failed, CancellationToken stop)
+    public OwnerObservation(LocalState storage, string file, AgentProfile profile, MessagingClient messaging, Coordination coordination, TimeProvider clock, NativeHistoryMode mode, Func<int> maximum, Func<NativeSessionState?> native, Action<Failure> failed, CancellationToken stop, bool mirrorOutput = true)
     {
-        this.storage = storage; this.file = file; this.profile = profile; this.messaging = messaging; this.coordination = coordination; this.clock = clock; this.mode = mode; this.maximum = maximum; this.native = native; this.failed = failed;
+        this.storage = storage; this.file = file; this.profile = profile; this.messaging = messaging; this.coordination = coordination; this.clock = clock; this.mode = mode; this.mirrorOutput = mirrorOutput; this.maximum = maximum; this.native = native; this.failed = failed;
         if (storage.Exists(file))
         {
             var journal = AgentIO.Read(storage, file, MaximumJournal); if (!Validation.Fields(journal, ["output", "observations"]).IsSuccess || journal.GetProperty("output").ValueKind != JsonValueKind.Array || journal.GetProperty("observations").ValueKind != JsonValueKind.Array) throw new InvalidDataException("Invalid owner observation journal; retained state requires owner inspection");
@@ -82,7 +83,7 @@ public sealed class OwnerObservation : IAsyncDisposable
             }
             else if (value is NativeOutput text)
             {
-                lastActivity = Now; var position = 0; var stream = text.StreamId is null ? null : WireJson.Compact(WireJson.Array(writer => { writer.WriteStringValue(text.SessionId); writer.WriteStringValue(text.StreamId); }));
+                lastActivity = Now; if (!mirrorOutput) return; var position = 0; var stream = text.StreamId is null ? null : WireJson.Compact(WireJson.Array(writer => { writer.WriteStringValue(text.SessionId); writer.WriteStringValue(text.StreamId); }));
                 foreach (var part in messaging.NoticeChunks(text.Text))
                 {
                     var id = Identity.Hash(WireJson.Compact(WireJson.Array(writer => { writer.WriteStringValue(text.SessionId); writer.WriteStringValue(text.Id); writer.WriteNumberValue(position++); }))); if (!sources.Add(id)) continue;

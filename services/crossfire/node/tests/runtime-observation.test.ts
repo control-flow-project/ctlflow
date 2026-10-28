@@ -299,3 +299,21 @@ test('observation coalescing never removes a snapshot while its publication is a
   assert.deepEqual(posted().map(request => (request.body as { observedAt: number }).observedAt), [1, 2]);
   assert.equal(native.requests().filter(request => request.method === 'turn/start').length, 0);
 });
+
+test('quiet native output leaves telemetry and explicit notices active without per-tool owner messages', async scope => {
+  const clock = testClock(scope), matrix = await matrixFixture(scope, temporary(scope), clock), stop = new AbortController();
+  const file = matrix.cursorFile + '.observation';
+  const observer = ownerObservation({ agentId: matrix.id, userId: SELF, file, storage: localState, clock,
+    transport: (signal, timeoutMs) => createMessagingClient(matrixClient({ base: matrix.settings.server, token: matrix.account.accessToken, signal, timeoutMs }), matrix.account.userId),
+    coordination: matrix.coordination, historyMode: 'shared', mirrorOutput: false, maximum: 65536 }, stop.signal);
+  cleanup(scope, async () => { stop.abort(); await clock.complete(observer.close()); });
+  observer.observe({ kind: 'state', observation: { sessionId: 'original', roomId: null, runtime: 'codex', state: 'working',
+    observedAt: clock.now(), settings: [], errorMessage: null } });
+  for (let index = 0; index < 500; index++) observer.observe({ kind: 'output', sessionId: 'original', id: 'fetch-' + index, streamId: null, text: 'Fetched item ' + index });
+  assert.deepEqual((JSON.parse(readFileSync(file, 'utf8')) as { output: unknown[] }).output, []);
+  assert.equal(observer.busy(), true);
+  assert.equal(matrix.requests.some(request => request.path.includes('/owner-conversation') || request.path.includes('/send/')), false);
+  observer.notice('important', 'Owner action required'); observer.start(randomUUID());
+  await clock.until(() => matrix.requests.some(request => request.path.endsWith('/runtime')) && matrix.requests.some(request => request.path.includes('/send/')));
+  assert.deepEqual(matrix.requests.filter(request => request.path.includes('/send/')).map(request => (request.body as { body: string }).body), ['Owner action required']);
+});

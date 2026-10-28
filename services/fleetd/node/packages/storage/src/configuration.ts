@@ -61,7 +61,8 @@ export function loadConfiguration(directory: string, replacement?: string): Resu
     }
     const instances = parsed.value.instances.map(({ listener_options, runtime_options, ...instance }) => ({ ...instance,
       ...(runtime_options ? { runtimeOptions: runtime_options } : {}),
-      ...(listener_options ? { listenerOptions: listener_options.history_mode === undefined ? {} : { historyMode: listener_options.history_mode } } : {}) }));
+      ...(listener_options ? { listenerOptions: { ...(listener_options.history_mode === undefined ? {} : { historyMode: listener_options.history_mode }),
+        ...(listener_options.mirror_output === undefined ? {} : { mirrorOutput: listener_options.mirror_output }) } } : {}) }));
     return success({ directory, roster: { ...parsed.value, instances }, definitions, digest: hash.digest('hex') });
   } catch (error) { return failure('invalid', error instanceof Error ? error.message : 'Cannot read fleet configuration'); }
 }

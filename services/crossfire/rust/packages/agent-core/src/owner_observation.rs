@@ -54,6 +54,7 @@ pub struct Observer<S, C, M, T> {
     profile: Profile,
     file: String,
     history_mode: HistoryMode,
+    mirror_output: bool,
     state: Mutex<StateJournal>,
     publication: AsyncMutex<()>,
     typing: AsyncMutex<()>,
@@ -63,6 +64,7 @@ pub struct Options {
     pub profile: Profile,
     pub file: String,
     pub history_mode: HistoryMode,
+    pub mirror_output: bool,
 }
 impl<S: LocalState, C: Coordination, M: MessagingClient, T: Clock + Send + Sync> owner_notices::Sink
     for Observer<S, C, M, T>
@@ -114,6 +116,7 @@ impl<S: LocalState, C: Coordination, M: MessagingClient, T: Clock + Send + Sync>
             profile: options.profile,
             file: options.file,
             history_mode: options.history_mode,
+            mirror_output: options.mirror_output,
             state: Mutex::new(StateJournal {
                 journal,
                 sources,
@@ -215,6 +218,9 @@ impl<S: LocalState, C: Coordination, M: MessagingClient, T: Clock + Send + Sync>
                 text,
             } => {
                 state.last_activity = Some(self.clock.now()?);
+                if !self.mirror_output {
+                    return Ok(());
+                }
                 let stream = stream_id.map(|stream| json!([session_id, stream]).to_string());
                 for (position, part) in self.messaging.notice_chunks(&text).into_iter().enumerate()
                 {

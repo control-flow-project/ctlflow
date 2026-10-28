@@ -10,19 +10,20 @@ public static class FleetConfigurationContract
 {
     public static Result<FleetInstance> Instance(JsonElement value, bool toml = true)
     {
-        var runtime = toml ? "runtime_options" : "runtimeOptions"; var listener = toml ? "listener_options" : "listenerOptions"; var history = toml ? "history_mode" : "historyMode";
+        var runtime = toml ? "runtime_options" : "runtimeOptions"; var listener = toml ? "listener_options" : "listenerOptions"; var history = toml ? "history_mode" : "historyMode"; var mirror = toml ? "mirror_output" : "mirrorOutput";
         if (!Validation.Fields(value, ["key", "name", "definition", "workarea"], ["workspace", runtime, listener]).IsSuccess) return Results.Fail<FleetInstance>("invalid", "Invalid fleet instance fields");
         var key = WireJson.Text(value, "key"); var name = WireJson.Text(value, "name"); var definition = WireJson.Text(value, "definition"); var workarea = WireJson.Text(value, "workarea"); var workspace = WireJson.Text(value, "workspace");
         if (key is null || !IdentitySyntax.Name(key) || name is null || !IdentitySyntax.Name(name) || definition is null || !IdentitySyntax.Name(definition) || workarea is null || workarea.Length > 1024 || !Relative(workarea) || value.TryGetProperty("workspace", out _) && (workspace is null || !Absolute(workspace))) return Results.Fail<FleetInstance>("invalid", "Invalid instance name or normalized workspace/workarea");
         var parts = workarea.Split('/'); if (parts.Length < 4 || parts[0] != "agents" || !IdentitySyntax.Name(parts[1]) || parts[2] != "workarea") return Results.Fail<FleetInstance>("invalid", "Work areas must be relative children of agents/<definition>/workarea");
         JsonElement? options = null; if (value.TryGetProperty(runtime, out var native)) { if (native.ValueKind != JsonValueKind.Object || !Validation.Json(native)) return Results.Fail<FleetInstance>("invalid", "Expected JSON runtime options"); options = native.Clone(); }
-        var mode = NativeHistoryMode.Shared;
+        var mode = NativeHistoryMode.Shared; bool? mirrorOutput = null;
         if (value.TryGetProperty(listener, out var receiver))
         {
-            if (!Validation.Fields(receiver, [], [history]).IsSuccess) return Results.Fail<FleetInstance>("invalid", "Invalid listener options");
+            if (!Validation.Fields(receiver, [], [history, mirror]).IsSuccess) return Results.Fail<FleetInstance>("invalid", "Invalid listener options");
             if (receiver.TryGetProperty(history, out var selected)) { var parsed = Validation.Choice(selected, "shared", "per-room"); if (!parsed.IsSuccess) return Result<FleetInstance>.Fail(parsed.Error); mode = parsed.Value == "shared" ? NativeHistoryMode.Shared : NativeHistoryMode.PerRoom; }
+            if (receiver.TryGetProperty(mirror, out var output)) { var parsed = Validation.Boolean(output); if (!parsed.IsSuccess) return Result<FleetInstance>.Fail(parsed.Error); mirrorOutput = parsed.Value; }
         }
-        return Result<FleetInstance>.Success(new(key, name, definition, workarea, workspace, options, mode));
+        return Result<FleetInstance>.Success(new(key, name, definition, workarea, workspace, options, mode, mirrorOutput));
     }
     public static Result<FleetRoster> Roster(JsonElement value)
     {

@@ -15,6 +15,7 @@ fn instance(key: &str) -> Instance {
         workarea: format!("agents/role/workarea/{key}"),
         workspace: None,
         history_mode: None,
+        mirror_output: None,
         runtime_options: None,
     }
 }

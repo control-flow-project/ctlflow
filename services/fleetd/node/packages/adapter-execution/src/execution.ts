@@ -213,7 +213,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, m
           binding: 'fleet-' + identity.agentId, host: listenerHost,
           control: bindingControl.control,
           release: software.manifest, cursorFile: local.cursors, limit: 100, pollMs: 10000, debounceMs: 1000, reconcileMs: 30000,
-          historyMode: instance.listenerOptions?.historyMode ?? 'shared',
+          historyMode: instance.listenerOptions?.historyMode ?? 'shared', mirrorOutput: instance.listenerOptions?.mirrorOutput ?? true,
           activity: (runId, generation) => { activity = stops.get(configuration.directory)!.activity(identity.agentId, runId, generation, () => bindingControl!.control.binding()); },
           ready: () => {
             if (!destination) { rejectReady(new Error('Runtime did not report its session')); return; }

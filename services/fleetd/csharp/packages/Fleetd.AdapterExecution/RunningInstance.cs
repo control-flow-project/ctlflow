@@ -76,7 +76,7 @@ public sealed partial class ExecutionHost
             }, transport.InvitationRooms, log, instance.HistoryMode, PollMs: 10000, Activity: (run, generation) => activity = connection.Reports.Activity(identity.AgentId, run, generation, () => control.Binding()), Ready: (_, _) =>
             {
                 activation = Activate(); async Task Activate() { if (native is null) { ready.TrySetResult(Results.Fail<Unit>("invalid", "Runtime did not report its session")); return; } var activated = await native.Activate(); ready.TrySetResult(activated); if (!activated.IsSuccess) stop.Cancel(); }
-            });
+            }, MirrorOutput: instance.MirrorOutput ?? true);
             receiving = ListenerRunner.Run(options, host, "fleet-" + identity.AgentId, stop.Token).AsTask(); InstanceExecution? running = null;
             observation = Observe(); async Task Observe()
             {

@@ -112,11 +112,17 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     writeFileSync(join(reviewer, 'agent.toml'), readFileSync(join(role, 'agent.toml')), { mode: 0o600 });
     writeFileSync(join(reviewer, 'AGENTS.md'), 'An alternate authored role.\n', { mode: 0o600 });
     let current = record((await call(operations.fleet, { fleetId })).data);
-    const extra = { key: 'temporary', name: 'temporary-' + runtime, definition: 'analyst', workarea: 'agents/analyst/workarea/temporary' };
+    const extra = { key: 'temporary', name: 'temporary-' + runtime, definition: 'analyst', workarea: 'agents/analyst/workarea/temporary', listenerOptions: { mirrorOutput: false } };
+    const unchanged = readFileSync(join(fleetDirectory, 'runtime.toml'));
+    for (const mirrorOutput of [null, 'false', 0, [], {}]) {
+      contractError(await raw('/api/fleets/' + fleetId + '/agents', 'POST', { expectedRevision: integer(current.revision), instance: { ...extra, listenerOptions: { mirrorOutput } } }), 400, 'invalid');
+      assert.deepEqual(readFileSync(join(fleetDirectory, 'runtime.toml')), unchanged, 'Invalid presentation settings cannot mutate the roster');
+    }
     current = record((await call(operations.addAgent, { fleetId }, { expectedRevision: integer(current.revision), instance: extra })).data);
     const registered = await call(operations.agents, { fleetId }, undefined, '?pageSize=1');
     assert.equal(registered.meta.totalItems, 2); assert.equal(list(registered.data).length, 1);
     assert.equal(record(record((await call(operations.agent, { fleetId, instanceKey: extra.key })).data).instance).name, extra.name);
+    assert.equal(record(record(record((await call(operations.agent, { fleetId, instanceKey: extra.key })).data).instance).listenerOptions).mirrorOutput, false, 'JSON configuration survives TOML persistence and reloading');
     const bytes = readFileSync(join(fleetDirectory, 'runtime.toml'));
     contractError(await raw('/api/fleets/' + fleetId + '/agents', 'POST', { expectedRevision: integer(current.revision) - 1, instance: extra }), 409, 'stale_revision');
     for (const duplicate of [extra, { ...extra, name: 'different-' + runtime }, { ...extra, key: 'another', workarea: 'agents/analyst/workarea/another' }]) {
@@ -125,6 +131,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     assert.deepEqual(readFileSync(join(fleetDirectory, 'runtime.toml')), bytes);
     current = record((await call(operations.changeAgent, { fleetId, instanceKey: extra.key }, { expectedRevision: integer(current.revision), definition: 'reviewer' })).data);
     assert.equal(record(record(list(current.instances).find(value => record(record(value).instance).key === extra.key)).instance).definition, 'reviewer');
+    assert.equal(record(record(record((await call(operations.agent, { fleetId, instanceKey: extra.key })).data).instance).listenerOptions).mirrorOutput, false, 'An unrelated role update retains the explicit quiet selection');
     current = record((await call(operations.removeAgent, { fleetId, instanceKey: extra.key }, { expectedRevision: integer(current.revision) })).data);
     revision = integer(current.revision); assert.equal(list(current.instances).length, 1);
     assert.deepEqual(readFileSync(join(role, 'AGENTS.md')), authored);
@@ -478,6 +485,42 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       if (provider.held()) provider.finish();
       await operate('stop'); writeFileSync(configuration, original, { mode: 0o600 }); await operate('reset');
       saved = (await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data;
+    }
+  });
+  await scope.test('quiet native output preserves collection work, telemetry, explicit messages and saved history', async () => {
+    const configuration = join(fleetDirectory, 'runtime.toml'), original = readFileSync(configuration, 'utf8');
+    await operate('stop');
+    const histories = (await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data;
+    writeFileSync(configuration, runtimeSource.replace('[instances.runtime_options]', '[instances.listener_options]\nmirror_output = false\n[instances.runtime_options]'), { mode: 0o600 });
+    const conversation = await contractHttp(platform.origin, 'POST', '/api/agents/' + agentId + '/owner-conversation', {}, { Authorization: 'Bearer ' + token });
+    assert.equal(conversation.status, 200); const room = text(record(record(conversation.body).data).roomId);
+    async function matrix(path: string) {
+      const result = await contractHttp(platform.origin, 'GET', '/_matrix/client/v3' + path, undefined, { Authorization: 'Bearer ' + platform.owner.nativeToken });
+      assert.equal(result.status, 200); return record(result.body);
+    }
+    const filter = '&filter=' + encodeURIComponent(JSON.stringify({ room: { rooms: [room], timeline: { limit: 100 } } }));
+    const before = text((await matrix('/sync?timeout=0' + filter)).next_batch);
+    try {
+      await operate('start');
+      const instance = record(record((await call(operations.agent, { fleetId, instanceKey: 'analyst' })).data).instance);
+      assert.equal(record(instance.listenerOptions).mirrorOutput, false);
+      const requests = provider.requests.length; provider.hold();
+      await call(operations.createFleetMessage, { fleetId }, { messageId: randomUUID(), body: 'Quiet collection proof ' + randomUUID() });
+      await observe(() => provider.requests.length > requests && provider.held() !== undefined, 'Quiet collection still reaches the actual native provider');
+      provider.finish(); await observe(idle, 'Quiet collection still reports native completion');
+      assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, histories);
+      await operate('stop');
+      const sync = await matrix('/sync?timeout=0&since=' + encodeURIComponent(before) + filter);
+      const joined = record(record(sync.rooms ?? {}).join ?? {}), events = Object.hasOwn(joined, room) ? list(record(record(joined[room]).timeline).events).map(record) : [];
+      assert.equal(events.some(event => event.sender === backendUserId && String(record(event.content).body).includes('Fixture complete.')), false, 'Completed native output never reaches Matrix when mirroring is disabled');
+      const state = JSON.parse(readFileSync(join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/cursors.json.observation'), 'utf8')) as unknown;
+      assert.equal(list(record(state).output).some(value => text(record(value).text).includes('Fixture complete.')), false, 'No per-tool output is left queued for later publication');
+      const sent = await contractHttp(platform.origin, 'PUT', '/_matrix/client/v3/rooms/' + encodeURIComponent(room) + '/send/m.room.message/' + randomUUID(),
+        { msgtype: 'm.text', body: 'Explicit important result' }, { Authorization: 'Bearer ' + token });
+      assert.equal(sent.status, 200, 'Intentional agent messages remain available');
+    } finally {
+      if (provider.held()) provider.finish();
+      await operate('stop'); writeFileSync(configuration, original, { mode: 0o600 }); await operate('start');
     }
   });
   await scope.test('stop, daemon restart and explicit resume retain history and stop intent', async () => {

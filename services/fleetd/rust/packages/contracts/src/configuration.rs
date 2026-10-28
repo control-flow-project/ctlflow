@@ -53,7 +53,7 @@ pub fn instance(value: &Value) -> Result<Instance> {
     let history_mode = value
         .get("listener_options")
         .map(|value| {
-            let value = check::object(value, &[], &["history_mode"])?;
+            let value = check::object(value, &[], &["history_mode", "mirror_output"])?;
             value
                 .get("history_mode")
                 .map(|value| HistoryMode::parse(check::text(value, 1, 20)?))
@@ -61,6 +61,11 @@ pub fn instance(value: &Value) -> Result<Instance> {
         })
         .transpose()?
         .flatten();
+    let mirror_output = value
+        .get("listener_options")
+        .and_then(|options| options.get("mirror_output"))
+        .map(check::boolean)
+        .transpose()?;
     Ok(Instance {
         key: check::name(&value["key"])?.to_owned(),
         name: check::name(&value["name"])?.to_owned(),
@@ -68,6 +73,7 @@ pub fn instance(value: &Value) -> Result<Instance> {
         workarea: check::text(&value["workarea"], 1, 1024)?.to_owned(),
         workspace,
         history_mode,
+        mirror_output,
         runtime_options: value.get("runtime_options").map(options).transpose()?,
     })
 }
@@ -82,7 +88,7 @@ pub fn api_instance(value: &Value) -> Result<Instance> {
         canonical.insert("runtime_options".to_owned(), options);
     }
     if let Some(options) = canonical.remove("listenerOptions") {
-        let options = check::object(&options, &[], &["historyMode"])?;
+        let options = check::object(&options, &[], &["historyMode", "mirrorOutput"])?;
         canonical.insert(
             "listener_options".to_owned(),
             options
@@ -91,6 +97,8 @@ pub fn api_instance(value: &Value) -> Result<Instance> {
                     (
                         if key == "historyMode" {
                             "history_mode".to_owned()
+                        } else if key == "mirrorOutput" {
+                            "mirror_output".to_owned()
                         } else {
                             key.clone()
                         },

@@ -14,7 +14,7 @@ const releaseDirectory = check.refine(check.text(4096), value => value.startsWit
 const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
   workspace: check.optional(check.text(4096)),
   runtimeOptions: check.optional(runtimeOptions),
-  listenerOptions: check.optional(check.object({ historyMode: check.optional(check.choice('shared', 'per-room')) })) });
+  listenerOptions: check.optional(check.object({ historyMode: check.optional(check.choice('shared', 'per-room')), mirrorOutput: check.optional(check.boolean) })) });
 export const phase = check.choice('stopped', 'starting', 'awaiting-approval', 'running', 'sleeping', 'waking', 'stopping', 'failed');
 export const instanceView = check.object({ instance, phase, listenerActive: check.boolean, desiredActive: check.boolean,
   lastActivityAt: check.nullable(check.integer()), historyAvailable: check.nullable(check.boolean),

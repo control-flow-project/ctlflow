@@ -23,19 +23,19 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
     const migrationImage = inspect(metadata.migration.reference, '{{.Id}}');
     const temporary = mkdtempSync(join(fixture.directory, 'transfer-'));
     let derivative: string | undefined;
-    cleanup(child, () => fixture.start(original));
     cleanup(child, () => rmSync(temporary, { recursive: true, force: true }));
     cleanup(child, () => {
-      if (derivative && spawnSync('docker', ['image', 'inspect', derivative], { stdio: 'ignore' }).status === 0) docker(['image', 'rm', '--no-prune', derivative]);
+      if (derivative && spawnSync('docker', ['image', 'inspect', derivative], { stdio: 'ignore' }).status === 0) docker(['image', 'rm', '--no-prune', derivative], artifactPreparationMilliseconds);
     });
-    cleanup(child, () => fixture.close());
+    // Restore the original container before removing its derivative image or Compose file.
+    cleanup(child, () => fixture.start(original));
     writeFileSync(join(temporary, 'Dockerfile'), 'FROM ' + parent + '\nLABEL org.crossfire.transfer=' + randomUUID() + '\n');
     derivative = docker(['build', '--quiet', '--cgroup-parent', process.env.CROSSFIRE_TEST_CGROUP_PARENT!, '--file', join(temporary, 'Dockerfile'), temporary], artifactPreparationMilliseconds);
     assert.match(derivative, /^sha256:[a-f0-9]{64}$/u);
     const output = join(temporary, 'package');
     const exported = spawnSync(process.execPath, [join(fixture.packages, original.name, 'package-tool.mjs'), 'export', '--runtime', derivative, '--migrations', migrationImage, '--output', output], { cwd: temporary, encoding: 'utf8', timeout: artifactPreparationMilliseconds });
     assert.equal(exported.status, 0, exported.stderr);
-    docker(['image', 'rm', '--no-prune', derivative]);
+    docker(['image', 'rm', '--no-prune', derivative], artifactPreparationMilliseconds);
     assert.notEqual(spawnSync('docker', ['image', 'inspect', derivative], { stdio: 'ignore' }).status, 0, 'The receiving operator must actually load the archive');
     await fixture.close(); await fixture.start(original, output);
     assert.equal(inspect(fixture.containerName, '{{.Config.Image}}'), derivative); await fixture.operation(operations.currentSession);

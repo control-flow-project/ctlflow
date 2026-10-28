@@ -303,6 +303,7 @@ async fn verify(prepared_query: bool) -> std::result::Result<(), Box<dyn std::er
         file: "receive".to_owned(),
         release: RELEASE.to_owned(),
         history_mode: HistoryMode::Shared,
+        mirror_output: true,
         room: None,
         limit: 100,
         poll_ms: 100,

@@ -814,11 +814,22 @@ running.
 
 ## 13. Observations, privacy and incidents
 
-All visible nonthinking terminal content goes only to the protected owner DM:
+By default, all visible nonthinking terminal content goes only to the protected owner DM:
 commentary, final text, tool results/stdout/stderr, progress and errors.
 Native reasoning/secret-entry/protocol credentials are excluded by event type.
 Ordered journals/native transaction IDs own retry. Output may split into complete
 literal chunks. The 64 MiB output journal fails explicitly rather than truncates.
+Per-instance `listener_options.mirror_output=false` disables automatic native-output
+mirroring. The JSON controller contract uses `listenerOptions.mirrorOutput`. The
+default is true. This is a listener presentation setting, independent of native
+runtime options and shared/per-room history. Quiet instances retain native
+history, activity/usage reporting, approvals, required decisions, intentional
+chat messages and important listener notices. They keep detailed work logs locally
+and send selected results through explicit messaging tools. The setting applies
+to newly observed output; already journaled receipts retain their identities.
+No domain-specific output filters, alternate reporting agent or second transport
+is introduced. Changing configuration requires the normal explicit listener
+stop/resume workflow with retained histories.
 
 The owner is trusted even for commentary from rooms they have not joined.
 Mirroring is not confidentiality protection; shared history combines room data.

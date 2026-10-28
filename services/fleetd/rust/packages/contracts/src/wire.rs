@@ -17,8 +17,14 @@ pub fn instance(value: &Instance) -> Value {
     if let Some(options) = &value.runtime_options {
         wire["runtimeOptions"] = json!(options);
     }
-    if value.history_mode == Some(HistoryMode::PerRoom) {
-        wire["listenerOptions"] = json!({"historyMode":"per-room"});
+    if value.history_mode == Some(HistoryMode::PerRoom) || value.mirror_output.is_some() {
+        wire["listenerOptions"] = json!({});
+        if value.history_mode == Some(HistoryMode::PerRoom) {
+            wire["listenerOptions"]["historyMode"] = json!("per-room");
+        }
+        if let Some(mirror) = value.mirror_output {
+            wire["listenerOptions"]["mirrorOutput"] = json!(mirror);
+        }
     }
     wire
 }

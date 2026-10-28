@@ -2,7 +2,7 @@ import type { Result } from '@ctlflow/crossfire-kernel/result';
 import type { RuntimeApproval, RuntimeConnection, RuntimeHooks, TurnControl } from './runtime.js';
 import type { RuntimeAttachment } from './terminal.js';
 import type { RuntimeObservation } from '@ctlflow/crossfire-contracts/runtime';
-export type ListenerOptions = { historyMode?: 'shared' | 'per-room' };
+export type ListenerOptions = { historyMode?: 'shared' | 'per-room'; mirrorOutput?: boolean };
 export type SavedRuntimeContext = { context: string; runtime: string; sessionId: string; workspace: string };
 export type NativeContextActivity = { context: string; sessionId: string; busy: boolean };
 export type NativeActivity = { busy: boolean; contexts: NativeContextActivity[] };
