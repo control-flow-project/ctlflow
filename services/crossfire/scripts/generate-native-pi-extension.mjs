@@ -1,9 +1,9 @@
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { piExtensionSource } from '../node/packages/adapter-pi/src/extension.ts';
+import { piExtensionSource } from '../assets/pi/extension.ts';
 
-const destinations = ['../node/packages/adapter-pi/native/owned-extension.mjs', '../rust/packages/adapter-pi/assets/crossfire-extension.mjs']
+const destinations = ['../assets/pi/owned-extension.mjs', '../rust/packages/adapter-pi/assets/crossfire-extension.mjs']
   .map(path => fileURLToPath(new URL(path, import.meta.url)));
 if (process.argv.length > 3 || process.argv.length === 3 && process.argv[2] !== '--check') throw new Error('Generate the native Pi extension, or verify it with --check');
 const source = piExtensionSource();

@@ -1,4 +1,4 @@
-import { createScheduleCalculator } from '@ctlflow/crossfire-adapter-schedule/create-calculator';
+import { createScheduleCalculator } from '@ctlflow/crossfire-test-support/calendar';
 
 export function calendarCases() {
   const calculator = createScheduleCalculator(); const cases = [];

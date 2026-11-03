@@ -23,12 +23,12 @@ for (const name of ['crossfire', 'fleetd', 'fleet']) {
   assert.equal(manifest.type, 'module');
 }
 const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-assert.deepEqual(manifest.workspaces, ['services/*', 'services/*/apps/*', 'services/*/node/apps/*', 'services/*/node/packages/*', 'services/*/database']);
+assert.deepEqual(manifest.workspaces, ['services/*', 'services/*/apps/*', 'services/*/packages/*', 'services/*/database']);
 verifyPackageOwnership(root);
 verifyCsharpArchitecture(root);
 verifyImplementationLayout(root);
 const nativeFiles = inventory();
-console.log('Native file inventory verified: ' + nativeFiles.files.length + ' Node/C# files; ' + nativeFiles.rustFiles + ' Rust files; explicit semantic owners.');
+console.log('Native file inventory verified: ' + nativeFiles.files.length + ' C# files; ' + nativeFiles.rustFiles + ' Rust files; explicit semantic owners.');
 verifyDocumentation(root);
 console.log('Structure verified: service-local Crossfire, fleetd and fleet; no root application/package pool.');
 verifyTestTiming(root);

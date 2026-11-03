@@ -28,5 +28,5 @@ operator tools. Current source tests own regression reproductions; scratch scrip
 do not become alternate runtime paths.
 
 - [Procedure and evidence limits](operator-tools.md)
-- [crossfire commands](../services/crossfire/node/tools/README.md)
-- [fleetd commands](../services/fleetd/node/tools/README.md)
+- [crossfire commands](../services/crossfire/tools/README.md)
+- [fleetd commands](../services/fleetd/tools/README.md)

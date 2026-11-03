@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, chmodSync, rmSync, copyFileSync, readFileSync }
 import { tmpdir } from 'node:os';
 import { resolve, join } from 'node:path';
 import Database from 'better-sqlite3';
-import { databaseIdentity, foreignKeyViolations, integrityResult } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
+import { databaseIdentity, foreignKeyViolations, integrityResult } from '@ctlflow/crossfire-database-inspection/schema/metadata';
 import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 import { migrationChange, migrationQuery, migrationSnapshot } from '../../dist/tests/support/migration-data.js';
 import contract from '@ctlflow/crossfire-data/management/sqlite/contract' with { type: 'json' };

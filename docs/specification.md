@@ -38,14 +38,14 @@ Every operational agent belongs to a fleet, including single-agent users.
 Setup leaves its calling coding assistant, process and conversation independent.
 There is no standalone-agent or existing-session-adoption path.
 
-Node, C# and Rust are independently selected implementations of all three products.
+C# and Rust are independently selected implementations of all three products.
 C# targets .NET 11 and produces managed and NativeAOT builds from the same source.
 Managed products optimize methods at first JIT compilation, with tiered
 compilation disabled. NativeAOT compilation remains ahead of time. The performance
 bank measures each installed target's defaults without test-only runtime tuning.
 An executable never substitutes another implementation when its selected one
-fails. Rust is verified separately and in the same explicit four-target matrix;
-Node/C#-only results do not establish Rust readiness.
+fails. Rust is verified separately and in the same explicit three-target matrix;
+C#-only results do not establish Rust readiness.
 
 All implementations use one shared React UI, wire contract and management SQLite
 file. Switching requires no import/export, reset or alternative schema.
@@ -62,7 +62,7 @@ unavailable combinations are errors, not substitution requests.
 services/
   crossfire/
     apps/web/
-    node/{apps/server,packages,tests,scripts,tools}/
+    packages/                         shared TypeScript contracts and tooling
     csharp/{apps/Crossfire.Server,packages,tests,build,scripts}/
     rust/{apps/server,packages,tests,scripts}/
     database/management/sqlite/{migrations,seeds}/
@@ -71,13 +71,13 @@ services/
     scripts/
     docs/
   fleetd/
-    node/{apps/daemon,packages,tests,scripts,tools}/
+    packages/                         shared TypeScript contracts and tooling
     csharp/{apps/Fleetd.Daemon,packages,tests}/
     rust/{apps/daemon,packages}/
     tests/contracts/
     docs/
   fleet/
-    node/{apps/cli,packages,tests,scripts}/
+    packages/                         shared TypeScript contracts and tooling
     csharp/{apps/Fleet.Cli,packages}/
     rust/{apps/cli,packages}/
     tests/contracts/
@@ -112,7 +112,7 @@ presentation. Generic owners use only neutral fields and opaque identifiers.
 | Filesystem adapter | Private files, atomic publication, locks and path validation |
 | Management UI | Human views/actions using the canonical REST contracts |
 
-Node queries use Tinqer, C# queries use EF Core and Rust queries use Diesel.
+C# application queries use EF Core and Rust application queries use Diesel. TypeScript read-only inspection tooling uses Tinqer; Knex owns schema/fixture builders.
 Knex alone creates/migrates owned SQL stores. Handwritten application and metadata
 queries are prohibited, including fixture setup and test assertions. Query libraries
 own statement generation; migration fixtures use Knex builders. Metadata reads use
@@ -143,17 +143,14 @@ the same content-addressed UI build and Element translation asset.
 
 ## 3. Distribution
 
-All npm names use @ctlflow. Only @ctlflow/fleet and @ctlflow/fleetd may be public.
-crossfire, internal workspaces and the root remain private.
-Products have one coordinated exact version; fleet pins fleetd exactly.
-Public builds bundle internal modules and install outside the monorepo without
-publishing private modules or resolving workspace source.
+All npm names use @ctlflow and all npm workspaces are private. Node.js is used for UI, Knex, builds, tooling and tests; it does not implement a server, controller or CLI service.
+Products have one coordinated exact version. Native distributions contain all executables and shared tool assets and install outside the monorepo without resolving workspace source.
 
 Publishing is a coordinated release of every affected distribution surface:
 source, shared UI, public packages, supported server images, shared Knex image,
 GHCR references, deployment bundles and release metadata. Repository, installed,
 setup and affected website documentation must describe those same artifacts and
-versions across Node, managed C#, NativeAOT and Rust. Check each required surface
+versions across managed C#, NativeAOT and Rust. Check each required surface
 before handoff; an unpublished image or stale installation reference prevents a
 complete-release claim even when a live deployment succeeds.
 
@@ -169,16 +166,15 @@ retains only its recorded exact named exceptions. Dependency updates do not
 grant new exceptions. Lockfile ownership and installed bytes are verified.
 
 First-party material is MIT-licensed under the root LICENSE, copyright
-Jeswin P Kumar, jeswinpk@agilehead.com. Node, C# and Rust metadata and distributed
+Jeswin P Kumar, jeswinpk@agilehead.com. C# and Rust metadata and distributed
 license copies must agree. Internal packages remain private; licensing does not
 authorize their publication.
 Third-party notices remain unchanged.
 
 Each selectable target has separate factual installation/packaging instructions:
-Node, C# managed, C# NativeAOT and Rust. Instructions distinguish build-time and
+C# managed, C# NativeAOT and Rust. Instructions distinguish build-time and
 installed dependencies, local packaging, publication and activation. Native
-distributions ship their selected guide as a standalone README; npm products
-ship their product guides. Installed documentation cannot rely on paths outside
+distributions ship their selected guide as a standalone README. Installed documentation cannot rely on paths outside
 its distribution. Current documentation contains no promotional claims.
 
 - [Target installation and packaging](distributions/README.md)
@@ -188,7 +184,7 @@ crossfire-client.mjs and messaging-LICENSE.txt. One private build export
 produces the server/fleetd bytes. Activation verifies the complete local release.
 Recovery and wake do not download or silently install software.
 
-Server deployment uses one standard Docker Compose kit for all four backends.
+Server deployment uses one standard Docker Compose kit for all three native targets.
 A transferable per-backend package contains bounded release.json, images.tar,
 package-tool.mjs and compose.yaml. The archive contains one exact runtime and the
 common Knex image. The trusted Node maintenance tool checks archive/image digests,
@@ -204,21 +200,21 @@ descriptor never retries another identity.
 The common Knex image copies the production dependency closure into a clean base;
 it does not ship the compiler/build stage or other target/test source.
 GAAP and Bad Bets select C# NativeAOT server packages by default. Their branding,
-DNS/TLS and deployment state remain site-owned. This does not change fleet
-attachment: generated instructions are addressed to the coding harness and always
-install the pinned Node @ctlflow/fleet CLI with Node fleetd, independent of the
-server backend. The setup harness's own process/history is never adopted.
+DNS/TLS and deployment state remain site-owned. Fleet attachment uses the matching
+installed native fleet/fleetd distribution and the existing supported harness/login.
+No Node service package is installed, and the setup harness's process/history is
+never adopted. NativeAOT is the default controller/CLI distribution.
 Images own readiness and entrypoints; site-specific branding uses build stages,
 not language-specific commands injected into another backend's runtime.
 Docker runs only crossfire, Conduit Matrix, shared UI/content and one-shot Knex
 initialization/migrations. It does not run fleetd or native agents. The execution
-host installs pinned Node fleet/fleetd and supplies its own supported Codex/Pi
+host installs the matching native fleet/fleetd distribution and supplies its own supported Codex/Pi
 installation and native provider login. Setup never installs or upgrades those
 harnesses or copies host credentials into a container. There is no fleet image,
 fleet Compose service or container relay. Server and host fleet use the same
 public origin; native Matrix/backend listeners remain private to the server.
 Docker Compose owns container lifecycle and project isolation. There is no
-Node/C#/Rust lifetime deployment operator, private deployment lock or custom
+C#/Rust lifetime deployment operator, private deployment lock or custom
 orphan-takeover protocol. Operators use one project/state selection consistently,
 stop writers before an upgrade, remove the completed migration job and start the
 selected release. Migration failure prevents application activation. Backup
@@ -233,20 +229,13 @@ targets require their platform adapters and test evidence, not a changed RID alo
 
 ## 4. HTTP contract and trusted ingress
 
-The [crossfire operation catalog](../services/crossfire/node/packages/contracts/src/rest/operations.ts)
+The [crossfire operation catalog](../services/crossfire/packages/contracts/src/rest/operations.ts)
 and its validators own exact methods, paths, authentication, fields and replies.
 fleetd owns its private catalog. Generated native metadata and typed clients must
 match their canonical owners, not introduce alternate validation decisions.
 
 crossfire uses /api, management /manage, and setup/tool assets /onboarding.
 Matrix retains /_matrix. Static reports use a separate origin/listener.
-
-The Node outbound Matrix/coordination adapter uses a pinned published Undici
-dispatcher with HTTP/2 disabled explicitly. This avoids the Node HTTP/2 stream
-error path without patching Node, replacing the global dispatcher or retrying a
-failed protocol with another one. HTTPS certificate/hostname verification,
-bearer authentication, origin restrictions, bounded bodies, cancellation and
-deadlines remain enforced. HTTP/1.1 does not provide HTTP/2 multiplexing.
 
 - Success is `{data, meta: {requestId, ...pagination}}`; failure is
   `{error: {code, message, fieldErrors?}, meta: {requestId}}`.
@@ -303,9 +292,7 @@ normalize to the same key. Hostnames, CIDRs, scopes and normalized duplicates fa
 
 A trusted peer must send exactly one X-Forwarded-For header containing one literal
 client IP. Missing, malformed, duplicate or chained values fail with 403.
-Ingress must overwrite that header, not append caller input. Node dispatches
-management requests in process rather than adding another loopback HTTP hop.
-Matrix forwarding removes forwarding metadata.
+Ingress must overwrite that header, not append caller input. Matrix forwarding removes forwarding metadata.
 
 Operators must configure the actual container peer and restrict upstream ports.
 Loopback, deployment hostname and branding do not confer trust. This protection
@@ -451,7 +438,7 @@ privileged service or boot service is installed.
 ### Read-only diagnostics
 
 `fleet diagnose [FLEET]` and `fleet agent diagnose FLEET INSTANCE` read the same
-authenticated fleetd `GET /api/diagnostics` contract across Node, managed C#,
+authenticated fleetd `GET /api/diagnostics` contract across managed C#,
 NativeAOT and Rust. Optional fleetId/instanceKey query fields select the scope;
 the default is the controller. Reports collect independent, timestamped checks
 with stable IDs and pass/fail/unknown/not-applicable outcomes, without repair.
@@ -567,8 +554,7 @@ protocol conflicts require action, not unlimited restarts.
 Stop completion requires exact owned-process evidence, not process-name scans.
 
 Owned native writers have a parent-lifetime guard and a private process lifetime
-lock in every implementation. Node uses its IPC parent channel on Linux/macOS;
-C# uses the native parent process handle, and Rust uses a parent pidfd on Linux.
+lock in every implementation. C# uses the native parent process handle, and Rust uses a parent pidfd on Linux.
 Parent death terminates the exact owned native group. A replacement waits for
 exclusive ownership instead of overlapping the old writer. Guards run only while
 their native engine runs; sleeping fleets retain no native guard processes.
@@ -965,7 +951,7 @@ constraints, indexes and reference data, not a duplicated handwritten schema.
 
 File-backed management storage uses SQLite write-ahead logging and full commit
 durability. A management read snapshot must not block a controller heartbeat
-commit. Node, C# and Rust use the same journal mode; none switch back to a rollback
+commit. C# and Rust use the same journal mode; none switch back to a rollback
 journal. Backups use SQLite's backup API or the documented quiescent procedure,
 including committed WAL state. A live main-file copy alone is not a backup.
 
@@ -983,7 +969,7 @@ Fleet file state and external Conduit RocksDB are not invented SQL stores.
 Current schema is 1: 57 singular application tables plus Knex tracking.
 One 00_initial migration creates the final schema, constraints, indexes and reference
 data directly. No historical schema admission, conversion or special obsolete-store
-handling exists. Runtime adapters validate the current contract; Node, C# and Rust
+handling exists. Runtime adapters validate the current contract; C# and Rust
 never create or migrate schemas. Switching current implementations requires no
 conversion. Future compatibility requires explicit owner approval.
 
@@ -1088,7 +1074,7 @@ actions without promotional claims. Deployment branding grants no authority.
 ## 20. Verification
 
 External behavior has one product-owned assertion bank selected by executable
-matrix. Node, C# managed, actual NativeAOT and Rust execute identical assertions.
+matrix. C# managed, actual NativeAOT and Rust execute identical assertions.
 Configured failures/missing targets cannot be skipped. Internal algorithm,
 compiler and injected-failure tests remain language-owned.
 The shared runner requires complete summary counters, no skipped or unfinished
@@ -1118,14 +1104,11 @@ real containers and migration/rollback tests. Coverage inventory distinguishes
 authentication, successful behavior, malformed input, recovery and UI evidence;
 counts alone establish none of them.
 
-The performance bank compares each workload against the measured Node baseline:
-zero request failures, no slower p50/p95 and no lower throughput. On 2026-10-18
-the owner approved only managed .NET's saved-runtime-observation p50 and p95 up to
-1.30 times Node's corresponding latency and throughput at least 0.95 times Node.
-Only that target/workload has these explicitly approved exceptions; every other
-target/workload remains strict. JSON and HTML expose latency and throughput limits
-and label exception use rather than claiming it meets the unmodified baseline.
-Failed earlier attempts remain recorded.
+The native performance bank compares each workload with the measured NativeAOT
+reference: zero request failures, no slower p50/p95 and no lower throughput.
+Historical performance reports retain their original thresholds and verdicts;
+they are not current native verification. JSON and HTML expose the selected
+reference, explicit limits, source and measurements without a hidden tolerance.
 
 Tests use verified finite aggregate memory/swap/task scopes, all available cores
 for independent files, and once-prepared immutable builds/native/browser assets.

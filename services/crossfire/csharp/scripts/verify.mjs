@@ -33,7 +33,7 @@ async function command(binary, arguments_, label, workingDirectory = root) {
 
 try {
   timeZones = prepareTimeZones(directory);
-  const { secureRouter } = await import('../../node/packages/test-support/dist/tls.js');
+  const { secureRouter } = await import('../../packages/test-support/dist/tls.js');
   const backend = await secureRouter({ after: operation => disposers.push(operation) }, createServer((request, response) => {
     response.writeHead(200, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ host: request.headers.host }));
   }));

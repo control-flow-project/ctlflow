@@ -82,7 +82,7 @@ omitted; each worker still runs the complete other container/recovery scenarios.
 | Native execution | Actual Codex/Pi chat, attribution, interruption, receipts, file-backed input, history, stop/resume, idle/in-flight controller death and upstream outage recovery |
 | Controller API | Every declaration has a decoded success or a checked native capability refusal; roster CRUD, revisions, operation replay, explicit updates and read-only readiness |
 | CLI/transport | Both native engines; exact daemon ownership handoff, noninteractive setup, per-agent/fleet resume/reset/update, messages, delivery, restart and strict SSH host verification |
-| CLI/controller interoperability | Every selected CLI reads every selected controller through the same private authenticated API; all 16 ordered four-target pairs run |
+| CLI/controller interoperability | Every selected CLI reads every selected controller through the same private authenticated API; all 16 ordered three-target pairs run |
 | Containers | Actual images/operators, Element room/media, same-file backend changes, concurrent starts and owned orphan recovery |
 | Data | One current Knex initial schema, constraints, transaction rollback, verified backups and same-file access |
 

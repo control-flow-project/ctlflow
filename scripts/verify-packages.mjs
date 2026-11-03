@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-export const PUBLIC_PACKAGES = ['@ctlflow/fleet', '@ctlflow/fleetd'];
+export const PUBLIC_PACKAGES = [];
 export const PACKAGE_LICENSE = 'MIT';
 export const PACKAGE_AUTHOR = 'Jeswin P Kumar <jeswinpk@agilehead.com>';
 
@@ -12,20 +12,9 @@ export function verifyPackageManifest(manifest, expectedName, isPublic) {
   assert.equal(manifest.type, 'module', 'Every package is ESM');
   assert.equal(manifest.license, PACKAGE_LICENSE, 'First-party packages use the MIT license');
   assert.equal(manifest.author, PACKAGE_AUTHOR, 'First-party package author/contact');
-  if (!isPublic) return;
-  assert.deepEqual(manifest.publishConfig, { access: 'public' }, 'Public scope requires explicit public access');
-  assert(Array.isArray(manifest.files) && manifest.files.length > 0, 'Public packages need a finite file allowlist');
-  assert(manifest.files.includes('LICENSE'), 'Public products explicitly distribute the MIT license');
-  for (const file of manifest.files) assert(typeof file === 'string' && ['dist/bin', 'dist/assets', 'docs', 'README.md', 'LICENSE'].includes(file), 'Public package files must be explicit executable, release assets, license or product documentation directories');
-  assert(!manifest.files.includes('dist/assets') || expectedName === '@ctlflow/fleetd', 'Only fleetd owns bundled listener release assets');
-  assert(manifest.bin && Object.keys(manifest.bin).length === 1 && manifest.bin[expectedName.slice('@ctlflow/'.length)], 'Public product needs its named executable');
-  for (const [name, version] of Object.entries(manifest.dependencies ?? {})) {
-    if (name.startsWith('@ctlflow/')) {
-      assert(PUBLIC_PACKAGES.includes(name), 'Internal modules must be bundled, not registry dependencies');
-      assert(/^\d+\.\d+\.\d+$/u.test(version), 'Public dependencies use exact versions');
-    }
-  }
-  for (const script of ['preinstall', 'install', 'postinstall']) assert(!manifest.scripts?.[script], 'Installation must not run controller/agent lifecycle scripts');
+  assert.equal(isPublic, false, 'No Node service packages are publishable');
+  assert.equal(manifest.bin, undefined, 'Private tooling manifests do not expose service executables');
+  assert.equal(manifest.publishConfig, undefined, 'Private tooling has no public npm publication configuration');
 }
 
 export function verifyWorkspaceLock(lock, manifests) {
@@ -72,7 +61,7 @@ export function verifyPackageOwnership(root) {
       assert.equal(manifest.version, workspace.version, 'Database assets share the coordinated release');
       manifests['services/' + service + '/database'] = manifest;
     }
-    for (const kind of ['apps', 'node/apps', 'node/packages']) {
+    for (const kind of ['apps', 'packages']) {
       const parent = join(directory, kind);
       if (!existsSync(parent)) continue;
       for (const entry of readdirSync(parent, { withFileTypes: true })) {
@@ -86,7 +75,7 @@ export function verifyPackageOwnership(root) {
       }
     }
   }
-  assert.deepEqual(published.sort(), [...PUBLIC_PACKAGES].sort(), 'Both and only fleet products are public');
+  assert.deepEqual(published.sort(), [...PUBLIC_PACKAGES].sort(), 'No Node service packages remain public');
   const license = readFileSync(join(root, 'LICENSE'), 'utf8');
   assert(license.startsWith('MIT License\n'), 'The root license is MIT');
   assert(license.includes('Permission is hereby granted, free of charge'), 'Root license includes the permission grant');

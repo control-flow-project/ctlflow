@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { isAbsolute } from 'node:path';
-import { target } from '../services/crossfire/node/packages/test-support/dist/contract-process.js';
+import { target } from '../services/crossfire/packages/test-support/dist/contract-process.js';
 import { containerStack } from '../services/crossfire/dist/tests/contracts/container-fixture.js';
 import { serverContracts } from '../services/crossfire/dist/tests/contracts/server.contract.js';
 import { browserContracts } from '../services/crossfire/dist/tests/contracts/browser.contract.js';

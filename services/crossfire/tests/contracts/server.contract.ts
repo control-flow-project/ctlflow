@@ -12,8 +12,8 @@ import { paginationContracts } from '@ctlflow/crossfire-test-support/contract-pa
 import { resourceContracts } from './resources.contract.js';
 import { defineSelect } from '@tinqerjs/tinqer';
 import { executeSelect, toSql } from '@tinqerjs/better-sqlite3-adapter';
-import { schema } from '@ctlflow/crossfire-adapter-sqlite/schema/tables';
-import { metadataSchema } from '@ctlflow/crossfire-adapter-sqlite/schema/metadata';
+import { schema } from '@ctlflow/crossfire-database-inspection/schema/tables';
+import { metadataSchema } from '@ctlflow/crossfire-database-inspection/schema/metadata';
 
 export async function managementDocumentContracts(request: (path: string, method: string) => Promise<ContractReply>): Promise<void> {
   for (const path of ['/manage', '/manage/', '/manage/fleets']) for (const method of ['GET', 'HEAD']) {

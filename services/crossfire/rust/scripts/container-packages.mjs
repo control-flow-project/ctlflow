@@ -17,8 +17,8 @@ export async function buildRustContainerPackage(source, output, parent) {
     if (inspected.code !== 0 || !/^sha256:[a-f0-9]{64}$/u.test(inspected.output.trim())) throw new Error('Cannot identify built container image');
     return inspected.output.trim();
   }
-  await build('services/crossfire/node/Dockerfile', 'assets', assets, 'assets');
-  const migrations = await build('services/crossfire/node/Dockerfile', 'migrations', 'crossfire-migrations:' + suffix, 'migrations');
+  await build('services/crossfire/Dockerfile.build', 'assets', assets, 'assets');
+  const migrations = await build('services/crossfire/Dockerfile.build', 'migrations', 'crossfire-migrations:' + suffix, 'migrations');
   const runtime = await build('services/crossfire/rust/Dockerfile', 'production', 'crossfire-rust:' + suffix, 'rust', ['--build-arg', 'CROSSFIRE_ASSETS_IMAGE=' + assets]);
   if (containerSourceDigest(source) !== sourceDigest) throw new Error('Container source changed during package construction');
   await exportContainerPackage(runtime, migrations, output, readFileSync(join(source, 'services/crossfire/dist/container-package-tool.mjs')), readFileSync(join(source, 'services/crossfire/docker/local/compose.yaml')));

@@ -1,3 +1,0 @@
-#!/usr/bin/env node
-import { main } from './dist/apps/server/src/operator.js';
-main().catch(error => { console.error(error instanceof Error ? error.message : 'Crossfire command failed'); process.exitCode = 1; });

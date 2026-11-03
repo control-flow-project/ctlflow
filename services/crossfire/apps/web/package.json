@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/crossfire-web",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
@@ -23,9 +23,9 @@
   "dependencies": {
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "@ctlflow/crossfire-contracts": "0.1.25",
-    "@ctlflow/crossfire-client": "0.1.25",
-    "@ctlflow/crossfire-kernel": "0.1.25"
+    "@ctlflow/crossfire-contracts": "0.1.26",
+    "@ctlflow/crossfire-client": "0.1.26",
+    "@ctlflow/crossfire-kernel": "0.1.26"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

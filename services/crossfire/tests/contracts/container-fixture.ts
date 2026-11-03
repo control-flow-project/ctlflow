@@ -7,10 +7,10 @@ import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import { contractProcess, freePorts, observe, record, text, type ContractTarget } from '@ctlflow/crossfire-test-support/contract-process';
 import { contractHttp } from '@ctlflow/crossfire-test-support/contract-http';
 import { secureProxy } from '@ctlflow/crossfire-test-support/tls';
-import { builtRelease } from '../../node/scripts/test-support/release.js';
-import { prepareContainerPackage } from '../../node/scripts/container-package.js';
+import { builtRelease } from '../support/release.js';
+import { prepareContainerPackage } from '../../scripts/container-package.js';
 import { contractClient } from './fixture.js';
-import { config as parseConfiguration } from '../../node/apps/server/src/config.js';
+import { config as parseConfiguration } from '@ctlflow/crossfire-contracts/server';
 
 export type ContainerStack = Awaited<ReturnType<typeof containerStack>>;
 export async function containerStack(scope: TestContext, initial: ContractTarget, targets: readonly ContractTarget[], packages: string) {

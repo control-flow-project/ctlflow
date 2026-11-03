@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { verifyTestResources } from './test-resources.mjs';
 import { readContractMatrix } from './contract-targets.mjs';
-import { target } from '../services/crossfire/node/packages/test-support/dist/contract-process.js';
+import { target } from '../services/crossfire/packages/test-support/dist/contract-process.js';
 import { contractStack } from '../services/crossfire/dist/tests/contracts/fixture.js';
 import { serverContracts } from '../services/crossfire/dist/tests/contracts/server.contract.js';
 import { browserContracts } from '../services/crossfire/dist/tests/contracts/browser.contract.js';

@@ -19,7 +19,7 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
   const { origin, state: directory, port, contentPort, containerName: name } = fixture;
   const release = JSON.parse(readFileSync(join(fixture.packages, fixture.current().name, 'release.json'), 'utf8')) as { migration: { reference: string } };
   const checked = spawnSync('docker', ['run', '--rm', '--cgroup-parent', cgroupParent, '--network', 'none', '--read-only', '--tmpfs', '/tmp:rw,nosuid,nodev,size=128m', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
-    '--mount', 'type=bind,source=' + directory + ',target=/runtime,readonly', '--entrypoint', 'node', release.migration.reference, '/app/services/crossfire/dist/scripts/container-configuration.js',
+    '--mount', 'type=bind,source=' + directory + ',target=/runtime,readonly', '--entrypoint', 'node', release.migration.reference, '/app/services/crossfire/dist/container-configuration.mjs',
     '--directory', '/runtime', '--instance', 'verification', '--origin', origin, '--content-origin', 'http://localhost:' + contentPort, '--server-name', 'verification.localhost'], { encoding: 'utf8', timeout: 30000 });
   assert.equal(checked.status, 0, checked.stderr);
   const empty = await fetch(origin + '/_matrix/client/v3/joined_rooms', { headers: { Authorization: 'Bearer ' + fixture.owner.nativeToken } });
@@ -53,7 +53,7 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
       }
       const health = (await (await fetch(origin + '/api/health')).json() as { data: { instance: string; version: string; release: string; startedAt: number } }).data;
       assert.equal(health.instance, 'verification');
-      const sourceExclusion = spawnSync('docker', ['exec', name, 'sh', '-c', 'test ! -d /app/services/crossfire/csharp && test ! -d /app/services/crossfire/node/tests && test ! -d /app/services/crossfire/dist/tests && test ! -d /app/services/crossfire/node/packages/domain/src'], { encoding: 'utf8' });
+      const sourceExclusion = spawnSync('docker', ['exec', name, 'sh', '-c', 'test ! -d /app/services/crossfire/csharp && test ! -d /app/services/crossfire/node/tests && test ! -d /app/services/crossfire/dist/tests && test ! -d /app/services/crossfire/packages/domain/src'], { encoding: 'utf8' });
       assert.equal(sourceExclusion.status, 0, 'Runtime images exclude build/test and other implementation source');
       assert(Number.isSafeInteger(health.startedAt) && health.startedAt > 0 && health.startedAt <= Date.now());
       for (const suffix of ['manifest.json', ...ARTIFACTS]) {
@@ -151,8 +151,8 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
         assert.equal(guide.status, 200);
         const guideText = await guide.text();
         const descriptorUrl = setupDescriptorUrl(origin, account.user_id);
-        assert(guideText.includes('@ctlflow/fleet@' + health.version));
-        assert(guideText.includes('Install only the pinned Node.js @ctlflow/fleet CLI and its exact Node.js fleetd dependency into private user-owned storage.'));
+        assert(guideText.includes('Install the native ctlflow ' + health.version));
+        assert(guideText.includes('Install the matching native fleet and fleetd distribution into private user-owned storage; NativeAOT is the default.'));
         assert(guideText.includes('Docker hosts the server only.'));
         assert(guideText.includes('Never install or upgrade Codex/Pi as part of these instructions.'));
         assert(guideText.includes('Do not attach this coding session; fleetd starts a separate managed native session.'));
@@ -161,10 +161,10 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
         const descriptorResponse = await fetch(descriptorUrl);
         assert.equal(descriptorResponse.status, 200);
         const descriptor = setupDescriptorSchema(await descriptorResponse.json());
-        assert(descriptor.ok, 'The personalized npm setup descriptor validates');
+        assert(descriptor.ok, 'The personalized native setup descriptor validates');
         assert.equal(descriptor.value.server, origin);
         assert.equal(descriptor.value.ownerBackendUserId, account.user_id);
-        assert.deepEqual(descriptor.value.package, { name: '@ctlflow/fleet', version: health.version });
+        assert.deepEqual(descriptor.value.package, { name: 'fleet', version: health.version });
         assert(!copied.includes(secrets.administratorPassword));
         assert(!copied.includes(additionalInstructions));
         assert.equal(guideText.includes(additionalInstructions), iteration === 1);

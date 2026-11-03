@@ -1,7 +1,7 @@
 # Local Docker server and host-native fleet
 
 Docker runs crossfire, Conduit Matrix, Element, management and the separate
-content listener. A one-shot image owns initialization and Knex migrations.
+content listener. The selected runtime initializes empty state; a one-shot Knex image owns migrations.
 fleet/fleetd and native agents run on the user's execution host, not in Docker.
 The default server image is C# NativeAOT; the host does not need .NET.
 
@@ -10,10 +10,11 @@ The default server image is C# NativeAOT; the host does not need .NET.
 - Docker with the Compose plugin (`docker compose`) and Linux amd64 containers. Native ARM64 images and
   emulation are not verified.
 - The matching Compose kit and trusted immutable server/migration image references.
-  Node, managed C#, NativeAOT C# and Rust server packages use the same Compose file.
+  managed C#, NativeAOT C# and Rust server packages use the same Compose file.
 - Available loopback ports 8080 and 8082. This is local HTTP, not public hosting.
-- On the fleet execution host: Linux/macOS, Node.js 26+, npm 11.17+, Git, Bash
-  and an existing supported Codex or Pi installation with its native login.
+- On the fleet execution host: Linux x64, the matching native fleet/fleetd
+  distribution, Git, Bash and an existing supported Codex/Pi installation with
+  its native login. Messaging tools and Pi retain their Node.js requirements.
 
 No credentials, domain fleet definitions or model weights are included in the
 server images. Do not mount host logins, fleet workspaces, controller state or a
@@ -21,28 +22,24 @@ Docker socket into the server. The server neither installs nor runs a harness.
 
 ## Start a new server
 
-The [0.1.25 release inventory](../../../docs/distributions/releases/0.1.25.md) records the four runtime choices
-and their matching migration image. Check that publication is complete before
-following this procedure. Its access section describes the required
-host-side registry login for private packages. Registry credentials never enter
-the server container.
+Use a matching current native-only container kit built from the selected source.
+The 0.1.26 candidate has not been published. The
+[0.1.25 release inventory](../../../docs/distributions/releases/0.1.25.md) is a
+historical registry receipt, not certification of the current setup workflow.
 
-For the default NativeAOT server, set `CROSSFIRE_RUNTIME_IMAGE` to the inventory's
-complete NativeAOT immutable reference and `CROSSFIRE_MIGRATION_IMAGE` to its
-matching migration reference. Then export and pull the selected values:
+Verify/import the selected package and use its immutable runtime/migration
+handles. This example selects NativeAOT and requires Node.js 26 maintenance
+tooling and jq:
 
 ```sh
-export CROSSFIRE_RUNTIME_IMAGE CROSSFIRE_MIGRATION_IMAGE
-docker pull \
-  "$CROSSFIRE_RUNTIME_IMAGE"
-docker pull \
-  "$CROSSFIRE_MIGRATION_IMAGE"
+node /absolute/packages/csharp-nativeaot/package-tool.mjs verify \
+  /absolute/packages/csharp-nativeaot > /absolute/private/verified-images.json
+export CROSSFIRE_RUNTIME_IMAGE=$(jq -r .runtimeImage /absolute/private/verified-images.json)
+export CROSSFIRE_MIGRATION_IMAGE=$(jq -r .migrationImage /absolute/private/verified-images.json)
 ```
 
-Use the release inventory to select Node, managed C# or Rust instead, retaining
-the same migration reference. Do not use `latest` or mix releases. An explicitly
-imported current [container package](container-packages.md) uses its verified
-local Docker image IDs; a failed registry pull never switches to a source build.
+Managed C# and Rust kits use the same procedure. Do not mix releases, use `latest`
+or switch to a source build automatically after an artifact failure.
 
 From this checkout's root:
 
@@ -66,7 +63,7 @@ Read the generated administrator password privately in your terminal:
 ```sh
 docker compose \
   -f services/crossfire/docker/local/compose.yaml \
-  --profile maintenance run --rm --no-deps --entrypoint node initialize \
+  --profile maintenance run --rm --no-deps --entrypoint node migrate \
   -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync("/runtime/bootstrap.json","utf8")).administratorPassword+"\n")'
 ```
 
@@ -86,16 +83,17 @@ existing local coding assistant, opened in the intended project. The guide:
 
 1. Checks host prerequisites and the selected harness's existing native login.
    Missing prerequisites stop setup; it does not install or upgrade Codex/Pi.
-2. Installs pinned `@ctlflow/fleet` and its exact `@ctlflow/fleetd` dependency in
-   private user-owned storage, then runs `fleet setup` on the execution host.
+2. Uses the matching native distribution installed beforehand in private
+   user-owned storage, then runs `fleet setup` on the execution host.
 3. Starts/reuses the private host controller and proposes a one-agent fleet, or
    the ordinary roster supplied through `--config /absolute/runtime.toml`.
 4. Prints the approval URL/code and waits for the human's enrollment review.
 5. Verifies the managed listener/native binding without a dummy model prompt.
 
 The original coding conversation stays independent. Codex is the default;
-Earendil Pi requires explicit fleet configuration. Node fleet/fleetd are used
-regardless of the server backend. No host-side .NET or Rust is required.
+Earendil Pi requires explicit fleet configuration. NativeAOT is the default
+fleet/fleetd distribution; Rust and managed C# are explicit choices. NativeAOT
+and Rust require no installed SDK or managed runtime.
 
 The browser cannot install software on another computer. The guide must run
 where agents will execute. No repository clone is needed for host fleet setup.
@@ -163,16 +161,14 @@ After building the workspace, run focused checks under the repository's verified
 finite process-group and Docker resource limits:
 
 ```sh
-node --test \
-  services/crossfire/dist/tests/local-docker.test.js
 npm exec -- node --test \
   services/crossfire/docker/local/containers.test.mjs
 ```
 
 The actual test uses the selected exact `CROSSFIRE_RUNTIME_IMAGE`, matching
-`CROSSFIRE_MIGRATION_IMAGE` and `CROSSFIRE_RUNTIME_BACKEND`. Run it for all four
+`CROSSFIRE_MIGRATION_IMAGE` and `CROSSFIRE_RUNTIME_BACKEND`. Run it for all three
 backends sequentially because the documented loopback ports are fixed. It installs
-the actual local fleet/fleetd archives into an isolated host home, uses a native
+the actual selected native fleet/fleetd distribution into an isolated host home, uses a native
 Codex with an inert local provider, checks enrollment and exact-history restart,
 and verifies real browser/Matrix/content isolation. It creates and disposes only
 its own host fixture, Docker project and volume. No production account or paid

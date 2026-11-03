@@ -95,8 +95,7 @@ execution, not a proven process exit.
 ## Abrupt controller death
 
 Every implementation guards the owned native engine group against controller
-death, including SIGKILL. Node observes its private parent IPC connection, C# an
-exact parent process handle and Rust an exact parent pidfd. Each guard retains
+death, including SIGKILL. C# observes an exact parent process handle and Rust an exact parent pidfd. Each guard retains
 the private native-group lock while stopping its owned group. A replacement
 cannot bypass an existing writer lock. Tools that escape the owned group are
 outside this protection.

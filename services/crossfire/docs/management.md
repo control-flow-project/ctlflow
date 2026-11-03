@@ -36,9 +36,10 @@ crossfire room-management surface. Stable IDs, not room names, own access.
 ## Agent setup
 
 `/manage/connect` supplies a personalized instruction to paste into an existing
-coding assistant on the execution host. It installs only pinned npm fleet/fleetd
-into private user-owned storage. Node.js, npm, Git, Bash, the chosen native
-harness and provider login must already exist there. Missing prerequisites are
+coding assistant on the execution host. Install the matching native fleet/fleetd
+distribution in private user-owned storage first and put fleet on PATH. Git, Bash,
+the chosen harness and its provider login must already exist there. Messaging
+tools and Pi retain their own Node.js requirements. Missing prerequisites are
 reported, not installed or silently upgraded. Docker hosts only the server side.
 The browser does not install host software or import the assistant's conversation.
 The human separately approves the exact proposed roster before agents connect.

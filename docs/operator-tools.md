@@ -8,13 +8,13 @@ These tools are not another deployment or lifecycle implementation.
 
 | Location | Responsibility |
 | --- | --- |
-| crossfire node/packages/operator-support | Private evidence, argument parsing, bounded HTTP/process reads and pagination |
-| crossfire node/tools | API, browser, releases, database, files, host and reviewed policy checks |
-| fleetd node/tools | Existing controller bindings, native settings and preservation |
+| crossfire packages/operator-support | Private evidence, argument parsing, bounded HTTP/process reads and pagination |
+| crossfire tools | API, browser, releases, database, files, host and reviewed policy checks |
+| fleetd tools | Existing controller bindings, native settings and preservation |
 | fleet CLI | Setup, stop/resume, update, reset and retirement |
 
-- [crossfire command/input reference](../services/crossfire/node/tools/README.md)
-- [fleetd command/input reference](../services/fleetd/node/tools/README.md)
+- [crossfire command/input reference](../services/crossfire/tools/README.md)
+- [fleetd command/input reference](../services/fleetd/tools/README.md)
 - [Script inventory](operator-script-inventory.md)
 
 ## Procedure

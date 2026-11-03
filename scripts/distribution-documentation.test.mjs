@@ -13,7 +13,7 @@ const headings = ['Prerequisites', 'Build and package', 'Install and run the ser
 test('every target has separate installation instructions; native publishers retain their exact canonical guides', () => {
   const temporary = mkdtempSync(join(tmpdir(), 'crossfire-distribution-docs-'));
   try {
-    for (const target of ['node', 'csharp-managed', 'csharp-nativeaot', 'rust']) {
+    for (const target of ['csharp-managed', 'csharp-nativeaot', 'rust']) {
       const filename = target + '.md';
       const expected = readFileSync(join(repository, 'docs/distributions', filename), 'utf8');
       for (const heading of headings) assert(expected.includes('\n## ' + heading + '\n'), target + ' documents ' + heading);

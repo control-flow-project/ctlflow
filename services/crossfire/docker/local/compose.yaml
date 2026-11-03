@@ -19,10 +19,9 @@ services:
   initialize:
     <<: *server-resources
     profiles: [maintenance]
-    image: ${CROSSFIRE_MIGRATION_IMAGE:?Set the exact matching migration image}
+    image: ${CROSSFIRE_RUNTIME_IMAGE:?Set the exact selected runtime image}
     network_mode: none
     volumes: *server-state
-    entrypoint: [node, /app/services/crossfire/crossfire]
     command: [init, --directory, /runtime, --instance, "${CROSSFIRE_INSTANCE:-local}", --origin, "${CROSSFIRE_ORIGIN:-http://127.0.0.1:8080}", --content-origin, "${CROSSFIRE_CONTENT_ORIGIN:-http://localhost:8082}", --server-name, "${CROSSFIRE_SERVER_NAME:-local.test}", --administrator, "${CROSSFIRE_ADMINISTRATOR:-admin}"]
 
   migrate:

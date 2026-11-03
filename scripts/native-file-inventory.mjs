@@ -8,13 +8,13 @@ import { implementationApplications, implementationPackages } from './verify-imp
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const sharedPackages = {
-  'agent-tools': ['intentional tool/library asset shared by all native targets', 'services/crossfire/node/packages/agent-tools'],
-  'operator-support': ['shared optional operator library; no native backend fallback', 'services/crossfire/node/packages/operator-support'],
+  'agent-tools': ['intentional tool/library asset shared by all native targets', 'services/crossfire/packages/agent-tools'],
+  'operator-support': ['shared optional operator library; no native backend fallback', 'services/crossfire/packages/operator-support'],
   'test-support': ['shared executable-contract fixture; native internal fixtures remain target-owned', 'services/crossfire/tests/contracts'],
 };
 export function fileOwner(file) {
   const [, product, language, layer, name] = file.split('/');
-  assert(product in implementationApplications && ['node', 'csharp'].includes(language));
+  assert(product in implementationApplications && language === 'csharp');
   const base = `services/${product}/rust`;
   if (layer === 'apps') return ['application', `${base}/apps/${implementationApplications[product].rust}`];
   if (layer === 'packages') {
@@ -47,7 +47,7 @@ function files(directory) {
 export function inventory() {
   const tracked = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '--', 'services'], { cwd: root, encoding: 'utf8' }).trim().split('\n');
   const deleted = new Set(execFileSync('git', ['ls-files', '--deleted', '--', 'services'], { cwd: root, encoding: 'utf8' }).trim().split('\n'));
-  const selected = [...new Set(tracked.filter(file => !deleted.has(file) && /^services\/(crossfire|fleetd|fleet)\/(node|csharp)\//u.test(file)))].sort();
+  const selected = [...new Set(tracked.filter(file => !deleted.has(file) && /^services\/(crossfire|fleetd|fleet)\/csharp\//u.test(file)))].sort();
   const rows = selected.map(file => {
     const bytes = readFileSync(resolve(root, file));
     const [disposition, counterpart] = fileOwner(file);

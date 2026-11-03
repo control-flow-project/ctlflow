@@ -34,4 +34,5 @@ ENV TZDIR=/app/zoneinfo
 STOPSIGNAL SIGTERM
 EXPOSE 8080 8082
 HEALTHCHECK --interval=30s --timeout=8s --start-period=90s --retries=3 CMD ["/app/server/crossfire", "health"]
-ENTRYPOINT ["/app/server/crossfire", "container"]
+ENTRYPOINT ["/app/server/crossfire"]
+CMD ["container"]

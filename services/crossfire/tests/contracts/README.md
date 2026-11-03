@@ -3,7 +3,7 @@
 These tests select backend executables, not backend-specific expected values.
 Run through the root coordinators in a finite resource scope.
 This is one acceptance suite across all three products. Product directories
-partition source ownership only; every selected Node, managed .NET, NativeAOT
+partition source ownership only; every selected managed .NET, NativeAOT
 or Rust executable set receives these same assertions. Codex and Pi both run
 through the controller and installed CLI scenarios.
 

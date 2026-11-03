@@ -11,10 +11,10 @@ import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/confi
 import { operations } from '@ctlflow/crossfire-contracts/rest/operations';
 import { decodeResponse, decodeFailure } from '@ctlflow/crossfire-contracts/rest/envelope';
 import type { Parser } from '@ctlflow/crossfire-contracts/schema/validation';
-import { conduitFixture } from '../../node/scripts/architecture-proof/conduit-fixture.js';
-import { builtRelease } from '../../node/scripts/test-support/release.js';
+import { conduitFixture } from '../../scripts/architecture-proof/conduit-fixture.js';
+import { builtRelease } from '../support/release.js';
 import { secureProxy } from '@ctlflow/crossfire-test-support/tls';
-import type { Config } from '../../node/apps/server/src/config.js';
+import type { Config } from '@ctlflow/crossfire-contracts/server';
 
 type ContractOperation = { method: string; path: string; status: number; collection: boolean; output: Parser<unknown> };
 export type ContractSession = { nativeToken: string; cookie: string; csrf: string; backendUserId: string; memberId: string };

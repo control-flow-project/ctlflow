@@ -35,7 +35,7 @@ retained for diagnosis, not treated as permission for a fresh context.
 
 ## Private locks
 
-Lock files have no application tables. Node, C# and Rust use the same exclusive SQLite
+Lock files have no application tables. C# and Rust use the same exclusive SQLite
 transaction and in-memory rollback-journal protocol.
 A live/suspended owner retains exclusion; process exit releases it.
 Do not delete the inode, use guessed PIDs or break another writer's lock.
@@ -53,6 +53,6 @@ Completed diagnostics/operation history use the logging age policy.
 Each reader accepts its one current format. There are no historical importers or
 conversion commands. Null fields represent facts that were not observed.
 
-- [Read-only operator tools](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/node/tools/README.md)
+- [Read-only operator tools](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/tools/README.md)
 - [Logging retention](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/logging.md)
 - [Abrupt controller death](operations.md#abrupt-controller-death)

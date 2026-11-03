@@ -1,8 +1,8 @@
 # crossfire databases
 
-Knex is the only database creation and migration owner for Node, C# and Rust.
+Knex is the only database creation and migration owner for C# and Rust.
 Applications open the same current SQLite database and never create tables or run
-ORM migrations. EF, Tinqer and Diesel own their respective application queries.
+ORM migrations. EF and Diesel own native application queries. Tinqer is restricted to read-only TypeScript inspection tooling.
 
 ```text
 database/

@@ -13,9 +13,9 @@ import { performanceHtml } from './report.js';
 
 export async function serverPerformance(scope: TestContext, targets: readonly ContractTarget[], output: string,
   provenance: Pick<PerformanceReport, 'source' | 'host'>): Promise<void> {
-  const baseline = targets.find(target => target.implementation === 'node');
+  const baseline = targets.find(target => target.name === 'csharp-nativeaot');
   assert(baseline && targets.some(target => target.name === 'csharp-managed') && targets.some(target => target.name === 'csharp-nativeaot')
-    && targets.some(target => target.implementation === 'rust'), 'Performance verification requires Node, .NET managed/NativeAOT and Rust');
+    && targets.some(target => target.implementation === 'rust'), 'Performance verification requires .NET managed/NativeAOT and Rust');
   mkdirSync(output, { mode: 0o700 });
   const measurements: Measurement[] = [], policy = { rounds: targets.length, samples: 100, warmup: 20, baseline: baseline.name };
   let fixture = { agents: 0, listenerRuns: 0, runtimeObservations: 0 };

@@ -1,13 +1,12 @@
 # crossfire server performance
 
-Run from a finite process-group resource scope after publishing current Node,
-.NET managed/NativeAOT and Rust executables:
+Run from a finite process-group resource scope after publishing current .NET managed/NativeAOT and Rust executables:
 
 ```sh
 npm run verify:performance -- /absolute/implementation-matrix.json /absolute/new-report-directory
 ```
 
-Use the same implementation matrix as the shared contract suite. All four targets
+Use the same implementation matrix as the shared contract suite. All three native targets
 are required. The command builds the shared fixtures, verifies report rendering,
 and uses the actual pinned Matrix server. There are no model calls or production
 connections. `verify:parity` includes this suite before container acceptance.
@@ -29,15 +28,11 @@ Every attempted measured request retains its latency; an error is never removed
 from percentiles. Setup/warm-up failures stop measurement and fail the run.
 
 Nearest-rank p50/p95/p99 and requests/second are calculated per round. The median
-round statistic is compared to Node for the same workload. Every non-Node target
-must have zero failures and throughput no lower than Node. p50 and p95 must not
-exceed their recorded per-comparison limits. The owner approved one exception on
-2026-10-18: managed .NET saved-observation p50 and p95 may each reach 1.30 times
-Node's corresponding latency, and that workload's throughput may be at least
-0.95 times Node. All other latency and throughput comparisons remain strict.
-JSON and HTML expose every limit. The report labels
-exception use and retains earlier failed attempts. There is no hidden tolerance,
-runtime exclusion, best-round selection or claim that results on one machine
+round statistic is compared with NativeAOT for the same workload. Every native
+target must have zero failures, p50/p95 no higher than the reference and throughput
+no lower than the reference.
+JSON and HTML expose every limit and retain earlier failed attempts. There is no
+hidden tolerance, runtime exclusion, best-round selection or claim that results on one machine
 establish arbitrary production capacity. Keep other builds and benchmark runs
 off the machine while measuring.
 
