@@ -62,21 +62,26 @@ explicit Stop. Normal controller shutdown preserves intent.
 Repeated Stop does not erase it; an empty selection resumes nobody.
 
 After reboot, start the same controller root. Desired bindings restore with
-bounded concurrency, current provider login and exact histories.
+bounded concurrency and exact sleeping histories. Provider login refreshes only
+when eligible input activates native execution.
 Manually stopped targets remain stopped. No filesystem discovery or native
 conversation import is performed.
 
-`resume-work.json` retains working/waiting contexts and exact continuation
-receipts. On resume, older publication settles first. The next continuation asks
-the agent to reread current AGENTS.md and inspect completed effects before
-continuing. Idle contexts receive no synthetic task.
+Restoration starts listeners, not model turns. All saved native histories remain
+asleep until genuine eligible input arrives. An interrupted historical task or
+pending owner decision cannot create a continuation prompt. Repeating Start does
+not wake an already bound agent. First initialization/reset establishes a native
+identity without inference and closes that initialization process before readiness.
 
 ## Failure and recovery
 
-Transient native/listener failures close their exact generation before retry,
-with one-to-sixty-second exponential backoff. Permanent configuration,
-authorization, filesystem or protocol conflicts require action.
-Explicit Stop cancels recovery. Unconfirmed cleanup blocks replacement.
+Transient listener failures close their exact generation before retry, with
+one-to-sixty-second exponential backoff. A disconnected native engine is closed
+and reported, and waits for genuine input to reopen its exact saved history.
+Permanent configuration, authorization, filesystem or protocol conflicts require
+action. Explicit Stop cancels binding recovery. Unconfirmed cleanup blocks
+replacement. Pending message journals retain their own recovery/acknowledgment;
+there is no separate historical-task restart prompt.
 
 Controller lease loss closes local delivery immediately when detected; request
 deadlines bound undetected loss. Old reporting failures cannot cancel a new run.

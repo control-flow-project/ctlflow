@@ -12,7 +12,6 @@ import type { UsageSample } from '@ctlflow/crossfire-contracts/statistics';
 import { failure, failureError, success, type Result } from '@ctlflow/crossfire-kernel/result';
 import { options, runTool, textOption } from '@ctlflow/crossfire-operator-support/command';
 import { createNativeLifecycle, type NativeLifecycleServices } from '@ctlflow/fleetd-domain/native-lifecycle';
-import { createResumeWork } from '@ctlflow/fleetd-storage/resume-work';
 
 export type PiProviderPlan = { binary: string; provider: string; model: string; thinkingLevel: string; evidence: string };
 type Managed = Extract<Awaited<ReturnType<typeof createNativeLifecycle>>, { ok: true }>['value'];
@@ -76,9 +75,8 @@ export async function verifyPiProvider(plan: PiProviderPlan, signal: AbortSignal
       } finally { pendingQuestion = false; }
     },
   };
-  const services: NativeLifecycleServices = { clock: nativeClock, primary: 'shared', runtime: 'pi', approval: 'none', initial: 'running',
-    initialSettings: adapter.configuredSettings(nativeOptions), hooks, work: createResumeWork(join(sharedState, 'resume-work'), Date.now),
-    saved: () => adapter.savedContexts({ workspace, stateDirectory: sharedState }),
+  const services: NativeLifecycleServices = { clock: nativeClock, primary: 'shared', runtime: 'pi', approval: 'none', allowNewHistory: true,
+    initialSettings: adapter.configuredSettings(nativeOptions), hooks, saved: () => adapter.savedContexts({ workspace, stateDirectory: sharedState }),
     async start(nativeSignal, observe) {
       report.sharedActivations++;
       const started = await adapter.start({ profile: 'pi-provider-proof', name: 'pi-provider-proof', workspace, stateDirectory: sharedState,
@@ -154,7 +152,7 @@ export async function verifyPiProvider(plan: PiProviderPlan, signal: AbortSignal
       if (source && existsSync(join(source, 'auth.json'))) requireProof(readFileSync(join(source, 'auth.json')).equals(readFileSync(join(sharedState, '.pi/auth.json'))), 'Wake did not recopy native authentication');
     });
     await check('controller-stop-and-saved-resume', async () => {
-      await shared.close(); services.initial = 'sleeping'; shared = value(await createNativeLifecycle(services, scope)); owned(shared.close);
+      await shared.close(); services.allowNewHistory = false; shared = value(await createNativeLifecycle(services, scope)); owned(shared.close);
       await shared.activate(); shared.runtime.lifecycle!.configureIdle(0);
       requireProof(shared.runtime.sessionId === sessionId, 'Controller restart replaced saved history');
       await send(shared.runtime, 'Use no tools. Reply with exactly the MEMORY_ marker from the first request in this conversation.', fact);
@@ -167,7 +165,8 @@ export async function verifyPiProvider(plan: PiProviderPlan, signal: AbortSignal
       const environment = readFileSync('/proc/' + pid + '/environ', 'utf8').split('\0');
       requireProof(environment.includes('PI_CODING_AGENT_DIR=' + join(sharedState, '.pi')) && environment.includes('CROSSFIRE_AGENT_NAME=pi-provider-proof'), 'Native process does not belong to the isolated proof');
       const before = report.modelResponses, ready = report.readyTransitions;
-      process.kill(pid, 'SIGKILL'); await until(() => report.readyTransitions === ready + 1 && shared.nativeState().phase === 'running');
+      process.kill(pid, 'SIGKILL'); await until(() => shared.nativeState().phase === 'failed');
+      requireProof(report.readyTransitions === ready, 'Idle crash eagerly reopened the native engine');
       requireProof(shared.runtime.sessionId === sessionId && report.modelResponses === before, 'Idle crash replaced history or created a model turn');
       await send(shared.runtime, 'Use no tools. Reply with exactly the MEMORY_ marker from the first request in this conversation.', fact);
       requireProof(report.nativeFailures === 1, 'Native crash did not report exactly one failure'); await shared.close();

@@ -1,10 +1,9 @@
-use crossfire_kernel::{failure::ErrorCode, identity};
+use crossfire_kernel::identity;
 use fleetd_domain::{
     model::*,
     resume_selection::{SelectionStore, Selections},
-    resume_work::{self, WorkStore},
 };
-use fleetd_storage::{registry::Registry, work::Work};
+use fleetd_storage::registry::Registry;
 use std::{fs, os::unix::fs::PermissionsExt};
 
 fn instance(key: &str) -> Instance {
@@ -84,89 +83,5 @@ fn durable_stop_selection_preserves_active_instances_and_does_not_wake_every_sto
     }];
     registry.save_resume_selections(&invalid)?;
     assert!(Selections::load(&registry, &reopened.registrations()?).is_err());
-    Ok(())
-}
-#[test]
-fn interrupted_work_keeps_the_exact_history_and_message_identity_until_acknowledged_and_reloads_current_instructions()
--> Result<(), Box<dyn std::error::Error>> {
-    let directory = tempfile::tempdir()?;
-    fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))?;
-    let store = Work::open(directory.path())?;
-    let context = InterruptedContext {
-        context: "!room:example.test".to_owned(),
-        session_id: identity::id(),
-    };
-    resume_work::capture(&store, std::slice::from_ref(&context), 1_792_000_000_000)?;
-    let first = store.work()?;
-    resume_work::capture(&store, std::slice::from_ref(&context), 1_792_000_000_001)?;
-    assert_eq!(
-        store.work()?,
-        first,
-        "Repeated stop preserves the original continuation identity"
-    );
-    let text = resume_work::continuation_text(&first[0])?;
-    assert!(text.contains("re-read the applicable AGENTS.md"));
-    assert!(text.contains("Do not disclose its contents to other rooms"));
-    assert!(text.ends_with(
-        "If the task is already complete or no longer authorized, do not repeat its effects."
-    ));
-    let changed = InterruptedContext {
-        context: context.context.clone(),
-        session_id: identity::id(),
-    };
-    assert_eq!(
-        resume_work::capture(&store, &[changed], 1_792_000_000_001)
-            .err()
-            .ok_or("Changed history")?
-            .code,
-        ErrorCode::Conflict
-    );
-    let reopened = Work::open(directory.path())?;
-    assert_eq!(reopened.work()?, first);
-    assert_eq!(
-        resume_work::renew(&reopened, &identity::id(), 1_792_000_000_002)
-            .err()
-            .ok_or("Missing checkpoint")?
-            .code,
-        ErrorCode::Conflict
-    );
-    assert_eq!(reopened.work()?, first);
-    resume_work::renew(&reopened, &first[0].message_id, 1_792_000_000_002)?;
-    let renewed = reopened.work()?;
-    assert_eq!(renewed.len(), 1);
-    assert_eq!(renewed[0].context, first[0].context);
-    assert_eq!(renewed[0].session_id, first[0].session_id);
-    assert_ne!(renewed[0].message_id, first[0].message_id);
-    assert_eq!(renewed[0].checkpointed_at, 1_792_000_000_002);
-    assert!(
-        resume_work::clear(
-            &reopened,
-            &[InterruptedContext {
-                context: context.context.clone(),
-                session_id: identity::id()
-            }]
-        )
-        .is_err()
-    );
-    assert_eq!(reopened.work()?, renewed);
-    assert!(resume_work::clear(&reopened, &[context.clone(), context.clone()]).is_err());
-    assert_eq!(reopened.work()?, renewed);
-    let other = InterruptedContext {
-        context: "!other:fixture".into(),
-        session_id: identity::id(),
-    };
-    resume_work::capture(&reopened, std::slice::from_ref(&other), 1_792_000_000_003)?;
-    resume_work::clear(&reopened, std::slice::from_ref(&other))?;
-    assert_eq!(reopened.work()?, renewed);
-    resume_work::clear(&reopened, std::slice::from_ref(&context))?;
-    assert!(reopened.work()?.is_empty());
-    fs::write(
-        directory.path().join("resume-work.json"),
-        b"{\"legacy\":true}",
-    )?;
-    assert!(
-        reopened.work().is_err(),
-        "Malformed or superseded state cannot trigger fresh history"
-    );
     Ok(())
 }

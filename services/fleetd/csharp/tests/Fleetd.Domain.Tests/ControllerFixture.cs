@@ -101,7 +101,6 @@ public sealed class ProbeAgent : RunningAgent
     }
     public NativeSessionState NativeState() => new("sleeping", 0, true);
     public ValueTask<NativeDiagnostic> Diagnostics(CancellationToken cancellation) => ValueTask.FromResult(new NativeDiagnostic("sleeping", 0, ProviderState.Unknown, null, false, false, 1));
-    public ValueTask<Result<Unit>> Resume() => ValueTask.FromResult(Results.Done());
     public ValueTask<Result<RuntimeAttachment>> Attachment(string? context = null)
         => ValueTask.FromResult(Result<RuntimeAttachment>.Success(new("codex", SessionId, "/isolated/controller-fixture", new Dictionary<string, string>())));
     public Result<IReadOnlyList<SavedRuntimeContext>> Contexts()

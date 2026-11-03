@@ -496,7 +496,7 @@ not a fallback. Read-only inspection/preflight does not rewrite active credentia
 | Action | Effect |
 | --- | --- |
 | Stop sessions | Save enabled selection, disable intent, close selected bindings/owned processes; controller stays connected |
-| Resume sessions | Restore saved selection plus enabled targets with exact histories; intentional empty selection starts nobody |
+| Resume sessions | Restore selected listener bindings with exact histories asleep; an intentional empty selection starts nobody |
 | Pause delivery | Close new delivery admission without replacing history or stopping engines |
 | Sleep | Close idle native execution; retain listener and exact resume binding |
 | Fresh history | Confirmed controller reset; archive old bindings and retain identity/access/data |
@@ -523,30 +523,26 @@ The installed CLI observes the same private daemon ownership lock before launchi
 a replacement, with a finite cancellable deadline. It never starts an overlapping
 controller or treats an authentication/unsafe-state error as an absent controller.
 
-Saved unfinished-work checkpoints bind exact contexts/publications. After restart,
-settle preceding input before one correlated continuation asking the agent to
-reread applicable AGENTS.md and continue unfinished authorized work. It cannot
-approve decisions, infer a reply room or replay completed effects. Idle/sleeping
-contexts receive no synthetic task.
-The lifecycle checkpoints the exact context before submitting input to the native
-adapter, without waiting for asynchronous activity notifications. It also records
-work already observed during activation. Idle notifications cannot erase submitted
-work. Existing native inspection clears completed checkpoints atomically only when
-the generation and activity revision are unchanged and that exact context has no
-input in flight or unacknowledged. Native adapters return one read-only activity
-snapshot containing exact context/history identities and native busy/publication
-state. Aggregate status uses the same snapshot. Another busy room cannot retain
-a completed room's checkpoint. Inspection never opens a native room process.
-Explicit stop reconciles existing work before closing native execution, even
-when another inspection is running. With no unfinished-work checkpoint, shutdown
-does not wait for an unrelated reader.
-A stopped or unavailable reader cannot prove completion or invent
-an unfinished task. A restart first resolves native submission and acknowledges
-its previous reminder, leaving ordinary input confirmations with their producer.
-Only when no native turn is active does it atomically save a new reminder identity
-and submit that exact reminder. The work record retains this identity until
-verified completion, including across repeated controller crashes. Delivering a
-reminder does not complete its task.
+All agents are lazy. Starting/resuming a fleet, restarting fleetd, reconnecting to
+crossfire and restoring desired intent restore listener bindings only. Established
+native histories stay closed until genuine eligible chat, scheduled or directed
+input requires them. Repeating Start cannot wake an already bound agent.
+Restart is never authorization to continue a historical task. Neither interrupted
+activity, an unanswered decision nor a release check may synthesize a restart
+prompt, replay completed work or fan out model turns. An idle fleet restart must
+produce zero model requests, including a full 100-instance roster.
+
+First enrollment or explicit reset may initialize the native identity through
+model-free native metadata operations. The initialization process closes before
+the listener becomes ready. Native settings and history identity remain observable
+while sleeping. Provider login refresh happens only during actual native activation.
+A disconnected native generation is closed and reported; its listener remains
+available, and a subsequent eligible input retries the same exact history. Unknown
+or failed cleanup blocks replacement. No autonomous native-restart loop submits
+work. Genuine pending publications retain their existing receipt and producer
+checkpoint owners; restart does not discard or silently acknowledge that evidence.
+Native adapters expose a read-only activity snapshot with exact context/history
+identities and busy/publication state. Inspection never opens a native room process.
 Native owner questions use the currently active listener run. A reporting
 replacement invalidates the preceding run; callers waiting during reconnection
 receive the new run, never the first run cached at initial startup.
@@ -579,7 +575,8 @@ their native engine runs; sleeping fleets retain no native guard processes.
 No target guesses process identities, adopts orphans or rewrites native history.
 Arbitrary subprocess escape from the owned group is not a product guarantee.
 The same executable acceptance scenarios verify idle and in-flight controller
-death, exact retained histories and authorized continuation in every target.
+death, exact retained histories, zero unsolicited model turns and message-driven
+wake in every target.
 
 ## 9. Controller admission
 
@@ -721,7 +718,8 @@ External model/tool effects cannot be promised exactly once.
 
 Each session journal allows one pending publication and 128 unacknowledged
 confirmations; unsettled evidence is not silently evicted.
-Recovery settles preceding input before continuation or ordinary new publication.
+Recovery settles genuine pending input before ordinary new publication. It never
+creates task-continuation reminders for already acknowledged historical work.
 
 ### Steering
 
@@ -846,7 +844,7 @@ management notices. Matrix/server outage can delay them. Acknowledgment does not
 approve work or restart execution.
 
 Observations distinguish waking, working, idle, waiting approval/answer, sleeping,
-failed and unavailable. Waking remains until input/continuation readiness settles.
+failed and unavailable. Waking remains until native input/receipt readiness settles.
 Recovery notice requires a ready exact-history observation.
 Last activity, history availability, configured and observed settings are nullable
 independent facts. Page-wide queries avoid per-agent hydration loops.

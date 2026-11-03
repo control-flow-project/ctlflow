@@ -1,9 +1,6 @@
 mod diagnostics;
 mod logical;
-use crate::{
-    lifecycle_observer::{LifecycleHooks, Tracker},
-    resume_work::{self, WorkStore},
-};
+use crate::lifecycle_observer::{LifecycleHooks, Tracker};
 use crossfire_agent_core::synchronization::{CancellationToken, Mutex as AsyncMutex};
 use crossfire_agent_core::{
     listener_budget::{Budget, Work},
@@ -19,18 +16,13 @@ use crossfire_agent_core::{
 use crossfire_domain::runtime::values::{HistoryMode, Runtime, State as NativeState};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, time::Clock};
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     sync::{
         Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
 };
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Initial {
-    Start,
-    ResumeSleeping,
-}
 struct State<N> {
     native: Option<Arc<N>>,
     phase: Phase,
@@ -39,17 +31,11 @@ struct State<N> {
     contexts: Vec<SavedContext>,
     unsettled: BTreeMap<String, String>,
 }
-pub struct Owner<
-    A: OwnedAdapter<LifecycleHooks<H, W, T>>,
-    H: Hooks,
-    W: WorkStore + Send + Sync,
-    T: Clock + Send + Sync,
-> {
+pub struct Owner<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks, T: Clock + Send + Sync> {
     adapter: Arc<A>,
     input: Input<H>,
-    work: Arc<W>,
     clock: Arc<T>,
-    tracker: Arc<Tracker<H, W, T>>,
+    tracker: Arc<Tracker<H, T>>,
     state: Mutex<State<A::Connection>>,
     transition: AsyncMutex<()>,
     calls: AtomicUsize,
@@ -57,13 +43,8 @@ pub struct Owner<
     approval: Approval,
     budget: Arc<Budget>,
 }
-pub struct Logical<
-    A: OwnedAdapter<LifecycleHooks<H, W, T>>,
-    H: Hooks,
-    W: WorkStore + Send + Sync,
-    T: Clock + Send + Sync,
-> {
-    owner: Arc<Owner<A, H, W, T>>,
+pub struct Logical<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks, T: Clock + Send + Sync> {
+    owner: Arc<Owner<A, H, T>>,
     room: Option<String>,
     session: String,
 }
@@ -79,19 +60,13 @@ fn unavailable(message: &str) -> Failure {
 fn ownership() -> Failure {
     unavailable("Native lifecycle state ownership failed")
 }
-impl<
-    A: OwnedAdapter<LifecycleHooks<H, W, T>>,
-    H: Hooks + 'static,
-    W: WorkStore + Send + Sync,
-    T: Clock + Send + Sync,
-> Owner<A, H, W, T>
+impl<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks + 'static, T: Clock + Send + Sync>
+    Owner<A, H, T>
 {
     pub async fn open(
         adapter: Arc<A>,
         input: Input<H>,
-        work: Arc<W>,
         clock: T,
-        initial: Initial,
         stop: CancellationToken,
         budget: Arc<Budget>,
     ) -> Result<Arc<Self>> {
@@ -111,7 +86,7 @@ impl<
             .find(|context| context.context == primary)
             .map(|context| context.session_id.clone())
             .unwrap_or_default();
-        if initial == Initial::ResumeSleeping && session.is_empty() {
+        if !input.allow_new_history && session.is_empty() {
             return Err(Failure::new(
                 ErrorCode::Missing,
                 "Exact saved history is missing; a sleeping resume never creates a replacement",
@@ -121,16 +96,13 @@ impl<
         let clock = Arc::new(clock);
         let tracker = Arc::new(Tracker::new(
             input.hooks.clone(),
-            work.clone(),
             clock.clone(),
-            primary,
             activity,
             stop.clone(),
         ));
         let owner = Arc::new(Self {
             adapter,
             input,
-            work,
             clock,
             tracker,
             state: Mutex::new(State {
@@ -147,17 +119,18 @@ impl<
             approval,
             budget,
         });
-        if (initial == Initial::Start
-            || owner.input.hooks.pending_decisions()
-            || !owner.work.work()?.is_empty())
-            && let Err(error) = owner.ensure(None).await
-        {
-            owner.close().await?;
-            return Err(error);
+        if !owner.current()?.history_available {
+            let native = match owner.ensure(None).await {
+                Ok(native) => native,
+                Err(error) => {
+                    owner.close().await?;
+                    return Err(error);
+                }
+            };
+            owner.discard(&native).await?;
+            owner.state.lock().map_err(|_| ownership())?.phase = Phase::Sleeping;
         }
-        if owner.current()?.phase == Phase::Sleeping {
-            owner.observe(NativeState::Sleeping, None)?;
-        }
+        owner.observe(NativeState::Sleeping, None)?;
         Ok(owner)
     }
     fn primary(&self) -> &'static str {
@@ -181,7 +154,7 @@ impl<
     }
     pub async fn attachment(&self, context: Option<&str>) -> Result<Attachment> {
         let native = self.state.lock().map_err(|_| ownership())?.native.clone().filter(|native| !native.lifetime().is_cancelled())
-            .ok_or_else(|| Failure::new(ErrorCode::Conflict,"Resume this agent before attaching its terminal; reading a pointer never starts a session"))?;
+            .ok_or_else(|| Failure::new(ErrorCode::Conflict,"Eligible input must wake this agent before attaching its terminal; reading a pointer never starts a session"))?;
         let context = context.unwrap_or(self.primary());
         let attachments = native.attachments().await?;
         if attachments.is_empty() {
@@ -220,7 +193,7 @@ impl<
         }
         Ok(())
     }
-    pub fn runtime(self: &Arc<Self>) -> Result<Logical<A, H, W, T>> {
+    pub fn runtime(self: &Arc<Self>) -> Result<Logical<A, H, T>> {
         let session = self.state.lock().map_err(|_| ownership())?.session.clone();
         if session.is_empty() {
             return Err(Failure::new(
@@ -269,7 +242,6 @@ impl<
         input.allow_new_history &= original.is_empty();
         self.state.lock().map_err(|_| ownership())?.phase = Phase::Waking;
         self.observe(NativeState::Waking, None)?;
-        self.tracker.suspend()?;
         let generation = self
             .tracker
             .generation
@@ -315,15 +287,7 @@ impl<
                     "Native activation did not retain its exact saved primary history",
                 ));
             }
-            resume_work::resume(
-                connected.as_ref(),
-                self.primary(),
-                &contexts,
-                self.work.as_ref(),
-                self.clock.now()?,
-            )
-            .await?;
-            self.tracker.checkpoint(&contexts, true)?;
+            connected.settle(connected.lifetime().child_token()).await?;
             Ok(contexts)
         }
         .await;
@@ -345,7 +309,6 @@ impl<
         Ok(connected)
     }
     async fn discard(&self, native: &Arc<A::Connection>) -> Result<()> {
-        self.tracker.suspend()?;
         native.close().await.map_err(|_| {
             if let Ok(mut state) = self.state.lock() {
                 state.phase = Phase::Failed;
@@ -367,62 +330,30 @@ impl<
         Ok(())
     }
     async fn inspect_native(&self, native: &Arc<A::Connection>) -> Result<bool> {
-        let revisions = self.tracker.revisions()?;
-        let generation = self.tracker.generation.load(Ordering::Acquire);
-        let activity = native.activity().await?;
-        self.tracker.complete_idle(&revisions, || {
-            let state = self.state.lock().map_err(|_| ownership())?;
-            if generation != self.tracker.generation.load(Ordering::Acquire)
-                || native.lifetime().is_cancelled()
-                || state.phase != Phase::Running
-                || !state
-                    .native
-                    .as_ref()
-                    .is_some_and(|current| Arc::ptr_eq(current, native))
-            {
-                return Ok(Vec::new());
-            }
-            let pending = state.unsettled.values().collect::<BTreeSet<_>>();
-            let saved = state
-                .contexts
-                .iter()
-                .map(|value| (&value.context, &value.session_id))
-                .collect::<BTreeMap<_, _>>();
-            Ok(activity
-                .contexts
-                .iter()
-                .filter(|value| {
-                    !value.busy
-                        && !pending.contains(&value.context)
-                        && saved
-                            .get(&value.context)
-                            .is_some_and(|session| **session == value.session_id)
-                })
-                .map(|value| crate::model::InterruptedContext {
-                    context: value.context.clone(),
-                    session_id: value.session_id.clone(),
-                })
-                .collect())
-        })?;
-        Ok(activity.busy)
+        Ok(native.activity().await?.busy)
     }
     pub async fn maintain(&self) -> Result<()> {
         self.tracker.check()?;
         if self.stop.is_cancelled() {
             return Ok(());
         }
-        let (native, phase) = {
+        let native = {
             let state = self.state.lock().map_err(|_| ownership())?;
-            (state.native.clone(), state.phase)
+            state.native.clone()
         };
         let Some(native) = native else {
-            if phase == Phase::Failed {
-                self.ensure(None).await?;
-            }
             return Ok(());
         };
         if native.lifetime().is_cancelled() {
-            self.ensure(None).await?;
+            let _transition = self.transition.lock().await;
+            self.discard(&native).await?;
+            self.state.lock().map_err(|_| ownership())?.phase = Phase::Failed;
+            self.observe(
+                NativeState::Failed,
+                Some(&unavailable(
+                    "Owned native execution disconnected; waiting for genuine input",
+                )),
+            )?;
             return Ok(());
         }
         let due = {
@@ -463,38 +394,19 @@ impl<
         self.observe(NativeState::Sleeping, None)?;
         Ok(())
     }
-    pub async fn stop_native(&self, preserve_work: bool) -> Result<()> {
+    pub async fn stop_native(&self) -> Result<()> {
         let _transition = self.transition.lock().await;
         let Some(native) = self.state.lock().map_err(|_| ownership())?.native.clone() else {
             return Ok(());
         };
-        if preserve_work {
-            if !self.stop.is_cancelled()
-                && !native.lifetime().is_cancelled()
-                && !self.work.work().is_ok_and(|work| work.is_empty())
-            {
-                let _ = self.inspect_native(&native).await;
-            }
-            self.tracker.suspend()?;
-        }
         self.discard(&native).await?;
         self.state.lock().map_err(|_| ownership())?.phase = Phase::Sleeping;
         self.observe(NativeState::Sleeping, None)?;
         Ok(())
     }
     pub async fn close(&self) -> Result<()> {
-        let unfinished = !self.work.work().is_ok_and(|work| work.is_empty());
-        let native = {
-            let state = self.state.lock().map_err(|_| ownership())?;
-            (state.phase == Phase::Running && unfinished)
-                .then(|| state.native.clone())
-                .flatten()
-        };
-        if let Some(native) = native {
-            let _ = self.inspect_native(&native).await;
-        }
         self.stop.cancel();
-        self.stop_native(true).await
+        self.stop_native().await
     }
     fn touch(&self, message: &str, context: &str) -> Result<()> {
         let mut state = self.state.lock().map_err(|_| ownership())?;
@@ -505,12 +417,8 @@ impl<
         Ok(())
     }
 }
-impl<
-    A: OwnedAdapter<LifecycleHooks<H, W, T>>,
-    H: Hooks,
-    W: WorkStore + Send + Sync,
-    T: Clock + Send + Sync,
-> Lifecycle for Owner<A, H, W, T>
+impl<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks, T: Clock + Send + Sync> Lifecycle
+    for Owner<A, H, T>
 {
     fn current(&self) -> Result<SessionState> {
         self.tracker.check()?;

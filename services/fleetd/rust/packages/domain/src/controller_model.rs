@@ -206,7 +206,6 @@ pub trait RunningAgent: Send + Sync {
     fn deliberately_stopped(&self) -> bool;
     fn listener_active(&self) -> Result<bool>;
     fn native_state(&self) -> Result<SessionState>;
-    fn resume(&self) -> Response<'_, ()>;
     fn attachment(&self, context: Option<&str>) -> Response<'_, Attachment>;
     fn contexts(&self) -> Response<'_, Vec<SavedContext>>;
     fn close(&self) -> Response<'_, ()>;

@@ -27,9 +27,8 @@ use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use fleetd_domain::{
     controller_model::{Response, RunningAgent},
     model::{Configuration, Instance},
-    native_lifecycle::Initial,
 };
-use fleetd_storage::{binding, work::Work};
+use fleetd_storage::binding;
 use std::{
     sync::{
         Arc, Mutex,
@@ -43,8 +42,8 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
-type Startup<M> = RuntimeStart<AgentHooks<M>, Work, Clock>;
-type RuntimeOwner<M> = NativeOwner<AgentHooks<M>, Work, Clock>;
+type Startup<M> = RuntimeStart<AgentHooks<M>, Clock>;
+type RuntimeOwner<M> = NativeOwner<AgentHooks<M>, Clock>;
 type ActivityReporter = Reporter<crossfire_adapter_crossfire::Connection, Clock>;
 struct Agent<M: MessagingClient + 'static> {
     session: String,
@@ -94,7 +93,7 @@ impl<M: MessagingClient + 'static> Agent<M> {
     }
     async fn shutdown(&self) -> Result<()> {
         let _close = self.close_owner.lock().await;
-        self.native.stop(true).await?;
+        self.native.stop().await?;
         self.stop.cancel();
         let mut failure = None;
         for owner in [&self.task, &self.maintenance] {
@@ -188,9 +187,7 @@ impl<M: MessagingClient + 'static> RunningAgent for Agent<M> {
             .state()?
             .ok_or_else(|| unavailable("Native session state is not initialized"))
     }
-    fn resume(&self) -> Response<'_, ()> {
-        Box::pin(async move { self.owner()?.resume().await })
-    }
+
     fn attachment(&self, context: Option<&str>) -> Response<'_, Attachment> {
         let context = context.map(str::to_owned);
         Box::pin(async move { self.owner()?.attachment(context.as_deref()).await })
@@ -290,14 +287,8 @@ impl<C: MessagingConnector> Host<C> {
                 ),
                 options: inspection.options,
                 history_mode: instance.history_mode.unwrap_or(HistoryMode::Shared),
-                initial: if recovery && !allow_new_history {
-                    Initial::ResumeSleeping
-                } else {
-                    Initial::Start
-                },
                 allow_new_history,
             },
-            Arc::new(Work::open(&paths.state)?),
             self.clock,
             host.budget.clone(),
         )?;

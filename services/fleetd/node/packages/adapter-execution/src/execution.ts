@@ -26,7 +26,6 @@ import { failureReporter } from './failures.js';
 import { resetInstance, resetInstructions } from './reset.js';
 import { canInitializeHistory, initializedHistory } from '@ctlflow/fleetd-storage/history';
 import { createNativeStopReceipts, type NativeStopActivity } from './native-stops.js';
-import { createResumeWork } from '@ctlflow/fleetd-storage/resume-work';
 import { nativeOptions } from '@ctlflow/fleetd-domain/model';
 import type { MessagingConnector } from '@ctlflow/crossfire-domain/port/messaging-client';
 
@@ -223,10 +222,9 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, m
             const options = adapter.validate(nativeOptions(configuration, instance));
             if (!options.ok) throw Object.assign(new Error(options.error.message), { code: options.error.code });
             const started = await createNativeLifecycle({ clock: nativeClock, hooks, runtime: definition.runtime, approval: options.value.approval,
-              work: createResumeWork(local.state),
               primary: instance.listenerOptions?.historyMode === 'per-room' ? 'control' : 'shared',
               initialSettings: adapter.configuredSettings(options.value.options),
-              initial: reason === 'operator' ? 'running' : 'sleeping',
+              allowNewHistory: canInitializeHistory(configuration.directory, identity.agentId),
               saved: () => adapter.savedContexts({ workspace, stateDirectory }),
               failed: (sessionId, error) => reporters.get(configuration.directory)?.record(identity.agentId, sessionId, error),
               recovered: () => reporters.get(configuration.directory)?.recovered(identity.agentId),
@@ -270,7 +268,7 @@ export function createExecution(adapters: Record<string, OwnedRuntimeAdapter>, m
           if (activity) stops.get(configuration.directory)?.closed(activity);
           bindingControl?.close(); await unlock(); })();
         return success({ sessionId: destination.runtime.sessionId, signal: stop.signal, attachment: destination.attachment,
-          attachments: destination.attachments, contexts: destination.contexts, nativeState: destination.nativeState, diagnostics: destination.diagnostics, resume: destination.resume,
+          attachments: destination.attachments, contexts: destination.contexts, nativeState: destination.nativeState, diagnostics: destination.diagnostics,
           control: bindingControl.control, close });
       } catch (error) {
         report(error); stop.abort(error); await done; await destination?.close();

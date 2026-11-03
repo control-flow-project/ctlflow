@@ -66,11 +66,11 @@ Ordinary start/resume retains exact history, identity, settings and unread state
 Each activation refreshes provider login from the authorized host source.
 A broken established binding is an error, not an implicit fresh conversation.
 
-Unfinished-work checkpoints retain exact context/session IDs. On restart the
-adapter first resolves preceding native publication. It then supplies one
-receipt-backed continuation asking the agent to reread applicable AGENTS.md,
-review completed effects and continue unfinished authorized work.
-Idle contexts receive no synthetic task.
+Restart restores listener bindings without model input. Native histories stay
+asleep until genuine eligible messages arrive. Interrupted past activity and
+unanswered decisions cannot create synthetic continuation prompts. A repeated
+Start cannot wake all engines. Pending genuine message receipts remain owned by
+their delivery producer and are reconciled before further publication.
 
 A restarted native process has no old running turn. If earlier input receipt
 cannot be established, its exact text is retained in a private file and supplied
@@ -83,7 +83,7 @@ Only fleetd performs reset. Management requires confirmation; CLI requires
 `--fresh-history`.
 
 Reset stops selected owned execution, verifies available authorized Matrix
-history and nonsecret configuration exports, archives prior bindings/checkpoints,
+history and nonsecret configuration exports, archives prior bindings,
 then initializes fresh native contexts with the same identities and configured
 parameters. Interrupted phases retain their operation IDs and verified export.
 Failure cannot silently replace an existing history.

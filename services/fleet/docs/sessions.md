@@ -23,14 +23,14 @@ UI and CLI ordinary start resumes full saved history with the same identity and
 configured native parameters. Current provider authentication is recopied on
 activation. Unread positions and pending receipts are retained.
 
-When unfinished-work evidence exists, the adapter first settles older input.
-It then inserts one receipt-backed restart instruction to reread AGENTS.md,
-inspect prior effects and continue unfinished authorized work.
-Idle/sleeping contexts receive no dummy task.
+Start restores the selected listeners with native histories asleep. It makes no
+model request, even if a historical task was interrupted. Repeated Start is
+idempotent. Eligible messages and due scheduled input wake the exact intended
+history. Pending genuine message receipts retain their recovery state.
 
 The native process does not resurrect an old operating-system command or active
-turn. Uncertain earlier delivery is explicitly supplied as restart context, not
-reported as a receipt from the previous process.
+turn. Uncertain receipt recovery belongs only to an actual pending publication;
+restart never sends a generic instruction to resume old tasks.
 
 ## Fresh history
 
@@ -43,7 +43,7 @@ fleet agent start research analyst-east --fresh-history
 
 Only fleetd performs reset. It stops selected execution, verifies available
 authorized Matrix history and nonsecret configuration exports, archives old
-bindings/checkpoints and starts fresh contexts with the same identity/settings.
+bindings and starts fresh contexts with the same identity/settings.
 Interrupted phases retain their operation identity. Failed exports cannot replace
 a context. Chats, media, credentials and archived histories are not erased.
 

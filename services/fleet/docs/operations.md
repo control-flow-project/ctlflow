@@ -37,8 +37,9 @@ Restart fleetd with its original root. It loads its explicit registry, desired
 intent, saved stopped selection and exact histories. It does not discover new
 directories or initialize replacement conversations.
 
-Unfinished checkpoints can trigger one receipt-backed continuation after older
-input settles. A quiet/idle context does not receive a synthetic task.
+Every restored native history stays asleep. Restart never creates a synthetic
+continuation turn, including when old work was interrupted. Genuine eligible
+input wakes only its intended retained history.
 Pending decisions and unconfirmed delivery remain recovery state, not logs.
 
 ## Failures

@@ -39,7 +39,7 @@ function fixture(execution: Partial<Execution> = {}) {
         binding.update({ connected: true, active: true, input: null });
         return success({ sessionId, signal: stop.signal, control: binding.connection,
           diagnostics: async () => ({ checkedAt: 1, state: 'idle' as const, observedAt: 1, provider: 'unknown' as const, providerObservedAt: null, pendingInput: false, pendingDecision: false }),
-          nativeState: () => ({ phase: 'running' as const, lastActivityAt: 1, historyAvailable: true }), resume: async () => success(undefined),
+          nativeState: () => ({ phase: 'running' as const, lastActivityAt: 1, historyAvailable: true }),
           contexts: async () => success([{ context: 'shared', runtime: 'codex', sessionId }]),
           attachment: async () => failure('conflict', 'No native process in domain fixture'), attachments: async () => success([]),
           close: async () => { calls.push('close:' + instance.key); stop.abort(); } });
@@ -180,7 +180,7 @@ test('readiness checks sleeping bindings without native wake; stopped readiness 
   current.services.execution.start = async (...args) => {
     const running = await start(...args); assert(running.ok);
     return success({ ...running.value, nativeState: () => ({ phase: 'sleeping' as const, lastActivityAt: 1, historyAvailable: true }),
-      resume: async () => { assert.fail('Read-only readiness cannot wake native execution'); } });
+ });
   };
   const first = value(await current.controller.setup(current.input)); assert(first.operation); await current.finish(first.operation);
   assert.equal(value(current.controller.view(first.fleet.fleetId)).phase, 'sleeping'); assert((await current.controller.test(first.fleet.fleetId)).ok);

@@ -47,7 +47,7 @@ exact saved session identity. No historical metadata conversion is provided.
 
 ## Other retained state
 
-Pending input, native confirmations, unfinished-work checkpoints and unacknowledged
+Pending input, native confirmations and unacknowledged
 operation outcomes remain recovery state.
 Completed diagnostics/operation history use the logging age policy.
 Each reader accepts its one current format. There are no historical importers or

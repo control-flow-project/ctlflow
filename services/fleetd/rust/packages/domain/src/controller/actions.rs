@@ -291,10 +291,7 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
             .running
             .get(&(fleet.to_owned(), instance.key.clone()))
             .cloned();
-        if let Some(runtime) = runtime {
-            if let Err(error) = runtime.resume().await {
-                self.record_error(fleet, errors, Some(instance), error)?;
-            }
+        if runtime.is_some() {
             return Ok(());
         }
         match self

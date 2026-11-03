@@ -98,7 +98,7 @@ public sealed partial class FleetController
             foreach (var instance in selected)
             {
                 cancellation.ThrowIfCancellationRequested(); if (errors.Any(error => error.InstanceKey == instance.Key)) continue; RunningAgent? current; lock (gate) current = running.GetValueOrDefault((fleet, instance.Key));
-                if (current is not null) { var resumed = await current.Resume(); if (!resumed.IsSuccess) Error(instance, resumed.Error); continue; }
+                if (current is not null) continue;
                 var started = await execution.Start(configuration, instance, cancellation, "operator"); bool discard; lock (gate) discard = cancellation.IsCancellationRequested || !wanted.Contains((fleet, instance.Key)); if (discard) { if (started.IsSuccess) await started.Value.DisposeAsync(); cancellation.ThrowIfCancellationRequested(); continue; }
                 if (!started.IsSuccess) Error(instance, started.Error); else if (!Launched(fleet, configuration, instance, started.Value, cancellation)) await started.Value.DisposeAsync();
             }

@@ -491,11 +491,7 @@ export function createController(services: Services) {
           const identity = key(fleetId, instance.key);
           if (operation.errors.some(error => error.instanceKey === instance.key)) continue;
           const current = running.get(identity);
-          if (current) {
-            const resumed = await current.resume();
-            if (!resumed.ok) operation.errors.push({ instanceKey: instance.key, ...resumed.error });
-            continue;
-          }
+          if (current) continue;
           const result = await services.execution.start(configuration, instance, AbortSignal.any([signal, lifetime.signal]), 'operator');
           if (signal.aborted || !wanted.has(identity)) { if (result.ok) await discardRuntime(fleetId, instance, result.value); signal.throwIfAborted(); continue; }
           if (!result.ok) { operation.errors.push({ instanceKey: instance.key, ...result.error }); states.set(identity, { instance, phase: 'failed', error: result.error.message, sessionId: null, startedAt: null }); continue; }

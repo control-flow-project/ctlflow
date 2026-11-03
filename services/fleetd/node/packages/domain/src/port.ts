@@ -23,7 +23,6 @@ export type Registry = {
 };
 export type Running = { sessionId: string; signal: AbortSignal; nativeState(): NativeSessionState;
   diagnostics(signal: AbortSignal): Promise<NativeDiagnostic>;
-  resume(): Promise<Result<void>>;
   attachment(): Promise<Result<RuntimeAttachment>>;
   attachments(): Promise<Result<{ context: string; attachment: RuntimeAttachment }[]>>;
   contexts(): Promise<Result<RetainedContext[]>>; control: ListenerControl; close(): Promise<void> };

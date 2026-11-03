@@ -76,15 +76,3 @@ pub struct ResumeSelection {
     pub fleet_id: String,
     pub instance_keys: Vec<String>,
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InterruptedContext {
-    pub context: String,
-    pub session_id: String,
-}
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ResumeWork {
-    pub context: String,
-    pub session_id: String,
-    pub message_id: String,
-    pub checkpointed_at: i64,
-}

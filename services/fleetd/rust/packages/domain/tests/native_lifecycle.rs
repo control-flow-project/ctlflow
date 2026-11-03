@@ -13,11 +13,7 @@ use crossfire_domain::{
     statistics::Usage,
 };
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, time::Clock};
-use fleetd_domain::{
-    model::ResumeWork,
-    native_lifecycle::{Initial, Owner},
-    resume_work::WorkStore,
-};
+use fleetd_domain::native_lifecycle::Owner;
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -60,26 +56,9 @@ impl Hooks for Observer {
     }
     fn observe(&self, _event: ObservationEvent) {}
 }
-#[derive(Default)]
-struct Work {
-    values: Mutex<Vec<ResumeWork>>,
-    reject: AtomicBool,
-}
 type Observers = Vec<Arc<dyn Fn(ObservationEvent) + Send + Sync>>;
 type BeforeDelivery = Arc<dyn Fn() -> Result<()> + Send + Sync>;
 type InspectionGate = (Arc<tokio::sync::Notify>, Arc<tokio::sync::Notify>);
-impl WorkStore for Work {
-    fn work(&self) -> Result<Vec<ResumeWork>> {
-        Ok(self.values.lock().map_err(|_| failed())?.clone())
-    }
-    fn save_work(&self, values: &[ResumeWork]) -> Result<()> {
-        if self.reject.load(Ordering::SeqCst) {
-            return Err(failed());
-        }
-        *self.values.lock().map_err(|_| failed())? = values.to_vec();
-        Ok(())
-    }
-}
 #[derive(Default)]
 struct State {
     starts: AtomicUsize,
@@ -89,6 +68,7 @@ struct State {
     working_on_start: AtomicBool,
     closing_fails: AtomicBool,
     starting_fails: AtomicBool,
+    wrong_history: AtomicBool,
     native_stop: Mutex<Option<CancellationToken>>,
     contexts: Mutex<Vec<SavedContext>>,
     context_busy: Mutex<BTreeMap<String, bool>>,
@@ -173,7 +153,11 @@ impl<H: Hooks + 'static> OwnedAdapter<H> for Adapter {
         Ok(Native {
             state: self.0.clone(),
             stop,
-            session: "saved".into(),
+            session: if self.0.wrong_history.load(Ordering::SeqCst) {
+                "wrong-history".into()
+            } else {
+                "saved".into()
+            },
         })
     }
 }
@@ -181,18 +165,16 @@ impl<H: Hooks + 'static> OwnedAdapter<H> for Adapter {
 #[tokio::test]
 async fn failed_or_unloaded_thread_observations_do_not_replace_a_live_native_process()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(State::default());
-    let work = Arc::new(Work::default());
+    let state = saved_state();
     let owner = Owner::open(
         Arc::new(Adapter(state.clone())),
         input(),
-        work,
         Time(Arc::new(AtomicI64::new(1))),
-        Initial::Start,
         CancellationToken::new(),
         Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
     )
     .await?;
+    owner.resume().await?;
     let observers = state.observations.lock().map_err(|_| failed())?.clone();
     for status in [NativeState::Unavailable, NativeState::Failed] {
         for observer in &observers {
@@ -215,91 +197,6 @@ async fn failed_or_unloaded_thread_observations_do_not_replace_a_live_native_pro
         );
         assert_eq!(state.closes.load(Ordering::SeqCst), 0);
     }
-    owner.close().await?;
-    Ok(())
-}
-#[tokio::test]
-async fn observations_checkpoint_work_before_a_crash_and_ignore_a_replaced_process_generation()
--> std::result::Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(State::default());
-    let clock = Arc::new(AtomicI64::new(1));
-    let work = Arc::new(Work::default());
-    let owner = Owner::open(
-        Arc::new(Adapter(state.clone())),
-        input(),
-        work.clone(),
-        Time(clock.clone()),
-        Initial::Start,
-        CancellationToken::new(),
-        Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
-    )
-    .await?;
-    let observation = state
-        .observations
-        .lock()
-        .map_err(|_| failed())?
-        .first()
-        .cloned()
-        .ok_or("Native observer")?;
-    let event = |state| ObservationEvent::State {
-        runtime: Runtime::Codex,
-        session_id: "saved".to_owned(),
-        room_id: None,
-        state,
-        observed_at: 1,
-        settings: vec![],
-        error_message: None,
-    };
-    clock.store(20, Ordering::SeqCst);
-    observation(event(NativeState::Working));
-    assert_eq!(work.work()?.len(), 1);
-    assert_eq!(owner.current()?.last_activity_at, Some(20));
-    state
-        .native_stop
-        .lock()
-        .map_err(|_| failed())?
-        .as_ref()
-        .ok_or("Native lifetime")?
-        .cancel();
-    owner.maintain().await?;
-    assert_eq!(state.starts.load(Ordering::SeqCst), 2);
-    let resumed = work.work()?;
-    assert_eq!(resumed.len(), 1);
-    assert!(
-        state
-            .deliveries
-            .lock()
-            .map_err(|_| failed())?
-            .iter()
-            .any(|(_, text)| text.contains("Your saved session was restarted"))
-    );
-    observation(event(NativeState::Working));
-    assert!(
-        work.work()? == resumed,
-        "The replaced native generation cannot recreate unfinished work"
-    );
-    let current = state
-        .observations
-        .lock()
-        .map_err(|_| failed())?
-        .last()
-        .cloned()
-        .ok_or("Current native observer")?;
-    clock.store(30, Ordering::SeqCst);
-    current(event(NativeState::Working));
-    assert_eq!(work.work()?.len(), 1);
-    clock.store(40, Ordering::SeqCst);
-    current(event(NativeState::Idle));
-    assert_eq!(work.work()?.len(), 1);
-    assert!(!owner.runtime()?.inspect().await?);
-    assert!(work.work()?.is_empty());
-    clock.store(50, Ordering::SeqCst);
-    current(event(NativeState::Idle));
-    assert_eq!(
-        owner.current()?.last_activity_at,
-        Some(40),
-        "Repeated idle reporting must not postpone automatic sleep"
-    );
     owner.close().await?;
     Ok(())
 }
@@ -410,8 +307,8 @@ impl Connection for Native {
     }
 }
 
-#[path = "support/native_work.rs"]
-mod native_work;
+#[path = "support/lazy_lifecycle.rs"]
+mod lazy_lifecycle;
 impl TurnControl for Native {
     async fn active_turn(
         &self,
@@ -488,35 +385,16 @@ fn input() -> Input<Observer> {
 #[tokio::test]
 async fn receipt_retirement_waits_for_complete_native_history_initialization()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(State::default());
-    state
-        .contexts
-        .lock()
-        .map_err(|_| failed())?
-        .push(SavedContext {
-            context: "shared".to_owned(),
-            runtime: "codex".to_owned(),
-            session_id: "saved".to_owned(),
-            workspace: PathBuf::from("/native/workspace"),
-        });
-    let work = Arc::new(Work::default());
+    let state = saved_state();
     let owner = Owner::open(
         Arc::new(Adapter(state.clone())),
         input(),
-        work.clone(),
         Time(Arc::new(AtomicI64::new(1))),
-        Initial::ResumeSleeping,
         CancellationToken::new(),
         Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
     )
     .await?;
     let logical = owner.runtime()?;
-    work.save_work(&[ResumeWork {
-        context: "shared".to_owned(),
-        session_id: "saved".to_owned(),
-        message_id: "00000000-0000-4000-8000-000000000001".to_owned(),
-        checkpointed_at: 1,
-    }])?;
     let entered = Arc::new(tokio::sync::Notify::new());
     let release = Arc::new(tokio::sync::Notify::new());
     *state.settlement_gate.lock().map_err(|_| failed())? = Some((entered.clone(), release.clone()));
@@ -552,22 +430,21 @@ async fn receipt_retirement_waits_for_complete_native_history_initialization()
 #[tokio::test]
 async fn exact_history_sleeps_at_thirty_minutes_and_wakes_on_the_same_identity()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(State::default());
+    let state = saved_state();
     let clock = Arc::new(AtomicI64::new(1));
     let owner = Owner::open(
         Arc::new(Adapter(state.clone())),
         input(),
-        Arc::new(Work::default()),
         Time(clock.clone()),
-        Initial::Start,
         CancellationToken::new(),
         Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
     )
     .await?;
+    owner.resume().await?;
     let logical = owner.runtime()?;
     assert_eq!(logical.approval(), Approval::Runtime);
     clock.store(1800000, Ordering::SeqCst);
-    owner.maintain().await?;
+    owner.resume().await?;
     assert_eq!(owner.current()?.phase, Phase::Running);
     clock.store(1800001, Ordering::SeqCst);
     owner.maintain().await?;
@@ -581,7 +458,7 @@ async fn exact_history_sleeps_at_thirty_minutes_and_wakes_on_the_same_identity()
     assert_eq!(state.starts.load(Ordering::SeqCst), 2);
     assert_eq!(owner.current()?.phase, Phase::Running);
     clock.store(3600002, Ordering::SeqCst);
-    owner.maintain().await?;
+    owner.resume().await?;
     assert_eq!(owner.current()?.phase, Phase::Running);
     logical.acknowledge(&["message".to_owned()])?;
     owner.maintain().await?;
@@ -593,18 +470,17 @@ async fn exact_history_sleeps_at_thirty_minutes_and_wakes_on_the_same_identity()
 #[tokio::test]
 async fn crashed_native_process_is_closed_before_replacement_and_failed_close_blocks_every_start()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(State::default());
+    let state = saved_state();
     let clock = Arc::new(AtomicI64::new(1));
     let owner = Owner::open(
         Arc::new(Adapter(state.clone())),
         input(),
-        Arc::new(Work::default()),
         Time(clock),
-        Initial::Start,
         CancellationToken::new(),
         Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
     )
     .await?;
+    owner.resume().await?;
     state
         .native_stop
         .lock()
@@ -617,10 +493,11 @@ async fn crashed_native_process_is_closed_before_replacement_and_failed_close_bl
     assert_eq!(state.starts.load(Ordering::SeqCst), 1);
     state.closing_fails.store(false, Ordering::SeqCst);
     state.starting_fails.store(true, Ordering::SeqCst);
-    assert!(owner.maintain().await.is_err());
-    assert_eq!(owner.current()?.phase, Phase::Failed);
-    state.starting_fails.store(false, Ordering::SeqCst);
     owner.maintain().await?;
+    assert_eq!(owner.current()?.phase, Phase::Failed);
+    assert!(owner.resume().await.is_err());
+    state.starting_fails.store(false, Ordering::SeqCst);
+    owner.resume().await?;
     assert_eq!(owner.current()?.phase, Phase::Running);
     assert_eq!(state.starts.load(Ordering::SeqCst), 3);
     owner.close().await?;
@@ -630,12 +507,12 @@ async fn crashed_native_process_is_closed_before_replacement_and_failed_close_bl
 async fn missing_saved_sleeping_history_fails_without_a_process_or_replacement()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(State::default());
+    let mut request = input();
+    request.allow_new_history = false;
     let result = Owner::open(
         Arc::new(Adapter(state.clone())),
-        input(),
-        Arc::new(Work::default()),
+        request,
         Time(Arc::new(AtomicI64::new(1))),
-        Initial::ResumeSleeping,
         CancellationToken::new(),
         Arc::new(crossfire_agent_core::listener_budget::Budget::default()),
     )
@@ -652,17 +529,7 @@ async fn missing_saved_sleeping_history_fails_without_a_process_or_replacement()
 async fn steering_never_waits_in_a_full_native_start_queue()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     use crossfire_agent_core::listener_budget::{Budget, Work as NativeWork};
-    let state = Arc::new(State::default());
-    state
-        .contexts
-        .lock()
-        .map_err(|_| failed())?
-        .push(SavedContext {
-            context: "shared".into(),
-            runtime: "codex".into(),
-            session_id: "saved".into(),
-            workspace: "/fixture".into(),
-        });
+    let state = saved_state();
     let budget = Arc::new(Budget::default());
     let mut leases = vec![];
     for _ in 0..4 {
@@ -675,9 +542,7 @@ async fn steering_never_waits_in_a_full_native_start_queue()
     let owner = Owner::open(
         Arc::new(Adapter(state.clone())),
         input(),
-        Arc::new(Work::default()),
         Time(Arc::new(AtomicI64::new(1))),
-        Initial::ResumeSleeping,
         CancellationToken::new(),
         budget,
     )
@@ -699,4 +564,17 @@ async fn steering_never_waits_in_a_full_native_start_queue()
     assert_eq!(state.starts.load(Ordering::SeqCst), 1);
     owner.close().await?;
     Ok(())
+}
+
+fn saved_state() -> Arc<State> {
+    let state = State {
+        contexts: Mutex::new(vec![SavedContext {
+            context: "shared".into(),
+            runtime: "codex".into(),
+            session_id: "saved".into(),
+            workspace: "/fixture".into(),
+        }]),
+        ..State::default()
+    };
+    Arc::new(state)
 }

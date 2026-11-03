@@ -216,10 +216,7 @@ impl<C: MessagingConnector> Host<C> {
             let archive = PrivateDirectory::open(&root.join("listener-archive"), true)?;
             let active = PrivateDirectory::open(&paths.state, false)?;
             for name in active.names(100000)? {
-                if name == "resume-work.json"
-                    || name == "cursors.json"
-                    || name.starts_with("cursors.json.")
-                {
+                if name == "cursors.json" || name.starts_with("cursors.json.") {
                     active.move_entry(&name, &archive)?;
                 }
             }
