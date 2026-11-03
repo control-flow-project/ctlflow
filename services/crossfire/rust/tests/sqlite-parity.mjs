@@ -54,7 +54,7 @@ try {
     change(database, query('listener_stat_interval').insert({ run_id: runId, bucket_at: bucket, agent_id: agentId, started_at: now, ended_at: now, captured_at: now, dropped: 0 }));
     change(database, query('listener_stat_flow').insert({ run_id: runId, bucket_at: bucket, room_id: '!room:example.test', sender_backend_user_id: '@owner:example.test', message_type: 'm.text', observed: 2, delivered: 1, content_bytes: 120, delivered_bytes: 60, attachment_bytes: 200, largest_bytes: 80 }));
     const tokens = { runtime: 'codex', session_id: 'native-session', input: 100, cached_input: 40, cache_write_input: null, output: 20, reasoning_output: 10, total: 120 };
-    change(database, query('listener_stat_usage').insert({ run_id: runId, bucket_at: bucket, ...tokens }));
+    change(database, query('listener_stat_usage').insert({ run_id: runId, bucket_at: bucket, ...tokens, input: 0, cached_input: 0, output: 0, reasoning_output: 0, total: 0 }));
     change(database, query('runtime_usage_checkpoint').insert({ agent_id: agentId, ...tokens, captured_at: now }));
   })();
   database.close(); database = null;

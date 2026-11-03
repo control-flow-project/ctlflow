@@ -27,8 +27,8 @@ test('performance report is readable offline on desktop and a phone without scri
       await expect(page.getByRole('heading', { name: 'Server performance', exact: true })).toBeVisible();
       await expect(page.getByRole('table')).toHaveCount(1); await expect(page.getByRole('img')).toHaveCount(3);
       await expect(page.locator('.card')).toHaveCount(3);
-      await expect(page.getByRole('cell', { name: '1.00× / 1.00×', exact: true })).toHaveCount(3);
-      await expect(page.getByRole('cell', { name: '1.00×', exact: true })).toHaveCount(3);
+      await expect(page.locator('tbody tr td:nth-child(7)')).toHaveText(['1.00× / 1.00×', '1.00× / 1.00×', '1.00× / 1.00×']);
+      await expect(page.locator('tbody tr td:nth-child(9)')).toHaveText(['1.00×', '1.00×', '1.00×']);
       await expect(page.getByText('approved exception', { exact: false })).toHaveCount(0);
       assert(await page.evaluate<boolean>('document.documentElement.scrollWidth <= innerWidth'), 'The report page must not overflow a phone viewport');
       assert.equal(await page.locator('script,iframe,link,img').count(), 0);

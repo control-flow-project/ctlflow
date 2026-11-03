@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { chmodSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,7 +21,7 @@ try {
   native('acknowledge');
   assert.deepEqual(JSON.parse(native('read')).confirmed, []);
   native('prepare', JSON.stringify(message)); native('confirm');
-  assert.equal(JSON.parse(native('read')).confirmed[0].text, message.text);
+  assert.equal(JSON.parse(native('read')).confirmed[0].digest, createHash('sha256').update(message.text).digest('hex'));
   owner = spawn(binary, ['lock', file], { stdio: ['pipe', 'pipe', 'pipe'] });
   const ended = new Promise((resolve, reject) => { owner.once('close', resolve); owner.once('error', reject); });
   const timer = setTimeout(() => owner.kill('SIGKILL'), 10000);

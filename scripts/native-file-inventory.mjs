@@ -30,7 +30,7 @@ export function fileOwner(file) {
   if (layer === 'build') return ['EF design-time generation; Diesel has no EF compiler', 'services/crossfire/scripts/generate-rust-schema.mjs'];
   if (layer === 'tests') return ['target-internal test; public behavior uses one common assertion bank', `services/${product}/tests/contracts`];
   if (layer === 'scripts') return ['target build/verification; native equivalent uses workspace coordinators', product === 'crossfire' ? 'scripts/verify-rust.mjs' : 'scripts/publish-rust.mjs'];
-  if (layer === 'tools') return ['shared optional operator CLI; no duplicated native implementation', `services/${product}/node/tools`];
+  if (layer === 'tools') return ['shared optional operator CLI; no duplicated native implementation', `services/${product}/tools`];
   if (layer === 'Dockerfile') return ['native container definition', `${base}/Dockerfile`];
   if (layer === 'README.md') return ['implementation guide', product === 'crossfire' ? `${base}/README.md` : `services/${product}/README.md`];
   assert(language === 'node' && /^tsconfig(?:\.[a-z-]+)?\.json$/u.test(layer), 'Unclassified file: ' + file);

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { createScheduleCalculator } from '@ctlflow/crossfire-adapter-schedule/create-calculator';
+import { createScheduleCalculator } from '@ctlflow/crossfire-test-support/calendar';
 
 const [binary] = process.argv.slice(2);
 assert(binary && process.argv.length === 3 && binary.startsWith('/'), 'One compiled native calendar executable is required');
@@ -49,4 +49,4 @@ const output = await new Promise((resolve, reject) => {
 });
 const result = JSON.parse(output);
 assert.equal(result.status, 'passed'); assert.equal(result.cases, cases.length);
-console.log(JSON.stringify({ status: 'passed', cases: cases.length, milliseconds: Math.round(performance.now() - started), scope: 'native Rust and canonical Node calendar outcomes' }));
+console.log(JSON.stringify({ status: 'passed', cases: cases.length, milliseconds: Math.round(performance.now() - started), scope: 'native Rust and shared calendar fixture outcomes' }));

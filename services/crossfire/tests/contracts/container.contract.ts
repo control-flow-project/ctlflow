@@ -53,7 +53,7 @@ export async function containerContracts(scope: TestContext, fixture: ContainerS
       }
       const health = (await (await fetch(origin + '/api/health')).json() as { data: { instance: string; version: string; release: string; startedAt: number } }).data;
       assert.equal(health.instance, 'verification');
-      const sourceExclusion = spawnSync('docker', ['exec', name, 'sh', '-c', 'test ! -d /app/services/crossfire/csharp && test ! -d /app/services/crossfire/node/tests && test ! -d /app/services/crossfire/dist/tests && test ! -d /app/services/crossfire/packages/domain/src'], { encoding: 'utf8' });
+      const sourceExclusion = spawnSync('docker', ['exec', name, 'sh', '-c', 'test ! -d /app/services/crossfire/csharp && test ! -d /app/services/crossfire/tests && test ! -d /app/services/crossfire/dist/tests && test ! -d /app/services/crossfire/packages/domain/src'], { encoding: 'utf8' });
       assert.equal(sourceExclusion.status, 0, 'Runtime images exclude build/test and other implementation source');
       assert(Number.isSafeInteger(health.startedAt) && health.startedAt > 0 && health.startedAt <= Date.now());
       for (const suffix of ['manifest.json', ...ARTIFACTS]) {

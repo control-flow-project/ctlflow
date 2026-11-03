@@ -40,18 +40,18 @@ try {
     const release = acquireFileLock(file);
     try {
       const contender = await command(nativeMode, 'probe');
-      assert.equal(contender.result.owned, false, 'C# must refuse Node-owned state immediately'); await close(contender);
+      assert.equal(contender.result.owned, false, 'C# must refuse fixture-owned state immediately'); await close(contender);
     } finally { release(); }
     for (const forced of [false, true]) {
       const owner = await command(nativeMode, 'hold'); assert.equal(owner.result.owned, true);
-      assert.throws(() => acquireFileLock(file), /already|held|locked|owns|process/iu, 'Node cannot acquire a C# owner');
+      assert.throws(() => acquireFileLock(file), /already|held|locked|owns|process/iu, 'A fixture cannot acquire a C# owner');
       const contender = await command(!nativeMode, 'probe'); assert.equal(contender.result.owned, false, 'managed and AOT ownership is mutually exclusive'); await close(contender);
       await close(owner, forced);
       const reacquired = acquireFileLock(file); reacquired();
       const next = await command(!nativeMode, 'probe'); assert.equal(next.result.owned, true, 'OS releases ownership after normal shutdown or process death'); await close(next);
     }
   }
-  console.log(JSON.stringify({ status: 'passed', directions: ['Node→managed', 'Node→AOT', 'managed→Node', 'AOT→Node', 'managed→AOT', 'AOT→managed'], forcedExit: true }));
+  console.log(JSON.stringify({ status: 'passed', directions: ['fixture→managed', 'fixture→AOT', 'managed→fixture', 'AOT→fixture', 'managed→AOT', 'AOT→managed'], forcedExit: true }));
 } finally {
   for (const child of owners) if (child.exitCode === null && child.signalCode === null) { const ended = once(child, 'exit'); child.kill('SIGKILL'); await ended.catch(() => {}); }
   rmSync(directory, { recursive: true });
