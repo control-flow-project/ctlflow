@@ -41,11 +41,11 @@ fleet agent update FLEET INSTANCE [--operation-id UUID] [--release-directory DIR
 fleet agent remove|contexts FLEET INSTANCE
 fleet agent attach FLEET INSTANCE [--context CONTEXT]
 
-Start resumes retained history; --fresh-history explicitly replaces it.
+Start restores listeners with retained histories asleep; --fresh-history replaces history.
 Stop clears the selected bindings' desired activation and retains their histories.
 Daemon shutdown preserves desired activation for the next daemon start.
 Contexts lists saved histories even when sleeping or stopped, without waking them.
-Attach only returns a live terminal pointer; resume a sleeping agent first.
+Attach only returns a live terminal pointer; eligible input must first wake a sleeping agent.
 Status separates native phase, listener delivery, desired activation and saved history.`;
 export async function run(argv: string[], signal: AbortSignal): Promise<void> {
   const { values, positionals, tokens } = parseArgs({ args: argv, allowPositionals: true, tokens: true, options: { root: { type: 'string' }, remote: { type: 'string' },

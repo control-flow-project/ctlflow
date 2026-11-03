@@ -87,7 +87,7 @@ Unsupported shell/TUI prompts are not guessed from prose.
 ## Activity, sleep and failure
 
 Native state distinguishes idle, working, waiting, sleeping, waking, failed and
-unavailable. Initialization stays waking until receipt/continuation readiness.
+unavailable. Initialization stays waking until native input/receipt readiness.
 Unknown activity prevents automatic sleep instead of inventing idle.
 
 Idle timeout defaults to thirty minutes. Busy contexts, questions, pending input,

@@ -39,7 +39,7 @@ deadline. Invalid configuration produces a finding and leaves dependent facts
 unknown. Other independent checks continue.
 
 Inspection never calls start, resume, reset, native admission, readiness, receipt
-settlement or checkpoint clearing. It neither renews provider credentials nor
+settlement or publication mutation. It neither renews provider credentials nor
 performs inference. A changed/closed running-agent owner invalidates its probe.
 Probe failures do not trigger lifecycle recovery. A cancelled Pi metadata request
 is retired without a later destructive native-command timeout; started protocol

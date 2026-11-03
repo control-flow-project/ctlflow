@@ -25,12 +25,11 @@ function createListenerControl(acknowledge: Parameters<typeof listenerControl>[0
   return listenerControl(acknowledge, () => ({ fleetId: '11111111-1111-4111-8111-111111111111', connectionId: '22222222-2222-4222-8222-222222222222', credential: 'fixture-controller-lease' }));
 }
 function runtimeFixture(input: { sessionId: string; signal: AbortSignal; control: Running['control']; pointer: RuntimeAttachment;
-  close: Running['close']; nativeState?: Running['nativeState']; resume?: Running['resume'] }): Running {
+  close: Running['close']; nativeState?: Running['nativeState'] }): Running {
   const nativeState: Running['nativeState'] = input.nativeState ?? (() => ({ phase: 'running', lastActivityAt: 1, historyAvailable: true }));
   return { sessionId: input.sessionId, signal: input.signal, control: input.control, nativeState, close: input.close,
     diagnostics: async () => { const phase = nativeState().phase; return { checkedAt: 1, state: phase === 'running' ? 'unknown' : phase,
       observedAt: 1, provider: 'unknown', providerObservedAt: null, pendingInput: false, pendingDecision: false }; },
-    resume: input.resume ?? (async () => success(undefined)),
     attachment: async () => nativeState().phase === 'running' ? success(input.pointer) : failure('conflict', 'Resume this sleeping session explicitly to attach'),
     attachments: async () => nativeState().phase === 'running' ? success([{ context: 'shared', attachment: input.pointer }]) : failure('conflict', 'No live native endpoint'),
     contexts: async () => success([{ context: 'shared', runtime: input.pointer.runtime, sessionId: input.sessionId }]) };
@@ -541,28 +540,22 @@ test('sleeping and waking native phases retain the listener and inspection never
   assert.equal(starts, 1); assert.equal(stoppedReads, 1);
 });
 
-test('explicit start wakes a sleeping native generation without replacing its binding or reenrolling', async scope => {
+test('repeated start preserves a sleeping binding without native resume or reenrollment', async scope => {
   const binding = createListenerControl(async () => {}); binding.update({ connected: true, active: false, input: null });
-  let phase: NativeSessionState['phase'] = 'sleeping', starts = 0, resumes = 0, deny = false;
+  let starts = 0;
   const fixture = fixtureController({ start: async () => {
     starts++; const stop = new AbortController();
     return success(runtimeFixture({ sessionId: 'exact-saved', signal: stop.signal, control: binding.connection,
       pointer: { runtime: 'fixture', sessionId: 'exact-saved', workspace: '/fixture', connection: {} },
-      nativeState: () => ({ phase, lastActivityAt: 123, historyAvailable: true }),
-      resume: async () => { resumes++; if (deny) return failure('conflict', 'Cleanup is unverified'); phase = 'running'; return success(undefined); },
+      nativeState: () => ({ phase: 'sleeping', lastActivityAt: 123, historyAvailable: true }),
       close: async () => { stop.abort(); } }));
   } });
   cleanup(scope, () => fixture.controller.close());
-  await fixture.finish(await fixture.operation('start'));
-  await fixture.finish(await fixture.operation('start'));
+  for (let attempt = 0; attempt < 3; attempt++) assert.equal((await fixture.finish(await fixture.operation('start'))).status, 'succeeded');
   const state = value(fixture.controller.view(fixture.record.fleetId));
-  assert.equal(state.instances[0]!.phase, 'running'); assert.equal(state.instances[0]!.sessionId, 'exact-saved');
-  assert.equal(state.instances[0]!.listenerActive, false, 'Native resume cannot change fleet delivery authority');
-  assert.equal(starts, 1); assert.equal(resumes, 1);
-  phase = 'sleeping'; deny = true;
-  const refused = await fixture.finish(await fixture.operation('start'));
-  assert.equal(refused.status, 'failed'); assert.equal(refused.errors[0]!.code, 'conflict');
-  assert.equal(starts, 1); assert.equal(resumes, 2);
+  assert.equal(state.instances[0]!.phase, 'sleeping'); assert.equal(state.instances[0]!.sessionId, 'exact-saved');
+  assert.equal(state.instances[0]!.listenerActive, false);
+  assert.equal(starts, 1);
 });
 
 test('desired bindings restore exact histories without enrollment and explicit stops remain stopped across restart', async scope => {

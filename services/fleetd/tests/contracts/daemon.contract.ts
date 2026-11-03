@@ -45,13 +45,11 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     await call(operations.changeFleetDelivery, { fleetId }, { expectedRevision: integer(record(fleet.connection).revision), enabled });
     await observe(async () => record(list(record((await call(operations.fleet, { fleetId })).data).instances)[0]).listenerActive === enabled, 'Controller applies delivery intent');
   }
-  let nativeInspection: unknown = null;
   async function idle(): Promise<boolean> {
     const file = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/listener.json');
     const endpoint = record(JSON.parse(readFileSync(file, 'utf8')) as unknown);
     const response = await contractHttp('http://127.0.0.1:' + String(endpoint.port), 'POST', '/bindings/' + text(endpoint.binding) + '/control',
       { action: 'test' }, { Authorization: 'Bearer ' + text(endpoint.secret) });
-    nativeInspection = { status: response.status, body: response.body };
     return response.status === 200 && record(record(response.body).test).busy === false;
   }
   function publications() {
@@ -193,31 +191,25 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       const result = await contractHttp(platform.origin, 'GET', '/api/agents/' + agentId + '/runtime-observations', undefined, { Cookie: platform.owner.cookie, Origin: platform.origin }); if (result.status !== 200) return false; const rows = list(record(result.body).data); if (!rows.length) return false; return list(record(rows[0]).settings).some(value => record(value).name === effort && record(value).effective === 'high');
     }, 'Reported effective native effort must be the instance override');
   });
-  await scope.test('readiness and attachment inspect the existing native writer without creating another session', async () => {
+  await scope.test('ready sleeping bindings expose no terminal and never start a native engine', async () => {
     const count = provider.requests.length;
     assert.equal(record((await call(operations.readiness, { fleetId })).data).accepted, true);
     const path = '/api/fleets/' + fleetId + '/agents/analyst/attachment';
-    if (runtime === 'pi') {
-      contractError(await raw(path), 503, 'unavailable');
-      unsupported.add(operations.attachment.method + ' ' + operations.attachment.path);
-    } else {
-      const pointer = record((await call(operations.attachment, { fleetId, instanceKey: 'analyst' })).data);
-      assert.equal(pointer.runtime, runtime); assert.equal(pointer.sessionId, record(list(saved)[0]).sessionId);
-      const connection = record(pointer.connection); assert(new URL(text(connection.endpoint)).hostname === '127.0.0.1');
-      assert.equal(statSync(text(connection.tokenFile)).mode & 0o777, 0o600);
-    }
+    contractError(await raw(path), 409, 'conflict');
     for (const query of ['?unknown=1', '?context=shared&context=shared']) contractError(await raw(path + query), 400, 'invalid');
     assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
-    assert.equal(provider.requests.length, count);
+    await operate('start');
+    assert.equal(record(list(record((await call(operations.fleet, { fleetId })).data).instances)[0]).phase, 'sleeping');
+    assert.equal(provider.requests.length, count, 'Repeated fleet start never submits a turn');
   });
   await scope.test('diagnostics inspect the existing provider without refresh, inference, or native history changes', async () => {
     const count = provider.requests.length, before = publications(), binding = readFileSync(join(fleetDirectory, '.fleet/binding.json'));
     const report = record((await call(operations.diagnostics, {}, undefined, '?fleetId=' + fleetId + '&instanceKey=analyst')).data);
     const checks = list(report.checks).map(record), native = checks.find(check => check.id === 'agent.native'), providerCheck = checks.find(check => check.id === 'agent.provider');
     assert(native && providerCheck);
-    assert.equal(native.status, 'pass'); assert.equal(native.message, 'Native state: idle');
-    assert.equal(providerCheck.status, runtime === 'pi' ? 'pass' : 'not-applicable');
-    assert.equal(typeof providerCheck.observedAt, 'number');
+    assert.equal(native.status, 'pass'); assert.equal(native.message, 'Native state: sleeping');
+    assert.equal(providerCheck.status, 'not-applicable');
+    assert.equal(providerCheck.observedAt, null);
     assert.equal(provider.requests.length, count, 'Provider metadata inspection never invokes the model');
     assert.deepEqual(publications(), before);
     assert.deepEqual(readFileSync(join(fleetDirectory, '.fleet/binding.json')), binding);
@@ -253,6 +245,19 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
   await scope.test('real native chat, steering and bounded history contracts', child => messageContracts(child, { platform, fleetDirectory, agent: { id: agentId, backendUserId, token }, provider,
     idle,
     delivery }));
+  await scope.test('an active native writer exposes its attachment without another model turn', async () => {
+    const before = provider.requests.length;
+    if (runtime === 'pi') {
+      contractError(await raw('/api/fleets/' + fleetId + '/agents/analyst/attachment'), 503, 'unavailable');
+      unsupported.add(operations.attachment.method + ' ' + operations.attachment.path);
+    } else {
+      const pointer = record((await call(operations.attachment, { fleetId, instanceKey: 'analyst' })).data);
+      assert.equal(pointer.runtime, runtime); assert.equal(pointer.sessionId, record(list(saved)[0]).sessionId);
+      const connection = record(pointer.connection); assert(new URL(text(connection.endpoint)).hostname === '127.0.0.1');
+      assert.equal(statSync(text(connection.tokenFile)).mode & 0o777, 0o600);
+    }
+    assert.equal(provider.requests.length, before);
+  });
   await scope.test('an actual native question waits for explicit owner submission and returns only to its original history', async () => {
     const requests = provider.requests.length, choice = 'Reviewed choice ' + randomUUID();
     provider.tool(runtime === 'codex' ? 'request_user_input' : 'crossfire_question', runtime === 'codex'
@@ -351,59 +356,37 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       throw error;
     } finally { await delivery(true); }
   });
-  await scope.test('repeated crashes during held native responses resume the same history and unfinished request', async child => {
+  await scope.test('repeated controller crashes leave accepted unfinished work lazy until genuine input', async child => {
     child.after(() => { if (provider.held()) provider.finish(); });
-    const marker = 'Resume this unfinished fleet request ' + randomUUID();
+    const marker = 'Retained unfinished fleet request ' + randomUUID();
     provider.hold();
     await call(operations.createFleetMessage, { fleetId }, { messageId: randomUUID(), body: marker });
-    await observe(() => provider.held() !== undefined, 'Fleet broadcast reaches the actual native engine');
+    await observe(() => provider.held() !== undefined, 'The actual requested task reaches the native engine');
     assert(lastUser(provider.requests.at(-1)).includes(marker));
-    const requestsBeforeDiagnosis = provider.requests.length;
-    let nativeCheck: Record<string, unknown> | undefined;
-    await observe(async () => {
-      const diagnostic = record((await call(operations.diagnostics, {}, undefined, '?fleetId=' + fleetId + '&instanceKey=analyst')).data);
-      nativeCheck = list(diagnostic.checks).map(record).find(check => check.id === 'agent.native');
-      return nativeCheck?.message === 'Native state: working';
-    }, 'The actual working notification reaches the read-only diagnostic snapshot');
-    assert.equal(nativeCheck?.status, 'pass'); assert.equal(nativeCheck?.message, 'Native state: working');
-    assert.equal(provider.requests.length, requestsBeforeDiagnosis, 'Diagnosing working agents cannot interrupt or submit work');
-    const checkpoint = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/resume-work.json');
-    try {
-      for (let restart = 0; restart < 2; restart++) {
-        const beforeCrash = readFileSync(checkpoint, 'utf8'), before = provider.requests.length, original = provider.held()!;
-        assert.equal(list(JSON.parse(beforeCrash) as unknown).length, 1, 'Unfinished work is durable before the actual provider request can be observed');
-        provider.hold(); assert.equal(daemon.child.kill('SIGKILL'), true); await daemon.ended;
-        await observe(() => original.destroyed, 'A dead controller leaves no native writer holding the old provider response');
-        daemon = contractProcess(scope, selected.daemon, ['--root', root], directory, environment);
-        try { await observe(() => provider.requests.length >= before + 1 && provider.held() !== undefined, 'Restart resumes the unfinished request rather than silently dropping it', 90000); }
-        catch (error) {
-          child.diagnostic(JSON.stringify({ restart, beforeCrash, afterRestart: existsSync(checkpoint) ? readFileSync(checkpoint, 'utf8') : null,
-            fleet: (await raw('/api/fleets/' + fleetId)).body, requestsBefore: before, requestsAfter: provider.requests.length, errors: daemon.errors().slice(-8192) }));
-          throw error;
-        }
-        const request = provider.requests.at(-1), input = lastUser(request);
-        assert(input.includes('[Crossfire session restarted]'), 'Recovery explicitly identifies the restarted session');
-        if (!JSON.stringify(request).includes(marker)) {
-          const location = /is saved at ("(?:[^"\\]|\\.)*")\./u.exec(input);
-          assert(location, 'Uncertain native receipt must retain the exact original input in a private file');
-          const path = join(fleetDirectory, 'agents/analyst/workarea/analyst', text(JSON.parse(location[1]!) as unknown));
-          assert.equal(statSync(path).mode & 0o777, 0o600);
-          assert(readFileSync(path, 'utf8').includes(marker), 'The restart context retains the original request verbatim');
-        }
-        assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
-      }
-    } finally { if (provider.held()) provider.finish(); }
-    try { await observe(idle, 'Recovered native work completes and leaves the listener idle'); }
-    catch (error) {
-      const workarea = join(fleetDirectory, 'agents/analyst/workarea/analyst'), state = join(workarea, '.crossfire/state/analyst');
-      const native = join(workarea, '.codex');
-      const files = [...readdirSync(state).filter(name => name === 'resume-work.json' || name.endsWith('.controller-input')).map(name => join(state, name)),
-        ...runtime === 'codex' ? readdirSync(native).filter(name => name.endsWith('.receipt')).map(name => join(native, name)) : []];
-      child.diagnostic(JSON.stringify({ completionTimeout: files.map(file => ({ file, value: readFileSync(file, 'utf8').slice(0, 8192) })),
-        fleet: (await raw('/api/fleets/' + fleetId)).body, requests: provider.requests.length, errors: daemon.errors().slice(-8192) }));
-      throw error;
+    await observe(() => publications().some(journal => journal.pending === null && journal.confirmed.length === 0),
+      'The delivery producer commits and acknowledges its original native receipt');
+    const count = provider.requests.length;
+    for (let restart = 0; restart < 2; restart++) {
+      const original = provider.held();
+      assert.equal(daemon.child.kill('SIGKILL'), true); await daemon.ended;
+      if (original) await observe(() => original.destroyed, 'Controller death closes its exact native writer');
+      daemon = contractProcess(scope, selected.daemon, ['--root', root], directory, environment);
+      await observe(async () => {
+        assert(daemon.alive(), daemon.errors());
+        try { return (await raw('/api/fleets/' + fleetId + '/readiness')).status === 200; } catch { return false; }
+      }, 'The restarted controller restores listener readiness without inference', 90000);
+      await call(operations.diagnostics, {}, undefined, '?fleetId=' + fleetId + '&instanceKey=analyst');
+      assert.equal(record(list(record((await call(operations.fleet, { fleetId })).data).instances)[0]).phase, 'sleeping');
+      assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
+      assert.equal(provider.requests.length, count, 'Restart cannot submit a synthetic task continuation');
     }
-    assert.deepEqual(JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, [], 'Verified native completion clears the durable work record');
+    if (provider.held()) provider.finish();
+    const next = 'Explicit new instruction after restart ' + randomUUID();
+    await call(operations.createFleetMessage, { fleetId }, { messageId: randomUUID(), body: next });
+    await observe(() => provider.requests.length === count + 1, 'Only a genuine new instruction wakes the retained history');
+    await observe(idle, 'The genuinely requested task completes');
+    assert(lastUser(provider.requests.at(-1)).includes(next));
+    assert(JSON.stringify(provider.requests.at(-1)).includes(marker), 'Wake preserves the earlier full history');
   });
   await scope.test('explicit fresh-history reset retains enrolled identity and makes no housekeeping model call', async () => {
     const original = saved, requests = provider.requests.length;
@@ -416,7 +399,7 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
     assert.equal(readFileSync(join(fleetDirectory, '.fleet/binding.json'), 'utf8'), binding, 'Reset never reenrolls or replaces accounts and credentials');
     assert.equal(provider.requests.length, requests, 'Reset exports context and instructions without model housekeeping');
   });
-  await scope.test('per-room stop and resume continue only unfinished work in its exact history', async () => {
+  await scope.test('per-room restart stays lazy and new input uses only its exact retained room history', async () => {
     const configuration = join(fleetDirectory, 'runtime.toml'), original = readFileSync(configuration, 'utf8');
     await operate('stop');
     const roster = list(record((await call(operations.fleet, { fleetId })).data).instances);
@@ -455,32 +438,20 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       const previousResponse = provider.held()!;
       await operate('stop');
       await observe(() => previousResponse.destroyed, 'Stop closes the exact native writer for the unfinished room');
-      const checkpoint = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/resume-work.json');
-      assert.deepEqual(list(JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown).map(record).map(value => value.context), [roomContext(rooms[1]!)],
-        'A completed room cannot receive synthetic restart work because another room is busy');
       const beforeResume = provider.requests.length;
-      provider.hold(); const resuming = operate('start');
-      try {
-        await observe(() => provider.requests.length > beforeResume && provider.held() !== undefined, 'Resume continues the actual unfinished room', 90000);
-        assert(lastUser(provider.requests.at(-1)).includes('[Crossfire session restarted]'));
-        assert(!JSON.stringify(provider.requests.at(-1)).includes(completed), 'The unfinished room never receives another room task history');
-      } finally { if (provider.held()) provider.finish(); await resuming; }
-      try { await observe(idle, 'Per-room resume settles to native idle'); }
-      catch (error) {
-        try {
-          const cursors = join(fleetDirectory, 'agents/analyst/workarea/analyst/.crossfire/state/analyst/cursors.json');
-          const producers = ['.chat-publication', '.steering-publication'].map(suffix => {
-            if (!existsSync(cursors + suffix)) return { kind: suffix, steps: null };
-            const plan = record(JSON.parse(readFileSync(cursors + suffix, 'utf8')) as unknown);
-            return { kind: suffix, steps: list(plan.steps).map(record).map(({ id, room, session, status }) => ({ id, room, session, status })) };
-          });
-          const nativeRequests = provider.requests.slice(-4).map(request => ({ lastUser: lastUser(request).slice(-600) }));
-          scope.diagnostic(JSON.stringify({ nativeInspection, work: JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, journals: publications(), producers, nativeRequests }).slice(0, 8192));
-        } catch (diagnosticError) { scope.diagnostic(String(diagnosticError).slice(0, 1024)); }
-        throw error;
-      }
-      assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, histories, 'Every room retains its exact saved native history');
-      assert.deepEqual(JSON.parse(readFileSync(checkpoint, 'utf8')) as unknown, []);
+      await operate('start');
+      assert.equal(provider.requests.length, beforeResume, 'Both completed and unfinished rooms remain asleep after restart');
+      assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, histories);
+      if (provider.held()) provider.finish();
+      const next = 'New explicit room input ' + randomUUID();
+      await send(rooms[1]!, next);
+      await observe(() => provider.requests.length === beforeResume + 1, 'A new room message wakes only the target history', 90000);
+      const request = provider.requests.at(-1);
+      assert(lastUser(request).includes(next));
+      assert(JSON.stringify(request).includes(unfinished), 'The exact target retains its earlier task context');
+      assert(!JSON.stringify(request).includes(completed), 'The target never receives another room task history');
+      await observe(idle, 'New per-room input completes');
+      assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, histories);
     } finally {
       if (provider.held()) provider.finish();
       await operate('stop'); writeFileSync(configuration, original, { mode: 0o600 }); await operate('reset');
@@ -563,10 +534,11 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
         const rows = list((await human(coordinationOperations.fleetRuntimeOperations)).data).map(record), operation = rows.find(value => value.operationId === operationId); assert(operation, 'Management retains its requested operation');
         assert.notEqual(operation.status, 'failed', String(operation.errorMessage) + '\n' + daemon.errors()); return operation.status === 'succeeded';
       }, 'Management receives actual controller completion: ' + action, 90000);
-      const state = record((await call(operations.fleet, { fleetId })).data), instance = record(list(state.instances)[0]); assert.equal(instance.desiredActive, action === 'start'); assert.equal(instance.phase, action === 'start' ? 'running' : 'stopped');
+      const state = record((await call(operations.fleet, { fleetId })).data), instance = record(list(state.instances)[0]); assert.equal(instance.desiredActive, action === 'start'); assert.equal(instance.phase, action === 'start' ? 'sleeping' : 'stopped');
       assert.deepEqual((await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data, saved);
+      assert.equal(provider.requests.length, before, 'Each management lifecycle operation preserves zero inference');
     }
-    assert.equal(provider.requests.length, before, 'Management lifecycle control makes no model call for finished work');
+    assert.equal(provider.requests.length, before, 'Management lifecycle control makes no model call');
   });
   await scope.test('setup reuses stopped identities and unregistration retains authored roles and native histories', async () => {
     const requests = provider.requests.length;

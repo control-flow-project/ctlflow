@@ -81,7 +81,7 @@ fleet agent update FLEET INSTANCE [--operation-id UUID] [--release-directory DIR
 fleet agent remove|contexts FLEET INSTANCE
 fleet agent attach FLEET INSTANCE [--context CONTEXT]
 
-Start resumes retained history; --fresh-history explicitly replaces it.
+Start restores listeners with retained histories asleep; --fresh-history replaces history.
 Stop clears selected bindings' desired activation and retains their histories.
 Daemon shutdown preserves desired activation for the next daemon start.
 Contexts lists saved histories without waking stopped or sleeping agents.

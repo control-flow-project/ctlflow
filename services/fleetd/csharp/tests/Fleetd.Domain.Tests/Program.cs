@@ -57,5 +57,5 @@ await using (var fixture = new ControllerFixture())
     var resumed = await fixture.Operate("start"); Check(resumed.IsSuccess, "Startup can be retried after the native adapter failure is corrected");
     Check((await fixture.Completion(resumed.Value.Request.OperationId).WaitAsync(TimeSpan.FromSeconds(5))).Status == "succeeded", "The replacement owner completes normally");
 }
-await NativeWorkAcceptance.Run(Check);
+await NativeLazyAcceptance.Run(Check);
 Console.WriteLine("{\"status\":\"passed\",\"scope\":\"controller state transitions\",\"assertions\":" + assertions + ",\"dynamicCode\":" + (RuntimeFeature.IsDynamicCodeSupported ? "true" : "false") + "}");

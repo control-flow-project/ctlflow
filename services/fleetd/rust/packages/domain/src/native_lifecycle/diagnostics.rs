@@ -1,12 +1,8 @@
 use super::*;
 use crossfire_agent_core::owned_runtime::{NativeDiagnostic, ProviderState};
 
-impl<
-    A: OwnedAdapter<LifecycleHooks<H, W, T>>,
-    H: Hooks + 'static,
-    W: WorkStore + Send + Sync,
-    T: Clock + Send + Sync,
-> Owner<A, H, W, T>
+impl<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks + 'static, T: Clock + Send + Sync>
+    Owner<A, H, T>
 {
     pub async fn diagnostics(&self, cancellation: CancellationToken) -> Result<NativeDiagnostic> {
         let (connection, phase, pending) = {

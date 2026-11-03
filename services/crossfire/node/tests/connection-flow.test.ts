@@ -93,7 +93,7 @@ test('public fleet setup starts a separate native history, reuses identity and p
   assert(!output.includes(existing.token));
   assert.equal(provider.requests.length, 0, 'Native startup and exact receiver readiness use ordinary code');
   const first = value(fleetView(JSON.parse((await cli('show', request.fleetKey!)).stdout)));
-  assert.equal(first.phase, 'running');
+  assert.equal(first.phase, 'sleeping');
   assert.equal(first.instances.length, 1);
   const agent = first.instances[0]!;
   assert(agent.sessionId);
@@ -142,7 +142,7 @@ test('public fleet setup starts a separate native history, reuses identity and p
   assert.equal(value(fleetView(JSON.parse((await cli('show', first.fleetKey)).stdout))).instances[0]!.phase, 'stopped');
   await cli('start', first.fleetKey);
   const resumed = value(fleetView(JSON.parse((await cli('show', first.fleetKey)).stdout)));
-  assert.equal(resumed.instances[0]!.phase, 'running');
+  assert.equal(resumed.instances[0]!.phase, 'sleeping');
   assert.equal(resumed.instances[0]!.sessionId, agent.sessionId, 'Default start resumes the exact managed native history');
   assert.deepEqual(readFileSync(profilePath), profileBytes);
   assert.equal(provider.requests.length, 0);

@@ -1,11 +1,7 @@
 use super::*;
 
-impl<
-    A: OwnedAdapter<LifecycleHooks<H, W, T>>,
-    H: Hooks + 'static,
-    W: WorkStore + Send + Sync,
-    T: Clock + Send + Sync,
-> Logical<A, H, W, T>
+impl<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks + 'static, T: Clock + Send + Sync>
+    Logical<A, H, T>
 {
     fn entered(&self) -> Operation<'_> {
         self.owner.calls.fetch_add(1, Ordering::AcqRel);
@@ -36,12 +32,8 @@ impl<
         Ok(selected)
     }
 }
-impl<
-    A: OwnedAdapter<LifecycleHooks<H, W, T>>,
-    H: Hooks + 'static,
-    W: WorkStore + Send + Sync,
-    T: Clock + Send + Sync,
-> Connection for Logical<A, H, W, T>
+impl<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks + 'static, T: Clock + Send + Sync> Connection
+    for Logical<A, H, T>
 {
     fn session_id(&self) -> &str {
         &self.session
@@ -67,7 +59,7 @@ impl<
                     || pending
                     || self.owner.calls.load(Ordering::Acquire) != 0)
             }
-            _ => Ok(matches!(phase, Phase::Waking | Phase::Failed)),
+            _ => Ok(phase == Phase::Waking || self.owner.calls.load(Ordering::Acquire) != 0),
         }
     }
     async fn deliver(
@@ -91,12 +83,6 @@ impl<
         if stop.is_cancelled() {
             return Err(unavailable("Native input cancelled before submission"));
         }
-        self.owner
-            .tracker
-            .capture_input(crate::model::InterruptedContext {
-                context: self.context(),
-                session_id: self.session.clone(),
-            })?;
         selected
             .as_ref()
             .unwrap_or(native.as_ref())
@@ -113,7 +99,6 @@ impl<
             .native
             .is_none()
             && !self.owner.input.hooks.pending_input()
-            && !self.owner.input.hooks.pending_decisions()
         {
             return Ok(false);
         }
@@ -191,12 +176,8 @@ impl<
         self.owner.close().await
     }
 }
-impl<
-    A: OwnedAdapter<LifecycleHooks<H, W, T>>,
-    H: Hooks + 'static,
-    W: WorkStore + Send + Sync,
-    T: Clock + Send + Sync,
-> TurnControl for Logical<A, H, W, T>
+impl<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks + 'static, T: Clock + Send + Sync> TurnControl
+    for Logical<A, H, T>
 {
     async fn active_turn(
         &self,
@@ -234,12 +215,8 @@ impl<
         native.interrupt(turn, recovery, admission).await
     }
 }
-impl<
-    A: OwnedAdapter<LifecycleHooks<H, W, T>>,
-    H: Hooks + 'static,
-    W: WorkStore + Send + Sync,
-    T: Clock + Send + Sync,
-> OwnedConnection for Logical<A, H, W, T>
+impl<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks + 'static, T: Clock + Send + Sync>
+    OwnedConnection for Logical<A, H, T>
 {
     async fn provider(
         &self,
@@ -255,7 +232,7 @@ impl<
         match native {
             Some(native) if !native.lifetime().is_cancelled() => native.activity().await,
             _ => Ok(NativeActivity {
-                busy: matches!(phase, Phase::Waking | Phase::Failed),
+                busy: phase == Phase::Waking || self.owner.calls.load(Ordering::Acquire) != 0,
                 contexts: Vec::new(),
             }),
         }
@@ -281,12 +258,8 @@ impl<
         }
     }
 }
-impl<
-    A: OwnedAdapter<LifecycleHooks<H, W, T>>,
-    H: Hooks,
-    W: WorkStore + Send + Sync,
-    T: Clock + Send + Sync,
-> Lifecycle for Logical<A, H, W, T>
+impl<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks, T: Clock + Send + Sync> Lifecycle
+    for Logical<A, H, T>
 {
     fn current(&self) -> Result<SessionState> {
         self.owner.current()

@@ -27,7 +27,6 @@ public sealed partial class ExecutionHost
         public InstanceExecution(NativeLifecycle native, CancellationToken lifetime, ListenerControl control, Func<Task> close) { Native = native; lifetimeToken = lifetime; Control = control; this.close = close; }
         public NativeSessionState NativeState() => Native.Current();
         public ValueTask<NativeDiagnostic> Diagnostics(CancellationToken cancellation) => Native.Diagnostics(cancellation);
-        public ValueTask<Result<Unit>> Resume() => Native.Resume();
         public ValueTask<Result<RuntimeAttachment>> Attachment(string? context = null) => Native.Attachment(context);
         public Result<IReadOnlyList<SavedRuntimeContext>> Contexts() => Native.Contexts();
         public ValueTask DisposeAsync()
@@ -65,7 +64,7 @@ public sealed partial class ExecutionHost
             control = connection.Control.Bind(identity.AgentId); var ready = new TaskCompletionSource<Result<Unit>>(TaskCreationOptions.RunContinuationsAsynchronously); var transport = connected.Value;
             var options = new ListenerOptions(profile, AgentState.Port, transport.Client, client, control, host.Budget, clock, local.Cursors, software.Release.Identity, async (hooks, lifetime) =>
             {
-                var services = new NativeLifecycleServices(definition.Runtime, validated.Value.Approval, instance.HistoryMode == NativeHistoryMode.PerRoom ? "control" : "shared", reason == "operator" ? "running" : "sleeping", adapter.ConfiguredSettings(validated.Value.Options), hooks, new ResumeFiles(local.State, clock).Port,
+                var services = new NativeLifecycleServices(definition.Runtime, validated.Value.Approval, instance.HistoryMode == NativeHistoryMode.PerRoom ? "control" : "shared", BindingFiles.CanInitialize(configuration.Directory, identity.AgentId), adapter.ConfiguredSettings(validated.Value.Options), hooks,
                     () => adapter.SavedContexts(workspace, stateDirectory), async (observe, admission, runtimeStop) =>
                     {
                         var admitted = await host.Budget.Acquire(ListenerWork.NativeStart, admission?.Cancellation ?? runtimeStop, admission is not null); if (!admitted.IsSuccess) return Result<OwnedRuntimeConnection>.Fail(admitted.Error); using var lease = admitted.Value;

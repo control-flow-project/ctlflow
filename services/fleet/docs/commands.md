@@ -44,7 +44,8 @@ fleet agent remove research analyst-west
 
 Add registers explicit configuration; it does not discover directories.
 Enroll proposes the stopped roster and policies for owner review without enabling
-execution. Start resumes saved histories. Stop removes desired activation before
+execution. Start restores listeners with saved native histories asleep; eligible
+input wakes only its target. Stop removes desired activation before
 closing listeners/native processes. Remove retires/archive coordination authority
 after exact stop evidence; files and histories remain.
 

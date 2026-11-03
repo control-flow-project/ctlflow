@@ -150,7 +150,7 @@ export async function cliContracts(scope: TestContext, platform: ContractPlatfor
     assert.deepEqual(await json('agent', 'contexts', configuredId, 'setup-analyst'), before);
     assert.equal(record(await json('test', configuredId)).accepted, true);
     const pointer = await cli('agent', 'attach', configuredId, 'setup-analyst');
-    assert.equal(pointer.code === 0, runtime === 'codex', 'Only Codex exposes an existing-process terminal attachment');
+    assert.notEqual(pointer.code, 0, 'An idle CLI start cannot open a native terminal or trigger inference');
     const operationId = randomUUID(), stop = ['agent', 'stop', configuredId, 'setup-analyst', '--operation-id', operationId];
     assert.equal((await cli(...stop)).code, 0); assert.equal((await cli(...stop)).code, 0);
     assert.notEqual((await cli('agent', 'start', configuredId, 'setup-analyst', '--operation-id', operationId)).code, 0);
@@ -198,7 +198,10 @@ export async function cliContracts(scope: TestContext, platform: ContractPlatfor
     const sent = await cli('message', configuredId, '--text', marker, '--message-id', messageId); assert.equal(sent.code, 0, sent.error);
     assert(sent.output.includes(messageId));
     await observe(() => provider.held() !== undefined, 'The installed CLI message reaches the actual native engine');
-    assert(JSON.stringify(provider.requests.at(-1)).includes(marker)); provider.finish();
+    assert(JSON.stringify(provider.requests.at(-1)).includes(marker));
+    const pointer = await cli('agent', 'attach', configuredId, 'setup-analyst');
+    assert.equal(pointer.code === 0, runtime === 'codex', 'Only an actually active Codex writer exposes its terminal');
+    provider.finish();
     await observe(async () => (await cli('test', configuredId)).code === 0, 'Native reply settles without changing CLI history');
     assert.deepEqual(await json('agent', 'contexts', configuredId, 'setup-analyst'), histories);
     assert.equal((await cli('stop', configuredId)).code, 0);

@@ -77,7 +77,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const [code] = await ended; assert.equal(code, 0, output + errors);
   const first = JSON.parse((await cli('show', 'research')).stdout) as Fleet;
   scope.diagnostic('Enrollment and initial native startup completed');
-  assert.equal(first.phase, 'running'); assert(first.instances.every(instance => instance.phase === 'running' && instance.sessionId));
+  assert.equal(first.phase, 'sleeping'); assert(first.instances.every(instance => instance.phase === 'sleeping' && instance.sessionId));
   assert(providers.every(provider => provider.requests.length === 0), 'Enrollment, native startup, release installation and ready heartbeats are model-free');
   const binding = JSON.parse(readFileSync(join(fleet, '.fleet/binding.json'), 'utf8')) as Binding;
   const controller = createClient({ origin, token: binding.controllerCredential });
@@ -129,15 +129,8 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   const resumed = JSON.parse((await cli('show', 'research')).stdout) as Fleet;
   assert.deepEqual(resumed.instances.map(instance => instance.sessionId), first.instances.map(instance => instance.sessionId));
   assert(providers.every(provider => provider.requests.length === 0));
-  const pointer = (await cli('agent', 'attach', 'research', 'north')).stdout.trim();
-  assert(pointer.includes(first.instances[0]!.sessionId!));
-  const northHome = join(definition, 'workarea/north/.codex');
-  const terminal = openTerminal(scope, pointer, { ...env, CODEX_HOME: northHome });
-  await terminal.until(output => output.includes('gpt-5.1'));
-  await terminal.quit();
-  scope.diagnostic('Same-history resume and native TUI attachment completed');
-  assert(providers.every(provider => provider.requests.length === 0), 'TUI pointer and native attachment make no model calls');
-  assert((JSON.parse((await cli('show', 'research')).stdout) as Fleet).instances.every(instance => instance.phase === 'running'));
+  await assert.rejects(cli('agent', 'attach', 'research', 'north'), /sleeping/);
+  assert((JSON.parse((await cli('show', 'research')).stdout) as Fleet).instances.every(instance => instance.phase === 'sleeping'));
   value(await invitations.change(guest.id, roomId, { accessMode: 'reply', nativeAccess: null })); await worker.drain();
   value(await nativeOk({ base: fixture.native.base, token: guest.token }, 'PUT', roomPath + '/send/m.room.message/foreign-context',
     { msgtype: 'm.text', body: 'Context from another owner’s agent' }));
@@ -152,6 +145,18 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   await acquired(); assert(providers.every(provider => provider.requests.length === 0));
   value(await nativeOk(ownerNative, 'PUT', roomPath + '/send/m.room.message/task', { msgtype: 'm.text', body: 'Authorized owner task' }));
   await until(() => providers[0]!.requests.length === 1);
+  const pointer = (await cli('agent', 'attach', 'research', 'north')).stdout.trim();
+  assert(pointer.includes(first.instances[0]!.sessionId!));
+  const northHome = join(definition, 'workarea/north/.codex');
+  const terminal = openTerminal(scope, pointer, { ...env, CODEX_HOME: northHome });
+  await terminal.until(output => output.includes('gpt-5.1'));
+  await terminal.quit();
+  scope.diagnostic('Same-history resume and native TUI attachment completed');
+  assert.equal(providers[0]!.requests.length, 1, 'TUI pointer and native attachment make no model calls');
+  assert.equal(providers[1]!.requests.length, 0);
+  const attached = (JSON.parse((await cli('show', 'research')).stdout) as Fleet).instances;
+  assert.equal(attached.find(instance => instance.instance.key === 'north')!.phase, 'running');
+  assert.equal(attached.find(instance => instance.instance.key === 'south')!.phase, 'sleeping');
   const request = providers[0]!.requests[0] as { model: string; reasoning: { effort: string };
     input: { type: string; role?: string; content?: { type: string; text?: string }[] }[] };
   assert.equal(request.model, 'gpt-5.1'); assert.equal(request.reasoning.effort, 'medium');
@@ -205,7 +210,7 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   }
   const paused = await observe(current => current.instances.every(instance => !instance.listenerActive));
   scope.diagnostic('Delivery pause observed');
-  assert.equal(paused.phase, 'running'); assert.deepEqual(paused.instances.map(instance => instance.sessionId), sessions);
+  assert.equal(paused.phase, 'sleeping'); assert.deepEqual(paused.instances.map(instance => instance.sessionId), sessions);
   const beforePause = providers.map(provider => provider.requests.length);
   value(await nativeOk(ownerNative, 'PUT', roomPath + '/send/m.room.message/while-disabled', { msgtype: 'm.text', body: 'Retained while fleet is deactivated' }));
   await assert.rejects(cli('message', 'research', '--text', 'Refused while deactivated'), /Activate this fleet/);
@@ -263,21 +268,21 @@ test('real fleet CLI, daemon, Conduit and stock Codex enroll, deliver and resume
   assert(remotelyStopped.instances.every(instance => !instance.listenerActive));
   assert.deepEqual(remotelyStopped.instances.map(instance => instance.sessionId), sessions);
   await requestSessions('start', null);
-  const remotelyResumed = await observe(current => current.instances.every(instance => instance.phase === 'running' && instance.listenerActive));
+  const remotelyResumed = await observe(current => current.instances.every(instance => instance.phase === 'sleeping' && instance.listenerActive));
   assert.deepEqual(remotelyResumed.instances.map(instance => instance.sessionId), sessions, 'Remote fleet resume retains the exact native histories');
   await requestSessions('stop', north.agentId);
   const individualStopped = await observe(current => current.instances.find(instance => instance.instance.key === 'north')?.phase === 'stopped');
   assert.equal(individualStopped.connection.connected, true);
-  assert.equal(individualStopped.instances.find(instance => instance.instance.key === 'south')?.phase, 'running');
+  assert.equal(individualStopped.instances.find(instance => instance.instance.key === 'south')?.phase, 'sleeping');
   await requestSessions('start', north.agentId);
-  const individualResumed = await observe(current => current.instances.every(instance => instance.phase === 'running' && instance.listenerActive));
+  const individualResumed = await observe(current => current.instances.every(instance => instance.phase === 'sleeping' && instance.listenerActive));
   assert.deepEqual(individualResumed.instances.map(instance => instance.sessionId), sessions, 'Remote individual resume preserves both histories');
   await requestSessions('reset', north.agentId);
-  const individualFresh = await observe(current => current.instances.every(instance => instance.phase === 'running' && instance.listenerActive));
+  const individualFresh = await observe(current => current.instances.every(instance => instance.phase === 'sleeping' && instance.listenerActive));
   assert.notEqual(individualFresh.instances[0]!.sessionId, sessions[0]);
   assert.equal(individualFresh.instances[1]!.sessionId, sessions[1], 'Fresh individual history does not replace a peer history');
   const wholeFleetReset = await requestSessions('reset', null);
-  const fleetFresh = await observe(current => current.instances.every(instance => instance.phase === 'running' && instance.listenerActive));
+  const fleetFresh = await observe(current => current.instances.every(instance => instance.phase === 'sleeping' && instance.listenerActive));
   assert(fleetFresh.instances.every((instance, index) => instance.sessionId !== individualFresh.instances[index]!.sessionId));
   const repeatedReset = await fetch(origin + sessionOperationsPath, { method: 'POST', headers: { Cookie: '__Host-crossfire=' + admin.secret, Origin: origin,
     'X-Crossfire-CSRF': admin.csrfSecret, 'Content-Type': 'application/json' }, body: JSON.stringify(wholeFleetReset) });

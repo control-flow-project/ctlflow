@@ -1294,21 +1294,18 @@ services/fleetd/csharp/packages/Fleetd.Domain/Models.cs	services/fleetd/rust/pac
 services/fleetd/csharp/packages/Fleetd.Domain/NativeDiagnostics.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/NativeLifecycle.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/NativeLogicalConnection.cs	services/fleetd/rust/packages/domain	native library
-services/fleetd/csharp/packages/Fleetd.Domain/ResumeTasks.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Storage/Authentication.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/ConfigurationFiles.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/FleetBinding.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/Fleetd.Storage.csproj	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/RegistryFiles.cs	services/fleetd/rust/packages/storage	native library
-services/fleetd/csharp/packages/Fleetd.Storage/ResumeFiles.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/SetupFiles.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/tests/Fleetd.Domain.Tests/ControllerFixture.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/csharp/tests/Fleetd.Domain.Tests/Fleetd.Domain.Tests.csproj	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
-services/fleetd/csharp/tests/Fleetd.Domain.Tests/NativeWorkAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Domain.Tests/NativeLazyAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/csharp/tests/Fleetd.Domain.Tests/Program.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/csharp/tests/Fleetd.Storage.Tests/Fleetd.Storage.Tests.csproj	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/csharp/tests/Fleetd.Storage.Tests/Program.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
-services/fleetd/csharp/tests/Fleetd.Storage.Tests/ResumeAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/apps/daemon/LICENSE	services/fleetd/rust/apps/daemon	application
 services/fleetd/node/apps/daemon/package.json	services/fleetd/rust/apps/daemon	application
 services/fleetd/node/apps/daemon/src/http.ts	services/fleetd/rust/apps/daemon	application
@@ -1336,7 +1333,6 @@ services/fleetd/node/packages/domain/src/native-lifecycle.ts	services/fleetd/rus
 services/fleetd/node/packages/domain/src/operation-history.ts	services/fleetd/rust/packages/domain	native library
 services/fleetd/node/packages/domain/src/port.ts	services/fleetd/rust/packages/domain	native library
 services/fleetd/node/packages/domain/src/resume-selection.ts	services/fleetd/rust/packages/domain	native library
-services/fleetd/node/packages/domain/src/resume-work.ts	services/fleetd/rust/packages/domain	native library
 services/fleetd/node/packages/domain/src/setup.ts	services/fleetd/rust/packages/domain	native library
 services/fleetd/node/packages/storage/LICENSE	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/package.json	services/fleetd/rust/packages/storage	native library
@@ -1349,7 +1345,6 @@ services/fleetd/node/packages/storage/src/logging.ts	services/fleetd/rust/packag
 services/fleetd/node/packages/storage/src/operation.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/registry.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/resume-selection.ts	services/fleetd/rust/packages/storage	native library
-services/fleetd/node/packages/storage/src/resume-work.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/packages/storage/src/setup.ts	services/fleetd/rust/packages/storage	native library
 services/fleetd/node/scripts/build-package.mjs	scripts/publish-rust.mjs	target build/verification; native equivalent uses workspace coordinators
 services/fleetd/node/tests/authentication.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
@@ -1363,14 +1358,12 @@ services/fleetd/node/tests/history-initialization.test.ts	services/fleetd/tests/
 services/fleetd/node/tests/logging-retention.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/native-lifecycle-integration.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/native-lifecycle.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
-services/fleetd/node/tests/native-recovery-order.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/native-stops.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/operator-tools.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/pi-lifecycle-integration.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/pi-provider-acceptance.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/registry-intent.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/resume-authority.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
-services/fleetd/node/tests/resume-work.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/setup-controller.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/setup-storage.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/node/tests/toml.test.ts	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank

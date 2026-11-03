@@ -38,11 +38,8 @@ public sealed record FleetRegistry(Func<Result<IReadOnlyList<FleetRegistration>>
     Func<Result<IReadOnlyList<FleetOperation>>> PendingOperations, Func<string, Result<FleetOperation?>> Operation, Func<FleetOperation, Result<Unit>> SaveOperation,
     Func<long, int, Result<bool>> PruneOperations, Func<string, Result<FleetConfiguration>> Load, Func<FleetConfiguration, FleetRoster, Result<FleetConfiguration>> WriteRoster,
     Func<SetupRequest, Result<SetupConfiguration>> Setup, Func<string, Result<Unit>> CompleteSetup, Func<string, string, Result<Unit>> RetrySetup);
-public sealed record ResumeWork(string Context, string SessionId, string MessageId, long CheckpointedAt);
-public sealed record InterruptedContext(string Context, string SessionId);
-public sealed record ResumeWorkStore(Func<Result<IReadOnlyList<ResumeWork>>> Read, Func<IReadOnlyList<InterruptedContext>, Result<Unit>> Capture, Func<string, Result<ResumeWork>> Renew, Func<IReadOnlyList<InterruptedContext>, Result<Unit>> Clear);
-public sealed record NativeLifecycleServices(string Runtime, RuntimeApproval Approval, string Primary, string Initial, IReadOnlyList<RuntimeSetting> Settings, RuntimeHooks Hooks,
-    ResumeWorkStore Work, Func<Result<IReadOnlyList<SavedRuntimeContext>>> Saved,
+public sealed record NativeLifecycleServices(string Runtime, RuntimeApproval Approval, string Primary, bool AllowNewHistory, IReadOnlyList<RuntimeSetting> Settings, RuntimeHooks Hooks,
+    Func<Result<IReadOnlyList<SavedRuntimeContext>>> Saved,
     Func<Action<RuntimeObservationEvent>, InputAdmission?, CancellationToken, ValueTask<Result<OwnedRuntimeConnection>>> Start,
     Action<string?, Failure> Failed, Action Recovered, TimeProvider Clock);
 public interface RunningAgent : IAsyncDisposable
@@ -53,7 +50,6 @@ public interface RunningAgent : IAsyncDisposable
     bool ListenerActive { get; }
     NativeSessionState NativeState();
     ValueTask<NativeDiagnostic> Diagnostics(CancellationToken cancellation);
-    ValueTask<Result<Unit>> Resume();
     ValueTask<Result<RuntimeAttachment>> Attachment(string? context = null);
     Result<IReadOnlyList<SavedRuntimeContext>> Contexts();
 }

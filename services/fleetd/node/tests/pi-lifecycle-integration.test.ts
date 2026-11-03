@@ -9,7 +9,6 @@ import { piProvider } from '@ctlflow/crossfire-test-support/pi-provider';
 import { piBinary } from '@ctlflow/crossfire-test-support/pi';
 import { piRuntime } from '@ctlflow/crossfire-adapter-pi/owned';
 import { createNativeLifecycle, type NativeLifecycleServices } from '@ctlflow/fleetd-domain/native-lifecycle';
-import { createResumeWork } from '@ctlflow/fleetd-storage/resume-work';
 import type { Clock } from '@ctlflow/crossfire-agent-core/port';
 import type { RuntimeObservationEvent } from '@ctlflow/crossfire-agent-core/runtime';
 import { success } from '@ctlflow/crossfire-kernel/result';
@@ -33,10 +32,9 @@ test('stock Pi uses common sleep, wake, stop, restart and process-crash recovery
     for (const [id, timer] of [...timers]) if (timer.at <= now) { timers.delete(id); timer.callback(); }
     await yieldLoop();
   }
-  const services: NativeLifecycleServices = { clock, primary: 'shared', runtime: 'pi', approval: 'none', initial: 'running',
+  const services: NativeLifecycleServices = { clock, primary: 'shared', runtime: 'pi', approval: 'none', allowNewHistory: true,
     initialSettings: adapter.configuredSettings({ provider: 'fixture', model: 'fixture-model', thinking_level: 'medium' }),
-    work: createResumeWork(join(workspace, '.crossfire/state/pi-lifecycle'), () => now),
-    saved: () => adapter.savedContexts({ workspace, stateDirectory: workspace }),
+        saved: () => adapter.savedContexts({ workspace, stateDirectory: workspace }),
     hooks: { observe: event => observations.push(event), pendingInput: () => false, pendingDecisions: () => false, requestDecision: async () => success(null) },
     failed: (_session, error) => failures.push(error instanceof Error ? error.message : String(error)), recovered: () => { recovered++; },
     start: async (signal, observe) => {
@@ -55,23 +53,19 @@ test('stock Pi uses common sleep, wake, stop, restart and process-crash recovery
   await advance(1800000); assert.equal(managed.nativeState().phase, 'running', 'Working Pi cannot idle-sleep');
   provider.finish(); await until(async () => !(await managed.runtime.inspect()).busy);
   await advance(1800000); await until(() => managed.nativeState().phase === 'sleeping');
-  assert.equal(starts, 1); assert.equal(value(await managed.contexts())[0]?.sessionId, sessionId);
+  assert.equal(starts, 2); assert.equal(value(await managed.contexts())[0]?.sessionId, sessionId);
   writeFileSync(join(provider.home, 'auth.json'), '{"fixture":{"type":"api_key","key":"refreshed-local"}}', { mode: 0o600 });
   await managed.runtime.deliver('Resume with native earlier context.', 'pi-lifecycle-two'); managed.runtime.acknowledge(['pi-lifecycle-two']);
   await until(async () => !(await managed.runtime.inspect()).busy);
-  assert.equal(starts, 2); assert.equal(managed.runtime.sessionId, sessionId);
+  assert.equal(starts, 3); assert.equal(managed.runtime.sessionId, sessionId);
   assert(JSON.stringify(provider.requests[1]).includes('Retain the original Pi task'));
   assert.equal(readFileSync(join(workspace, '.pi/auth.json'), 'utf8'), readFileSync(join(provider.home, 'auth.json'), 'utf8'));
   provider.hold(); await managed.runtime.deliver('Unfinished Pi task before controller restart.', 'pi-lifecycle-unfinished');
   managed.runtime.acknowledge(['pi-lifecycle-unfinished']); await until(() => provider.held() !== undefined);
-  await until(() => value(services.work.read()).length === 1); await managed.close(); services.initial = 'sleeping';
-  managed = value(await createNativeLifecycle(services, new AbortController().signal));
-  assert.equal(provider.requests.length, 3, 'No continuation before listener readiness'); await managed.activate();
-  await until(() => provider.requests.length === 4); await until(async () => !(await managed.runtime.inspect()).busy);
-  assert.equal(starts, 3); assert.equal(managed.runtime.sessionId, sessionId);
-  assert(JSON.stringify(provider.requests[3]).includes('[Crossfire session restarted]'));
-  assert(JSON.stringify(provider.requests[3]).includes('Unfinished Pi task before controller restart.'));
-  assert.deepEqual(value(services.work.read()), []);
+  await managed.close(); services.allowNewHistory = false;
+  managed = value(await createNativeLifecycle(services, new AbortController().signal)); await managed.activate();
+  assert.equal(provider.requests.length, 3, 'Restart never submits an unfinished-task reminder');
+  assert.equal(managed.nativeState().phase, 'sleeping'); assert.equal(managed.runtime.sessionId, sessionId);
   const marker = join(directory, 'native.pid'); provider.tool('bash', { command: 'printf "%s" "$PPID" > ' + JSON.stringify(marker), timeout: 5 });
   await managed.runtime.deliver('Record the inert native process identity for a crash test.', 'pi-lifecycle-crash');
   managed.runtime.acknowledge(['pi-lifecycle-crash']); await until(async () => !(await managed.runtime.inspect()).busy);
@@ -82,12 +76,13 @@ test('stock Pi uses common sleep, wake, stop, restart and process-crash recovery
       'Crash target has this fixture’s exact private Pi home and immutable instance profile');
   }
   const recoveredBeforeCrash = recovered;
-  process.kill(pid, 'SIGKILL'); await until(() => starts === 4 && recovered === recoveredBeforeCrash + 1);
-  await until(() => managed.nativeState().phase === 'running');
-  assert.equal(managed.runtime.sessionId, sessionId); assert.equal(failures.length, 1); assert.equal(provider.requests.length, 6);
+  const startsBeforeCrash = starts;
+  process.kill(pid, 'SIGKILL'); await until(() => managed.nativeState().phase === 'failed');
+  assert.equal(starts, startsBeforeCrash); assert.equal(recovered, recoveredBeforeCrash);
+  assert.equal(managed.runtime.sessionId, sessionId); assert.equal(failures.length, 1); assert.equal(provider.requests.length, 5);
   await managed.runtime.deliver('Continue after process recovery.', 'pi-lifecycle-recovered'); managed.runtime.acknowledge(['pi-lifecycle-recovered']);
   await until(async () => !(await managed.runtime.inspect()).busy);
-  assert(JSON.stringify(provider.requests[6]).includes('Retain the original Pi task'));
+  assert(JSON.stringify(provider.requests[5]).includes('Retain the original Pi task'));
   assert(observations.some(event => event.kind === 'state' && event.observation.state === 'failed'));
   assert(observations.some(event => event.kind === 'state' && event.observation.state === 'sleeping'));
   for (const request of provider.requests) assert.equal((request.reasoning_effort), 'medium', 'Every Pi activation uses exact configured thinking');

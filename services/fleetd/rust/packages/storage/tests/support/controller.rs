@@ -64,9 +64,7 @@ impl RunningAgent for Agent {
             history_available: true,
         })
     }
-    fn resume(&self) -> Response<'_, ()> {
-        Box::pin(async { Ok(()) })
-    }
+
     fn attachment(&self, _context: Option<&str>) -> Response<'_, Attachment> {
         Box::pin(async { Err(Failure::new(ErrorCode::Conflict, "Fixture has no terminal")) })
     }

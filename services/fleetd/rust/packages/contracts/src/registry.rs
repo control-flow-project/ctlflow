@@ -1,5 +1,5 @@
 use crossfire_contracts::validation as check;
-use crossfire_kernel::{Failure, Result, failure::ErrorCode, time::MAX_TIMESTAMP};
+use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 use fleetd_domain::model::*;
 use serde_json::{Value, json};
 use std::{
@@ -163,49 +163,4 @@ pub fn selections_wire(values: &[ResumeSelection]) -> Value {
             .map(|value| json!({"fleetId":value.fleet_id,"instanceKeys":value.instance_keys}))
             .collect(),
     )
-}
-pub fn work(value: &Value) -> Result<Vec<ResumeWork>> {
-    let values = check::list(value, 0, 2002)?
-        .iter()
-        .map(|value| {
-            let value = check::object(
-                value,
-                &["context", "sessionId", "messageId", "checkpointedAt"],
-                &[],
-            )?;
-            Ok(ResumeWork {
-                context: check::text(
-                    &value["context"],
-                    1,
-                    crossfire_kernel::history_context::MAXIMUM_LENGTH,
-                )?
-                .to_owned(),
-                session_id: check::text(&value["sessionId"], 1, 200)?.to_owned(),
-                message_id: check::identifier(&value["messageId"])?.to_owned(),
-                checkpointed_at: check::integer(&value["checkpointedAt"], 0, MAX_TIMESTAMP)?,
-            })
-        })
-        .collect::<Result<Vec<_>>>()?;
-    if values
-        .iter()
-        .map(|value| &value.context)
-        .collect::<BTreeSet<_>>()
-        .len()
-        != values.len()
-        || values
-            .iter()
-            .map(|value| &value.message_id)
-            .collect::<BTreeSet<_>>()
-            .len()
-            != values.len()
-    {
-        return Err(Failure::new(
-            ErrorCode::Invalid,
-            "Duplicate interrupted native history",
-        ));
-    }
-    Ok(values)
-}
-pub fn work_wire(values: &[ResumeWork]) -> Value {
-    Value::Array(values.iter().map(|value| json!({"context":value.context,"sessionId":value.session_id,"messageId":value.message_id,"checkpointedAt":value.checkpointed_at})).collect())
 }

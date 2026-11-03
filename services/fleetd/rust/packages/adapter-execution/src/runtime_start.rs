@@ -7,10 +7,7 @@ use crossfire_agent_core::{
 };
 use crossfire_domain::runtime::values::HistoryMode;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, time::Clock};
-use fleetd_domain::{
-    native_lifecycle::{Initial, Logical, Owner},
-    resume_work::WorkStore,
-};
+use fleetd_domain::native_lifecycle::{Logical, Owner};
 use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
@@ -25,50 +22,32 @@ pub struct Template {
     pub instructions: String,
     pub options: Value,
     pub history_mode: HistoryMode,
-    pub initial: Initial,
     pub allow_new_history: bool,
 }
-pub type NativeOwner<H, W, T> = Owner<Adapter, H, W, T>;
-type OwnerSlot<H, W, T> = Arc<Mutex<Option<Arc<NativeOwner<H, W, T>>>>>;
-pub struct RuntimeStart<
-    H: Hooks + 'static,
-    W: WorkStore + Send + Sync + 'static,
-    T: Clock + Send + Sync + 'static,
-> {
+pub type NativeOwner<H, T> = Owner<Adapter, H, T>;
+type OwnerSlot<H, T> = Arc<Mutex<Option<Arc<NativeOwner<H, T>>>>>;
+pub struct RuntimeStart<H: Hooks + 'static, T: Clock + Send + Sync + 'static> {
     pub adapter: Arc<Adapter>,
     pub template: Template,
-    pub work: Arc<W>,
     pub clock: T,
-    owner: OwnerSlot<H, W, T>,
+    owner: OwnerSlot<H, T>,
     budget: Arc<Budget>,
 }
-impl<
-    H: Hooks + 'static,
-    W: WorkStore + Send + Sync + 'static,
-    T: Clock + Clone + Send + Sync + 'static,
-> Clone for RuntimeStart<H, W, T>
-{
+impl<H: Hooks + 'static, T: Clock + Clone + Send + Sync + 'static> Clone for RuntimeStart<H, T> {
     fn clone(&self) -> Self {
         Self {
             adapter: self.adapter.clone(),
             template: self.template.clone(),
-            work: self.work.clone(),
             clock: self.clock.clone(),
             owner: self.owner.clone(),
             budget: self.budget.clone(),
         }
     }
 }
-impl<
-    H: Hooks + 'static,
-    W: WorkStore + Send + Sync + 'static,
-    T: Clock + Clone + Send + Sync + 'static,
-> RuntimeStart<H, W, T>
-{
+impl<H: Hooks + 'static, T: Clock + Clone + Send + Sync + 'static> RuntimeStart<H, T> {
     pub fn new(
         adapter: Arc<Adapter>,
         template: Template,
-        work: Arc<W>,
         clock: T,
         budget: Arc<Budget>,
     ) -> Result<Self> {
@@ -86,7 +65,6 @@ impl<
         Ok(Self {
             adapter,
             template,
-            work,
             clock,
             owner: Arc::new(Mutex::new(None)),
             budget,
@@ -99,7 +77,7 @@ impl<
         }
         Ok(())
     }
-    pub fn owner(&self) -> Result<Option<Arc<NativeOwner<H, W, T>>>> {
+    pub fn owner(&self) -> Result<Option<Arc<NativeOwner<H, T>>>> {
         Ok(self
             .owner
             .try_lock()
@@ -114,21 +92,18 @@ impl<
             .map(|owner| owner.current())
             .transpose()
     }
-    pub async fn stop(&self, preserve_work: bool) -> Result<()> {
+    pub async fn stop(&self) -> Result<()> {
         let owner = self.owner.lock().await.clone();
         if let Some(owner) = owner {
-            owner.stop_native(preserve_work).await?;
+            owner.stop_native().await?;
         }
         Ok(())
     }
 }
-impl<
-    H: Hooks + 'static,
-    W: WorkStore + Send + Sync + 'static,
-    T: Clock + Clone + Send + Sync + 'static,
-> Factory<H> for RuntimeStart<H, W, T>
+impl<H: Hooks + 'static, T: Clock + Clone + Send + Sync + 'static> Factory<H>
+    for RuntimeStart<H, T>
 {
-    type Native = Logical<Adapter, H, W, T>;
+    type Native = Logical<Adapter, H, T>;
     async fn start(&self, hooks: Arc<H>, stop: CancellationToken) -> Result<Self::Native> {
         let mut current = self.owner.lock().await;
         if current.is_some() {
@@ -152,9 +127,7 @@ impl<
         let owner = Owner::open(
             self.adapter.clone(),
             input,
-            self.work.clone(),
             self.clock.clone(),
-            template.initial,
             stop,
             self.budget.clone(),
         )
