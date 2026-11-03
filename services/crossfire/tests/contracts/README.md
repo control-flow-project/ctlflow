@@ -34,7 +34,7 @@ through the controller and installed CLI scenarios.
 | Concurrent storage | server.contract.ts | An open read snapshot does not block a committed controller heartbeat; every backend retains WAL |
 | Container deployment | container.contract.ts | Actual operator/image, Element login/room/media, assets and persisted restart |
 | Operator arguments | operator.contract.ts | Repeated-option refusal, canonical decimal port bounds, unchanged private state and validation before native operations |
-| Operator recovery | container-recovery.contract.ts | Concurrent refusal, real launcher death, running/exited orphans and foreign-ownership fencing |
+| Container recovery | container-recovery.contract.ts | Transfer/import, image-owned readiness, shared Compose backend changes, validation before writer stop, failed-migration gating and project isolation |
 
 An authentication check is not successful-operation coverage. A decoded success
 is not proof of every possible state transition. Language-local suites retain
@@ -48,8 +48,7 @@ with localhost/IP subject alternatives and serverAuth usage. Strict native clien
 verify its actual chain; no backend disables TLS verification. The installed
 ingress fixture uses a real TLS proxy that overwrites the peer IP;
 its immediate application peer is explicitly trusted. Container deployment tests
-separately exercise rootless port publication and persistent data. Migration-orphan
-fixtures represent abandoned native-container states; they do not simulate every
-possible interrupted Knex statement.
+separately exercise rootless port publication and persistent data. Migration-failure fixtures check Compose startup gating and retry against retained
+data; they do not simulate every possible interrupted Knex statement.
 
 - [Execution and matrix format](../../../../docs/verification/shared-contracts.md)

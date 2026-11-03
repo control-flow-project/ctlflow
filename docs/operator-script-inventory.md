@@ -15,7 +15,6 @@
 | Reviewed complete-roster wake changes | crossfire fleet-wake check |
 | Current controller/native binding | fleetd verify |
 | Provider-file/context preservation | fleetd snapshot/preserve |
-| Explicit selected Pi provider execution | fleetd provider-acceptance tool |
 | Setup/update/start/stop/reset | fleet CLI and controller lifecycle |
 
 Generic checks take deployment-specific inputs.

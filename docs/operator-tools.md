@@ -50,8 +50,8 @@ A reachable controller is not a currently working model.
 
 Production resets, broad process killing, guessed native ownership and silent
 software download are not operator-check capabilities.
-Mutating regressions use isolated fixtures. Provider execution requires the
-separate explicit acceptance command and its budgets.
+Mutating regressions use isolated fixtures. Paid-provider execution requires separate explicit authorization and is not
+part of the inert-provider regression suite.
 
 - [Development resource limits](development.md)
 - [Deployment operations](../services/crossfire/docs/operations.md)

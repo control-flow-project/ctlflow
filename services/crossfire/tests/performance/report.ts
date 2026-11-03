@@ -1,25 +1,22 @@
-import type { PerformanceComparison, PerformanceReport } from './statistics.js';
+import type { PerformanceReport } from './statistics.js';
 
 function escape(value: string): string {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 }
 const number = (value: number) => value.toFixed(2);
-const usesApprovedException = (value: PerformanceComparison) => value.passed &&
-  (value.medianRatio > 1 || value.tailRatio > 1 || value.throughputRatio < 1);
 
 export function performanceHtml(report: PerformanceReport): string {
   const workloads = [...new Set(report.comparisons.map(value => value.workload))];
   const cards = report.targets.map(target => {
     const rows = report.comparisons.filter(value => value.target === target.name);
     const failed = rows.filter(value => !value.passed).length;
-    const exceptionUsed = rows.some(usesApprovedException);
-    return `<article class="card"><p class="eyebrow">${escape(target.implementation)}</p><h2>${escape(target.name)}</h2><p class="verdict ${failed || !rows.length ? 'fail' : 'pass'}">${!rows.length ? 'Not measured' : failed ? failed + ' workloads exceed recorded limits' : exceptionUsed ? 'Passes with approved performance exception' : 'Meets reference baseline'}</p><p>${rows.reduce((sum, value) => sum + value.samples, 0).toLocaleString('en-US')} measured requests · ${rows.reduce((sum, value) => sum + value.failures, 0)} failures</p></article>`;
+    return `<article class="card"><p class="eyebrow">${escape(target.implementation)}</p><h2>${escape(target.name)}</h2><p class="verdict ${failed || !rows.length ? 'fail' : 'pass'}">${!rows.length ? 'Not measured' : failed ? failed + ' workloads exceed recorded limits' : 'Meets reference baseline'}</p><p>${rows.reduce((sum, value) => sum + value.samples, 0).toLocaleString('en-US')} measured requests · ${rows.reduce((sum, value) => sum + value.failures, 0)} failures</p></article>`;
   }).join('');
   const sections = workloads.map(workload => {
     const rows = report.comparisons.filter(value => value.workload === workload);
     const maximum = Math.max(...rows.map(value => value.p50Ms));
     const bars = rows.map(value => `<div class="bar-row"><span>${escape(value.target)}</span><svg role="img" aria-label="${escape(value.target)} median ${number(value.p50Ms)} milliseconds" viewBox="0 0 400 24"><rect width="${number(value.p50Ms / maximum * 400)}" height="24" rx="5" fill="${value.passed ? '#16745b' : '#b45309'}"/></svg><strong>${number(value.p50Ms)} ms</strong></div>`).join('');
-    const table = rows.map(value => `<tr><th scope="row">${escape(value.target)}</th><td>${number(value.p50Ms)}</td><td>${number(value.p95Ms)}</td><td>${number(value.p99Ms)}</td><td>${number(value.requestsPerSecond)}</td><td>${number(value.medianRatio)}× / ${number(value.tailRatio)}×</td><td>${number(value.maximumMedianRatio)}× / ${number(value.maximumTailRatio)}×</td><td>${number(value.throughputRatio)}×</td><td>${number(value.minimumThroughputRatio)}×</td><td>${value.failures}</td><td class="${value.passed ? 'pass' : 'fail'}">${value.passed ? usesApprovedException(value) ? 'Pass · approved exception' : 'Pass' : 'Fail'}</td></tr>`).join('');
+    const table = rows.map(value => `<tr><th scope="row">${escape(value.target)}</th><td>${number(value.p50Ms)}</td><td>${number(value.p95Ms)}</td><td>${number(value.p99Ms)}</td><td>${number(value.requestsPerSecond)}</td><td>${number(value.medianRatio)}× / ${number(value.tailRatio)}×</td><td>${number(value.maximumMedianRatio)}× / ${number(value.maximumTailRatio)}×</td><td>${number(value.throughputRatio)}×</td><td>${number(value.minimumThroughputRatio)}×</td><td>${value.failures}</td><td class="${value.passed ? 'pass' : 'fail'}">${value.passed ? 'Pass' : 'Fail'}</td></tr>`).join('');
     return `<section class="panel"><h2>${escape(workload)}</h2><p class="muted">Warm median latency. Shorter bars are faster.</p><div class="bars">${bars}</div><div class="table-wrap"><table><thead><tr><th scope="col">Runtime</th><th scope="col">p50 ms</th><th scope="col">p95 ms</th><th scope="col">p99 ms</th><th scope="col">Requests/s</th><th scope="col">p50 / p95 vs NativeAOT</th><th scope="col">p50 / p95 limits vs NativeAOT</th><th scope="col">Throughput vs NativeAOT</th><th scope="col">Minimum throughput vs NativeAOT</th><th scope="col">Failures</th><th scope="col">Gate</th></tr></thead><tbody>${table}</tbody></table></div></section>`;
   }).join('');
   const failures = (report.problem === null ? '' : `<li>${escape(report.problem)}</li>`) + report.measurements.flatMap(value => value.failures.map(failure => `<li><strong>${escape(value.target)} / ${escape(value.workload)}</strong>: ${escape(failure)}</li>`)).join('');
