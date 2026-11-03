@@ -18,7 +18,7 @@ native agents or write controller state directly.
 
 C# service source lives under `csharp/` and Rust service source under `rust/`. Shared TypeScript packages are private tooling and contract dependencies.
 External behavior is tested under `tests/contracts/`.
-`@ctlflow/fleet` may be publicly distributed; first-party material is MIT-licensed.
-Internal dependencies are bundled, not published separately.
+fleet is distributed with the matching native fleetd and shared artifacts.
+All npm workspaces are private; first-party material is MIT-licensed.
 
 - [License](LICENSE)
