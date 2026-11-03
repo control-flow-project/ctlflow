@@ -33,7 +33,7 @@ through the controller and installed CLI scenarios.
 | Data interchange | server.contract.ts | Every selected implementation reopens the same SQLite file |
 | Concurrent storage | server.contract.ts | An open read snapshot does not block a committed controller heartbeat; every backend retains WAL |
 | Container deployment | container.contract.ts | Actual operator/image, Element login/room/media, assets and persisted restart |
-| Operator arguments | operator.contract.ts | Repeated-option refusal, canonical decimal port bounds, unchanged private state and validation before native operations |
+| Operator arguments and daemon startup | operator.contract.ts | Normal invalid-daemon error exit before state creation; Repeated-option refusal, canonical decimal port bounds, unchanged private state and validation before native operations |
 | Container recovery | container-recovery.contract.ts | Transfer/import, image-owned readiness, shared Compose backend changes, validation before writer stop, failed-migration gating and project isolation |
 
 An authentication check is not successful-operation coverage. A decoded success

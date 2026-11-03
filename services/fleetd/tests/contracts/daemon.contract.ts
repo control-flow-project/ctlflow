@@ -435,7 +435,11 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       await observe(() => provider.held() !== undefined && lastUser(provider.requests.at(-1)).includes(unfinished), 'Another room has actual unfinished native work');
       const histories = (await call(operations.contexts, { fleetId, instanceKey: 'analyst' })).data;
       assert.deepEqual(list(histories).map(record).map(value => value.context).sort(), ['control', ...rooms.map(roomContext)].sort());
+      const unfinishedSession = text(list(histories).map(record).find(value => value.context === roomContext(rooms[1]!))?.sessionId);
+      await observe(() => publications().some(journal => journal.sessionId === unfinishedSession && journal.pending === null && journal.confirmed.length === 0),
+        'The native input receipt is acknowledged before stopping unfinished room work');
       const previousResponse = provider.held()!;
+      assert.equal(previousResponse.destroyed, false, 'Receipt acknowledgment must not require completing the held model work');
       await operate('stop');
       await observe(() => previousResponse.destroyed, 'Stop closes the exact native writer for the unfinished room');
       const beforeResume = provider.requests.length;
@@ -445,7 +449,17 @@ export async function daemonContracts(scope: TestContext, platform: ContractPlat
       if (provider.held()) provider.finish();
       const next = 'New explicit room input ' + randomUUID();
       await send(rooms[1]!, next);
-      await observe(() => provider.requests.length === beforeResume + 1, 'A new room message wakes only the target history', 90000);
+      try {
+        await observe(() => provider.requests.length === beforeResume + 1, 'A new room message wakes only the target history', 90000);
+      } catch (error) {
+        scope.diagnostic(JSON.stringify({ phase: 'per-room message after restart', runtime, beforeResume,
+          requests: provider.requests.length, daemonAlive: daemon.alive(), daemonError: daemon.errors().slice(-2000),
+          recentRequests: provider.requests.slice(beforeResume).map(request => ({
+            hasNewInput: lastUser(request).includes(next), hasUnfinishedInput: JSON.stringify(request).includes(unfinished),
+            hasOtherRoomInput: JSON.stringify(request).includes(completed),
+          })) }));
+        throw error;
+      }
       const request = provider.requests.at(-1);
       assert(lastUser(request).includes(next));
       assert(JSON.stringify(request).includes(unfinished), 'The exact target retains its earlier task context');
