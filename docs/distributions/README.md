@@ -11,7 +11,7 @@ does not move credentials into Docker. NativeAOT is the default; managed C# and
 Rust are explicit selections of the same current contract.
 
 - [Local Docker server and host-native fleet](../../services/crossfire/docs/local-docker.md)
-- [0.1.25 server and migration release inventory](releases/0.1.25.md)
+- [0.1.26 native release inventory](releases/0.1.26.md)
 
 | Target | Server installation | Fleet/controller installation | Build command |
 | --- | --- | --- | --- |
