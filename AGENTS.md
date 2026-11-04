@@ -7,6 +7,12 @@ contracts. Native identifiers follow language conventions, including Crossfire.*
 Fleetd.* and Fleet.* in C#. Generic UI headings use ordinary sentence casing.
 Historical verification records describe their original revisions.
 
+On 2026-11-03 the owner removed all Node.js service implementations. crossfire,
+fleetd and fleet use C# managed/NativeAOT or Rust only; NativeAOT is the deployment
+default. TypeScript/Node remain for the shared UI, contracts, Knex, builds, tooling and tests.
+All npm workspaces are private. Shared TypeScript lives in service-local packages,
+scripts, tools and tests; no Node service application or listener implementation remains.
+
 Read docs/specification.md before implementation. It is the current architecture,
 API, data and acceptance contract. Work is greenfield: WCBUBWHB, one current
 implementation, no compatibility shims, aliases, duplicate owners or hidden fallbacks.
@@ -27,11 +33,10 @@ Do not retain or introduce any compatibility reader/writer, old/new handler,
 alias, bridge or fallback to save existing state. Any such exception requires
 the owner's explicit approval of that specific path; none is approved. No historical
 preservation or conversion is required before an explicit production declaration.
-Explicitly selected Node/C#/Rust build targets remain
+Explicitly selected C#/Rust build targets remain
 separate implementations of that same current contract, not compatibility modes.
 
-On 2026-10-13 the owner explicitly authorized independently selected Node and
-C# implementations of all three products in this monorepo. C# targets .NET 11,
+C# and Rust implement all three products in this monorepo. C# targets .NET 11,
 NativeAOT and EF Core. All implementations must use one shared React UI, identical
 wire contracts and directly interchangeable SQLite databases. This authorization
 does not permit cross-language runtime fallbacks, compatibility handlers or
@@ -52,7 +57,7 @@ from the same C# source and initially deploying the managed build. EF remains th
 C# data-access owner. NativeAOT diagnostics must remain visible and receive an
 evidence-based disposition; their number is not proof of independent bugs or a
 required EF fork. All tests must pass. This is explicit build selection, never an
-automatic managed/Node fallback inside a native executable. Neither a checkpoint
+automatic managed fallback inside a native executable. Neither a checkpoint
 nor an isolated proof establishes full product readiness in either native track.
 
 On 2026-10-06 the owner approved a one-time npm release-age exception only for
@@ -79,7 +84,7 @@ knexfile and one-shot migration container. Standard Docker Compose owns server
 deployment, with service_completed_successfully gating runtime startup on the
 migration job. Upgrades stop existing writers and remove the completed migration
 job before starting the selected release. Backups are optional and operator-owned;
-there is no custom application deployment CLI or mandatory backup gate. Node, C# and Rust validate existing databases; none creates schemas,
+there is no custom application deployment CLI or mandatory backup gate. C# and Rust validate existing databases; none creates schemas,
 runs ORM migrations or silently migrates at startup. New databases follow the
 same nesting and owner. File state and Conduit's externally owned RocksDB are
 not SQL databases and are not converted into artificial Knex stores.
@@ -91,9 +96,7 @@ historical native-context/observation converters and bespoke obsolete-file check
 Read only each current format; do not inspect past formats before using it.
 
 On 2026-10-16 the owner selected C# NativeAOT as the GAAP and Bad Bets server
-deployment default. Node and managed C# remain explicit package choices, never
-fallbacks. Fleet attachment continues to install the Node @ctlflow/fleet CLI and
-Node fleetd on every server implementation. The setup harness remains independent.
+deployment default. Managed C# and Rust remain explicit distribution choices, never fallbacks. Fleet attachment uses the matching installed native distribution. The setup harness remains independent.
 
 ## Source ownership
 All product code is under services/crossfire, services/fleetd or services/fleet.
@@ -114,7 +117,7 @@ protocols, registration stages or native-client URLs. Use normalized messaging
 ports and opaque identifiers. Backend adapters own native validation, authority,
 capabilities, encoding, authentication integration and protocol translations.
 Matrix is the implemented backend; do not add placeholder Slack/Zulip adapters.
-Apply every applicable change in Node, C# managed/NativeAOT and Rust. Verify the
+Apply every applicable service change in C# managed/NativeAOT and Rust; update shared TypeScript consumers and tests together. Verify the
 generic core with a non-Matrix-shaped fixture as well as actual Matrix integration.
 
 Use functional modules, strict types without any, named exports, explicit .js
@@ -126,7 +129,7 @@ performance. Use normal, sound ORM queries; do not introduce complex queries,
 opaque layouts or positional representations to chase small timing differences.
 Never compromise domain or API object shapes for performance.
 SQL tables/columns are singular snake_case; normalized domain state uses indexed
-relations. Tinqer owns Node queries, EF Core C# queries and Diesel Rust queries.
+relations. EF Core owns C# queries and Diesel owns Rust queries. Tinqer is restricted to read-only TypeScript inspection tooling.
 Handwritten application and metadata queries are prohibited, including tests.
 Do not route a string through a helper, raw-query API or fixture to evade this
 rule. Query libraries generate execution statements from structured queries.
@@ -154,20 +157,17 @@ Codex and Earendil Pi are implemented through the same owned-runtime ports.
 Claude remains unimplemented; no standalone paths or placeholder adapters exist.
 Pi requires verified native 1.0.0 RPC. Its owned extension implements native
 control/instruction/input correlation, not terminal scraping or history writing.
-All npm names use @ctlflow. Only @ctlflow/fleet and @ctlflow/fleetd may be public;
-every other workspace remains private. Public builds cannot require publishing
+All npm names use @ctlflow and every workspace is private. Public builds cannot require publishing
 internal modules or resolving source through the monorepo.
 Controller labels/metadata are descriptive, not authentication or permissions.
 Every fleetd operation requires its shared OS-user configuration credential.
 fleetd alone initializes the persistent random key; fleet reads the same private
 OS-native file locally or through strict SSH. No anonymous or compatibility path.
-Normal harness-facing setup always uses pinned npm fleet/fleetd, independent of
-server implementation; do not require .NET/Rust on ordinary setup hosts.
+Normal setup uses matching native fleet/fleetd with an existing Codex/Pi installation. NativeAOT and Rust do not require an installed SDK or managed runtime.
 On 2026-10-18 the owner selected server-only Docker: crossfire, Matrix, shared
 UI/content and one-shot Knex maintenance. fleet/fleetd and native agents run on
 the user's execution host, using an existing supported Codex/Pi installation and
-native login. Setup installs only the pinned fleet/fleetd packages, never a
-harness or provider credentials. Do not retain fleet-container images, services,
+native login. Setup uses installed native fleet/fleetd, never installs a harness or copies provider credentials. Do not retain fleet-container images, services,
 network relays or an alternative container onboarding workflow.
 No systemd/global services, global skills, unrequested host changes, production
 resets or unrequested deployment. Preserve credentials and shared source work.
@@ -204,12 +204,10 @@ For isolated changes with confidently local impact, run the affected tests and
 necessary targeted checks. Run the full quality gates for cross-layer changes
 or whenever the impact is uncertain. Never weaken a gate or claim verification
 that was not performed.
-On 2026-10-18 the owner approved one performance exception: managed .NET's
-saved-runtime-observation median and p95 may each be at most 1.30 times Node's
-corresponding measured latency; that workload's throughput may be at least 0.95
-times Node's. Request success and every other target/workload retain strict Node
-comparisons. JSON/HTML reports expose both limits
-and label its use; no implicit tolerance or unreported failed attempt.
+Performance verification uses NativeAOT as the current reference. Every target
+must preserve request success, median/p95 latency no higher than the reference
+and throughput no lower than the reference. Historical reports retain their
+original measured baselines and verdicts; they do not certify current source.
 Keep the unified spec and .analysis/20260929-164420-fleet-handover/necessity-ledger.md
 aligned with decisions and evidence. .analysis/MEMORY.md is the local work memory.
 Do not stop at intermediate milestones when completion is authorized. Never
@@ -218,12 +216,12 @@ Root commands coordinate typecheck, build, tests and architecture verification.
 
 Documentation uses factual language, not promotional claims. Describe exact
 behavior, prerequisites, measured verification and limitations. Keep separate
-installation/packaging instructions for Node, C# managed, C# NativeAOT and Rust;
+installation/packaging instructions for C# managed, C# NativeAOT and Rust;
 installed guides must not depend on checkout-relative documentation links.
 
 ## Test execution
 External behavior has one shared executable acceptance suite for crossfire,
-fleetd and fleet. Select Node, managed .NET, NativeAOT and Rust through executable
+fleetd and fleet. Select managed .NET, NativeAOT and Rust through executable
 configuration, not copied assertions or implementation-specific omissions.
 Run both Codex and Pi. Skipped/unfinished scenarios and differing assertion
 counts fail the shared gate. Language-owned internal/compiler tests supplement
@@ -242,7 +240,7 @@ build output and verification caches after their last required use. Check disk
 use periodically during long verification runs and retain concise evidence, not
 accumulated fixture trees. Never remove active resources, source worktrees,
 credentials, production state, research originals or saved user/native histories.
-Node, C# and Rust keep symmetric service ownership and semantic source structure;
+C# and Rust keep symmetric service ownership and semantic source structure;
 language/framework differences must be explicit and justified, not hidden paths.
 
 ## Git

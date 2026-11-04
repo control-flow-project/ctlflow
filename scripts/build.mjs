@@ -34,7 +34,7 @@ export async function typecheckProducts(selected) {
   const compiler = fileURLToPath(import.meta.resolve('typescript/bin/tsc'));
   await Promise.all(selected.flatMap(service => {
     const root = join(repository, 'services', service);
-    const configurations = service === 'crossfire' ? ['node/tsconfig.json', 'apps/web/tsconfig.json'] : ['node/tsconfig.json'];
+    const configurations = service === 'crossfire' ? ['tsconfig.json', 'apps/web/tsconfig.json'] : ['tsconfig.json'];
     return configurations.map(configuration => command(process.execPath, [compiler, '-p', configuration, '--noEmit'], root));
   }));
 }
@@ -42,8 +42,8 @@ export async function typecheckProducts(selected) {
 async function buildPackages() {
   const jobs = [];
   for (const service of products) {
-    const packages = join(repository, 'services', service, 'node/packages');
-    for (const name of readdirSync(packages)) {
+    const packages = join(repository, 'services', service, 'packages');
+    for (const name of existsSync(packages) ? readdirSync(packages) : []) {
       const source = join(packages, name, 'src'), output = join(packages, name, 'dist');
       if (!existsSync(source)) continue;
       rmSync(output, { recursive: true, force: true });
@@ -63,25 +63,26 @@ async function buildPackages() {
 async function buildProduct(service) {
   const root = join(repository, 'services', service), entries = [];
   rmSync(join(root, 'dist'), { recursive: true, force: true });
-  for (const directory of ['apps', 'tests', 'scripts', 'tools']) {
-    const base = join(root, 'node', directory);
+  for (const directory of ['scripts', 'tools', 'tests/support']) {
+    const base = join(root, directory);
     if (!existsSync(base)) continue;
     for (const file of readdirSync(base, { recursive: true })) {
       if (!file.endsWith('.ts') || file.endsWith('.d.ts') || (file.startsWith('architecture-proof/') && file.endsWith('.test.ts')) || file === 'verify-architecture.ts') continue;
       entries.push(join(base, file));
     }
   }
-  await bundle({ entryPoints: entries, outdir: join(root, 'dist'), outbase: join(root, 'node'), platform: 'node', format: 'esm', target: 'node26' });
+  await bundle({ entryPoints: entries, outdir: join(root, 'dist'), outbase: root, platform: 'node', format: 'esm', target: 'node26' });
   const sharedTests = join(root, 'tests');
   for (const suite of existsSync(sharedTests) ? readdirSync(sharedTests) : []) {
     const directory = join(sharedTests, suite);
     await bundle({ entryPoints: readdirSync(directory).filter(file => file.endsWith('.ts')).map(file => join(directory, file)), outdir: join(root, 'dist/tests', suite), bundle: true, packages: 'external', platform: 'node', format: 'esm', target: 'node26' });
   }
   if (service === 'crossfire') {
-    await bundle({ entryPoints: [join(root, 'node/scripts/container-package-tool.ts')], outfile: join(root, 'dist/container-package-tool.mjs'), bundle: true, platform: 'node', format: 'esm', target: 'node26' });
+    await bundle({ entryPoints: [join(root, 'scripts/container-configuration.ts')], outfile: join(root, 'dist/container-configuration.mjs'), bundle: true, platform: 'node', format: 'esm', target: 'node26' });
+    await bundle({ entryPoints: [join(root, 'scripts/container-package-tool.ts')], outfile: join(root, 'dist/container-package-tool.mjs'), bundle: true, platform: 'node', format: 'esm', target: 'node26' });
     await command(process.execPath, [join(root, 'dist/scripts/build-release.js'), '--root', root, '--web-directory', join(root, 'apps/web/dist')], root);
   }
-  else await command(process.execPath, [join(root, 'node/scripts/build-package.mjs')], root);
+
 }
 
 export async function buildProducts(selected) {

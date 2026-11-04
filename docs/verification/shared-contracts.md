@@ -4,7 +4,7 @@ Each product owns external assertions under `tests/contracts/`.
 The root coordinates builds, process limits and target selection.
 Tests send the same requests and expect the same results for every target.
 These directories are ownership boundaries within one acceptance suite, not
-separate Node, C# or Rust suites. Each selected executable set runs the same
+separate C# or Rust suites. Each selected executable set runs the same
 server, fleetd, fleet, UI and ingress scenarios. Both controller and installed
 CLI scenarios run with actual Codex and Pi processes and inert local providers.
 Language-local compiler and algorithm tests supplement this bank; they cannot
@@ -19,7 +19,8 @@ native authority, explicit delegation and removal limited to one's own additions
 ## Targets
 
 The matrix is a schema-version-one JSON object containing explicit executable
-and argument vectors for each server, daemon and CLI. Include the Node reference.
+and argument vectors for each server, daemon and CLI. The integrated matrix
+contains C# managed, C# NativeAOT and Rust.
 Selecting C# requires both `csharp-managed` and `csharp-nativeaot`.
 The integrated gate also requires an explicit Rust distribution. A C#-only
 build does not establish Rust readiness.
@@ -42,7 +43,7 @@ The combined command is:
 npm run verify:parity -- /absolute/new-evidence-directory
 ```
 
-It runs architecture, Node tests, C# tests, Rust tests, both C# distributions,
+It runs shared TypeScript tests, architecture, C# tests, Rust tests, both C# distributions,
 Rust publication, matrix generation, installed-product tests, container tests
 and migration-container tests. Failure stops subsequent phases. Configured targets cannot be skipped.
 The runner rejects missing summary counters, skipped/unfinished scenarios and
@@ -59,12 +60,9 @@ directory, ports, browser contexts and exact container identities; scenarios
 within one fixture remain sequential. Concurrency does not change assertions,
 product deadlines or the finite target/overall test timeouts.
 
-The operator/package matrix is distributed across those workers: each selected
-operator runs every backend package once. Four target workers therefore verify
-all 16 ordered operator/implementation pairs, not 64 duplicate executions. Each worker
-asserts its operator identity and records the implementation identities after successful
-image, readiness and API checks. No unique pair or behavioral assertion is
-omitted; each worker still runs the complete other container/recovery scenarios.
+Each selected container worker runs every backend package through the same
+Compose kit and verifies its image identity, readiness and retained data.
+Three workers cover all nine ordered initial-configuration/backend pairs.
 
 ## Coverage
 
@@ -82,8 +80,8 @@ omitted; each worker still runs the complete other container/recovery scenarios.
 | Native execution | Actual Codex/Pi chat, attribution, interruption, receipts, file-backed input, history, stop/resume, idle/in-flight controller death and upstream outage recovery |
 | Controller API | Every declaration has a decoded success or a checked native capability refusal; roster CRUD, revisions, operation replay, explicit updates and read-only readiness |
 | CLI/transport | Both native engines; exact daemon ownership handoff, noninteractive setup, per-agent/fleet resume/reset/update, messages, delivery, restart and strict SSH host verification |
-| CLI/controller interoperability | Every selected CLI reads every selected controller through the same private authenticated API; all 16 ordered four-target pairs run |
-| Containers | Actual images/operators, Element room/media, same-file backend changes, concurrent starts and owned orphan recovery |
+| CLI/controller interoperability | Every selected CLI reads every selected controller through the same private authenticated API; all nine ordered native-target pairs run |
+| Containers | Actual images/operators, Element room/media, same-file backend changes, transfer/import, project isolation and migration-failure recovery |
 | Data | One current Knex initial schema, constraints, transaction rollback, verified backups and same-file access |
 
 - [Scenario inventory](../../services/crossfire/tests/contracts/README.md)
@@ -99,17 +97,18 @@ return the same explicit unavailable result, without creating another writer;
 that capability refusal is recorded separately from successful operations.
 There are no implementation-specific test omissions or relaxed assertions.
 
-## Operator recovery checks
+## Container recovery checks
 
-A real launcher is killed while its runtime container remains running or exited.
-The next selected implementation must remove that exact old ID and reopen the
-same state. Running/exited migration-orphan fixtures exercise the same
-reconciliation owner. A foreign migration label must refuse takeover without
-stopping the correctly owned runtime. A second live launcher must fail without
-touching the original stack.
+A derivative package is exported, removed from the engine and imported again;
+its image-owned readiness must succeed. The same Compose kit switches across
+all selected native backend packages while retaining the current database.
+Corrupt archives, mismatched release labels and rejected manifest schemas fail
+before the running service is stopped.
 
-Migration-orphan fixtures are controlled native containers representing abandoned
-migration states; they are not a claim to simulate every possible power-loss
+An intentionally failed one-shot Knex job blocks runtime activation. Removing
+that completed job and rerunning the matching successful migration restores
+access to the retained data. A separately named Compose project cannot replace
+this project's containers. These fixtures do not simulate every power-loss
 instruction boundary inside Knex or Docker.
 
 ## Evidence and disposal

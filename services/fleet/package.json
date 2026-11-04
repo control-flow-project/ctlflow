@@ -1,40 +1,22 @@
 {
   "name": "@ctlflow/fleet",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
-  "private": false,
-  "publishConfig": {
-    "access": "public"
-  },
+  "private": true,
   "type": "module",
   "devDependencies": {
-    "@ctlflow/crossfire-test-support": "0.1.25"
-  },
-  "bin": {
-    "fleet": "./dist/bin/fleet.mjs"
-  },
-  "files": [
-    "LICENSE",
-    "dist/bin",
-    "docs",
-    "README.md"
-  ],
-  "exports": {
-    "./executable": "./dist/bin/fleet.mjs",
-    "./package.json": "./package.json"
-  },
-  "dependencies": {
-    "@ctlflow/fleetd": "0.1.25"
+    "@ctlflow/crossfire-test-support": "0.1.26",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.26",
+    "@ctlflow/fleetd-storage": "0.1.26"
   },
   "engines": {
     "node": ">=26.0.0",
     "npm": ">=11.17.0"
   },
   "scripts": {
-    "typecheck": "tsc -p node/tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "node ../../scripts/build-service.mjs fleet",
-    "build:package": "node node/scripts/build-package.mjs",
     "test": "node ../../scripts/test.mjs fleet all"
   }
 }

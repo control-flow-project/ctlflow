@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
 import { dirname, join, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { buildContainerPackages as buildNodeCsharpPackages } from '../services/crossfire/dist/scripts/container-packages.js';
+import { buildContainerPackages as buildCsharpPackages } from '../services/crossfire/dist/scripts/container-packages.js';
 import { buildRustContainerPackage } from '../services/crossfire/rust/scripts/container-packages.mjs';
 
 export async function buildContainerPackages(source, output, parent) {
@@ -10,7 +10,7 @@ export async function buildContainerPackages(source, output, parent) {
   const temporary = mkdtempSync(join(dirname(output), '.crossfire-all-containers-'));
   try {
     const stage = join(temporary, 'packages');
-    await buildNodeCsharpPackages(source, stage, parent);
+    await buildCsharpPackages(source, stage, parent);
     await buildRustContainerPackage(source, join(stage, 'rust'), parent);
     renameSync(stage, output);
   } finally { rmSync(temporary, { recursive: true, force: true }); }

@@ -14,16 +14,14 @@ crossfire owns remote authorization and coordination, not local process control.
 - [Read-only diagnostic API](docs/diagnostics.md)
 - [Coordination defaults](docs/coordination.md)
 - [Private storage](docs/storage.md)
-- [Operator inspection](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/node/tools/README.md)
+- [Operator inspection](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/tools/README.md)
 - [fleet CLI](https://github.com/control-flow-project/ctlflow/blob/main/services/fleet/README.md)
-- [Node package installation](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/node.md)
 - [C# managed installation](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/csharp-managed.md)
 - [C# NativeAOT installation](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/csharp-nativeaot.md)
 - [Rust installation](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/rust.md)
 
-Node source is under `node/`, C# under `csharp/` and Rust under `rust/`.
+C# service source is under `csharp/` and Rust service source under `rust/`. Shared TypeScript contracts, UI, tools and tests have service-local owners outside those implementation directories.
 The shared external bank is under `tests/contracts/`.
-Only this product and fleet may be publicly distributed through npm;
-internal workspaces remain private.
+fleetd ships in the selected native distribution. All npm workspaces are private build, test and tooling dependencies.
 
 - [License](LICENSE)

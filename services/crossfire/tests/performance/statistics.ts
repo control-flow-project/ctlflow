@@ -45,13 +45,11 @@ export function comparePerformance(measurements: readonly Measurement[], baselin
   }));
   return summaries.map(value => {
     const reference = summaries.find(candidate => candidate.target === baseline && candidate.workload === value.workload);
-    if (!reference || reference.p50Ms <= 0 || reference.p95Ms <= 0) throw new Error('Every workload requires a measured Node baseline');
+    if (!reference || reference.p50Ms <= 0 || reference.p95Ms <= 0) throw new Error('Every workload requires a measured reference baseline');
     const medianRatio = value.p50Ms / reference.p50Ms, tailRatio = value.p95Ms / reference.p95Ms;
-    const managedObservations = value.target === 'csharp-managed' && value.workload === 'Saved runtime observations';
-    const maximumMedianRatio = managedObservations ? 1.3 : 1;
-    const maximumTailRatio = maximumMedianRatio;
+    const maximumMedianRatio = 1, maximumTailRatio = 1;
     const throughputRatio = value.requestsPerSecond / reference.requestsPerSecond;
-    const minimumThroughputRatio = managedObservations ? 0.95 : 1;
+    const minimumThroughputRatio = 1;
     return { ...value, medianRatio, tailRatio, maximumMedianRatio, maximumTailRatio, throughputRatio, minimumThroughputRatio,
       passed: reference.failures === 0 && value.failures === 0 && medianRatio <= maximumMedianRatio && tailRatio <= maximumTailRatio && throughputRatio >= minimumThroughputRatio };
   });

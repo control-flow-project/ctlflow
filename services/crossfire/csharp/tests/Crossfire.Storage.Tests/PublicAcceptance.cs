@@ -76,7 +76,7 @@ public static class PublicAcceptance
         {
             Equal(descriptor.RootElement.GetProperty("ownerBackendUserId").GetString(), owner, "setup descriptor binds a registered human identity");
             Equal(descriptor.RootElement.GetProperty("package").GetProperty("version").GetString(), state.Release.Version, "setup uses the exact coordinated public release");
-            Equal(descriptor.RootElement.GetProperty("package").GetProperty("name").GetString(), "@ctlflow/fleet", "internal modules are not published by onboarding");
+            Equal(descriptor.RootElement.GetProperty("package").GetProperty("name").GetString(), "fleet", "internal modules are not published by onboarding");
         }
         var guide = await Read("GET", descriptorPath.Replace("setup.json", "setup", StringComparison.Ordinal), 200);
         Equal(guide.Contains("This coding session only performs setup.", StringComparison.Ordinal), true, "onboarding cannot adopt the current coding session");

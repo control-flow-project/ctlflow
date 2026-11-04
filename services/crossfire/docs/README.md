@@ -19,4 +19,4 @@ describe current procedures, not the state of an earlier deployment.
 
 - [Specification](../../../docs/specification.md)
 - [Database](../database/README.md)
-- [Operator tools](../node/tools/README.md)
+- [Operator tools](../tools/README.md)

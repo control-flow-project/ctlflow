@@ -1,20 +1,15 @@
 # crossfire performance verification
 
-Node, .NET managed, NativeAOT and Rust run the same HTTP workload against one
+Managed .NET, NativeAOT and Rust run the same HTTP workload against one
 populated management database. A server health response is not a management UI
 latency measurement. Runtime adapters and paid model quality are separate checks.
 
-The suite fails when any selected runtime is missing, any request fails, or a
-workload exceeds its recorded Node comparison limits. It produces an offline HTML
-report and machine-readable samples, including failed attempts. Source and
-resource limits remain visible in the report.
-
-One owner-approved exception, dated 2026-10-18, permits managed .NET's saved
-runtime observation median and p95 up to 1.30 times Node's corresponding latency,
-and that workload's throughput at least 0.95 times Node. All other workloads,
-NativeAOT and Rust retain strict comparisons. Every JSON comparison records the
-latency and throughput limits. The HTML labels exception use;
-it does not describe slower allowed latency as meeting the unmodified Node baseline.
+NativeAOT is the measured reference. The suite fails if a selected target is
+missing, any request fails, median/p95 latency exceeds the reference or throughput
+falls below it. The same limits apply to all targets. It produces an offline HTML
+report and machine-readable samples, including failed attempts and actual source
+and resource limits. Historical reports retain their original comparisons;
+they do not certify the current source.
 
 - [Command, workload and comparison method](../../services/crossfire/tests/performance/README.md)
 - [Executable matrix and contract verification](shared-contracts.md)

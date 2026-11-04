@@ -18,7 +18,7 @@ pub fn descriptor(value: &Value) -> Result<SetupDescriptor> {
     )?;
     check::integer(&value["schemaVersion"], 1, 1)?;
     let package = check::object(&value["package"], &["name", "version"], &[])?;
-    check::choice(&package["name"], &["@ctlflow/fleet"])?;
+    check::choice(&package["name"], &["fleet"])?;
     let version = check::text(&package["version"], 1, 100)?;
     if version != env!("CARGO_PKG_VERSION") {
         return Err(Failure::new(

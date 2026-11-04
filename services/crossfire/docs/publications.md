@@ -90,4 +90,4 @@ Management retains attribution and dates, and never embeds report scripts.
 
 - [Reports UI](reports.md)
 - [Instance configuration](configuration.md)
-- [Operator content check](../node/tools/README.md)
+- [Operator content check](../tools/README.md)

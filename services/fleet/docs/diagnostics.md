@@ -9,7 +9,7 @@ fleet --remote office diagnose research
 
 The default scope is the selected controller. A fleet key or UUID selects a
 registered fleet. Agent scope requires its fleet and immutable instance key.
-Node, C# managed/NativeAOT and Rust implement these same commands and reports.
+C# managed/NativeAOT and Rust implement these same commands and reports.
 
 The command writes one JSON report to stdout. Checks have stable IDs, scope,
 `pass`, `fail`, `unknown` or `not-applicable`, an observation timestamp, a safe

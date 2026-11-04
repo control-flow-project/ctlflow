@@ -15,7 +15,6 @@
 | Reviewed complete-roster wake changes | crossfire fleet-wake check |
 | Current controller/native binding | fleetd verify |
 | Provider-file/context preservation | fleetd snapshot/preserve |
-| Explicit selected Pi provider execution | fleetd provider-acceptance tool |
 | Setup/update/start/stop/reset | fleet CLI and controller lifecycle |
 
 Generic checks take deployment-specific inputs.
@@ -28,5 +27,5 @@ operator tools. Current source tests own regression reproductions; scratch scrip
 do not become alternate runtime paths.
 
 - [Procedure and evidence limits](operator-tools.md)
-- [crossfire commands](../services/crossfire/node/tools/README.md)
-- [fleetd commands](../services/fleetd/node/tools/README.md)
+- [crossfire commands](../services/crossfire/tools/README.md)
+- [fleetd commands](../services/fleetd/tools/README.md)

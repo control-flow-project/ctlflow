@@ -6,8 +6,8 @@ room access and message delivery for fleet-managed coding agents.
 | Product | Responsibility | Distribution |
 | --- | --- | --- |
 | crossfire | REST API, messaging adapters, management UI, authorization and coordination records | Private |
-| fleetd | User-scoped controller, shared listener and native session lifecycle | `@ctlflow/fleetd` |
-| fleet | CLI for the controller's private API, locally or through SSH | `@ctlflow/fleet` |
+| fleetd | User-scoped controller, shared listener and native session lifecycle | Native distribution |
+| fleet | CLI for the controller's private API, locally or through SSH | Native distribution |
 
 Use lowercase project and product names in documentation and display branding.
 Commands and package names are unchanged; native identifiers retain language
@@ -17,19 +17,21 @@ Every agent belongs to a fleet. A single agent uses a one-agent fleet.
 Setup creates a separate managed conversation; it does not attach the coding
 assistant that runs setup.
 
-Personalized setup always installs pinned npm fleet and Node fleetd, independent
-of server implementation. Setup hosts do not need .NET or Rust. fleetd creates a private
-OS-native authentication file automatically; fleet reads it.
+Personalized setup uses the matching installed native fleet and fleetd distribution.
+NativeAOT is the default. NativeAOT and Rust do not need a .NET runtime or Node.js
+to run the controller or CLI. Intentional messaging tools and Pi retain their own
+Node.js tooling prerequisites. fleetd creates a private OS-native authentication
+file automatically; fleet reads it.
 Docker runs the server side only: crossfire, Matrix, Element, management and
 content, plus one-shot Knex migrations. Standard Docker Compose gates runtime
 startup on migration success; upgrades stop writers and replace the completed
 migration job. Backups are operator-managed. fleetd and its agents run on the user's execution host with an existing
 Codex/Pi installation and native login. Setup installs fleet/fleetd, not a harness.
 
-Node, C# and Rust implement the same products. C# targets .NET 11 with managed and
+C# and Rust implement the same products. C# targets .NET 11 with managed and
 NativeAOT outputs. They share the React UI, wire contracts and SQLite database.
 Knex alone owns database creation and migrations for all implementations. The
-combined gate selects Node, C# managed, C# NativeAOT and Rust explicitly.
+combined gate selects C# managed, C# NativeAOT and Rust explicitly.
 
 Matrix is the implemented messaging backend. Its native identity, permission,
 invitation, authentication and client-protocol rules belong to its adapter.

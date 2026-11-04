@@ -1,53 +1,44 @@
 {
   "name": "@ctlflow/crossfire",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
-  "bin": {
-    "crossfire": "./crossfire"
-  },
   "type": "module",
   "description": "Human-led Matrix coordination and agent management",
   "devDependencies": {
-    "@ctlflow/crossfire-web": "0.1.25",
-    "@ctlflow/crossfire-test-support": "0.1.25",
-    "@ctlflow/crossfire-data": "0.1.25",
+    "@ctlflow/crossfire-web": "0.1.26",
+    "@ctlflow/crossfire-test-support": "0.1.26",
+    "@ctlflow/crossfire-data": "0.1.26",
     "knex": "3.2.10",
-    "@ctlflow/crossfire-operator-support": "0.1.25",
-    "@ctlflow/crossfire-adapter-crossfire": "0.1.25",
-    "@ctlflow/crossfire-client": "0.1.25",
-    "@ctlflow/crossfire-adapter-matrix": "0.1.25",
-    "@ctlflow/crossfire-adapter-sqlite": "0.1.25",
-    "@ctlflow/crossfire-adapter-filesystem": "0.1.25",
-    "@ctlflow/crossfire-contracts": "0.1.25",
-    "@ctlflow/crossfire-kernel": "0.1.25",
+    "@ctlflow/crossfire-operator-support": "0.1.26",
+    "@ctlflow/crossfire-adapter-crossfire": "0.1.26",
+    "@ctlflow/crossfire-client": "0.1.26",
+    "@ctlflow/crossfire-adapter-matrix": "0.1.26",
+    "@ctlflow/crossfire-database-inspection": "0.1.26",
+    "@ctlflow/crossfire-adapter-filesystem": "0.1.26",
+    "@ctlflow/crossfire-contracts": "0.1.26",
+    "@ctlflow/crossfire-kernel": "0.1.26",
     "@tinqerjs/better-sqlite3-adapter": "0.0.28",
     "better-sqlite3": "13.0.3",
     "@playwright/test": "1.63.0",
-    "@ctlflow/crossfire-agent-tools": "0.1.25",
-    "@ctlflow/fleet": "0.1.25",
-    "@ctlflow/fleetd-contracts": "0.1.25"
+    "@ctlflow/crossfire-agent-tools": "0.1.26",
+    "@ctlflow/fleetd-contracts": "0.1.26",
+    "@ctlflow/crossfire-domain": "0.1.26"
   },
   "engines": {
     "node": ">=26.0.0",
     "npm": ">=11.17.0"
   },
   "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
+    "build": "node ../../scripts/build-service.mjs crossfire",
+    "test": "node ../../scripts/test.mjs crossfire all",
     "migrate:latest:management:sqlite": "knex migrate:latest --knexfile ./knexfile.management.mjs --env production",
     "migrate:status:management:sqlite": "knex migrate:list --knexfile ./knexfile.management.mjs --env production",
     "migrate:make:management:sqlite": "knex migrate:make --knexfile ./knexfile.management.mjs --env development -x mjs",
-    "typecheck": "tsc -p node/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
-    "build": "node ../../scripts/build-service.mjs crossfire",
     "package:containers": "npm run build && node dist/scripts/package-containers.js",
-    "test": "node ../../scripts/test.mjs crossfire all",
-    "test:browser": "node ../../scripts/test.mjs crossfire browser",
-    "test:integration": "node ../../scripts/test.mjs crossfire integration",
-    "generate:matrix": "npm run build && node dist/scripts/generate-matrix-api.js",
-    "crossfire": "node crossfire",
     "tools": "node dist/tools/main.js",
-    "verify:architecture": "node node/scripts/verify-architecture.ts",
-    "verify:installation": "node node/scripts/verify-architecture.ts installation",
-    "verify:container": "node ../../scripts/verify-container.mjs"
+    "verify:architecture": "node ../../scripts/verify-structure.mjs"
   }
 }

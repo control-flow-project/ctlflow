@@ -110,5 +110,5 @@ SIGKILL during a detached tool can leave that tool alive. Linux inert-provider
 coverage does not certify every provider/model or another platform.
 
 - [Common session controls](sessions.md)
-- [Explicit provider acceptance](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/node/tools/README.md)
+- [Native runtime verification](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/tools/README.md)
 - [Runtime contract](https://github.com/control-flow-project/ctlflow/blob/main/services/crossfire/docs/runtime.md)

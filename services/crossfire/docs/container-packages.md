@@ -4,10 +4,10 @@ crossfire packages a selected server backend and the common Knex migration image
 For a local Docker server and host-native fleet, see the [local Docker quickstart](local-docker.md).
 The deployment host needs rootless Docker with Compose. Trusted package
 verification/export tooling requires Node.js 26; the server backend does not
-require a host language runtime or a source checkout. All four backends use the
+require a host language runtime or a source checkout. All three backends use the
 same Compose definition and one-shot migration dependency.
 
-Build targets are Node, C# managed, C# NativeAOT and Rust on Linux amd64.
+Build targets are C# managed, C# NativeAOT and Rust on Linux amd64.
 The Rust image contains its native server, not a substituted Node process.
 These packages do not provide native macOS/Windows fleetd or ARM64 images.
 C# fleetd currently has Linux-specific process/filesystem adapters.
@@ -24,11 +24,10 @@ npm run package:containers -- --output /absolute/new-packages
 
 An optional `--cgroup-parent EXISTING.slice` selects an existing bounded Docker
 slice. Verification always supplies its verified finite resource slice. The build
-constructs cached common assets/migrations, then the four runtime images:
+constructs cached common assets/migrations, then the three runtime images:
 
 ```text
 new-packages/
-  node/{release.json,images.tar,package-tool.mjs,compose.yaml}
   csharp-managed/{release.json,images.tar,package-tool.mjs,compose.yaml}
   csharp-nativeaot/{release.json,images.tar,package-tool.mjs,compose.yaml}
   rust/{release.json,images.tar,package-tool.mjs,compose.yaml}
@@ -55,7 +54,7 @@ code; the archive checksum is not authentication of this helper.
 
 The [0.1.25 release inventory](../../../docs/distributions/releases/0.1.25.md) records publication and immutable references for
 the generic images under
-`ghcr.io/control-flow-project/crossfire-node`, `crossfire-csharp-managed`,
+`ghcr.io/control-flow-project/crossfire-csharp-managed`,
 `crossfire-csharp-nativeaot`, `crossfire-rust` and `crossfire-migrations`.
 These are server images; fleet/fleetd and native agents run on the execution host,
 not in Docker. Publish a coordinated version only after its applicable gates
@@ -73,7 +72,7 @@ the matching-release checks or one-shot migration requirement.
 | schemaVersion | Number 2; superseded package formats are rejected |
 | version | Coordinated product version |
 | sourceDigest | Lowercase SHA-256 of the crossfire build input |
-| backend | Explicit backend slug, such as node or csharp-nativeaot |
+| backend | Explicit backend slug, csharp-managed, csharp-nativeaot or rust |
 | platform | linux/amd64 |
 | archiveSha256 | Lowercase SHA-256 of images.tar |
 | runtime | Runtime image object |
@@ -119,7 +118,7 @@ Every runtime image owns its entrypoint, Conduit, Element, management UI, agent
 tools, time-zone data and Docker health check. Runtime ports are 8080/8082 and
 private state is mounted at /runtime. Images run read-only with a bounded /tmp,
 dropped capabilities and no-new-privileges. Neither deployment projects nor the
-operator inject a Node-based health check. The AOT image contains no Node or CLR
+operator inject a backend-specific health check. The AOT image contains no CLR
 dependency; the managed image contains its required .NET runtime.
 
 ## Deploy or switch backends
@@ -207,23 +206,23 @@ node /absolute/packages/csharp-managed/package-tool.mjs export \
 The two IDs must be complete 64-character lowercase digests. This export function
 also packages ordinary build outputs; it is not another deployment path. It checks
 the inherited release labels and refuses mismatched runtime/migration releases.
-Site-specific initialization uses the common maintenance image or Compose
-initialize service, never application-source imports from a selected runtime. Configuration
+Site-specific initialization uses the selected native runtime through the Compose
+initialize service, never application-source imports. Configuration
 updates must be validated outside language-specific image internals. All SQL
-changes remain in the shared Knex image, never EF/Node runtime startup.
+changes remain in the shared Knex image, never runtime startup.
 
 The common migration image also contains supported maintenance commands. It is
 Node build/maintenance tooling, not a language fallback inside an AOT runtime:
 
 ```sh
 docker run --rm --network none --mount type=bind,source=/absolute/private/state,target=/runtime \
-  --entrypoint node sha256:MIGRATION_IMAGE_ID /app/services/crossfire/crossfire init \
+  sha256:RUNTIME_IMAGE_ID init \
   --directory /runtime --instance NAME --origin https://SITE --content-origin https://CONTENT \
   --server-name SITE --administrator USERNAME
 ```
 
 Use init only on a new empty directory. On existing state, run
-`/app/services/crossfire/dist/scripts/container-configuration.js` in that same
+`/app/services/crossfire/dist/container-configuration.mjs` in that same
 maintenance image with `--directory`, `--instance`, `--origin`, `--content-origin`
 and `--server-name`, mounting state read-only. It validates without rewriting or
 printing secrets. Then use the same Compose project to stop writers, remove the completed migrate
@@ -231,10 +230,10 @@ job and start the selected release. Backups remain operator-managed. Apply the d
 read-only filesystem, dropped-capability, no-new-privileges and resource controls
 to maintenance containers as well.
 
-Fleet instructions always recommend the pinned Node @ctlflow/fleet and Node
-fleetd, including when either server backend is C#. The coding harness runs setup
-as an operator; fleetd starts separate sessions. No .NET installation is added to
-fleet attachment and no existing coding conversation is adopted.
+Fleet setup uses the matching installed native distribution. NativeAOT is the
+default; Rust and managed C# are explicit choices. Retain sibling product
+directories and put fleet on PATH. The coding harness runs setup as an operator;
+fleetd starts separate sessions without adopting the calling conversation.
 
 ## Verification and Rust integration
 
@@ -244,7 +243,7 @@ image-owned readiness probes, tests transfer/import and rejects
 corrupt archives/mismatched labels before touching a running instance.
 The installed-products and current-schema migration banks remain required.
 
-The root packaging coordinator composes the unchanged Node/C# builder with the
+The root packaging coordinator composes the C# builder with the
 Rust-owned image producer. Rust reuses the common asset/migration Dockerfile,
 package exporter and label validation; only its runtime build is target-owned.
 The same container assertion bank covers all selected distributions. Rust's

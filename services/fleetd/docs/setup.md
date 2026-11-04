@@ -7,17 +7,17 @@ fleet validates crossfire's personalized setup descriptor and submits
 An existing coding assistant may execute that command, but its process and
 conversation are never imported or attached.
 
-Management supplies a personalized guide; the user's local coding assistant runs
-its pinned npm installation and setup command on the Linux/macOS execution host.
-The browser/server does not install software on that host. No .NET/Rust
-installation is needed. The guide installs only fleet/fleetd and requires an
-existing supported Codex/Pi installation and native provider login. It does not
-install/upgrade a harness, run agents in Docker or copy credentials into Docker.
+Management supplies a personalized guide. The local coding assistant runs its setup
+command using the matching already-installed native distribution on Linux x64.
+The browser/server does not install software on that host. NativeAOT is the default;
+NativeAOT and Rust need no .NET runtime to execute fleet/fleetd. Existing Codex/Pi
+installation and provider login are required. Setup does not install a harness,
+run agents in Docker or copy credentials into Docker.
 fleetd initializes private OS-native authentication before setup calls its API;
 fleet reads that same file and sends its key automatically.
 
 The descriptor identifies one active registered human, exact server origin and
-exact installed public fleet version. Unknown fields, redirects, origin/owner
+exact installed native fleet version. Unknown fields, redirects, origin/owner
 substitution, ambiguous queries, oversized data and malformed text fail.
 Administrator instruction text grants no additional authority.
 

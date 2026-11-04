@@ -60,13 +60,15 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
   await scope.test('package validation fails before stopping the running Compose service', async () => {
     const temporary = mkdtempSync(join(fixture.directory, 'bad-package-'));
     try {
-      for (const target of fixture.targets) for (const failure of ['archive', 'labels', 'schema']) {
+      for (const target of fixture.targets) for (const failure of ['archive', 'labels', 'schema', 'backend']) {
         const path = join(temporary, target.name + '-' + failure); mkdirSync(path);
         const source = join(fixture.packages, target.name), manifest = JSON.parse(readFileSync(join(source, 'release.json'), 'utf8')) as Record<string, unknown>;
         if (failure === 'archive') writeFileSync(join(path, 'images.tar'), 'corrupt archive');
         else {
           copyFileSync(join(source, 'images.tar'), join(path, 'images.tar'));
-          if (failure === 'labels') manifest.backend = 'incorrect-backend'; else manifest.schemaVersion = 1;
+          if (failure === 'labels') { const other = fixture.targets.find(value => value.name !== target.name); assert(other); manifest.backend = other.name; }
+          else if (failure === 'schema') manifest.schemaVersion = 1;
+          else manifest.backend = 'incorrect-backend';
         }
         writeFileSync(join(path, 'release.json'), JSON.stringify(manifest));
         const identity = inspect(fixture.containerName, '{{.Id}}');

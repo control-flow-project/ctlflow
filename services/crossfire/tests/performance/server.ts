@@ -13,9 +13,9 @@ import { performanceHtml } from './report.js';
 
 export async function serverPerformance(scope: TestContext, targets: readonly ContractTarget[], output: string,
   provenance: Pick<PerformanceReport, 'source' | 'host'>): Promise<void> {
-  const baseline = targets.find(target => target.implementation === 'node');
+  const baseline = targets.find(target => target.name === 'csharp-nativeaot');
   assert(baseline && targets.some(target => target.name === 'csharp-managed') && targets.some(target => target.name === 'csharp-nativeaot')
-    && targets.some(target => target.implementation === 'rust'), 'Performance verification requires Node, .NET managed/NativeAOT and Rust');
+    && targets.some(target => target.implementation === 'rust'), 'Performance verification requires .NET managed/NativeAOT and Rust');
   mkdirSync(output, { mode: 0o700 });
   const measurements: Measurement[] = [], policy = { rounds: targets.length, samples: 100, warmup: 20, baseline: baseline.name };
   let fixture = { agents: 0, listenerRuns: 0, runtimeObservations: 0 };
@@ -88,5 +88,5 @@ export async function serverPerformance(scope: TestContext, targets: readonly Co
   scope.diagnostic('Performance HTML and JSON: ' + output);
   assert.equal(problem, null, 'Performance setup and requests must complete');
   assert.equal(complete, true, 'Every runtime must complete every rotated workload');
-  assert.equal(passed, true, 'Every workload must meet its recorded Node comparison limits with zero failures; inspect report.html');
+  assert.equal(passed, true, 'Every workload must meet its recorded native comparison limits with zero failures; inspect report.html');
 }

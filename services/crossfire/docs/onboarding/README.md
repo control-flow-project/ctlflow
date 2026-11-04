@@ -3,7 +3,7 @@
 ## Setup entry
 
 Management's Set up an agent page supplies one personalized guide URL.
-The guide verifies the active registered human and pins the exact public fleet
+The guide verifies the active registered human and pins the exact native fleet
 release. Its JSON descriptor is at:
 
 ```text
@@ -14,12 +14,12 @@ The CLI checks the fixed path, exact origin/owner/version, strict schema and
 response bounds. Redirects, ambiguous queries and credential-bearing URLs fail.
 No default deployment account or inferred owner is used.
 
-All server implementations emit pinned npm setup for @ctlflow/fleet and Node
-fleetd on Linux/macOS. The calling Codex/Pi harness does not need .NET or Rust.
-The user runs that guide on the machine where native agents will execute. Docker
-hosts crossfire/Matrix/UI/content and Knex maintenance only. The guide installs
-fleet/fleetd, not Codex/Pi; the selected harness and native login must already be
-available on the execution host. Missing prerequisites fail without automatic
+All server implementations use the matching installed native fleet/fleetd
+distribution on Linux x64. Retain its sibling directories and put fleet on PATH.
+NativeAOT is the default; NativeAOT and Rust require no installed SDK or managed
+runtime. Run the guide on the execution host. Docker hosts
+crossfire/Matrix/UI/content and Knex maintenance only. Setup never installs
+Codex/Pi; the selected harness and native login must already be available. Missing prerequisites fail without automatic
 harness installation, credential copying or a container setup alternative.
 fleetd creates private OS-native authentication configuration automatically;
 fleet reads it and authenticates private API calls without asking for a key.
@@ -66,7 +66,7 @@ Rejected/expired requests cannot yield credentials.
 
 ## Software
 
-The installed fleetd package or native distribution owns a pinned local tool release:
+The installed native fleetd distribution owns a pinned local tool release:
 README, skill, client and Matrix license. Artifact size and SHA-256 establish
 byte integrity, not independent publisher trust.
 
@@ -77,7 +77,7 @@ release. Sleeping engines are not woken for that notice.
 
 After explicit consent:
 
-1. Install the exact new fleet/fleetd npm release or native distribution in
+1. Install the exact new native fleet/fleetd distribution in
    private storage; keep native product directories together.
 2. Use its new CLI to update the selected fleet/instances.
 3. Restart fleetd from the installed executable with the same root.
@@ -89,9 +89,8 @@ Changed instructions use the same receipt-confirmed native producer.
 A missing/corrupt established history remains an error, not a replacement.
 Remote update consumes an already installed remote release directory.
 
-Only `@ctlflow/fleet` and `@ctlflow/fleetd` may be public npm packages.
-Internal modules and crossfire remain private. Local pack/install evidence is
-not registry publication.
+All npm workspaces are private; no Node service executable is published.
+Local distribution builds are not registry publication or deployment.
 
 - [CLI update commands](../../../fleet/docs/commands.md)
 - [Server operations](../operations.md)

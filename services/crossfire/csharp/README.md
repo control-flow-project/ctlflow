@@ -1,6 +1,6 @@
 # C# products
 
-C# implements the same crossfire, fleetd and fleet contracts as Node.
+C# implements the same crossfire, fleetd and fleet contracts as Rust.
 It targets .NET 11 and produces managed and NativeAOT output from the same source.
 The React UI, agent tools, Pi extension and Knex migration image are shared.
 
@@ -11,9 +11,8 @@ ports and concrete adapters. `tests/` contains language-owned acceptance.
 `build/` contains the pinned EF compiler/startup host and never ships as a
 production dependency.
 
-Tinqer is Node's query owner; EF is C#'s.
-Both open identical Knex-created SQLite data. C# never invokes Node as a backend
-fallback or substitutes ORM migration for Knex.
+EF owns C# application queries; Diesel owns Rust queries. Both use identical
+Knex-created SQLite data. Runtime code never substitutes ORM migrations for Knex.
 
 - [Repository layout and language differences](../../../docs/architecture/native-implementations.md)
 - [Database owner](../database/README.md)
@@ -60,7 +59,7 @@ npm run verify:csharp
 npm run verify:parity -- /absolute/new-evidence-directory
 ```
 
-The integrated gate builds and runs both C# outputs plus Node/Rust, common external
+The integrated gate builds and runs both C# outputs plus Rust, common external
 API/UI/native/CLI assertions, containers and migration containers.
 The SDK/EF versions are pinned previews. IL diagnostics remain visible;
 supported-query execution is not arbitrary EF reflection/query support.

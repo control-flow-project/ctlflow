@@ -34,7 +34,7 @@ Remote update consumes already installed remote assets:
 
 ```sh
 fleet --remote office update research \
-  --release-directory /absolute/private/install/node_modules/@ctlflow/fleetd/dist/assets
+  --release-directory /absolute/private/native-release/fleetd/artifacts
 ```
 
 Install the selected release there first and restart the controller using its new

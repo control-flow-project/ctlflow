@@ -1,6 +1,6 @@
 # Messaging backends
 
-Messaging policy and messaging protocols have separate owners. Node, C# and Rust
+Messaging policy and messaging protocols have separate owners. C# and Rust
 implement the same boundaries, REST contract and SQLite schema. The React UI is
 shared. Matrix is the implemented backend; Slack and Zulip are not implemented.
 

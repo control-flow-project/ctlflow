@@ -1,7 +1,7 @@
 mod guide;
 use serde_json::{Value, json};
 pub fn descriptor(origin: &str, owner: &str, version: &str, instructions: &str) -> Value {
-    json!({"schemaVersion":1,"server":origin,"ownerBackendUserId":owner,"package":{"name":"@ctlflow/fleet","version":version},"instructions":instructions})
+    json!({"schemaVersion":1,"server":origin,"ownerBackendUserId":owner,"package":{"name":"fleet","version":version},"instructions":instructions})
 }
 fn quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))

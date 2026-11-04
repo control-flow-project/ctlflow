@@ -2,8 +2,7 @@
 
 Rust implements crossfire, fleetd and fleet. It uses the shared React UI, wire
 contracts, agent-tool assets and SQLite files. Diesel owns Rust application
-queries; Knex alone creates and migrates schemas. Rust executables do not invoke
-Node or C# as backend substitutes.
+queries; Knex alone creates and migrates schemas. Rust executables use their selected native backend directly.
 
 ## Source ownership
 
@@ -47,7 +46,7 @@ npm run verify:parity -- /absolute/new-evidence-directory
 ```
 
 The Rust coordinator prepares Knex-created fixture databases and native assets
-before running internal/native tests. The integrated gate adds Node, both C#
+before running internal/native tests. The integrated gate adds both C#
 modes, standalone products, shared API/UI/native/CLI assertions, containers and
 migrations. No configured target is skipped on failure.
 

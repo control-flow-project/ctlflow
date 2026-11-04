@@ -18,7 +18,7 @@ function sourceFiles(directory, filename) {
   });
 }
 
-test('all packages use their service-owned ctlflow namespace and only the two products are public', () => {
+test('all packages use their service-owned ctlflow namespace and every npm workspace is private', () => {
   verifyPackageOwnership(fileURLToPath(new URL('../', import.meta.url)));
 });
 
@@ -39,16 +39,12 @@ test('the lock rejects removed workspaces, missing links, alternate owners and s
   ]) assert.throws(() => verifyWorkspaceLock({ lockfileVersion: 3, packages: changed }, manifests));
 });
 
-test('publication rejects internal exposure, source files, private dependencies, ranged public dependencies and install hooks', () => {
-  const valid = { name: '@ctlflow/fleet', private: false, type: 'module', license: PACKAGE_LICENSE, author: PACKAGE_AUTHOR, publishConfig: { access: 'public' }, files: ['dist/bin', 'docs', 'README.md', 'LICENSE'], bin: { fleet: './dist/bin/fleet.mjs' }, dependencies: { '@ctlflow/fleetd': '0.1.0' } };
-  verifyPackageManifest(valid, valid.name, true);
-  for (const changed of [ { private: true }, { files: ['src'] }, { files: ['dist/*'] }, { files: ['dist/src'] }, { files: ['dist/tests'] }, { files: ['dist/assets'] }, { files: ['docs/*'] }, { dependencies: { '@ctlflow/fleetd-app': '0.1.0' } },
-    { dependencies: { '@ctlflow/fleetd': '^0.1.0' } }, { scripts: { postinstall: 'fleet start' } }, { publishConfig: { access: 'restricted' } },
-    { license: 'SEE LICENSE IN LICENSE' }, { author: 'another owner' }, { files: ['dist/bin', 'docs', 'README.md'] } ]) {
-    assert.throws(() => verifyPackageManifest({ ...valid, ...changed }, valid.name, true));
-  }
-  assert.throws(() => verifyPackageManifest({ name: '@ctlflow/crossfire-domain', private: false, type: 'module' }, '@ctlflow/crossfire-domain', false));
-  assert.throws(() => verifyPackageManifest({ name: '@other/fleet', private: false, type: 'module' }, valid.name, true));
+test('tooling manifests reject public packages and service executable installation', () => {
+  const valid = { name: '@ctlflow/fleet', private: true, type: 'module', license: PACKAGE_LICENSE, author: PACKAGE_AUTHOR };
+  verifyPackageManifest(valid, valid.name, false);
+  for (const changed of [{ private: false }, { bin: { fleet: './fleet.mjs' } }, { publishConfig: { access: 'public' } }])
+    assert.throws(() => verifyPackageManifest({ ...valid, ...changed }, valid.name, false));
+  assert.throws(() => verifyPackageManifest({ ...valid, private: false }, valid.name, true));
 });
 
 test('private packages require the same MIT license and author as public products', () => {
@@ -93,6 +89,6 @@ test('C# and Rust products inherit MIT metadata without changing publication per
 });
 
 test('the upstream Matrix specification license is retained unchanged', () => {
-  const notice = readFileSync(join(root, 'services/crossfire/node/packages/agent-tools/assets/messaging-LICENSE.txt'));
+  const notice = readFileSync(join(root, 'services/crossfire/packages/agent-tools/assets/messaging-LICENSE.txt'));
   assert.equal(createHash('sha256').update(notice).digest('hex'), '0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594');
 });

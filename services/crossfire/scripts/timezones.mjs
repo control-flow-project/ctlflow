@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, renameSync, rmSync, cpSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { timeZoneSource, prepareTimeZones } from '../node/scripts/time-zones.ts';
+import { timeZoneSource, prepareTimeZones } from '../scripts/time-zones.ts';
 
 const pin=timeZoneSource();
 const sourceNames=['africa','antarctica','asia','australasia','europe','northamerica','southamerica','etcetera','factory','backward'];

@@ -18,7 +18,7 @@ await command(process.execPath, ['dist/scripts/architecture-proof/conduit-assets
 const { serverPerformance } = await import('../services/crossfire/dist/tests/performance/server.js');
 process.chdir(join(repository, 'services/crossfire'));
 const git = args => execFileSync('git', args, { cwd: repository, encoding: 'utf8' }).trim();
-test('crossfire Node, .NET and Rust performance parity', { timeout: 900000 }, scope => serverPerformance(scope, targets, output, {
+test('crossfire .NET and Rust performance parity', { timeout: 900000 }, scope => serverPerformance(scope, targets, output, {
   source: { commit: git(['rev-parse', 'HEAD']), dirty: git(['status', '--porcelain', '--untracked-files=normal']) !== '' },
   host: { platform: process.platform, architecture: process.arch, processors: availableParallelism(), resources },
 }));

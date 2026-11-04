@@ -1,6 +1,6 @@
 {
   "name": "@ctlflow/workspace",
-  "version": "0.1.25",
+  "version": "0.1.26",
   "license": "MIT",
   "author": "Jeswin P Kumar <jeswinpk@agilehead.com>",
   "private": true,
@@ -12,8 +12,7 @@
   "workspaces": [
     "services/*",
     "services/*/apps/*",
-    "services/*/node/apps/*",
-    "services/*/node/packages/*",
+    "services/*/packages/*",
     "services/*/database"
   ],
   "scripts": {
@@ -24,8 +23,7 @@
     "verify:rust": "node scripts/verify-rust-release.mjs",
     "test:browser": "node scripts/test.mjs crossfire browser",
     "verify:structure": "node scripts/verify-structure.mjs",
-    "verify:architecture": "npm run verify:structure && npm run verify:architecture --workspace=@ctlflow/crossfire",
-    "verify:installation": "npm run verify:installation --workspace=@ctlflow/crossfire",
+    "verify:architecture": "node scripts/verify-structure.mjs && node scripts/native-architecture.mjs",
     "verify:container": "node scripts/verify-container.mjs",
     "verify:csharp": "node services/crossfire/csharp/scripts/verify.mjs && node services/crossfire/csharp/scripts/verify-runtime.mjs",
     "verify:csharp:core": "node services/crossfire/csharp/scripts/verify.mjs",

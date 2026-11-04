@@ -86,7 +86,7 @@ test('the coordinated producer includes Rust alongside all upstream targets and 
   try {
     const output = join(selected.directory, 'packages');
     execFileSync(process.execPath, ['--input-type=module', '-e', `import {buildContainerPackages} from ${JSON.stringify(new URL('./container-packages.mjs', import.meta.url).href)};await buildContainerPackages(${JSON.stringify(selected.source)},${JSON.stringify(output)},'verification.slice');`], { cwd: root, env: selected.environment, timeout: 30000, maxBuffer: 65536 });
-    assert.deepEqual(readdirSync(output).sort(), ['csharp-managed', 'csharp-nativeaot', 'node', 'rust']);
+    assert.deepEqual(readdirSync(output).sort(), ['csharp-managed', 'csharp-nativeaot', 'rust']);
     const values = readdirSync(output).map(name => JSON.parse(readFileSync(join(output, name, 'release.json'), 'utf8')));
     assert.equal(new Set(values.map(value => JSON.stringify(value.migration))).size, 1, 'Every backend uses the same exact Knex image objects');
     assert.equal(new Set(values.map(value => value.sourceDigest)).size, 1, 'One coordinated input identity');

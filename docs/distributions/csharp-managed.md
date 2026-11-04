@@ -17,7 +17,7 @@ Managed products disable tiered compilation: application methods receive optimiz
 JIT code on first compilation instead of waiting for traffic-driven promotion.
 This trades additional first-call compilation work for predictable low-volume
 request latency. NativeAOT remains a separate ahead-of-time build, not a runtime
-substitution. The four-target performance gate measures the installed defaults.
+substitution. The three-target performance gate measures the installed defaults.
 
 Building managed runtime and shared Knex images requires a source checkout.
 Server deployment needs rootless Docker with Compose and a trusted image kit,
@@ -44,12 +44,12 @@ runtime files, common web/tool assets, licenses, this target-specific README and
 coordinated version, tool release and executable paths.
 
 This command writes local files. It does not create a release upload or publish
-to npm. Only the Node fleet/fleetd packages may be public npm packages.
+to npm. All npm workspaces are private build, test, UI and maintenance dependencies.
 
 ## Install and run the server
 
 Server deployment uses Docker Compose with the selected csharp-managed image and
-matching one-shot Knex image. Build the four backend kits from source with
+matching one-shot Knex image. Build the three native backend kits from source with
 `npm run package:containers -- --output /absolute/packages`. Copy the complete
 selected directory, including release.json, images.tar, package-tool.mjs and
 compose.yaml, to the deployment host. The trusted maintenance helper requires
@@ -105,16 +105,13 @@ These are local example addresses, not live deployment evidence.
 
 fleetd automatically creates one private OS-user authentication file on first
 start: Linux `$XDG_CONFIG_HOME/ctlflow/fleetd.json` (default
-`$HOME/.config/ctlflow/fleetd.json`), or macOS
-`$HOME/Library/Application Support/ctlflow/fleetd.json` for the Node products.
+`$HOME/.config/ctlflow/fleetd.json`). The currently verified native distributions target Linux x64.
 fleet reads the same persistent random key and authenticates every daemon
 request. Back it up separately from controller roots; remote clients read the
 remote host's file over strict SSH. See the
 [authentication contract](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/docs/authentication.md).
 
-Management-generated setup always uses pinned npm fleet and Node fleetd,
-independent of the server backend. Native controllers are explicit operator
-choices, not prerequisites imposed on a setup harness.
+Management-generated setup uses the matching installed native fleet/fleetd distribution. Install it first, retain the sibling product directories and add fleet to PATH. NativeAOT is the default; the CLI selects its packaged controller without substitution.
 
 
 Keep the distribution's sibling `fleet` and `fleetd` directories together.
@@ -168,7 +165,7 @@ npm run verify:csharp
 npm run verify:parity -- /absolute/new-evidence-directory
 ```
 
-The integrated bank covers Node, both C# modes and Rust, installed products,
+The integrated bank covers both C# modes and Rust, installed products,
 actual containers and Knex. EF NativeAOT diagnostics from the other C# build
 remain visible. Supported fixed-query tests do not establish arbitrary EF query,
 reflection or plugin compatibility.

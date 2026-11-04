@@ -7,7 +7,7 @@ import type { TestContext } from 'node:test';
 import { cleanup } from '@ctlflow/crossfire-test-support/cleanup';
 import type { ContractTarget } from '@ctlflow/crossfire-test-support/contract-process';
 
-export async function operatorContracts(scope: TestContext, selected: Pick<ContractTarget, 'name' | 'server'>): Promise<void> {
+export async function operatorContracts(scope: TestContext, selected: Pick<ContractTarget, 'name' | 'server' | 'daemon'>): Promise<void> {
   const directory = mkdtempSync(join(tmpdir(), 'cf-operator-contracts-'));
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const state = join(directory, 'state'), bin = join(directory, 'bin'), calls = join(directory, 'docker-calls');
@@ -25,6 +25,19 @@ export async function operatorContracts(scope: TestContext, selected: Pick<Contr
     assert.equal(result.signal, null, 'Operator must exit normally rather than abort, time out or be killed');
     return result;
   }
+  await scope.test('invalid daemon startup exits normally before creating controller state', () => {
+    const unopened = join(directory, 'invalid-daemon');
+    for (const arguments_ of [['--help'], ['--unknown'], ['--root', 'relative'], ['--root', unopened, '--name']]) {
+      const result = spawnSync(selected.daemon.binary, [...selected.daemon.arguments, ...arguments_], {
+        cwd: directory, env: environment, encoding: 'utf8', timeout: 10000, maxBuffer: 4096,
+      });
+      assert.ifError(result.error);
+      assert.equal(result.signal, null, 'Invalid daemon arguments must never abort or time out');
+      assert.equal(result.status, 1, 'Expected startup failures return a normal error exit');
+      assert(result.stderr.trim(), 'Startup failure must report a diagnostic');
+      assert.equal(existsSync(unopened), false, 'Invalid startup creates no controller state');
+    }
+  });
   const initialized = run(init);
   assert.equal(initialized.status, 0, initialized.stderr);
   assert(!existsSync(calls), 'Initialization must not call Docker');

@@ -1,0 +1,36 @@
+import type { ControllerState } from '@ctlflow/crossfire-contracts/listener';
+import type { ListenerOptions, SavedRuntimeContext } from '@ctlflow/crossfire-contracts/listener';
+import type { CoordinationPolicy } from '@ctlflow/crossfire-domain/coordination/values';
+import type { SetupDescriptor } from '@ctlflow/crossfire-domain/onboarding/values';
+export type FleetDelivery = { fleetId: string; revision: number; deliveryEnabled: boolean;
+  connection: { status: 'online' | 'offline'; lastSeenAt: number | null } };
+export type FleetMessageResult = { messageId: string; body: string; createdAt: number; expiresAt: number;
+  total: number; pending: number; delivered: number; failed: number; skipped: number; expired: number };
+export type Controller = { name: string; metadata?: Record<string, string> };
+export type Instance = { key: string; name: string; definition: string; workarea: string; workspace?: string; listenerOptions?: ListenerOptions;
+  runtimeOptions?: Record<string, unknown> };
+export type Roster = { fleet: string; coordination: { adapter: 'crossfire'; server: string; owner: string }; instances: Instance[] };
+export type Definition = { name: string; runtime: string; options: Record<string, unknown>; instructions: string;
+  coordinationPolicy: CoordinationPolicy };
+export type Configuration = { directory: string; roster: Roster; definitions: Record<string, Definition>; digest: string };
+export function nativeOptions(configuration: Configuration, instance: Instance): Record<string, unknown> {
+  return { ...configuration.definitions[instance.definition]!.options, ...instance.runtimeOptions };
+}
+export type Registration = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; digest: string };
+export type DesiredIntent = { fleetId: string; instanceKey: string };
+export type ResumeSelection = { fleetId: string; instanceKeys: string[] };
+export type RetainedContext = Omit<SavedRuntimeContext, 'workspace'>;
+export type Phase = 'stopped' | 'starting' | 'awaiting-approval' | 'running' | 'sleeping' | 'waking' | 'stopping' | 'failed';
+export type InstanceState = { instance: Instance; phase: Phase; sessionId: string | null; error: string | null; startedAt: number | null };
+export type FleetState = { fleetId: string; fleetKey: string; directory: string; label: string; revision: number; controller: Controller; phase: Phase;
+  resumeInstanceKeys: string[] | null;
+  connection: ControllerState; instances: (InstanceState & { listenerActive: boolean; desiredActive: boolean; lastActivityAt: number | null; historyAvailable: boolean | null })[]; error: string | null };
+export type Target = { kind: 'fleet' | 'agent' | 'daemon'; fleetId?: string; instanceKey?: string };
+export type OperationInput = { operationId: string; target: Target; action: 'enroll' | 'start' | 'stop' | 'reset' | 'update'; expectedRevision: number; releaseDirectory?: string };
+export type Approval = { url: string; code: string };
+export type Operation = OperationInput & { status: 'accepted' | 'running' | 'awaiting-approval' | 'succeeded' | 'failed'; createdAt: number; completedAt: number | null;
+  receiptPending?: true;
+  approval: Approval | null; errors: { instanceKey: string | null; code: string; message: string }[] };
+export type SetupInput = { descriptor: SetupDescriptor; workspace: string; configuration?: string };
+export type SetupConfiguration = { configuration: Configuration; operationId: string; completed: boolean };
+export type SetupResult = { fleet: FleetState; operation: Operation | null; status: 'starting' | 'ready' | 'stopped' };

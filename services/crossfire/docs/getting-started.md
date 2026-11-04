@@ -3,7 +3,7 @@
 ## Requirements
 
 Use Linux amd64, rootless Docker with the Compose plugin and exact matching
-server/migration images. Choose Node, C# managed, C# NativeAOT or Rust explicitly.
+server/migration images. Choose C# managed, C# NativeAOT or Rust explicitly. NativeAOT is the default.
 The server runs in its selected image; no host SDK is required. Trusted archive
 verification/export tooling uses Node.js 26. Source builds additionally require
 the pinned tools documented for the selected target. crossfire does not install
@@ -11,7 +11,6 @@ host services, certificates, firewall rules or DNS.
 
 - [Local Docker server and host-native fleet](local-docker.md)
 - [Build, verify and transfer a server kit](container-packages.md)
-- [Node installation and packaging](../../../docs/distributions/node.md)
 - [C# managed installation and packaging](../../../docs/distributions/csharp-managed.md)
 - [C# NativeAOT installation and packaging](../../../docs/distributions/csharp-nativeaot.md)
 - [Rust installation and packaging](../../../docs/distributions/rust.md)

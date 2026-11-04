@@ -5,7 +5,7 @@ import { fileOwner, inventory } from './native-file-inventory.mjs';
 
 test('per-file inventory names every language owner without pretending shared assets are ports', () => {
   const value = inventory();
-  assert.deepEqual(Object.keys(value.totals).sort(), ['crossfire/csharp', 'crossfire/node', 'fleet/csharp', 'fleet/node', 'fleetd/csharp', 'fleetd/node']);
+  assert.deepEqual(Object.keys(value.totals).sort(), ['crossfire/csharp', 'fleet/csharp', 'fleetd/csharp']);
   assert.equal(new Set(value.files.map(row => row.file)).size, value.files.length);
   assert.equal(Object.values(value.totals).reduce((sum, total) => sum + total, 0), value.files.length);
   for (const row of value.files) {
@@ -22,10 +22,10 @@ test('per-file inventory names every language owner without pretending shared as
 
 test('file associations reject new unreviewed owners and retain concrete framework boundaries', () => {
   assert.equal(fileOwner('services/crossfire/csharp/packages/Crossfire.AdapterProcess/NativeProcess.cs')[1], 'services/crossfire/rust/packages/adapter-process');
-  assert.equal(fileOwner('services/fleetd/node/packages/adapter-execution/src/execution.ts')[1], 'services/fleetd/rust/packages/adapter-execution');
-  assert.equal(fileOwner('services/fleet/node/apps/cli/src/main.ts')[1], 'services/fleet/rust/apps/cli');
-  assert.equal(fileOwner('services/crossfire/node/packages/agent-tools/src/message-envelope.ts')[1], 'services/crossfire/node/packages/agent-tools');
+  assert.equal(fileOwner('services/fleetd/csharp/packages/Fleetd.AdapterExecution/Execution.cs')[1], 'services/fleetd/rust/packages/adapter-execution');
+  assert.throws(() => fileOwner('services/fleet/node/apps/cli/src/main.ts'));
+  assert.throws(() => fileOwner('services/crossfire/packages/agent-tools/src/message-envelope.ts'));
   assert.equal(fileOwner('services/crossfire/csharp/build/Crossfire.EfCompiler/Program.cs')[1], 'services/crossfire/scripts/generate-rust-schema.mjs');
-  assert.throws(() => fileOwner('services/crossfire/node/packages/hidden-fallback/src/main.ts'), /explicit semantic owner/u);
+  assert.throws(() => fileOwner('services/crossfire/csharp/packages/HiddenFallback/Program.cs'), /explicit semantic owner/u);
   assert.throws(() => fileOwner('services/crossfire/csharp/legacy/Server.cs'), /Unclassified file/u);
 });

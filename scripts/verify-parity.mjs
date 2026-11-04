@@ -26,7 +26,7 @@ async function run(label, binary, args, environment = process.env) {
   if (failure) throw new Error(label + ' failed; inspect ' + log);
 }
 try {
-  await run('node', 'npm', ['test']);
+  await run('typescript', 'npm', ['test']);
   await run('architecture', 'npm', ['run', 'verify:architecture']);
   await run('csharp', 'npm', ['run', 'verify:csharp']);
   await run('rust', 'systemd-run', ['--user', '--scope', '--quiet',
@@ -42,7 +42,7 @@ try {
   await run('containers', process.execPath, ['scripts/verify-container.mjs', matrix]);
   await run('migrations', process.execPath, ['services/crossfire/scripts/verify-migrations.mjs']);
   verified = true;
-  console.log(JSON.stringify({ status: 'passed', targets: ['node', 'csharp-managed', 'csharp-nativeaot','rust'], resources, evidence: output }));
+  console.log(JSON.stringify({ status: 'passed', targets: ['csharp-managed', 'csharp-nativeaot','rust'], resources, evidence: output }));
 } finally {
   if (verified) { rmSync(temporary, { recursive: true, force: true }); fixtures.close(); }
   else console.error('Failed-gate artifacts retained for bounded diagnosis: ' + temporary + '; fixtures: ' + fixtures.directory + '; remove after their last diagnostic use.');

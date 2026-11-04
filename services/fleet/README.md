@@ -12,14 +12,13 @@ native agents or write controller state directly.
 - [Software updates and diagnosis](docs/operations.md)
 - [Read-only diagnostic reports](docs/diagnostics.md)
 - [Pi runtime](docs/pi.md)
-- [Node package installation](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/node.md)
 - [C# managed installation](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/csharp-managed.md)
 - [C# NativeAOT installation](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/csharp-nativeaot.md)
 - [Rust installation](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/rust.md)
 
-Node source lives under `node/`, C# under `csharp/` and Rust under `rust/`.
+C# service source lives under `csharp/` and Rust service source under `rust/`. Shared TypeScript packages are private tooling and contract dependencies.
 External behavior is tested under `tests/contracts/`.
-`@ctlflow/fleet` may be publicly distributed; first-party material is MIT-licensed.
-Internal dependencies are bundled, not published separately.
+fleet is distributed with the matching native fleetd and shared artifacts.
+All npm workspaces are private; first-party material is MIT-licensed.
 
 - [License](LICENSE)

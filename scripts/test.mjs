@@ -3,13 +3,12 @@ import { readdirSync, mkdirSync, writeFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildProducts, repository, products, command } from './build.mjs';
+import { buildProducts, repository, products } from './build.mjs';
 import { testOptions } from './test-options.mjs';
 import { testEvidence } from './test-evidence.mjs';
 import { verifyTestResources } from './test-resources.mjs';
 
 const browserFile = file => basename(file) === 'browser.test.js' || basename(file).endsWith('-browser.test.js');
-const elementFiles = new Set(['browser.test.js', 'fleet-browser.test.js']);
 
 export function selectedTest(directory, file, selection) {
   const browser = directory === 'tests' && browserFile(file), integration = file.endsWith('.integration.js');
@@ -35,18 +34,6 @@ export async function runTests(selected, selection) {
   const concurrency = Math.min(availableParallelism(), jobs.length), started = performance.now();
   const evidence = join(repository, '.temp/test-runs', new Date().toISOString().replaceAll(':', '-') + '-' + process.pid);
   mkdirSync(evidence, { recursive: true });
-  if (jobs.some(job => job.service === 'crossfire')) {
-    const root = join(repository, 'services/crossfire');
-    await command(process.execPath, [join(root, 'dist/scripts/architecture-proof/conduit-assets.js')], root);
-  }
-  if (jobs.some(job => products.includes(job.service))) {
-    const root = join(repository, 'services/crossfire');
-    await command(process.execPath, [join(root, 'dist/scripts/architecture-proof/pi-assets.js')], root);
-  }
-  if (jobs.some(job => job.service === 'crossfire' && elementFiles.has(basename(job.file)))) {
-    const root = join(repository, 'services/crossfire');
-    await command(process.execPath, [join(root, 'dist/tests/support/element.js')], root);
-  }
   const preparationMs = Math.round(performance.now() - started);
   let next = 0;
   const results = [];

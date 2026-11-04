@@ -5,7 +5,7 @@ verification reports identify the revisions and executions they actually tested.
 
 ## Coverage
 
-The [per-file map](native-file-map.tsv) lists every Node/C# file, its semantic
+The [per-file map](native-file-map.tsv) lists every C# file, its semantic
 Rust/shared owner and disposition. `node scripts/native-file-inventory.mjs`
 reads each complete file and emits its identity, declarations, size and owner.
 Structure verification rejects unclassified packages, missing counterparts and
@@ -35,7 +35,7 @@ paths. Public behavior uses one external assertion bank.
 | Queries | Bound SQLite LIKE without host case folding; identical filters, creation/ID ordering and page counts | Repository tests and shared agent/discovery/fleet/wake/report scenarios |
 | State | Shared Knex-created schema, runtime validation, transactional rollback and same-file interoperability | Bidirectional SQLite, journal, lock and actual migration proofs |
 | Steering | Predecessor settlement precedes recording a new publication; input and exact history remain recoverable | Fault/reopen recovery and installed native runtime tests |
-| History inspection | Synchronous maintenance never claims an active query slot; real unread ownership remains exclusive | Deterministic mutex/lease regression and unchanged four-target room/global history contracts |
+| History inspection | Synchronous maintenance never claims an active query slot; real unread ownership remains exclusive | Deterministic mutex/lease regression and unchanged three-target room/global history contracts |
 | Telemetry | Atomic bounded summaries; safe labels; invalid input does not poison counters or heartbeats | Cross-language collector and overflow regressions |
 | Lifecycle | fleetd alone owns execution; saved history, explicit operation identity and native writer locks | Actual Codex/Pi inert-provider, restart, terminal, steering and process-group proofs |
 | Server deployment | One common Compose kit, explicit writer stop and fresh migration job; optional operator backups | Shared real-container API/UI/data bank, migration-failure gating and restart persistence |
@@ -48,7 +48,7 @@ paths. Public behavior uses one external assertion bank.
 
 General ownership follows [the layout](native-layout.md). Native process, HTTP,
 TOML and ORM primitives stay in their adapters. Rust tests sit beside their
-crate; C# tests retain managed/AOT projects and Node uses isolated test files.
+crate; C# tests retain managed/AOT projects. Shared TypeScript tests run against each selected native target.
 
 The EF design-time compiler is not a missing Rust feature: Diesel metadata is
 generated from the common Knex-created schema. No empty EF counterpart, second
@@ -63,7 +63,7 @@ a process-adapter primitive, not arbitrary-subprocess containment.
 
 Current-source verification and failed-attempt diagnoses are recorded in the
 parent quality-gate report. Historical Rust-only passes do not replace the
-complete four-target gate. No deployment, registry publication or paid-provider
+complete three-target gate. No deployment, registry publication or paid-provider
 certification is implied.
 
 - [Parent quality gate](../verification/20261016-rust-quality-gate.md)

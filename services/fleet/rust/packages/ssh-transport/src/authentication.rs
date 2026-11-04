@@ -7,10 +7,9 @@ pub async fn read(host: &str, stop: CancellationToken) -> Result<Secret> {
     if !super::valid_host(host) {
         return Err(failure());
     }
-    let asset: serde_json::Value = serde_json::from_str(include_str!(
-        "../../../../node/packages/ssh-transport/assets/authentication.json"
-    ))
-    .map_err(|_| failure())?;
+    let asset: serde_json::Value =
+        serde_json::from_str(include_str!("../../../../assets/authentication.json"))
+            .map_err(|_| failure())?;
     let script = asset["script"].as_str().ok_or_else(failure)?;
     let result = capture(
         &NativeCommand {

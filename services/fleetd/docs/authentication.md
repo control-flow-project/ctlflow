@@ -47,9 +47,8 @@ remote copy, or put secrets in argv, profiles or errors. The noninteractive
 SSH environment must select the same HOME/XDG_CONFIG_HOME as the controller.
 A missing remote key fails; start fleetd on that host first.
 
-Node supports Linux/macOS controllers. Current C#/Rust native distributions and
-filesystem adapters are verified on Linux x64 only; matching path rules do not
-establish native macOS runtime support.
+Current C#/Rust distributions and filesystem adapters are verified on Linux x64
+only. The path contract does not establish native macOS runtime support.
 
 ## Upgrade and recovery
 

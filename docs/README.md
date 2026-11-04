@@ -4,7 +4,6 @@
 
 - [Target selection and packaging](distributions/README.md)
 - [Local Docker server and host-native fleet](../services/crossfire/docs/local-docker.md)
-- [Node installation](distributions/node.md)
 - [C# managed installation](distributions/csharp-managed.md)
 - [C# NativeAOT installation](distributions/csharp-nativeaot.md)
 - [Rust installation](distributions/rust.md)
