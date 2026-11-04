@@ -66,7 +66,11 @@ by the benchmark's existing aggregation, not added across overlapping workers.
 
 All three runtime images and the shared Knex image were published and pulled by
 immutable digest. The [release inventory](../distributions/releases/0.1.26.md)
-records exact digests, private registry access and local native archive hashes.
+records exact digests, public registry access and local native archive hashes.
+After the package visibility change, complete anonymous Docker pulls passed for
+all four images using a new empty credential configuration and no login or
+credential helpers. Manifest digests, image identities and release labels matched
+the earlier publication. The concurrent pulls completed in 28.0 seconds overall.
 GitHub native archive publication remains blocked by missing repository-release
 credential scope; no successful public archive download is claimed.
 
