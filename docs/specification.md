@@ -1104,11 +1104,12 @@ real containers and migration/rollback tests. Coverage inventory distinguishes
 authentication, successful behavior, malformed input, recovery and UI evidence;
 counts alone establish none of them.
 
-The native performance bank compares each workload with the measured NativeAOT
-reference: zero request failures, no slower p50/p95 and no lower throughput.
-Historical performance reports retain their original thresholds and verdicts;
-they are not current native verification. JSON and HTML expose the selected
-reference, explicit limits, source and measurements without a hidden tolerance.
+The native performance bank records p50/p95/p99 latency, throughput and request
+failures for every target and workload. Every configured target, round and workload
+must complete with zero request failures. Timing measurements have no speed
+thresholds or requirement to match another target or an earlier release. JSON and
+HTML retain source, resource limits, samples and failures. Historical reports keep
+their original thresholds and verdicts; they do not certify current source.
 
 Tests use verified finite aggregate memory/swap/task scopes, all available cores
 for independent files, and once-prepared immutable builds/native/browser assets.

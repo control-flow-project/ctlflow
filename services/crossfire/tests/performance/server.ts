@@ -8,20 +8,20 @@ import type { ContractTarget } from '@ctlflow/crossfire-test-support/contract-pr
 import { contractStack } from '../contracts/fixture.js';
 import { populatePerformanceHistory } from './fixture.js';
 import { performanceTransport, type PerformanceRequest } from './transport.js';
-import { comparePerformance, type Measurement, type PerformanceReport } from './statistics.js';
+import { summarizePerformance, type Measurement, type PerformanceReport } from './statistics.js';
 import { performanceHtml } from './report.js';
 
 export async function serverPerformance(scope: TestContext, targets: readonly ContractTarget[], output: string,
   provenance: Pick<PerformanceReport, 'source' | 'host'>): Promise<void> {
-  const baseline = targets.find(target => target.name === 'csharp-nativeaot');
-  assert(baseline && targets.some(target => target.name === 'csharp-managed') && targets.some(target => target.name === 'csharp-nativeaot')
+  const initial = targets.find(target => target.name === 'csharp-nativeaot');
+  assert(initial && targets.some(target => target.name === 'csharp-managed') && targets.some(target => target.name === 'csharp-nativeaot')
     && targets.some(target => target.implementation === 'rust'), 'Performance verification requires .NET managed/NativeAOT and Rust');
   mkdirSync(output, { mode: 0o700 });
-  const measurements: Measurement[] = [], policy = { rounds: targets.length, samples: 100, warmup: 20, baseline: baseline.name };
+  const measurements: Measurement[] = [], policy = { rounds: targets.length, samples: 100, warmup: 20 };
   let fixture = { agents: 0, listenerRuns: 0, runtimeObservations: 0 };
   let problem: string | null = null;
   try {
-    const platform = await contractStack(scope, baseline, targets);
+    const platform = await contractStack(scope, initial, targets);
     const agent = await platform.agent('performance-analyst');
     await platform.close();
     fixture = populatePerformanceHistory(join(platform.state, 'management.sqlite'), agent.id);
@@ -76,17 +76,17 @@ export async function serverPerformance(scope: TestContext, targets: readonly Co
       }
     }
   } catch (error) { problem = error instanceof Error ? error.message : String(error); }
-  let comparisons: PerformanceReport['comparisons'] = [];
-  try { comparisons = comparePerformance(measurements, baseline.name); }
+  let summaries: PerformanceReport['summaries'] = [];
+  try { summaries = summarizePerformance(measurements); }
   catch (error) { problem ??= error instanceof Error ? error.message : String(error); }
   const complete = measurements.length === policy.rounds * targets.length * 6;
-  const passed = problem === null && complete && comparisons.every(value => value.passed);
+  const passed = problem === null && complete && summaries.every(value => value.failures === 0);
   const report: PerformanceReport = { schemaVersion: 1, generatedAt: new Date().toISOString(), ...provenance, fixture, policy,
-    targets: targets.map(target => ({ name: target.name, implementation: target.implementation })), measurements, comparisons, passed, problem };
+    targets: targets.map(target => ({ name: target.name, implementation: target.implementation })), measurements, summaries, passed, problem };
   writeFileSync(join(output, 'results.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
   writeFileSync(join(output, 'report.html'), performanceHtml(report), { mode: 0o600 });
   scope.diagnostic('Performance HTML and JSON: ' + output);
   assert.equal(problem, null, 'Performance setup and requests must complete');
   assert.equal(complete, true, 'Every runtime must complete every rotated workload');
-  assert.equal(passed, true, 'Every workload must meet its recorded native comparison limits with zero failures; inspect report.html');
+  assert.equal(passed, true, 'Every workload must complete with zero request failures; inspect report.html');
 }

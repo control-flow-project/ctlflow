@@ -22,6 +22,30 @@ requires operator-owned DNS, HTTPS and separate application/content hostnames.
 The full verification bank additionally requires Rust, Chrome and native test
 assets. These commands do not install host services or provider credentials.
 
+## Download a native distribution
+
+Release archives contain all three products and their shared artifacts. Download
+one selected target, verify its checksum and retain the extracted layout:
+
+```sh
+set -eu
+version=0.1.26
+archive=ctlflow-csharp-nativeaot-$version-linux-x64.tar.gz
+base=https://github.com/control-flow-project/ctlflow/releases/download/v$version
+curl -fLO "$base/$archive"
+curl -fLO "$base/SHA256SUMS"
+sha256sum --ignore-missing --check SHA256SUMS
+mkdir -p /absolute/releases
+tar -xzf "$archive" -C /absolute/releases
+export PATH="/absolute/releases/ctlflow-csharp-nativeaot-$version-linux-x64/fleet:$PATH"
+fleet --help
+```
+
+The checksum file covers the release archives. These commands install no host
+service and start no controller or agent. Keep fleetd and its artifacts beside
+fleet in the same extracted distribution. Local source builds remain available
+below and produce the same selected native implementation.
+
 ## Build and package
 
 From the repository root, with an existing output parent and a new destination:

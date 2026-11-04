@@ -4,12 +4,12 @@ Managed .NET, NativeAOT and Rust run the same HTTP workload against one
 populated management database. A server health response is not a management UI
 latency measurement. Runtime adapters and paid model quality are separate checks.
 
-NativeAOT is the measured reference. The suite fails if a selected target is
-missing, any request fails, median/p95 latency exceeds the reference or throughput
-falls below it. The same limits apply to all targets. It produces an offline HTML
-report and machine-readable samples, including failed attempts and actual source
-and resource limits. Historical reports retain their original comparisons;
-they do not certify the current source.
+The suite requires every configured target, round and workload to complete with
+zero request failures. Latency percentiles and throughput are recorded without
+speed thresholds or comparisons against another target or an earlier release.
+The offline HTML and JSON contain source provenance, resource limits, samples
+and failures. Historical reports retain their original comparisons and verdicts;
+they do not certify current source.
 
 - [Command, workload and comparison method](../../services/crossfire/tests/performance/README.md)
 - [Executable matrix and contract verification](shared-contracts.md)

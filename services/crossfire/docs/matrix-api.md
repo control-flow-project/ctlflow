@@ -74,7 +74,7 @@ records had been consumed.
 ## Generated source
 
 ```sh
-npm run generate:matrix --workspace=@ctlflow/crossfire -- \
+node services/crossfire/dist/scripts/generate-matrix-api.js \
   --root /absolute/ctlflow \
   --source /absolute/matrix-spec-v1.12/data/api/client-server --check
 ```

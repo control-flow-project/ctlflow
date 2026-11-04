@@ -204,10 +204,12 @@ For isolated changes with confidently local impact, run the affected tests and
 necessary targeted checks. Run the full quality gates for cross-layer changes
 or whenever the impact is uncertain. Never weaken a gate or claim verification
 that was not performed.
-Performance verification uses NativeAOT as the current reference. Every target
-must preserve request success, median/p95 latency no higher than the reference
-and throughput no lower than the reference. Historical reports retain their
-original measured baselines and verdicts; they do not certify current source.
+On 2026-11-04 the owner rejected the native speed-comparison gate. Performance
+verification records latency percentiles and throughput without speed thresholds
+or a requirement to match another target or an earlier release. Every configured
+target, round and workload must still complete with zero request failures.
+Historical reports retain their original measurements and verdicts; they do not
+certify current source.
 Keep the unified spec and .analysis/20260929-164420-fleet-handover/necessity-ledger.md
 aligned with decisions and evidence. .analysis/MEMORY.md is the local work memory.
 Do not stop at intermediate milestones when completion is authorized. Never

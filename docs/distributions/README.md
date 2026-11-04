@@ -31,7 +31,9 @@ resolve its documentation links.
 `publish:csharp` and `publish:rust` write local directories. They do not upload
 releases, install host services, publish npm packages or activate an instance.
 All npm workspaces are private. crossfire and all
-internal packages remain private. No native release-download service is assumed.
+internal packages remain private. Native release archives and SHA256SUMS are
+published as ordinary GitHub release assets; the selected target guide describes
+download and extraction. There is no custom download or installation service.
 
 Build dependencies and runtime dependencies differ. Native fleet controllers
 still require Node for the shared agent-tool client; selecting a native backend
