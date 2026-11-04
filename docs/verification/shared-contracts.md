@@ -44,8 +44,8 @@ npm run verify:parity -- /absolute/new-evidence-directory
 ```
 
 It runs shared TypeScript tests, architecture, C# tests, Rust tests, both C# distributions,
-Rust publication, matrix generation, installed-product tests, container tests
-and migration-container tests. Failure stops subsequent phases. Configured targets cannot be skipped.
+Rust publication, matrix generation, installed-product tests, performance
+measurement, container tests and migration-container tests. Failure stops subsequent phases. Configured targets cannot be skipped.
 The runner rejects missing summary counters, skipped/unfinished scenarios and
 different assertion counts between selected implementations, even when every
 worker exits successfully.

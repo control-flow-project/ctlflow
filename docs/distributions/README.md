@@ -11,7 +11,7 @@ does not move credentials into Docker. NativeAOT is the default; managed C# and
 Rust are explicit selections of the same current contract.
 
 - [Local Docker server and host-native fleet](../../services/crossfire/docs/local-docker.md)
-- [0.1.25 server and migration release inventory](releases/0.1.25.md)
+- [0.1.26 native release inventory](releases/0.1.26.md)
 
 | Target | Server installation | Fleet/controller installation | Build command |
 | --- | --- | --- | --- |
@@ -31,7 +31,9 @@ resolve its documentation links.
 `publish:csharp` and `publish:rust` write local directories. They do not upload
 releases, install host services, publish npm packages or activate an instance.
 All npm workspaces are private. crossfire and all
-internal packages remain private. No native release-download service is assumed.
+internal packages remain private. Native release archives and SHA256SUMS are
+published as ordinary GitHub release assets; the selected target guide describes
+download and extraction. There is no custom download or installation service.
 
 Build dependencies and runtime dependencies differ. Native fleet controllers
 still require Node for the shared agent-tool client; selecting a native backend

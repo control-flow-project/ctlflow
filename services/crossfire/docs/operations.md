@@ -27,7 +27,7 @@ A migration failure blocks activation. Inspect the migrate service logs, correct
 the failure and repeat the explicit upgrade sequence. Never delete persistent
 volumes as a restart or migration-recovery procedure. No phase silently
 substitutes another runtime or schema. A successful image build or migration
-does not establish browser or fleet health. Website deployment, npm publication
+does not establish browser or fleet health. Website deployment, distribution publication
 and starting fleets remain separate actions.
 
 ## Persistent data

@@ -52,10 +52,12 @@ code; the archive checksum is not authentication of this helper.
 
 ## Format and image contract
 
-The [0.1.25 release inventory](../../../docs/distributions/releases/0.1.25.md) records publication and immutable references for
+The [0.1.26 release inventory](../../../docs/distributions/releases/0.1.26.md) records publication and immutable references for
 the generic images under
 `ghcr.io/control-flow-project/crossfire-csharp-managed`,
 `crossfire-csharp-nativeaot`, `crossfire-rust` and `crossfire-migrations`.
+All four generic packages are public and support anonymous pulls without a
+GitHub account, registry login or token.
 These are server images; fleet/fleetd and native agents run on the execution host,
 not in Docker. Publish a coordinated version only after its applicable gates
 pass. Do not overwrite an existing version with different bytes or publish

@@ -98,9 +98,12 @@ No import/export is needed when changing between verified implementations.
 
 ## .NET dependencies
 
-The SDK is pinned to `11.0.100-rc.2.26504.105`; EF/SQLite packages are pinned
-to `11.0.0-rc.2.26504.105`. Managed initial deployment is permitted.
-There is no automatic managed fallback inside a NativeAOT executable.
+The SDK is pinned to `11.0.100-rc.3.26522.148`; EF/SQLite packages are pinned
+to `11.0.0-rc.3.26522.148`. Managed initial deployment is permitted.
+These RC3 pins replace vulnerable RC2 runtime/compiler packages described by
+[Microsoft advisory GHSA-p3jp-9v83-76w9](https://github.com/dotnet/runtime/security/advisories/GHSA-p3jp-9v83-76w9).
+The SDK archive and server image digests are pinned; NuGet security checks remain
+enabled. There is no automatic managed fallback inside a NativeAOT executable.
 
 Both managed and NativeAOT publication precompile the fixed EF models and queries
 through the same build owner. Managed publication does not leave query expression

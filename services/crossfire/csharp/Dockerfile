@@ -1,6 +1,6 @@
 ARG CROSSFIRE_ASSETS_IMAGE
 FROM ${CROSSFIRE_ASSETS_IMAGE} AS assets
-FROM mcr.microsoft.com/dotnet/sdk:11.0.100-rc.2@sha256:bfabf51e74c5a7cf2fc4eac852145db86f4867d475257d809518d6a2b0fe71e1 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0.100-rc.3@sha256:9fc2f44fba54c579b9b650f6feea29beff050fb030d797eac697de85a94ad77f AS build
 WORKDIR /app
 ENV DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1 DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_GENERATE_ASPNET_CERTIFICATE=false
 RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ zlib1g-dev && rm -rf /var/lib/apt/lists/*
@@ -9,7 +9,7 @@ COPY services/crossfire/csharp ./services/crossfire/csharp
 RUN dotnet publish services/crossfire/csharp/apps/Crossfire.Server -c Release -r linux-x64 -p:PublishAot=true -p:CppCompilerAndLinker=gcc -o /native
 RUN dotnet publish services/crossfire/csharp/apps/Crossfire.Server -c Release -p:PublishAot=false --self-contained false -o /managed
 
-FROM mcr.microsoft.com/dotnet/aspnet:11.0.0-rc.2@sha256:623c52ed3fad0fa423b8cc860910492364b0d6245870a415e997017d4a4f4513 AS managed
+FROM mcr.microsoft.com/dotnet/aspnet:11.0.0-rc.3@sha256:ae56002e3869a9ae7ade43a595e3645d3d808f6d193d5400ba10ed78db4137cc AS managed
 COPY --from=assets /conduit /usr/local/bin/conduit
 WORKDIR /app
 COPY --from=assets /web ./web
@@ -26,7 +26,7 @@ HEALTHCHECK --interval=30s --timeout=8s --start-period=90s --retries=3 CMD ["dot
 ENTRYPOINT ["dotnet", "/app/server/Crossfire.Server.dll"]
 CMD ["container"]
 
-FROM mcr.microsoft.com/dotnet/runtime-deps:11.0.0-rc.2@sha256:fccbc81aefc5cb3f40373a99844b0950d71eabd49225ce4442a5fcf11917acee AS nativeaot
+FROM mcr.microsoft.com/dotnet/runtime-deps:11.0.0-rc.3@sha256:3c81c03a51654fa931d3690c0cd4c4bb36a3f19af61dd47c5d0589f681379a26 AS nativeaot
 COPY --from=assets /conduit /usr/local/bin/conduit
 WORKDIR /app
 COPY --from=assets /web ./web

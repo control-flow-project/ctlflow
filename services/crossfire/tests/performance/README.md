@@ -28,13 +28,12 @@ Every attempted measured request retains its latency; an error is never removed
 from percentiles. Setup/warm-up failures stop measurement and fail the run.
 
 Nearest-rank p50/p95/p99 and requests/second are calculated per round. The median
-round statistic is compared with NativeAOT for the same workload. Every native
-target must have zero failures, p50/p95 no higher than the reference and throughput
-no lower than the reference.
-JSON and HTML expose every limit and retain earlier failed attempts. There is no
-hidden tolerance, runtime exclusion, best-round selection or claim that results on one machine
-establish arbitrary production capacity. Keep other builds and benchmark runs
-off the machine while measuring.
+round statistic is reported for each target and workload. All configured targets,
+rounds and workloads must complete with zero request failures. Latencies and
+throughput are measurements, not pass/fail thresholds; no implementation must
+match another implementation or an earlier release. Keep other builds and
+benchmark runs off the machine while measuring. Results on one machine do not
+establish arbitrary production capacity.
 
 `results.json` contains samples, failures, resource ceilings and source provenance.
 `report.html` is an offline, responsive report with comparison tables and median

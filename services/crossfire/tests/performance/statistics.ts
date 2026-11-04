@@ -6,17 +6,13 @@ export type PerformanceSummary = {
   target: string; workload: string; samples: number; failures: number;
   p50Ms: number; p95Ms: number; p99Ms: number; requestsPerSecond: number;
 };
-export type PerformanceComparison = PerformanceSummary & {
-  medianRatio: number; tailRatio: number; maximumMedianRatio: number; maximumTailRatio: number;
-  throughputRatio: number; minimumThroughputRatio: number; passed: boolean;
-};
 export type PerformanceReport = {
   schemaVersion: 1; generatedAt: string; source: { commit: string; dirty: boolean };
   host: { platform: string; architecture: string; processors: number; resources: Record<string, string> };
   fixture: { agents: number; listenerRuns: number; runtimeObservations: number };
-  policy: { rounds: number; samples: number; warmup: number; baseline: string };
+  policy: { rounds: number; samples: number; warmup: number };
   targets: { name: string; implementation: string }[]; measurements: Measurement[];
-  comparisons: PerformanceComparison[]; passed: boolean; problem: string | null;
+  summaries: PerformanceSummary[]; passed: boolean; problem: string | null;
 };
 
 export function percentile(values: readonly number[], fraction: number): number {
@@ -26,7 +22,7 @@ export function percentile(values: readonly number[], fraction: number): number 
   return ordered[Math.ceil(ordered.length * fraction) - 1]!;
 }
 
-export function comparePerformance(measurements: readonly Measurement[], baseline: string): PerformanceComparison[] {
+export function summarizePerformance(measurements: readonly Measurement[]): PerformanceSummary[] {
   const groups = new Map<string, Measurement[]>();
   for (const value of measurements) {
     if (!value.samplesMs.length || !Number.isFinite(value.elapsedMs) || value.elapsedMs <= 0)
@@ -34,7 +30,7 @@ export function comparePerformance(measurements: readonly Measurement[], baselin
     const key = JSON.stringify([value.target, value.workload]);
     const entries = groups.get(key) ?? []; entries.push(value); groups.set(key, entries);
   }
-  const summaries = [...groups.values()].map(entries => ({
+  return [...groups.values()].map(entries => ({
     target: entries[0]!.target, workload: entries[0]!.workload,
     samples: entries.reduce((sum, value) => sum + value.samplesMs.length, 0),
     failures: entries.reduce((sum, value) => sum + value.failures.length, 0),
@@ -43,14 +39,4 @@ export function comparePerformance(measurements: readonly Measurement[], baselin
     p99Ms: percentile(entries.map(value => percentile(value.samplesMs, 0.99)), 0.5),
     requestsPerSecond: percentile(entries.map(value => value.samplesMs.length / value.elapsedMs * 1000), 0.5),
   }));
-  return summaries.map(value => {
-    const reference = summaries.find(candidate => candidate.target === baseline && candidate.workload === value.workload);
-    if (!reference || reference.p50Ms <= 0 || reference.p95Ms <= 0) throw new Error('Every workload requires a measured reference baseline');
-    const medianRatio = value.p50Ms / reference.p50Ms, tailRatio = value.p95Ms / reference.p95Ms;
-    const maximumMedianRatio = 1, maximumTailRatio = 1;
-    const throughputRatio = value.requestsPerSecond / reference.requestsPerSecond;
-    const minimumThroughputRatio = 1;
-    return { ...value, medianRatio, tailRatio, maximumMedianRatio, maximumTailRatio, throughputRatio, minimumThroughputRatio,
-      passed: reference.failures === 0 && value.failures === 0 && medianRatio <= maximumMedianRatio && tailRatio <= maximumTailRatio && throughputRatio >= minimumThroughputRatio };
-  });
 }

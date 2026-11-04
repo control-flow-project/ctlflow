@@ -22,23 +22,20 @@ Docker socket into the server. The server neither installs nor runs a harness.
 
 ## Start a new server
 
-Use a matching current native-only container kit built from the selected source.
-The 0.1.26 candidate has not been published. The
-[0.1.25 release inventory](../../../docs/distributions/releases/0.1.25.md) is a
-historical registry receipt, not certification of the current setup workflow.
-
-Verify/import the selected package and use its immutable runtime/migration
-handles. This example selects NativeAOT and requires Node.js 26 maintenance
-tooling and jq:
+The [0.1.26 release inventory](../../../docs/distributions/releases/0.1.26.md)
+records the public native server and shared Knex images. Pull the selected pair
+without a GitHub account, registry login or token. This example selects NativeAOT:
 
 ```sh
-node /absolute/packages/csharp-nativeaot/package-tool.mjs verify \
-  /absolute/packages/csharp-nativeaot > /absolute/private/verified-images.json
-export CROSSFIRE_RUNTIME_IMAGE=$(jq -r .runtimeImage /absolute/private/verified-images.json)
-export CROSSFIRE_MIGRATION_IMAGE=$(jq -r .migrationImage /absolute/private/verified-images.json)
+export CROSSFIRE_RUNTIME_IMAGE=ghcr.io/control-flow-project/crossfire-csharp-nativeaot@sha256:721054592f99bafd21b7ec4c22154063f4d7d696b9ccf82ae8f2f2682ae51f19
+export CROSSFIRE_MIGRATION_IMAGE=ghcr.io/control-flow-project/crossfire-migrations@sha256:c543c0af875aed6865cfc8549d954514baa1adbe73d34e97040175aad10c8c47
+docker pull --platform linux/amd64 "$CROSSFIRE_RUNTIME_IMAGE"
+docker pull --platform linux/amd64 "$CROSSFIRE_MIGRATION_IMAGE"
 ```
 
-Managed C# and Rust kits use the same procedure. Do not mix releases, use `latest`
+Managed C# and Rust use their selected runtime reference from the same inventory.
+Transferred container kits follow the [package verification procedure](container-packages.md).
+Do not mix releases, use `latest`
 or switch to a source build automatically after an artifact failure.
 
 From this checkout's root:
