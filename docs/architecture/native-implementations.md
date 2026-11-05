@@ -142,7 +142,7 @@ owner, with its upstream notices retained; they are not runtime query fallbacks.
 
 - [Historical Rust implementation review](../verification/20261017-rust-integration-review.md)
 
-- [Current correction record and issue IDs](../verification/20261015-outside-review-fixes.md)
+- [Historical correction record and issue IDs](../verification/20261015-outside-review-fixes.md)
 - [Shared contract execution](../verification/shared-contracts.md)
 - [Development gates](../development.md)
 

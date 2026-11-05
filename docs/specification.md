@@ -147,7 +147,7 @@ All npm names use @ctlflow and all npm workspaces are private. Node.js is used f
 Products have one coordinated exact version. Native distributions contain all executables and shared tool assets and install outside the monorepo without resolving workspace source.
 
 Publishing is a coordinated release of every affected distribution surface:
-source, shared UI, public packages, supported server images, shared Knex image,
+source, shared UI, native release archives, supported server images, shared Knex image,
 GHCR references, deployment bundles and release metadata. Repository, installed,
 setup and affected website documentation must describe those same artifacts and
 versions across managed C#, NativeAOT and Rust. Check each required surface
@@ -388,8 +388,9 @@ owner, pinned fleet version and bounded administrator instructions.
 Unknown/missing/duplicate fields fail. The CLI refuses redirects and checks origin,
 owner and installed version. HTTPS is required except explicit loopback fixtures.
 
-Setup privately installs/reuses pinned products with persisted project-derived
-identifiers, workspace/controller defaults, shared history and native defaults.
+Setup uses the matching already-installed native distribution. It verifies the
+exact release and persists project-derived identifiers, workspace/controller
+defaults, shared history and native defaults.
 It asks no configuration questions. Optional config/root flags use the same
 validators. Human enrollment approval is still required.
 

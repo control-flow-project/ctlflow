@@ -230,7 +230,7 @@ export const operations = {
     status: 200, collection: false, permissions: ['agent.read.self', 'agent.read.owned', 'agent.read.any'], description: 'Agent details' }),
   changeAgent: operation({ method: 'PATCH', path: '/api/agents/{agentId}', auth: 'human',
     params: check.object({ agentId: check.identifier }), query: query.none, input: req.agentChange, output: res.agent,
-    status: 202, collection: false, permissions: ['agent.configure.owned', 'agent.configure.any'], description: 'Change agent lifecycle or name' }),
+    status: 202, collection: false, permissions: ['agent.configure.owned', 'agent.configure.any'], description: 'Change agent account status' }),
   wakePolicy: operation({ method: 'GET', path: '/api/agents/{agentId}/wake-policy', auth: 'either',
     params: check.object({ agentId: check.identifier }), query: query.none, input: check.empty, output: res.wakePolicy,
     status: 200, collection: false, permissions: ['agent.read.self', 'agent.read.owned', 'agent.read.any'], description: 'Wake policy' }),

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-The current publisher targets Linux x64. Building requires an authorized source
+The current publisher targets Linux x64. Building requires a source
 checkout, Node.js 26+, npm 11.17+, the .NET SDK pinned in `global.json`, the
 repository's EF/NuGet pins, GCC and the NativeAOT native-link dependencies.
 Use the exact .NET 11/EF preview pins. NativeAOT build diagnostics are not
@@ -23,6 +23,12 @@ The full verification bank additionally requires Rust, Chrome and native test
 assets. These commands do not install host services or provider credentials.
 
 ## Download a native distribution
+
+Native release archives for 0.1.26 have not been published. The commands below
+become usable when the archives and SHA256SUMS appear in the GitHub release.
+Check the [release inventory](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/releases/0.1.26.md)
+for publication status. Build from source using this guide if an archive is unavailable;
+setup never downloads or substitutes a different release automatically.
 
 Release archives contain all three products and their shared artifacts. Download
 one selected target, verify its checksum and retain the extracted layout:
@@ -131,8 +137,10 @@ request. Back it up separately from controller roots; remote clients read the
 remote host's file over strict SSH. See the
 [authentication contract](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/docs/authentication.md).
 
-Management-generated setup uses the matching installed native fleet/fleetd distribution. Install it first, retain the sibling product directories and add fleet to PATH. NativeAOT is the default; the CLI selects its packaged controller without substitution.
-
+Management-generated setup uses the matching installed native fleet/fleetd
+distribution. Install this selected target first, retain the sibling product
+directories and add fleet to PATH. The CLI selects its packaged controller
+without substitution.
 
 Retain the sibling `fleet` and `fleetd` directories. The CLI resolves the native
 controller and `fleetd/artifacts` from that layout, not an npm installation.

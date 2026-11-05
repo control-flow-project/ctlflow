@@ -5,7 +5,7 @@ room access and message delivery for fleet-managed coding agents.
 
 | Product | Responsibility | Distribution |
 | --- | --- | --- |
-| crossfire | REST API, messaging adapters, management UI, authorization and coordination records | Private |
+| crossfire | REST API, messaging adapters, management UI, authorization and coordination records | Public server images; native archives pending publication |
 | fleetd | User-scoped controller, shared listener and native session lifecycle | Native distribution |
 | fleet | CLI for the controller's private API, locally or through SSH | Native distribution |
 
@@ -25,8 +25,9 @@ file automatically; fleet reads it.
 Docker runs the server side only: crossfire, Matrix, Element, management and
 content, plus one-shot Knex migrations. Standard Docker Compose gates runtime
 startup on migration success; upgrades stop writers and replace the completed
-migration job. Backups are operator-managed. fleetd and its agents run on the user's execution host with an existing
-Codex/Pi installation and native login. Setup installs fleet/fleetd, not a harness.
+migration job. Backups are operator-managed. fleetd and its agents run on the user's execution
+host with an existing Codex/Pi installation and native login. Install the matching
+native fleet/fleetd distribution before setup; setup checks that release.
 
 C# and Rust implement the same products. C# targets .NET 11 with managed and
 NativeAOT outputs. They share the React UI, wire contracts and SQLite database.

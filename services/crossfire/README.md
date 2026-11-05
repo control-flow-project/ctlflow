@@ -24,7 +24,11 @@ The React project, database migrations and external test scenarios are shared.
 - [Rust distribution](rust/README.md)
 - [Separate installation and packaging for every target](../../docs/distributions/README.md)
 
-The service is private. All npm workspaces are private. fleet and fleetd ship as native distribution executables.
+The 0.1.26 crossfire server images are public. Native distributions contain
+crossfire, fleetd and fleet; their archive publication status is recorded below. All npm workspaces
+are private build, UI, test and maintenance dependencies.
+
+- [Publication status and exact artifacts](../../docs/distributions/releases/0.1.26.md)
 Production data, credentials and saved native histories are retained across
 supported upgrades. Schema changes use explicit forward Knex
 migrations, never runtime resets.

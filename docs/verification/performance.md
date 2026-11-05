@@ -11,7 +11,7 @@ The offline HTML and JSON contain source provenance, resource limits, samples
 and failures. Historical reports retain their original comparisons and verdicts;
 they do not certify current source.
 
-- [Command, workload and comparison method](../../services/crossfire/tests/performance/README.md)
+- [Command, workload and measurement method](../../services/crossfire/tests/performance/README.md)
 - [Executable matrix and contract verification](shared-contracts.md)
 
 Production diagnosis should separately measure connection establishment, response
