@@ -61,10 +61,12 @@ a process-adapter primitive, not arbitrary-subprocess containment.
 
 ## Evidence
 
-Current-source verification and failed-attempt diagnoses are recorded in the
-parent quality-gate report. Historical Rust-only passes do not replace the
-complete three-target gate. No deployment, registry publication or paid-provider
-certification is implied.
+Verification records identify their actual source revision, selected targets and
+failed attempts. The October parent quality gate predates removal of Node service
+implementations; it does not certify current source. Later changes require their
+own applicable checks. No deployment, registry publication or paid-provider
+certification follows from a file inventory.
 
-- [Parent quality gate](../verification/20261016-rust-quality-gate.md)
+- [4 November native release verification](../verification/20261104-native-release.md)
+- [Historical parent quality gate](../verification/20261016-rust-quality-gate.md)
 - [Historical integration review](../verification/20261017-rust-integration-review.md)

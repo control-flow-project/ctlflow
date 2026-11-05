@@ -24,7 +24,7 @@ missing targets are rejected. This route has no browser/anonymous exception.
 
 The example is the data object inside the ordinary response envelope, not a
 complete controller report. The canonical executable schema is in fleetd's
-contracts package. All three language implementations expose the same contract.
+contracts package. Managed C#, NativeAOT C# and Rust expose the same contract.
 
 fleet owns transport/presentation. fleetd projects its registry, activation,
 connection and native lifecycle observations. The existing crossfire connection

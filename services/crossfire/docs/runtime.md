@@ -94,14 +94,15 @@ Idle timeout defaults to thirty minutes. Busy contexts, questions, pending input
 startup/cleanup and uncertain receipts veto sleep. Eligible input resumes the
 exact saved history. Explicit Stop cancels desired activation and stays stopped.
 
-Unexpected failure closes the affected generation before bounded recovery.
-Transient retries back off from one to sixty seconds; authorization/configuration
-conflicts require action. Failed cleanup blocks a replacement writer.
+Unexpected native failure closes the affected generation and waits for genuine
+eligible input before reopening the retained history. Listener reconnection
+retries with one-to-sixty-second backoff; authorization/configuration conflicts
+require action. Failed cleanup blocks a replacement writer.
 The controller reports incidents to the owner's private crossfire management DM.
 Lost contact is unknown execution state; a dead controller cannot report itself.
 
 Every implementation's process adapter guards the owned native engine group
-against controller death, including SIGKILL. C# an exact parent process handle and Rust an exact parent pidfd. The guard
+against controller death, including SIGKILL. C# observes an exact parent process handle and Rust an exact parent pidfd. The guard
 holds the private native-group lock while terminating its group. The native
 history lock also refuses a competing writer. These mechanisms do not contain
 arbitrary subprocesses that escape the group.

@@ -128,4 +128,4 @@ inode-constrained `/tmp` tmpfs. Keep adequate free bytes and inodes on the fixtu
 filesystem; a failed resource allocation is a failed gate, not a passing retry.
 
 - [Resource limits and development commands](../development.md)
-- [Current issue correction record](20261015-outside-review-fixes.md)
+- [Historical issue correction record](20261015-outside-review-fixes.md)

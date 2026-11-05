@@ -91,7 +91,9 @@ same owner-decision port. Only explicit verified owner answers resolve the exact
 request. No reply, expiry or interruption grants permission.
 Secret answers and arbitrary stdin prompt scraping are not provided by this tool.
 
-Text and visible tool-result output goes to the owner's DM.
+With automatic output mirroring enabled, text and visible tool-result output
+goes to the owner's DM. The common `listener_options.mirror_output = false`
+setting suppresses new mirrored output without changing decisions or history.
 Thinking and tool-call arguments are excluded. Room replies still require the
 intentional messaging tool.
 

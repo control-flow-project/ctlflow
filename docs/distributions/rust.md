@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-The current publisher targets Linux x64. Building requires an authorized source
+The current publisher targets Linux x64. Building requires a source
 checkout, the toolchain pinned in `rust-toolchain.toml`, Node.js 26+, npm 11.17+
 and a native C/link toolchain. Dependencies come from the checked-in lockfiles.
 The generated executables use the GNU Linux target and host system libraries;
@@ -20,6 +20,12 @@ dependencies, Chrome and native test assets. These installation commands do not
 configure host services or install native agents/provider credentials.
 
 ## Download a native distribution
+
+Native release archives for 0.1.26 have not been published. The commands below
+become usable when the archives and SHA256SUMS appear in the GitHub release.
+Check the [release inventory](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/releases/0.1.26.md)
+for publication status. Build from source using this guide if an archive is unavailable;
+setup never downloads or substitutes a different release automatically.
 
 Release archives contain all three products and their shared artifacts. Download
 one selected target, verify its checksum and retain the extracted layout:
@@ -143,8 +149,10 @@ request. Back it up separately from controller roots; remote clients read the
 remote host's file over strict SSH. See the
 [authentication contract](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/docs/authentication.md).
 
-Management-generated setup uses the matching installed native fleet/fleetd distribution. Install it first, retain the sibling product directories and add fleet to PATH. NativeAOT is the default; the CLI selects its packaged controller without substitution.
-
+Management-generated setup uses the matching installed native fleet/fleetd
+distribution. Install this selected target first, retain the sibling product
+directories and add fleet to PATH. The CLI selects its packaged controller
+without substitution.
 
 Keep sibling `fleet` and `fleetd` directories together. The CLI resolves its
 controller and `fleetd/artifacts` from that layout. The packaged process guard

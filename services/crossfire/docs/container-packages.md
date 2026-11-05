@@ -213,24 +213,28 @@ initialize service, never application-source imports. Configuration
 updates must be validated outside language-specific image internals. All SQL
 changes remain in the shared Knex image, never runtime startup.
 
-The common migration image also contains supported maintenance commands. It is
-Node build/maintenance tooling, not a language fallback inside an AOT runtime:
+The selected native runtime image owns `init`, used only for a new empty state.
+Prefer the Compose initialize service shown above; its image selection and
+private state match the runtime.
+
+The common Knex image separately contains the Node configuration-validation
+helper. For existing state, use that matching migration image with a read-only
+state mount:
 
 ```sh
-docker run --rm --network none --mount type=bind,source=/absolute/private/state,target=/runtime \
-  sha256:RUNTIME_IMAGE_ID init \
-  --directory /runtime --instance NAME --origin https://SITE --content-origin https://CONTENT \
-  --server-name SITE --administrator USERNAME
+docker run --rm --network none --read-only --cap-drop ALL \
+  --security-opt no-new-privileges:true --memory 2g --pids-limit 512 \
+  --mount type=bind,source=/absolute/private/state,target=/runtime,readonly \
+  --entrypoint node sha256:MIGRATION_IMAGE_ID \
+  /app/services/crossfire/dist/container-configuration.mjs \
+  --directory /runtime --instance NAME --origin https://SITE \
+  --content-origin https://CONTENT --server-name SITE
 ```
 
-Use init only on a new empty directory. On existing state, run
-`/app/services/crossfire/dist/container-configuration.mjs` in that same
-maintenance image with `--directory`, `--instance`, `--origin`, `--content-origin`
-and `--server-name`, mounting state read-only. It validates without rewriting or
-printing secrets. Then use the same Compose project to stop writers, remove the completed migrate
-job and start the selected release. Backups remain operator-managed. Apply the documented
-read-only filesystem, dropped-capability, no-new-privileges and resource controls
-to maintenance containers as well.
+This validates existing configuration without rewriting it or printing secrets.
+Then use the same Compose project to stop writers, remove the completed migrate
+job and start the selected release. Backups remain operator-managed. Node runs
+only in the explicit maintenance image, never as the C#/Rust server.
 
 Fleet setup uses the matching installed native distribution. NativeAOT is the
 default; Rust and managed C# are explicit choices. Retain sibling product
