@@ -28,11 +28,11 @@ assets. No command here installs a host service or native agent runtime.
 
 ## Download a native distribution
 
-Native release archives for 0.1.26 have not been published. The commands below
-become usable when the archives and SHA256SUMS appear in the GitHub release.
-Check the [release inventory](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/releases/0.1.26.md)
-for publication status. Build from source using this guide if an archive is unavailable;
-setup never downloads or substitutes a different release automatically.
+Native release archives for 0.1.26 and SHA256SUMS are public. Anonymous downloads
+of all four assets were verified against the recorded checksums on 5 November 2026.
+See the [release inventory](https://github.com/control-flow-project/ctlflow/blob/main/docs/distributions/releases/0.1.26.md)
+for exact files and checksums. Setup never downloads or substitutes a different
+release automatically.
 
 Release archives contain all three products and their shared artifacts. Download
 one selected target, verify its checksum and retain the extracted layout:

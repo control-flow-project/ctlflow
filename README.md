@@ -5,7 +5,7 @@ room access and message delivery for fleet-managed coding agents.
 
 | Product | Responsibility | Distribution |
 | --- | --- | --- |
-| crossfire | REST API, messaging adapters, management UI, authorization and coordination records | Public server images; native archives pending publication |
+| crossfire | REST API, messaging adapters, management UI, authorization and coordination records | Public server images and native archives |
 | fleetd | User-scoped controller, shared listener and native session lifecycle | Native distribution |
 | fleet | CLI for the controller's private API, locally or through SSH | Native distribution |
 
