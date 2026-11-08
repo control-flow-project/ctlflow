@@ -179,6 +179,13 @@ owns all quality, diff, review and final verification gates; a worker's report
 or passing isolated tests never replaces parent acceptance.
 
 ## Work discipline
+
+Fleet-wide task/control broadcasts are banned for operator work. Never invoke
+`fleet message` or another roster-wide send, including readiness/test/update
+notices. These can wake many cold model contexts and incur large token costs.
+Use a verified directed message to the explicitly assigned agent only. Preserve
+all other sleeping/stopped selections; restarts and deployments must not create
+model turns or notify the roster. Never send synthetic prompts to test readiness.
 A user request to deploy authorizes completing the in-scope release end to end,
 including necessary coordinated version updates, verified non-main release
 commits/pushes, authorized public package publication, backups, activation and
