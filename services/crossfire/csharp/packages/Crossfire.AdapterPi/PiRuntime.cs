@@ -2,6 +2,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Crossfire.AdapterFilesystem;
+using Crossfire.AdapterRuntime;
+using Crossfire.AdapterProcess;
 using Crossfire.AgentCore;
 using Crossfire.Contracts;
 using Crossfire.Domain;
@@ -11,10 +13,10 @@ namespace Crossfire.AdapterPi;
 
 public static partial class PiRuntime
 {
-    public static OwnedRuntimeAdapter Create(string binary = "pi", string? host = null)
+    public static OwnedRuntimeAdapter Create(string binary = "pi", string? host = null, NativePlacement? placement = null)
         => new(Configured, value => PiValues.Options(value).Map(_ => new ValidatedRuntime(value.Clone(), RuntimeApproval.None)),
-            (input, cancellation) => Inspect(binary, host ?? PiValues.Host, input, cancellation), Saved, Reset,
-            (input, cancellation) => Start(binary, host ?? PiValues.Host, input, cancellation));
+            (input, cancellation) => Inspect(binary, host ?? PiValues.Host, placement ?? NativePlacement.Host, input, cancellation), Saved, Reset,
+            (input, cancellation) => Start(binary, host ?? PiValues.Host, placement ?? NativePlacement.Host, input, cancellation));
     private static IReadOnlyList<RuntimeSetting> Configured(JsonElement input)
         => input.ValueKind == JsonValueKind.Object ? new[] { "provider", "model", "thinking_level" }.Where(name => input.TryGetProperty(name, out _))
             .Select(name => new RuntimeSetting(name, PiValues.Text(input, name), null)).ToArray() : [];
@@ -22,28 +24,30 @@ public static partial class PiRuntime
     { PrivateFiles.ExistingDirectory(workspace, false); PrivateFiles.ExistingDirectory(state, true); }
     private static string Home(string workspace, string state)
     { Directories(workspace, state); return PrivateFiles.Directory(Path.Combine(state, ".pi")); }
-    private static async ValueTask<Result<OwnedRuntimeConnection>> Start(string binary, string host, OwnedRuntimeInput input, CancellationToken cancellation)
+    private static async ValueTask<Result<OwnedRuntimeConnection>> Start(string binary, string host, NativePlacement placement, OwnedRuntimeInput input, CancellationToken cancellation)
     {
         var parsed = PiValues.Options(input.Options); if (!parsed.IsSuccess) return Result<OwnedRuntimeConnection>.Fail(parsed.Error);
         if (!Profile().IsMatch(input.Profile) || input.Name.Length is < 1 or > 200 || !Enum.IsDefined(input.HistoryMode)) return Results.Fail<OwnedRuntimeConnection>("invalid", "Native Pi requires the immutable controller-assigned profile, agent name and valid history mode");
-        StateLock? stateLock = null;
+        NativeLease? stateLock = null;
         try
         {
-            cancellation.ThrowIfCancellationRequested(); var home = Home(input.Workspace, input.StateDirectory); stateLock = new(Path.Combine(home, "owner"));
+            cancellation.ThrowIfCancellationRequested();
+            var leased = await placement.Open(new(input.OwnershipDirectory, input.Workspace, input.StateDirectory, Path.Combine(input.StateDirectory, ".pi")), cancellation);
+            if (!leased.IsSuccess) return Result<OwnedRuntimeConnection>.Fail(leased.Error); stateLock = leased.Value; var home = Home(input.Workspace, input.StateDirectory);
             var refreshed = PiValues.Refresh(home, host); if (!refreshed.IsSuccess) return Result<OwnedRuntimeConnection>.Fail(refreshed.Error);
             var owned = stateLock; stateLock = null; return await PiHistories.Start(binary, home, owned, input with { Options = input.Options.Clone() }, parsed.Value, cancellation);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or ArgumentException or OperationCanceledException)
         { return Results.Fail<OwnedRuntimeConnection>("native", "Cannot start the exact owned Pi runtime: " + PiValues.ErrorText(error.Message)); }
-        finally { stateLock?.Dispose(); }
+        finally { if (stateLock is not null) await stateLock.DisposeAsync(); }
     }
-    private static async ValueTask<Result<Unit>> Inspect(string binary, string host, RuntimeInspectionInput input, CancellationToken cancellation)
+    private static async ValueTask<Result<Unit>> Inspect(string binary, string host, NativePlacement placement, RuntimeInspectionInput input, CancellationToken cancellation)
     {
         var parsed = PiValues.Options(input.Options); if (!parsed.IsSuccess) return Result<Unit>.Fail(parsed.Error); string? directory = null;
         try
         {
             cancellation.ThrowIfCancellationRequested(); Directories(input.Workspace, input.StateDirectory); directory = PrivateFiles.Directory(Path.Combine(input.StateDirectory, ".pi-inspection-" + Identity.Identifier()));
-            var selected = await Start(binary, host, new("crossfire-inspection", "crossfire-inspection", input.Workspace, directory,
+            var selected = await Start(binary, host, placement, new("crossfire-inspection", "crossfire-inspection", input.Workspace, directory, input.OwnershipDirectory,
                 "Capability inspection only. No model work is authorized.", input.Options,
                 new((_, _) => ValueTask.FromResult(Results.Fail<JsonElement>("forbidden", "Capability inspection cannot answer native decisions"))), AllowNewHistory: true), cancellation);
             if (!selected.IsSuccess) return Result<Unit>.Fail(selected.Error); await using var owner = selected.Value; return Results.Done();
@@ -68,7 +72,7 @@ public static partial class PiRuntime
         if (!Validation.Identifier(input.ResetId)) return Results.Fail<Unit>("invalid", "Invalid Pi context reset identity");
         try
         {
-            var home = Home(input.Workspace, input.StateDirectory); using var stateLock = new StateLock(Path.Combine(home, "owner"));
+            using var stateLock = NativeOwnership.Acquire(input.OwnershipDirectory, input.Workspace, Path.Combine(input.StateDirectory, ".pi")); var home = Home(input.Workspace, input.StateDirectory);
             var loaded = PiState.Read(home); if (!loaded.IsSuccess) return Result<Unit>.Fail(loaded.Error); var marker = Path.Combine(home, "crossfire-reset.json");
             if (PrivateFiles.Exists(marker))
             {

@@ -6,6 +6,12 @@ Build-only source is pinned to dotnet/efcore tag
 Original .NET Foundation MIT headers/notices remain.
 This project is not a production runtime dependency.
 
+The local fork currently compiles against EF packages
+`v11.0.0-rc.3.26522.148`, selected in `Directory.Packages.props`, with SDK
+`11.0.100-rc.3.26522.148` from `global.json`. The RC2 tag above records the
+borrowed source's origin; it does not describe a second supported runtime or
+an upstream RC3 source rebase. Owned changes use the selected current EF APIs.
+
 ## Owned changes
 
 | Area | Behavior |

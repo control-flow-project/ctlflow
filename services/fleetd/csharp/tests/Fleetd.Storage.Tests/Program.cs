@@ -8,6 +8,9 @@ if (args.Length != 0) throw new ArgumentException("Storage acceptance takes no s
 if (!OperatingSystem.IsLinux()) throw new PlatformNotSupportedException("Storage acceptance requires the supported Linux filesystem adapter");
 var assertions = 0;
 void Check(bool condition, string label) { if (!condition) throw new InvalidOperationException(label); assertions++; }
+Fleetd.Storage.Tests.ExecutionAcceptance.Run(Check);
+Fleetd.Storage.Tests.ExecutionConfigurationAcceptance.Run(Check);
+Fleetd.Storage.Tests.NativeOwnershipAcceptance.Run(Check);
 void Reject(Action action, string label) { try { action(); } catch (IOException error) { Check(!error.Message.Contains("do-not-leak-secret", StringComparison.Ordinal), label); return; } throw new InvalidOperationException(label); }
 Check(Authentication.ConfigurationDirectory("linux", "/home/operator", null) == "/home/operator/.config/ctlflow", "Linux default");
 Check(Authentication.ConfigurationDirectory("linux", "/home/operator", "/private/config") == "/private/config/ctlflow", "XDG override");

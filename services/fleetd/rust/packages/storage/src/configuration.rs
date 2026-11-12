@@ -77,6 +77,23 @@ pub fn load(directory: &Path, replacement: Option<&str>) -> Result<Configuration
     let roster = check::roster(&parse(&source)?)?;
     let mut digest = Sha256::new();
     digest.update(source.as_bytes());
+    let execution_source = OwnedFile::open(&directory.join("execution.toml"), 1024 * 1024)?
+        .map(|file| {
+            String::from_utf8(file.configuration(1024 * 1024)?)
+                .map_err(|_| Failure::new(ErrorCode::Invalid, "Execution catalog must be UTF-8"))
+        })
+        .transpose()?;
+    let execution = execution_source
+        .as_ref()
+        .map(|source| {
+            digest.update(source.as_bytes());
+            fleetd_contracts::execution::catalog(&parse(source)?)
+        })
+        .transpose()?;
+    fleetd_contracts::execution::validate(
+        roster.instances.iter().map(|instance| &instance.execution),
+        execution.as_ref(),
+    )?;
     let setup = match OwnedFile::open(
         &directory.join(".fleet/setup-instructions.json"),
         256 * 1024,
@@ -135,6 +152,7 @@ pub fn load(directory: &Path, replacement: Option<&str>) -> Result<Configuration
         }
     }
     Ok(Configuration {
+        execution,
         directory: directory.to_owned(),
         roster,
         definitions,
@@ -145,6 +163,7 @@ pub fn roster_wire(roster: &Roster) -> Value {
     json!({ "fleet":roster.fleet,"coordination":{"adapter":"crossfire","server":roster.coordination.server,"owner":roster.coordination.owner},
         "instances":roster.instances.iter().map(|instance| {
             let mut value = json!({"key":instance.key,"name":instance.name,"definition":instance.definition,"workarea":instance.workarea});
+            if instance.execution != fleetd_domain::execution::Placement::Host { value["execution"] = fleetd_contracts::execution::placement_wire(&instance.execution); }
             if let Some(workspace) = &instance.workspace { value["workspace"] = json!(workspace); }
             if instance.history_mode.is_some() || instance.mirror_output.is_some() {
                 value["listener_options"] = json!({});

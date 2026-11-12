@@ -1,6 +1,7 @@
 pub mod binding;
 pub mod configuration;
 pub mod diagnostics;
+pub mod execution;
 pub mod operation;
 pub mod operations;
 pub mod registry;

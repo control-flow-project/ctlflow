@@ -5,5 +5,8 @@
   <ItemGroup>
     <ProjectReference Include="../../packages/Fleetd.Storage/Fleetd.Storage.csproj" />
     <EmbeddedResource Include="../../../tests/contracts/authentication-cases.json" LogicalName="Fleetd.AuthenticationCases" />
+    <EmbeddedResource Include="../../../tests/contracts/execution-cases.json" LogicalName="Fleetd.ExecutionCases" />
+    <EmbeddedResource Include="../../../tests/contracts/execution-selection-cases.json" LogicalName="Fleetd.ExecutionSelectionCases" />
+    <EmbeddedResource Include="../../../tests/contracts/native-ownership-cases.json" LogicalName="Fleetd.NativeOwnershipCases" />
   </ItemGroup>
 </Project>

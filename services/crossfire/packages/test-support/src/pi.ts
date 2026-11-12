@@ -9,6 +9,9 @@ const version = '1.0.0';
 const integrity = '/FtbxoSQU/mEv1QnichJjRjqteqaIaMWxmhB4G367+MwZfX7/DI5B9YAg5lqbN7nztFskBEtUSZ+FlmMBECtMw==';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../..');
 const asset = join(root, '.temp/native-pi-' + version);
+export function piExtensionSource(): string {
+  return readFileSync(join(root, 'services/crossfire/assets/pi/owned-extension.mjs'), 'utf8');
+}
 export function preparePi(): void {
   if (lstatSync(join(asset, 'ready'), { throwIfNoEntry: false })) { piBinary(); return; }
   mkdirSync(join(root, '.temp'), { recursive: true, mode: 0o700 });

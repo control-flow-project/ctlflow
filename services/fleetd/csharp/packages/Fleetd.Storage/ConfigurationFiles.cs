@@ -20,6 +20,14 @@ public static class ConfigurationFiles
     {
         PrivateFiles.OwnedDirectory(directory); var source = replacement ?? Text(Path.Combine(directory, "runtime.toml")); var parsed = TomlJson.Parse(source).Bind(FleetConfigurationContract.Roster); if (!parsed.IsSuccess) return Result<FleetConfiguration>.Fail(parsed.Error);
         var definitions = new Dictionary<string, AgentDefinition>(StringComparer.Ordinal); using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256); void Append(string value) => hash.AppendData(Utf8.GetBytes(value)); Append(source);
+        ExecutionCatalog? execution = null; var executionPath = Path.Combine(directory, "execution.toml");
+        if (PrivateFiles.Exists(executionPath))
+        {
+            var executionSource = Text(executionPath); var catalog = TomlJson.Parse(executionSource).Bind(ExecutionContract.Catalog);
+            if (!catalog.IsSuccess) return Result<FleetConfiguration>.Fail(catalog.Error); execution = catalog.Value; Append(executionSource);
+        }
+        var admitted = ExecutionContract.Validate(parsed.Value.Instances.Select(instance => instance.Execution), execution);
+        if (!admitted.IsSuccess) return Result<FleetConfiguration>.Fail(admitted.Error);
         var extraPath = Path.Combine(directory, ".fleet", "setup-instructions.json"); var extra = "";
         if (PrivateFiles.Exists(extraPath)) { var value = WireJson.Parse(PrivateFiles.Read(extraPath, 262144)); if (!Validation.Fields(value, ["instructions"]).IsSuccess || !Validation.PlainText(value.GetProperty("instructions"), 131072).IsSuccess) return Results.Fail<FleetConfiguration>("invalid", "Invalid persisted setup instructions"); extra = WireJson.Text(value, "instructions")!; } Append(extra);
         foreach (var instance in parsed.Value.Instances)
@@ -31,7 +39,7 @@ public static class ConfigurationFiles
             if (instance.Workspace is not null) PrivateFiles.OwnedDirectory(instance.Workspace, true);
             var path = directory; foreach (var part in instance.Workarea.Split('/')) { path = Path.Combine(path, part); if (PrivateFiles.Exists(path)) PrivateFiles.OwnedDirectory(path); }
         }
-        return Result<FleetConfiguration>.Success(new(directory, parsed.Value, definitions, Convert.ToHexStringLower(hash.GetHashAndReset())));
+        return Result<FleetConfiguration>.Success(new(directory, parsed.Value, definitions, Convert.ToHexStringLower(hash.GetHashAndReset()), execution));
     });
     public static Result<FleetConfiguration> WriteRoster(FleetConfiguration configuration, FleetRoster roster) => Boundary(() =>
     {

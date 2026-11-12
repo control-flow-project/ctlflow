@@ -22,6 +22,11 @@ test('every target has separate installation instructions; native publishers ret
       const destination = join(temporary, target); mkdirSync(destination);
       stageDistributionDocumentation(repository, destination, target);
       assert.equal(readFileSync(join(destination, 'README.md'), 'utf8'), expected, target + ' ships the reviewed target-specific instructions');
+      for (const [published, source] of [
+        ['README.md', 'docs/architecture/vm-execution.md'],
+        ['setup-vm-host.sh', 'services/fleetd/scripts/setup-vm-host.sh'],
+        ['fleet.pkr.hcl', 'services/fleetd/images/qemu/fleet.pkr.hcl'],
+      ]) assert.deepEqual(readFileSync(join(destination, 'vm', published)), readFileSync(join(repository, source)), target + ' retains the canonical VM operator asset ' + published);
     }
     assert.throws(() => stageDistributionDocumentation(repository, temporary, 'csharp'), /explicit native distribution/u);
     assert.throws(() => stageDistributionDocumentation(repository, temporary, 'node'), /explicit native distribution/u);

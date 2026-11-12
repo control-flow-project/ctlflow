@@ -1,6 +1,8 @@
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
 pub mod background;
+pub mod execution;
 mod guarded;
+pub mod ssh_commands;
 use rustix::process::{Pid, PidfdFlags, Signal};
 use std::{
     collections::BTreeMap,
@@ -15,6 +17,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
+#[derive(Clone)]
 pub struct NativeCommand {
     pub binary: OsString,
     pub arguments: Vec<OsString>,

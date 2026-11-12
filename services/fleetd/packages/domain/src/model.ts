@@ -1,3 +1,4 @@
+import type { ExecutionCatalog, ExecutionPlacement } from './execution.js';
 import type { ControllerState } from '@ctlflow/crossfire-contracts/listener';
 import type { ListenerOptions, SavedRuntimeContext } from '@ctlflow/crossfire-contracts/listener';
 import type { CoordinationPolicy } from '@ctlflow/crossfire-domain/coordination/values';
@@ -8,11 +9,11 @@ export type FleetMessageResult = { messageId: string; body: string; createdAt: n
   total: number; pending: number; delivered: number; failed: number; skipped: number; expired: number };
 export type Controller = { name: string; metadata?: Record<string, string> };
 export type Instance = { key: string; name: string; definition: string; workarea: string; workspace?: string; listenerOptions?: ListenerOptions;
-  runtimeOptions?: Record<string, unknown> };
+  runtimeOptions?: Record<string, unknown>; execution?: ExecutionPlacement };
 export type Roster = { fleet: string; coordination: { adapter: 'crossfire'; server: string; owner: string }; instances: Instance[] };
 export type Definition = { name: string; runtime: string; options: Record<string, unknown>; instructions: string;
   coordinationPolicy: CoordinationPolicy };
-export type Configuration = { directory: string; roster: Roster; definitions: Record<string, Definition>; digest: string };
+export type Configuration = { directory: string; roster: Roster; definitions: Record<string, Definition>; execution?: ExecutionCatalog; digest: string };
 export function nativeOptions(configuration: Configuration, instance: Instance): Record<string, unknown> {
   return { ...configuration.definitions[instance.definition]!.options, ...instance.runtimeOptions };
 }

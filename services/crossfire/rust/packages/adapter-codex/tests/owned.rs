@@ -32,12 +32,19 @@ impl Hooks for NoInference {
     }
     fn observe(&self, _event: ObservationEvent) {}
 }
-fn input(workspace: &Path, state: &Path, mode: HistoryMode, fresh: bool) -> Input<NoInference> {
+fn input(
+    workspace: &Path,
+    state: &Path,
+    ownership: &Path,
+    mode: HistoryMode,
+    fresh: bool,
+) -> Input<NoInference> {
     Input {
         profile: "rust-native-acceptance".to_owned(),
         name: "Rust owned acceptance".to_owned(),
         workspace: workspace.to_owned(),
         state_directory: state.to_owned(),
+        ownership_directory: ownership.to_owned(),
         instructions:
             "This is a local native-runtime acceptance fixture. Do not call models or tools."
                 .to_owned(),
@@ -49,20 +56,62 @@ fn input(workspace: &Path, state: &Path, mode: HistoryMode, fresh: bool) -> Inpu
 }
 
 #[tokio::test]
+async fn rejected_native_owner_does_not_prepare_a_managed_home()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let workspace = directory.path().join("workspace");
+    PrivateDirectory::open(&workspace, true)?;
+    let state = directory.path().join("state");
+    PrivateDirectory::open(&state, true)?;
+    let control = directory.path().join("control");
+    let home = state.join(".codex");
+    let _owner = crossfire_adapter_runtime::ownership::acquire(&control, &workspace, &home)?;
+    let runtime = CodexRuntime {
+        placement: Default::default(),
+        binary: "/nonexistent".into(),
+        host_home: directory.path().join("host"),
+    };
+    assert!(
+        runtime
+            .start(
+                input(&workspace, &state, &control, HistoryMode::Shared, true),
+                CancellationToken::new()
+            )
+            .await
+            .is_err()
+    );
+    assert!(
+        !home.exists(),
+        "Rejected admission cannot prepare native files"
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn actual_stock_codex_shared_owned_runtime_resumes_exact_history_and_explicit_reset_retains_original_native_files()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
+    let ownership = tempfile::Builder::new()
+        .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o700))
+        .tempdir()?;
     let state = directory.path().join("state");
     let host = directory.path().join("host");
     PrivateDirectory::open(&state, true)?;
     PrivateDirectory::open(&host, true)?;
     let runtime = CodexRuntime {
+        placement: Default::default(),
         binary: "codex".into(),
         host_home: host,
     };
     let connection = runtime
         .start(
-            input(directory.path(), &state, HistoryMode::Shared, true),
+            input(
+                directory.path(),
+                &state,
+                ownership.path(),
+                HistoryMode::Shared,
+                true,
+            ),
             CancellationToken::new(),
         )
         .await?;
@@ -70,7 +119,13 @@ async fn actual_stock_codex_shared_owned_runtime_resumes_exact_history_and_expli
     assert!(
         runtime
             .start(
-                input(directory.path(), &state, HistoryMode::Shared, true),
+                input(
+                    directory.path(),
+                    &state,
+                    ownership.path(),
+                    HistoryMode::Shared,
+                    true
+                ),
                 CancellationToken::new()
             )
             .await
@@ -86,7 +141,13 @@ async fn actual_stock_codex_shared_owned_runtime_resumes_exact_history_and_expli
     connection.close().await?;
     let resumed = runtime
         .start(
-            input(directory.path(), &state, HistoryMode::Shared, false),
+            input(
+                directory.path(),
+                &state,
+                ownership.path(),
+                HistoryMode::Shared,
+                false,
+            ),
             CancellationToken::new(),
         )
         .await?;
@@ -105,7 +166,13 @@ async fn actual_stock_codex_shared_owned_runtime_resumes_exact_history_and_expli
     assert!(home.join("sessions").is_dir());
     let fresh = runtime
         .start(
-            input(directory.path(), &state, HistoryMode::Shared, true),
+            input(
+                directory.path(),
+                &state,
+                ownership.path(),
+                HistoryMode::Shared,
+                true,
+            ),
             CancellationToken::new(),
         )
         .await?;
@@ -118,17 +185,27 @@ async fn actual_stock_codex_shared_owned_runtime_resumes_exact_history_and_expli
 async fn actual_stock_codex_per_room_owned_histories_have_distinct_persisted_sessions_and_resume_without_new_bindings()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
+    let ownership = tempfile::Builder::new()
+        .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o700))
+        .tempdir()?;
     let state = directory.path().join("state");
     let host = directory.path().join("host");
     PrivateDirectory::open(&state, true)?;
     PrivateDirectory::open(&host, true)?;
     let runtime = CodexRuntime {
+        placement: Default::default(),
         binary: "codex".into(),
         host_home: host,
     };
     let connection = runtime
         .start(
-            input(directory.path(), &state, HistoryMode::PerRoom, true),
+            input(
+                directory.path(),
+                &state,
+                ownership.path(),
+                HistoryMode::PerRoom,
+                true,
+            ),
             CancellationToken::new(),
         )
         .await?;
@@ -148,7 +225,13 @@ async fn actual_stock_codex_per_room_owned_histories_have_distinct_persisted_ses
     connection.close().await?;
     let resumed = runtime
         .start(
-            input(directory.path(), &state, HistoryMode::PerRoom, false),
+            input(
+                directory.path(),
+                &state,
+                ownership.path(),
+                HistoryMode::PerRoom,
+                false,
+            ),
             CancellationToken::new(),
         )
         .await?;

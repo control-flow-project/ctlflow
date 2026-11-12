@@ -7,6 +7,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Instance {
+    pub execution: crate::execution::Placement,
     pub key: String,
     pub name: String,
     pub definition: String,
@@ -37,6 +38,7 @@ pub struct Definition {
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Configuration {
+    pub execution: Option<crate::execution::Catalog>,
     pub directory: PathBuf,
     pub roster: Roster,
     pub definitions: BTreeMap<String, Definition>,

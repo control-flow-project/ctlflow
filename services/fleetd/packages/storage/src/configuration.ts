@@ -1,6 +1,7 @@
 import { openSync, closeSync, fstatSync, readFileSync, realpathSync, constants, lstatSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { createHash } from 'node:crypto';
+import { executionCatalog, validateExecution } from '@ctlflow/fleetd-contracts/execution';
 import { parseToml, validateRoster, definition } from '@ctlflow/fleetd-contracts/configuration';
 import type { Configuration, Definition } from '@ctlflow/fleetd-domain/model';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
@@ -29,6 +30,13 @@ export function loadConfiguration(directory: string, replacement?: string): Resu
     const source = replacement ?? readText(join(directory, 'runtime.toml')), parsed = parseToml(source, validateRoster);
     if (!parsed.ok) return parsed;
     const definitions: Record<string, Definition> = {}, hash = createHash('sha256').update(source);
+    const executionFile = join(directory, 'execution.toml');
+    const executionSource = lstatSync(executionFile, { throwIfNoEntry: false }) ? readText(executionFile) : undefined;
+    const execution = executionSource === undefined ? success(undefined) : parseToml(executionSource, executionCatalog);
+    if (!execution.ok) return execution;
+    if (executionSource !== undefined) hash.update(executionSource);
+    const admitted = validateExecution(parsed.value.instances.map(instance => instance.execution ?? { kind: 'host' }), execution.value);
+    if (!admitted.ok) return admitted;
     const instructionFile = join(directory, '.fleet', 'setup-instructions.json');
     const setup = lstatSync(instructionFile, { throwIfNoEntry: false }) ? check.object({ instructions: check.plainText(128 * 1024) })(readJson<unknown>(instructionFile, 256 * 1024)) : success({ instructions: '' });
     if (!setup.ok) return setup;
@@ -63,6 +71,6 @@ export function loadConfiguration(directory: string, replacement?: string): Resu
       ...(runtime_options ? { runtimeOptions: runtime_options } : {}),
       ...(listener_options ? { listenerOptions: { ...(listener_options.history_mode === undefined ? {} : { historyMode: listener_options.history_mode }),
         ...(listener_options.mirror_output === undefined ? {} : { mirrorOutput: listener_options.mirror_output }) } } : {}) }));
-    return success({ directory, roster: { ...parsed.value, instances }, definitions, digest: hash.digest('hex') });
+    return success({ directory, roster: { ...parsed.value, instances }, definitions, ...(execution.value ? { execution: execution.value } : {}), digest: hash.digest('hex') });
   } catch (error) { return failure('invalid', error instanceof Error ? error.message : 'Cannot read fleet configuration'); }
 }

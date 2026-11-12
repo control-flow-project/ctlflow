@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AdapterToml;
+using Crossfire.AdapterProcess;
 using Crossfire.Kernel;
 
 namespace Crossfire.AdapterCodex;
@@ -90,11 +91,28 @@ public static class ManagedHome
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
         { return Results.Fail<Unit>("unauthorized", "Cannot refresh the private native Codex login from the host. Check the host CODEX_HOME and sign in with codex login, then resume. Never paste credentials into chat."); }
     }
-    public static IReadOnlyDictionary<string, string?> NativeEnvironment(string home, string state, string? profile = null)
+    public static IReadOnlyDictionary<string, string?> NativeEnvironment(string home, string state, string? profile, bool isolated, string authenticationHome)
     {
         var values = new Dictionary<string, string?>(StringComparer.Ordinal);
         foreach (DictionaryEntry entry in Environment.GetEnvironmentVariables()) if (entry.Key is string key && entry.Value is string value) values[key] = value;
         values["CODEX_HOME"] = home; values["CROSSFIRE_PROJECT"] = state; values["CODEX_THREAD_ID"] = null; values["CROSSFIRE_AGENT_NAME"] = profile;
+        // Only the provider explicitly selected by trusted host configuration
+        // may request its one environment key. The SSH transport sends its
+        // value as encrypted channel environment, never in argv or a prompt.
+        values.Remove(SshCommands.ProviderKey); values.Remove(SshCommands.ProviderSecret);
+        if (isolated)
+        {
+            var read = ReadConfiguration(authenticationHome); if (!read.IsSuccess) throw new IOException(read.Error.Message);
+            var provider = Provider(read.Value); if (!provider.IsSuccess) throw new IOException(provider.Error.Message);
+            if (provider.Value.Settings.TryGetValue("env_key", out var key))
+            {
+                if (key is not string name || name.Length is < 1 or > 128
+                    || name.Where((character, index) => !(char.IsAsciiLetter(character) || character == '_' || index > 0 && char.IsAsciiDigit(character))).Any())
+                    throw new IOException("Invalid native provider environment key");
+                values[SshCommands.ProviderKey] = name;
+                values[name] = Environment.GetEnvironmentVariable(name);
+            }
+        }
         return values;
     }
 }

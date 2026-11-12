@@ -2,7 +2,7 @@ use crate::{
     histories::{self, Histories, NativeConnection},
     home, options, state,
 };
-use crossfire_adapter_filesystem::{PrivateDirectory, lock::StateLock};
+use crossfire_adapter_filesystem::PrivateDirectory;
 use crossfire_adapter_runtime::clock;
 use crossfire_agent_core::{
     owned_runtime::{
@@ -29,12 +29,13 @@ use std::{
 use tokio_util::sync::CancellationToken;
 
 pub struct PiRuntime {
+    pub placement: crossfire_adapter_runtime::placement::NativePlacement,
     pub binary: OsString,
     pub host_home: PathBuf,
 }
 struct Owner<H> {
     histories: Histories<H>,
-    lock: Mutex<Option<StateLock>>,
+    lock: Mutex<Option<crossfire_adapter_runtime::placement::NativeLease>>,
 }
 pub struct PiOwnedConnection<H> {
     owner: Arc<Owner<H>>,
@@ -102,6 +103,7 @@ impl PiRuntime {
                     name: "crossfire-inspection".to_owned(),
                     workspace: input.workspace.clone(),
                     state_directory: directory.path().to_owned(),
+                    ownership_directory: input.ownership_directory.clone(),
                     instructions: "Capability inspection only. No model work is authorized."
                         .to_owned(),
                     options: input.options.clone(),
@@ -132,37 +134,56 @@ impl PiRuntime {
         }
         clock::check(&cancellation)?;
         directories(&input.workspace, &input.state_directory)?;
-        let home = home::prepare(&input.state_directory)?;
-        let lock = StateLock::acquire(&home.join("owner"))?;
-        home::refresh(&home, &self.host_home)?;
-        let histories = Histories::new(
-            histories::Configuration {
-                binary: self.binary.clone(),
-                home,
-                workspace: input.workspace,
-                state_directory: input.state_directory,
-                profile: input.profile,
-                instructions: input.instructions,
-                options: configured,
-                hooks: input.hooks,
-                mode: input.history_mode,
-                allow_new_history: input.allow_new_history,
+        let lock = (self.placement.open)(
+            crossfire_adapter_runtime::placement::LeaseRequest {
+                directory: input.ownership_directory.clone(),
+                workspace: input.workspace.clone(),
+                state_directory: input.state_directory.clone(),
+                home: input.state_directory.join(".pi"),
             },
-            cancellation,
-        )?;
-        let connection = histories.open(histories.primary(), None).await;
-        if connection.is_err() {
-            histories.close().await?;
+            cancellation.clone(),
+        )
+        .await?;
+        let cleanup = lock.clone();
+        let result = async {
+            let home = home::prepare(&input.state_directory)?;
+            home::refresh(&home, &self.host_home)?;
+            let histories = Histories::new(
+                histories::Configuration {
+                    execution: lock.execution.clone(),
+                    binary: self.binary.clone(),
+                    home,
+                    workspace: input.workspace,
+                    state_directory: input.state_directory,
+                    ownership_directory: input.ownership_directory,
+                    profile: input.profile,
+                    instructions: input.instructions,
+                    options: configured,
+                    hooks: input.hooks,
+                    mode: input.history_mode,
+                    allow_new_history: input.allow_new_history,
+                },
+                cancellation,
+            )?;
+            let connection = histories.open(histories.primary(), None).await;
+            if connection.is_err() {
+                histories.close().await?;
+            }
+            Ok(PiOwnedConnection {
+                connection: connection?,
+                context: histories.primary().to_owned(),
+                owner: Arc::new(Owner {
+                    histories,
+                    lock: Mutex::new(Some(lock)),
+                }),
+                root: true,
+            })
         }
-        Ok(PiOwnedConnection {
-            connection: connection?,
-            context: histories.primary().to_owned(),
-            owner: Arc::new(Owner {
-                histories,
-                lock: Mutex::new(Some(lock)),
-            }),
-            root: true,
-        })
+        .await;
+        if result.is_err() {
+            cleanup.close().await?;
+        }
+        result
     }
     pub fn saved(&self, input: &Inspection) -> Result<Vec<SavedContext>> {
         directories(&input.workspace, &input.state_directory)?;
@@ -185,8 +206,12 @@ impl PiRuntime {
     pub fn reset(&self, input: &Reset) -> Result<()> {
         crossfire_contracts::validation::identifier(&json!(input.reset_id))?;
         directories(&input.workspace, &input.state_directory)?;
+        let _owner = crossfire_adapter_runtime::ownership::acquire(
+            &input.ownership_directory,
+            &input.workspace,
+            &input.state_directory.join(".pi"),
+        )?;
         let home = home::prepare(&input.state_directory)?;
-        let _owner = StateLock::acquire(&home.join("owner"))?;
         state::load(&home)?;
         let directory = PrivateDirectory::open(&home, false)?;
         if let Some(marker) = directory.read_optional("crossfire-reset.json", 1024)? {
@@ -286,11 +311,20 @@ impl<H: Hooks + 'static> Connection for PiOwnedConnection<H> {
     async fn close(&self) -> Result<()> {
         if self.root {
             let result = self.owner.histories.close().await;
-            self.owner
+            let ownership = self
+                .owner
                 .lock
                 .lock()
                 .map_err(|_| invalid("Pi native owner lock failed during cleanup"))?
-                .take();
+                .clone();
+            if let Some(ownership) = ownership {
+                ownership.close().await?;
+                self.owner
+                    .lock
+                    .lock()
+                    .map_err(|_| invalid("Pi native owner lock failed during cleanup"))?
+                    .take();
+            }
             result
         } else {
             self.connection.close().await

@@ -1,0 +1,393 @@
+[
+  {
+    "name": "separate workspace and native state",
+    "valid": true,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": []
+  },
+  {
+    "name": "workspace equals native state",
+    "valid": true,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/fleet/agents/research/workarea/one",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": []
+  },
+  {
+    "name": "workspace is inside native state",
+    "valid": true,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/fleet/agents/research/workarea/one/source",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": []
+  },
+  {
+    "name": "explicit shared originals are readonly",
+    "valid": true,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/data/originals",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "source paths retain quotes and Unicode",
+    "valid": true,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/analyst's研究",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": []
+  },
+  {
+    "name": "whole fleet exposes credentials and peers",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/fleet",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": []
+  },
+  {
+    "name": "host control cannot be exported",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/private/ctlflow",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "an ancestor cannot expose control",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/private",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "a child cannot expose control",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/private/ctlflow/native-ownership/one/private",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "peer native state is private even readonly",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/fleet/agents/research/workarea/two",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "host provider login is private",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/host/native-login",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "same workspace cannot also have a readonly selector",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/projects/project",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "additional mounts cannot overlap",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/data",
+        "read_only": true
+      },
+      {
+        "path": "/data/originals",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "host kernel or IPC export /proc",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/proc",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "host kernel or IPC export /proc/self/fd",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/proc/self/fd",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "host kernel or IPC export /sys/fs/cgroup",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/sys/fs/cgroup",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "host kernel or IPC export /dev/shm",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/dev/shm",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "host kernel or IPC export /run/user/1001",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/project",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": [
+      {
+        "path": "/run/user/1001",
+        "read_only": true
+      }
+    ]
+  },
+  {
+    "name": "noncanonical workspace '/'",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": []
+  },
+  {
+    "name": "noncanonical workspace '/projects/../private'",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/../private",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": []
+  },
+  {
+    "name": "noncanonical workspace '/projects//source'",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects//source",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": []
+  },
+  {
+    "name": "noncanonical workspace '/projects/source/'",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/source/",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": []
+  },
+  {
+    "name": "noncanonical workspace '/projects/source\\nother'",
+    "valid": false,
+    "state": "/fleet/agents/research/workarea/one",
+    "workspace": "/projects/source\nother",
+    "control": "/private/ctlflow/native-ownership/one",
+    "protected": [
+      "/private/ctlflow",
+      "/fleet/.fleet",
+      "/fleet/agents/research/workarea/two",
+      "/host/native-login"
+    ],
+    "additional": []
+  }
+]

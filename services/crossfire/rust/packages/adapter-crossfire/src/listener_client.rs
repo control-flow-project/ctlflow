@@ -27,6 +27,15 @@ pub async fn request(state: &Path, input: &Value, stop: CancellationToken) -> Re
         ));
     }
     let binding = check::text(&value["binding"], 1, 255)?;
+    if !binding
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
+    {
+        return Err(Failure::new(
+            ErrorCode::Invalid,
+            "Invalid private listener binding",
+        ));
+    }
     let response = NativeHttp::new(&format!("http://127.0.0.1:{port}"), stop)?
         .json(
             Some(&Secret::new(secret.to_owned())),

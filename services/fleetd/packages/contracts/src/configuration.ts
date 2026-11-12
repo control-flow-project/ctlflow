@@ -1,3 +1,4 @@
+import { executionPlacement } from './execution.js';
 import { parse } from 'smol-toml';
 import * as check from '@ctlflow/crossfire-contracts/schema/validation';
 import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result';
@@ -9,7 +10,7 @@ export const runtimeOptions = (input: unknown): Result<Record<string, unknown>> 
 export const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
   workspace: check.optional(check.refine(check.text(4096), value => value.startsWith('/') && !value.includes('\\')
     && value.split('/').slice(1).every(segment => segment && segment !== '.' && segment !== '..'), 'Workspace must be an absolute normalized directory')),
-  listener_options: check.optional(listenerOptions), runtime_options: check.optional(runtimeOptions) });
+  execution: check.optional(executionPlacement), listener_options: check.optional(listenerOptions), runtime_options: check.optional(runtimeOptions) });
 export const coordination = check.object({ adapter: check.choice('crossfire'), server: check.text(2048), owner: check.backendUserId });
 export const roster = check.object({ fleet: check.name, coordination, instances: check.list(instance, 100) });
 const coordinationOptions = check.object({ wake_mode: check.wakeMode,

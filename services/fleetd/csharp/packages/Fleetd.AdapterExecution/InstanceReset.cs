@@ -36,7 +36,7 @@ public static class InstanceReset
         if (state.Phase == "prepared")
         {
             var verified = await Export(); if (!verified.IsSuccess) return Result<Unit>.Fail(verified.Error); if (verified.Value.Manifest != state.Manifest || !ReceiveState.Same(verified.Value.Cursors, state.Cursors)) return Results.Fail<Unit>("conflict", "Reset history boundaries changed; context was not replaced");
-            var rotated = adapter.Reset(new(workspace, stateDirectory, generation)); if (!rotated.IsSuccess) return rotated; StateArchive.Move(paths.State, Path.Combine(root, "listener-archive"), name => name == "cursors.json" || name.StartsWith("cursors.json.", StringComparison.Ordinal)); state = state with { Phase = "retired" }; Save(file, state);
+            var rotated = adapter.Reset(new(workspace, stateDirectory, NativeOwnershipFiles.ForState(stateDirectory), generation)); if (!rotated.IsSuccess) return rotated; StateArchive.Move(paths.State, Path.Combine(root, "listener-archive"), name => name == "cursors.json" || name.StartsWith("cursors.json.", StringComparison.Ordinal)); state = state with { Phase = "retired" }; Save(file, state);
         }
         AgentIO.Write(AgentState.Port, paths.Cursors, ReceiveState.Encode(state.Cursors)); BindingFiles.InitializeHistory(configuration.Directory, agent, generation); Save(file, state with { Phase = "reset" }); return Results.Done();
     });

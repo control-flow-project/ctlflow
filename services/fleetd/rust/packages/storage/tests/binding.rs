@@ -16,6 +16,7 @@ fn fleet_bindings_use_the_shared_private_directory_and_preserve_exact_identity_c
     let directory = tempfile::tempdir()?;
     std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o755))?;
     let configuration = Configuration {
+        execution: None,
         directory: directory.path().to_owned(),
         roster: Roster {
             fleet: "research".to_owned(),

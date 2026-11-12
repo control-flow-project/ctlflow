@@ -6,6 +6,7 @@ using Crossfire.AgentCore;
 using Crossfire.Contracts;
 using MessagingConnector = Crossfire.Domain.MessagingConnector;
 using Crossfire.Kernel;
+using Crossfire.AdapterRuntime;
 using Fleetd.Domain;
 using Fleetd.Storage;
 
@@ -15,6 +16,7 @@ public sealed partial class ExecutionHost : IAsyncDisposable
 {
     private sealed record Connection(FleetBinding Binding, FleetConnection Control, FleetReports Reports);
     private readonly IReadOnlyDictionary<string, OwnedRuntimeAdapter> adapters;
+    private readonly IReadOnlyDictionary<string, Func<NativePlacement, OwnedRuntimeAdapter>> factories;
     private readonly MessagingConnector messaging;
     private readonly string artifacts;
     private readonly Action<string> log;
@@ -25,22 +27,31 @@ public sealed partial class ExecutionHost : IAsyncDisposable
     private Task<ListenerHost>? listenerHost;
     private Task? closing;
     public FleetExecution Port { get; }
-    public ExecutionHost(IReadOnlyDictionary<string, OwnedRuntimeAdapter> adapters, MessagingConnector messaging, string artifacts, Action<string> log, TimeProvider clock)
+    public ExecutionHost(IReadOnlyDictionary<string, Func<NativePlacement, OwnedRuntimeAdapter>> factories, MessagingConnector messaging, string artifacts, Action<string> log, TimeProvider clock)
     {
-        this.adapters = adapters; this.messaging = messaging; this.artifacts = artifacts; this.log = log; this.clock = clock;
+        this.factories = factories; adapters = factories.ToDictionary(entry => entry.Key, entry => entry.Value(NativePlacement.Host), StringComparer.Ordinal);
+        this.messaging = messaging; this.artifacts = artifacts; this.log = log; this.clock = clock;
         Port = new(Connect, Status, Delivery, Message, Disconnect, Validate, Inspect, Test, Prepare, Start, Contexts, ConfirmStopped, Reset, Remove, Archive, Update);
     }
     private Coordination Client(string server, string? token) => CoordinationTransport.Create(http, server, token);
     private Connection? Find(string directory) { lock (gate) return connections.GetValueOrDefault(directory); }
     private Result<Unit> Validate(FleetConfiguration configuration)
     {
+        var execution = Fleetd.Contracts.ExecutionContract.Validate(configuration.Roster.Instances.Select(instance => instance.Execution), configuration.Execution);
+        if (!execution.IsSuccess) return execution;
         foreach (var definition in configuration.Definitions.Values) { if (!adapters.TryGetValue(definition.Runtime, out var adapter)) return Results.Fail<Unit>("invalid", "Unsupported native runtime: " + definition.Runtime); var parsed = adapter.Validate(definition.Options); if (!parsed.IsSuccess) return Result<Unit>.Fail(parsed.Error); }
         foreach (var instance in configuration.Roster.Instances) { var definition = configuration.Definitions[instance.Definition]; var parsed = adapters[definition.Runtime].Validate(configuration.NativeOptions(instance)); if (!parsed.IsSuccess) return Result<Unit>.Fail(parsed.Error with { Message = instance.Key + ": " + parsed.Error.Message }); } return Results.Done();
     }
     private ValueTask<Result<Unit>> Inspect(FleetConfiguration configuration, IReadOnlyList<FleetInstance> instances, CancellationToken cancellation) => AgentIO.Boundary(async () =>
     {
-        var valid = Validate(configuration); if (!valid.IsSuccess) return valid; foreach (var instance in instances) { cancellation.ThrowIfCancellationRequested(); var definition = configuration.Definitions[instance.Definition]; var state = PrivateFiles.Directory(Path.Combine(configuration.Directory, instance.Workarea)); var inspected = await adapters[definition.Runtime].Inspect(new(instance.Workspace ?? state, state, configuration.NativeOptions(instance)), cancellation); if (!inspected.IsSuccess) return inspected; } return Results.Done();
+        var valid = Validate(configuration); if (!valid.IsSuccess) return valid; foreach (var instance in instances) { cancellation.ThrowIfCancellationRequested(); var definition = configuration.Definitions[instance.Definition]; var state = PrivateFiles.Directory(Path.Combine(configuration.Directory, instance.Workarea)); var inspected = await Adapter(configuration, instance, null).Inspect(new(instance.Workspace ?? state, state, NativeOwnershipFiles.ForState(state), configuration.NativeOptions(instance)), cancellation); if (!inspected.IsSuccess) return inspected; } return Results.Done();
     });
+    private OwnedRuntimeAdapter Adapter(FleetConfiguration configuration, FleetInstance instance, int? listenerPort)
+    {
+        var runtime = configuration.Definitions[instance.Definition].Runtime;
+        return instance.Execution.Kind == ExecutionKind.Host ? adapters[runtime]
+            : factories[runtime](Vm.Placement.Create(configuration, instance, listenerPort));
+    }
     private Result<Unit> Connect(FleetConfiguration configuration, CancellationToken stop, Func<OperationRequest, ValueTask<Result<FleetOperation>>> execute, Func<string, Result<Unit>> acknowledged) => ConfigurationFiles.Boundary(() =>
     {
         var loaded = BindingFiles.Load(configuration); if (!loaded.IsSuccess) return Result<Unit>.Fail(loaded.Error); var binding = loaded.Value; if (binding.FleetId is null || binding.ControllerCredential is null) return Results.Done();

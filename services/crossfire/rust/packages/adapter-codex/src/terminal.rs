@@ -1,4 +1,5 @@
 use crate::websocket;
+use crossfire_adapter_process::ssh_commands::{self, SshExecution};
 use crossfire_agent_core::owned_runtime::{Attachment, Terminal};
 use crossfire_contracts::validation;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode};
@@ -15,7 +16,38 @@ fn quote(value: &str) -> String {
 
 impl Terminal for CodexTerminal {
     fn command(&self, attachment: &Attachment) -> Result<String> {
-        if attachment.runtime != "codex" || attachment.connection.len() != 5 {
+        let transport = attachment
+            .connection
+            .get("transport")
+            .ok_or_else(invalid)?
+            .as_str();
+        let names: &[&str] = match transport {
+            "host" => &[
+                "endpoint",
+                "tokenFile",
+                "home",
+                "binary",
+                "path",
+                "transport",
+            ],
+            "ssh" => &[
+                "endpoint",
+                "tokenFile",
+                "home",
+                "binary",
+                "path",
+                "transport",
+                "executionDirectory",
+                "executionId",
+            ],
+            _ => return Err(invalid()),
+        };
+        if attachment.runtime != "codex"
+            || attachment.connection.len() != names.len()
+            || names
+                .iter()
+                .any(|name| !attachment.connection.contains_key(*name))
+        {
             return Err(invalid());
         }
         validation::identifier(&json!(attachment.session_id))?;
@@ -60,7 +92,7 @@ impl Terminal for CodexTerminal {
             "resume",
             &attachment.session_id,
         ];
-        Ok(format!(
+        let command = format!(
             "PATH={} CODEX_HOME={} FLEET_RUNTIME_AUTH_TOKEN=\"$(cat -- {})\" {}",
             quote(path),
             quote(home),
@@ -70,6 +102,18 @@ impl Terminal for CodexTerminal {
                 .map(quote)
                 .collect::<Vec<_>>()
                 .join(" ")
-        ))
+        );
+        if transport == "host" {
+            Ok(command)
+        } else {
+            ssh_commands::terminal(
+                &SshExecution {
+                    directory: field("executionDirectory", 4096)?.into(),
+                    id: field("executionId", 36)?.to_owned(),
+                },
+                &attachment.workspace,
+                &command,
+            )
+        }
     }
 }

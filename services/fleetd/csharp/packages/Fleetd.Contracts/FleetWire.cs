@@ -9,6 +9,7 @@ public static class FleetWire
 {
     public static JsonElement Instance(FleetInstance value, bool toml = false) => WireJson.Object(writer =>
     {
+        if (value.Execution.Kind != ExecutionKind.Host) { writer.WritePropertyName("execution"); ExecutionContract.Placement(value.Execution).WriteTo(writer); }
         writer.WriteString("key", value.Key); writer.WriteString("name", value.Name); writer.WriteString("definition", value.Definition); writer.WriteString("workarea", value.Workarea); if (value.Workspace is not null) writer.WriteString("workspace", value.Workspace); if (value.RuntimeOptions is { } runtime) { writer.WritePropertyName(toml ? "runtime_options" : "runtimeOptions"); runtime.WriteTo(writer); }
         if (value.HistoryMode != NativeHistoryMode.Shared || value.MirrorOutput.HasValue) { writer.WriteStartObject(toml ? "listener_options" : "listenerOptions"); if (value.HistoryMode != NativeHistoryMode.Shared) writer.WriteString(toml ? "history_mode" : "historyMode", "per-room"); if (value.MirrorOutput is { } mirror) writer.WriteBoolean(toml ? "mirror_output" : "mirrorOutput", mirror); writer.WriteEndObject(); }
     });

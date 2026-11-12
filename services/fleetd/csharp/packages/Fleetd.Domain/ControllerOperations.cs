@@ -85,7 +85,9 @@ public sealed partial class FleetController
             FleetInstance[] recoveringInstances; lock (gate) recoveringInstances = selected.Where(instance => recovering.ContainsKey((fleet, instance.Key))).ToArray(); await Stop(recoveringInstances);
             if (action == "reset")
             {
-                var inspected = await execution.Inspect(configuration, selected, cancellation); if (!inspected.IsSuccess) { Error(null, inspected.Error); return; } await Stop(selected.Where(instance => errors.All(error => error.InstanceKey != instance.Key)).ToArray());
+                await Stop(selected.Where(instance => errors.All(error => error.InstanceKey != instance.Key)).ToArray());
+                var stopped = selected.Where(instance => errors.All(error => error.InstanceKey != instance.Key)).ToArray();
+                var inspected = await execution.Inspect(configuration, stopped, cancellation); if (!inspected.IsSuccess) { Error(null, inspected.Error); return; }
                 foreach (var instance in selected) { if (errors.Any(error => error.InstanceKey == instance.Key)) continue; var reset = await execution.Reset(configuration, instance, operation.Request.OperationId, cancellation); if (!reset.IsSuccess) Error(instance, reset.Error); }
             }
             foreach (var instance in selected) { lock (gate) if (!running.ContainsKey((fleet, instance.Key)) && errors.All(error => error.InstanceKey != instance.Key)) State(fleet, instance, "starting"); }

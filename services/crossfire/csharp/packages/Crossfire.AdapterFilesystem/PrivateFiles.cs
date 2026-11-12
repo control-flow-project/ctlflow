@@ -110,6 +110,20 @@ public static class PrivateFiles
         catch { handle.Dispose(); throw; }
     }
 
+    // A trusted native producer such as ssh-keygen may rely on umask, which
+    // inherited default ACLs override. Call only for its new output inside an
+    // already-private directory; ordinary state readers still reject open files.
+    public static void SecureGeneratedFile(string path, int maximumBytes)
+    {
+        if (maximumBytes < 1 || !Path.IsPathFullyQualified(path) || Path.GetFullPath(path) != path) throw new IOException("Generated private output requires an exact bounded path");
+        using var parent = PrivateDirectory(Path.GetDirectoryName(path)!);
+        using var file = Posix.Handle(Posix.OpenAt(Posix.Descriptor(parent), Path.GetFileName(path), Posix.ReadOnly | Posix.NoFollow | Posix.NonBlock | Posix.CloseOnExec, 0));
+        var metadata = Posix.RegularFile(file);
+        if (metadata.Owner != Posix.Owner() || metadata.Links != 1 || (metadata.Mode & 0x12) != 0 || metadata.Size > (ulong)maximumBytes)
+            throw new IOException("Generated private output must be bounded, owned, single-link and not writable by others");
+        if (Posix.Chmod(Posix.Descriptor(file), 0x180) != 0 || Posix.Sync(Posix.Descriptor(file)) != 0) throw Posix.Failure();
+    }
+
     public static string UnixSocket(string path)
     {
         if (!Path.IsPathFullyQualified(path) || path != Path.GetFullPath(path)) throw new IOException("Native socket requires an exact absolute path");

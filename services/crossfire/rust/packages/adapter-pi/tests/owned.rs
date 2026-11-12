@@ -82,19 +82,30 @@ async fn real_pi_interrupts_captured_live_execution_and_accepts_the_next_directe
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     for mode in [HistoryMode::Shared, HistoryMode::PerRoom] {
         let directory = tempfile::tempdir()?;
+        let ownership = tempfile::Builder::new()
+            .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o700))
+            .tempdir()?;
         let state = directory.path().join("state");
         let host = directory.path().join("host");
         PrivateDirectory::open(&state, true)?;
         let mut provider = Fixture::open().await?;
         configure(&host, &provider.origin)?;
         let runtime = PiRuntime {
+            placement: Default::default(),
             binary: binary()?,
             host_home: host,
         };
         let hooks = Arc::new(Capture::default());
         let owner = runtime
             .start(
-                input(directory.path(), &state, &hooks, mode, true),
+                input(
+                    directory.path(),
+                    &state,
+                    ownership.path(),
+                    &hooks,
+                    mode,
+                    true,
+                ),
                 CancellationToken::new(),
             )
             .await?;
@@ -158,12 +169,16 @@ async fn real_pi_interrupts_captured_live_execution_and_accepts_the_next_directe
 async fn real_pi_required_owner_question_receives_the_offered_answer_and_reports_only_after_native_delivery()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
+    let ownership = tempfile::Builder::new()
+        .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o700))
+        .tempdir()?;
     let state = directory.path().join("state");
     let host = directory.path().join("host");
     PrivateDirectory::open(&state, true)?;
     let mut provider = Fixture::open().await?;
     configure(&host, &provider.origin)?;
     let runtime = PiRuntime {
+        placement: Default::default(),
         binary: binary()?,
         host_home: host,
     };
@@ -173,7 +188,14 @@ async fn real_pi_required_owner_question_receives_the_offered_answer_and_reports
     });
     let connection = runtime
         .start(
-            input(directory.path(), &state, &hooks, HistoryMode::Shared, true),
+            input(
+                directory.path(),
+                &state,
+                ownership.path(),
+                &hooks,
+                HistoryMode::Shared,
+                true,
+            ),
             CancellationToken::new(),
         )
         .await?;
@@ -250,6 +272,7 @@ fn configure(home: &Path, origin: &str) -> Result<()> {
 fn input(
     workspace: &Path,
     state: &Path,
+    ownership: &Path,
     hooks: &Arc<Capture>,
     mode: HistoryMode,
     fresh: bool,
@@ -259,6 +282,7 @@ fn input(
         name: "rust-pi-proof".to_owned(),
         workspace: workspace.to_owned(),
         state_directory: state.to_owned(),
+        ownership_directory: ownership.to_owned(),
         instructions: "Private native Pi role instructions. Historical marker silver orchard 913."
             .to_owned(),
         options: json!({"provider":"fixture","model":"fixture-model","thinking_level":"high"}),
@@ -270,6 +294,45 @@ fn input(
 fn binary() -> std::result::Result<std::ffi::OsString, Box<dyn std::error::Error>> {
     std::env::var_os("CROSSFIRE_TEST_PI_BINARY")
         .ok_or_else(|| "Prepare the pinned Pi binary before Rust workers".into())
+}
+
+#[tokio::test]
+async fn rejected_native_owner_does_not_prepare_a_managed_home()
+-> std::result::Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let workspace = directory.path().join("workspace");
+    let state = directory.path().join("state");
+    PrivateDirectory::open(&workspace, true)?;
+    PrivateDirectory::open(&state, true)?;
+    let control = directory.path().join("control");
+    let home = state.join(".pi");
+    let _owner = crossfire_adapter_runtime::ownership::acquire(&control, &workspace, &home)?;
+    let runtime = PiRuntime {
+        placement: Default::default(),
+        binary: "/nonexistent".into(),
+        host_home: directory.path().join("host"),
+    };
+    assert!(
+        runtime
+            .start(
+                input(
+                    &workspace,
+                    &state,
+                    &control,
+                    &Arc::new(Capture::default()),
+                    HistoryMode::Shared,
+                    true
+                ),
+                CancellationToken::new()
+            )
+            .await
+            .is_err()
+    );
+    assert!(
+        !home.exists(),
+        "Rejected admission cannot prepare native files"
+    );
+    Ok(())
 }
 fn response(call: Call) -> Result<()> {
     assert_eq!(call.method, "POST");
@@ -307,19 +370,30 @@ async fn idle(connection: &impl Connection) -> Result<()> {
 async fn real_pi_owned_delivery_receipt_usage_output_and_saved_history_are_preserved_across_restart()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
+    let ownership = tempfile::Builder::new()
+        .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o700))
+        .tempdir()?;
     let state = directory.path().join("state");
     let host = directory.path().join("host");
     PrivateDirectory::open(&state, true)?;
     let mut provider = Fixture::open().await?;
     configure(&host, &provider.origin)?;
     let runtime = PiRuntime {
+        placement: Default::default(),
         binary: binary()?,
         host_home: host,
     };
     let hooks = Arc::new(Capture::default());
     let connection = runtime
         .start(
-            input(directory.path(), &state, &hooks, HistoryMode::Shared, true),
+            input(
+                directory.path(),
+                &state,
+                ownership.path(),
+                &hooks,
+                HistoryMode::Shared,
+                true,
+            ),
             CancellationToken::new(),
         )
         .await?;
@@ -360,7 +434,14 @@ async fn real_pi_owned_delivery_receipt_usage_output_and_saved_history_are_prese
     connection.close().await?;
     let resumed = runtime
         .start(
-            input(directory.path(), &state, &hooks, HistoryMode::Shared, false),
+            input(
+                directory.path(),
+                &state,
+                ownership.path(),
+                &hooks,
+                HistoryMode::Shared,
+                false,
+            ),
             CancellationToken::new(),
         )
         .await?;
@@ -394,18 +475,29 @@ async fn real_pi_owned_delivery_receipt_usage_output_and_saved_history_are_prese
 async fn real_pi_per_room_histories_stay_distinct_reset_is_explicit_and_live_owner_cannot_be_reset()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
+    let ownership = tempfile::Builder::new()
+        .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o700))
+        .tempdir()?;
     let state = directory.path().join("state");
     let host = directory.path().join("host");
     PrivateDirectory::open(&state, true)?;
     configure(&host, "http://127.0.0.1:1")?;
     let runtime = PiRuntime {
+        placement: Default::default(),
         binary: binary()?,
         host_home: host,
     };
     let hooks = Arc::new(Capture::default());
     let connection = runtime
         .start(
-            input(directory.path(), &state, &hooks, HistoryMode::PerRoom, true),
+            input(
+                directory.path(),
+                &state,
+                ownership.path(),
+                &hooks,
+                HistoryMode::PerRoom,
+                true,
+            ),
             CancellationToken::new(),
         )
         .await?;
@@ -416,12 +508,14 @@ async fn real_pi_per_room_histories_stay_distinct_reset_is_explicit_and_live_own
     let saved = runtime.saved(&crossfire_agent_core::owned_runtime::Inspection {
         workspace: directory.path().to_owned(),
         state_directory: state.clone(),
+        ownership_directory: ownership.path().to_owned(),
         options: json!({}),
     })?;
     assert_eq!(saved.len(), 3);
     let reset = Reset {
         workspace: directory.path().to_owned(),
         state_directory: state.clone(),
+        ownership_directory: ownership.path().to_owned(),
         reset_id: identity::id(),
     };
     assert!(runtime.reset(&reset).is_err());
@@ -440,7 +534,14 @@ async fn real_pi_per_room_histories_stay_distinct_reset_is_explicit_and_live_own
     );
     let fresh = runtime
         .start(
-            input(directory.path(), &state, &hooks, HistoryMode::PerRoom, true),
+            input(
+                directory.path(),
+                &state,
+                ownership.path(),
+                &hooks,
+                HistoryMode::PerRoom,
+                true,
+            ),
             CancellationToken::new(),
         )
         .await?;

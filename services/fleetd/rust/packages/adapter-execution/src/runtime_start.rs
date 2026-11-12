@@ -19,6 +19,7 @@ pub struct Template {
     pub name: String,
     pub workspace: PathBuf,
     pub state_directory: PathBuf,
+    pub ownership_directory: PathBuf,
     pub instructions: String,
     pub options: Value,
     pub history_mode: HistoryMode,
@@ -56,6 +57,7 @@ impl<H: Hooks + 'static, T: Clock + Clone + Send + Sync + 'static> RuntimeStart<
             || template.name.is_empty()
             || !template.workspace.is_absolute()
             || !template.state_directory.is_absolute()
+            || !template.ownership_directory.is_absolute()
         {
             return Err(Failure::new(
                 ErrorCode::Invalid,
@@ -118,6 +120,7 @@ impl<H: Hooks + 'static, T: Clock + Clone + Send + Sync + 'static> Factory<H>
             name: template.name.clone(),
             workspace: template.workspace.clone(),
             state_directory: template.state_directory.clone(),
+            ownership_directory: template.ownership_directory.clone(),
             instructions: template.instructions.clone(),
             options: template.options.clone(),
             hooks,

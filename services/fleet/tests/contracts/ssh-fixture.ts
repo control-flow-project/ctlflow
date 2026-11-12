@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir, userInfo } from 'node:os';
 import { join } from 'node:path';
 import type { TestContext } from 'node:test';
@@ -13,7 +13,13 @@ export async function sshFixture(scope: TestContext, configurationHome: string) 
   cleanup(scope, () => rmSync(directory, { recursive: true, force: true }));
   const bin = join(directory, 'bin'); mkdirSync(bin, { mode: 0o700 });
   const execute = promisify(execFile);
-  for (const name of ['host', 'client', 'wrong-host']) await execute('/usr/bin/ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', join(directory, name)], { timeout: 15000 });
+  for (const name of ['host', 'client', 'wrong-host']) {
+    const key = join(directory, name);
+    await execute('/usr/bin/ssh-keygen', ['-q', '-t', 'ed25519', '-N', '', '-f', key], { timeout: 15000 });
+    // Inherited default ACLs can override the native producer's umask.
+    // Keep StrictModes enabled and make only these new fixture keys private.
+    chmodSync(key, 0o600);
+  }
   const [port] = await freePorts(scope), known = join(directory, 'known_hosts'), configuration = join(directory, 'ssh_config');
   const trust = (name: string) => writeFileSync(known, '[127.0.0.1]:' + port + ' ' + readFileSync(join(directory, name + '.pub'), 'utf8'), { mode: 0o600 }); trust('host');
   writeFileSync(configuration, 'Host fixture\n  HostName 127.0.0.1\n  Port ' + port + '\n  User ' + userInfo().username + '\n  IdentityFile ' + join(directory, 'client') + '\n  IdentitiesOnly yes\n  BatchMode yes\n  UserKnownHostsFile ' + known + '\n', { mode: 0o600 });

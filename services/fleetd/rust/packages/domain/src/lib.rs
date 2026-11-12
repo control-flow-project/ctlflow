@@ -3,6 +3,8 @@ pub mod controller;
 pub mod controller_model;
 pub mod controller_ports;
 pub mod diagnostics;
+pub mod execution;
+pub mod execution_exports;
 pub mod lifecycle_observer;
 pub mod model;
 pub mod native_lifecycle;

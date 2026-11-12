@@ -1,7 +1,10 @@
 pub mod clock;
 pub mod delivery;
 pub mod event_clock;
+pub mod execution_state;
 pub mod history;
 pub mod journal;
+pub mod ownership;
+pub mod placement;
 pub mod resumption;
 pub mod room_operations;

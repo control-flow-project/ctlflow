@@ -5,6 +5,7 @@ using System.Runtime.Versioning;
 [assembly: SupportedOSPlatform("linux")]
 
 if (Crossfire.AdapterRuntime.NativeGuard.Requested(args)) { Environment.ExitCode = await Crossfire.AdapterRuntime.NativeGuard.Run(args); return; }
+if (NativeOwnershipAcceptance.Requested(args)) { await NativeOwnershipAcceptance.Probe(args); return; }
 if (args.Length != 0) throw new ArgumentException("Runtime acceptance takes no optional suite flags");
 StatisticsAcceptance.Verify();
 await ProtocolAcceptance.Verify();
@@ -13,6 +14,9 @@ ConfigurationAcceptance.Verify();
 NativeValuesAcceptance.Verify();
 ProviderDiagnosticsAcceptance.Verify();
 await ProcessAcceptance.Verify();
+await NativeExecutionAcceptance.Verify();
+await NativeLeaseAcceptance.Verify();
+await NativeOwnershipAcceptance.Verify();
 await ModelAcceptance.Verify();
 HistoryAcceptance.Verify();
 await CodexAcceptance.Verify();

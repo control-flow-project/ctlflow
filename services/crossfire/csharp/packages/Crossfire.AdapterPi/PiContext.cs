@@ -1,6 +1,7 @@
 using Crossfire.Domain;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
+using Crossfire.AdapterProcess;
 using Crossfire.AgentCore;
 using Crossfire.Kernel;
 
@@ -33,12 +34,12 @@ public sealed class PiContext : IAsyncDisposable
             ? state with { RoomId = HistoryContext.Room(binding.Context) } : value) };
         observation = new(hooks, () => session, () => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()); usage = new(hooks, () => session);
     }
-    public static async ValueTask<Result<PiContext>> Open(string binary, string home, PiBinding binding, OwnedRuntimeInput input, PiOptions options, CancellationToken cancellation)
+    public static async ValueTask<Result<PiContext>> Open(string binary, string home, PiBinding binding, OwnedRuntimeInput input, PiOptions options, NativeExecution execution, CancellationToken cancellation)
     {
         var owner = new PiContext(input, home, binding, cancellation); var ready = false;
         try
         {
-            var started = await PiProtocol.Start(binary, home, input.Workspace, input.StateDirectory, input.Profile, owner.history, input.Instructions, owner.Event, owner.Lifetime);
+            var started = await PiProtocol.Start(binary, home, input.Workspace, input.StateDirectory, input.OwnershipDirectory, input.Profile, owner.history, input.Instructions, owner.Event, owner.Lifetime, execution: execution);
             if (!started.IsSuccess) return Result<PiContext>.Fail(started.Error); owner.native = started.Value;
             var admitted = await PiAdmission.Read(owner.native, options, owner.Lifetime); if (!admitted.IsSuccess) return Result<PiContext>.Fail(admitted.Error);
             var state = admitted.Value.State; var id = PiValues.Text(state, "sessionId");

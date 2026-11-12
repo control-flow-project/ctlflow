@@ -5,11 +5,11 @@ using Crossfire.Kernel;
 
 namespace Fleetd.Domain;
 
-public sealed record FleetInstance(string Key, string Name, string Definition, string Workarea, string? Workspace, JsonElement? RuntimeOptions, NativeHistoryMode HistoryMode = NativeHistoryMode.Shared, bool? MirrorOutput = null);
+public sealed record FleetInstance(string Key, string Name, string Definition, string Workarea, string? Workspace, JsonElement? RuntimeOptions, NativeHistoryMode HistoryMode = NativeHistoryMode.Shared, bool? MirrorOutput = null, ExecutionPlacement Execution = default);
 public sealed record FleetCoordination(string Server, string Owner);
 public sealed record FleetRoster(string Fleet, FleetCoordination Coordination, IReadOnlyList<FleetInstance> Instances);
 public sealed record AgentDefinition(string Name, string Runtime, JsonElement Options, string Instructions, JsonElement CoordinationPolicy);
-public sealed record FleetConfiguration(string Directory, FleetRoster Roster, IReadOnlyDictionary<string, AgentDefinition> Definitions, string Digest)
+public sealed record FleetConfiguration(string Directory, FleetRoster Roster, IReadOnlyDictionary<string, AgentDefinition> Definitions, string Digest, ExecutionCatalog? Execution = null)
 {
     public JsonElement NativeOptions(FleetInstance instance) => WireJson.Object(writer =>
     {

@@ -1,4 +1,4 @@
-import { copyFileSync, readFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { documentationLinks } from './verify-documentation.mjs';
 
@@ -16,4 +16,8 @@ export function stageDistributionDocumentation(repository, destination, target) 
     if (!link.startsWith('https://') && !link.startsWith('#')) throw new Error('Installed distribution guide links must not require the source checkout: ' + link);
   }
   copyFileSync(source, join(destination, 'README.md'));
+  const vm = join(destination, 'vm'); mkdirSync(vm, { mode: 0o755 });
+  copyFileSync(join(repository, 'docs/architecture/vm-execution.md'), join(vm, 'README.md'));
+  copyFileSync(join(repository, 'services/fleetd/scripts/setup-vm-host.sh'), join(vm, 'setup-vm-host.sh'));
+  copyFileSync(join(repository, 'services/fleetd/images/qemu/fleet.pkr.hcl'), join(vm, 'fleet.pkr.hcl'));
 }

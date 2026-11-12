@@ -124,7 +124,11 @@ public static class ProtocolAcceptance
     {
         await using var fixture = await ProtocolFixture.Open(); await using var protocol = await Connect(fixture);
         var first = protocol.Request("first", Json("{}")).AsTask(); await fixture.Receive(); var second = protocol.Request("second", Json("{}")).AsTask(); await fixture.Receive();
-        await fixture.Send(frame, binary); var outcomes = await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5));
+        // A rejected binary/invalid-UTF8 frame can abort the client before the
+        // server's final flush completes. Require the same client failure below.
+        try { await fixture.Send(frame, binary); }
+        catch (System.Net.WebSockets.WebSocketException) when (protocol.Lifetime.IsCancellationRequested) { }
+        var outcomes = await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(5));
         Equal(outcomes.All(value => !value.IsSuccess), true, "invalid native response cancels every waiter, including the named request");
         Equal(protocol.Lifetime.IsCancellationRequested, true, "malformed protocol cannot continue with uncertain state");
     }

@@ -25,6 +25,9 @@ impl Events for Notices {
 async fn actual_verified_pi_native_rpc_controls_instructions_admission_and_exact_history_resumption_without_inference()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
+    let ownership = tempfile::Builder::new()
+        .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o700))
+        .tempdir()?;
     let state_directory = directory.path().join("state");
     let home = state_directory.join(".pi");
     PrivateDirectory::open(&state_directory, true)?;
@@ -39,10 +42,13 @@ async fn actual_verified_pi_native_rpc_controls_instructions_admission_and_exact
         "Local native Pi acceptance only. No model work, tools or external actions are authorized.";
     let binary = std::env::var_os("CROSSFIRE_TEST_PI_BINARY")
         .ok_or("Prepare the verified native Pi asset once before Rust test workers")?;
+    let execution = Default::default();
     let launch = Launch {
+        execution: &execution,
         binary: &binary,
         workspace: directory.path(),
         state: &state_directory,
+        ownership: ownership.path(),
         home: &home,
         profile: "rust-native-acceptance",
         history: &history_file,

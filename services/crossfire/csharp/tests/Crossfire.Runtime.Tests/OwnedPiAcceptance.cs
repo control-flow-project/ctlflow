@@ -38,14 +38,14 @@ public static class OwnedPiAcceptance
                 if (waitQuestion) { await Task.Delay(Timeout.InfiniteTimeSpan, scope); throw new InvalidOperationException("Cancelled question cannot produce an answer"); }
                 return Result<JsonElement>.Success(PiValues.Object(writer => { writer.WriteStartObject("answers"); writer.WriteStartObject(decision.Request); writer.WriteStartArray("answers"); writer.WriteStringValue("B"); writer.WriteEndArray(); writer.WriteEndObject(); writer.WriteEndObject(); }));
             }, Usage: usage.Enqueue, Observe: events.Enqueue);
-            var options = ModelAcceptance.Json("{\"provider\":\"fixture\",\"model\":\"fixture-model\",\"thinking_level\":\"high\"}"); var adapter = PiRuntime.Create(binary, provider.Host);
-            var input = new OwnedRuntimeInput("native-pi-proof", "Native Pi proof", workspace, state, "Private initial Pi instructions. Preserve the original source and use explicit room tools.", options, hooks);
+            var options = ModelAcceptance.Json("{\"provider\":\"fixture\",\"model\":\"fixture-model\",\"thinking_level\":\"high\"}"); var execution = new ExecutionRecording(); var adapter = PiRuntime.Create(binary, provider.Host, NativePlacement.Local(execution.Port));
+            var input = new OwnedRuntimeInput("native-pi-proof", "Native Pi proof", workspace, state, Path.Combine(directory, "ownership"), "Private initial Pi instructions. Preserve the original source and use explicit room tools.", options, hooks);
             foreach (var mode in new[] { NativeHistoryMode.Shared, NativeHistoryMode.PerRoom })
             { var missing = await adapter.Start(input with { HistoryMode = mode }, cancellation); Equal(!missing.IsSuccess && missing.Error.Code == "missing", true, "Pi ordinary resume cannot create an initial history in either mode"); }
             Equal(provider.Requests, 0, "missing-history rejection never invokes a model");
             foreach (var invalid in new[] { "{\"provider\":\"fixture\",\"model\":\"missing\"}", "{\"provider\":\"fixture\",\"model\":\"plain-model\",\"thinking_level\":\"high\"}", "{\"provider\":\"fixture\",\"model\":\"fixture-model\",\"thinking_level\":\"max\"}", "{\"sandbox_mode\":\"danger-full-access\"}" })
-                Equal((await adapter.Inspect(new(workspace, state, ModelAcceptance.Json(invalid)), cancellation)).IsSuccess, false, "Pi rejects unavailable native configuration without substitution");
-            Equal((await adapter.Inspect(new(workspace, state, options), cancellation)).IsSuccess, true, "actual Pi admission uses the inert advertised provider"); Equal(provider.Requests, 0, "Pi inspection and model/effort admission make zero model calls");
+                Equal((await adapter.Inspect(new(workspace, state, input.OwnershipDirectory, ModelAcceptance.Json(invalid)), cancellation)).IsSuccess, false, "Pi rejects unavailable native configuration without substitution");
+            Equal((await adapter.Inspect(new(workspace, state, input.OwnershipDirectory, options), cancellation)).IsSuccess, true, "actual Pi admission uses the inert advertised provider"); Equal(provider.Requests, 0, "Pi inspection and model/effort admission make zero model calls");
             var current = await Start(adapter, input with { AllowNewHistory = true }, cancellation); string session; string home = Path.Combine(state, ".pi"); string history;
             try
             {
@@ -86,6 +86,10 @@ public static class OwnedPiAcceptance
             finally { await current.DisposeAsync(); }
             await ResumeAndRecover(adapter, input, provider, home, history, session, cancellation);
             await Contexts(adapter, input, provider, cancellation);
+            Equal(execution.Commands.Any(arguments => arguments.SequenceEqual(new[] { "--version" })), true, "Pi version checks cross the selected execution boundary");
+            Equal(execution.Commands.Any(arguments => arguments.Take(2).SequenceEqual(new[] { "--mode", "rpc" })), true, "Pi RPC launches cross the selected execution boundary");
+            var refused = await PiRuntime.Create(binary, provider.Host, NativePlacement.Local(ExecutionRecording.Rejected)).Inspect(new(workspace, state, input.OwnershipDirectory, options), cancellation);
+            Equal(!refused.IsSuccess && refused.Error.Code == "forbidden", true, "Pi inspection does not run host probes after placement rejection");
         }
         finally { Directory.Delete(directory, recursive: true); }
     }
@@ -121,7 +125,7 @@ public static class OwnedPiAcceptance
     }
     private static async Task Contexts(OwnedRuntimeAdapter adapter, OwnedRuntimeInput input, PiProvider provider, CancellationToken cancellation)
     {
-        var isolated = input with { StateDirectory = PrivateFiles.Directory(Path.Combine(Path.GetDirectoryName(input.StateDirectory)!, "per-room")), HistoryMode = NativeHistoryMode.PerRoom, AllowNewHistory = true };
+        var isolated = input with { StateDirectory = PrivateFiles.Directory(Path.Combine(Path.GetDirectoryName(input.StateDirectory)!, "per-room")), OwnershipDirectory = Path.Combine(Path.GetDirectoryName(input.StateDirectory)!, "ownership-per-room"), HistoryMode = NativeHistoryMode.PerRoom, AllowNewHistory = true };
         var current = await Start(adapter, isolated, cancellation); IReadOnlyList<SavedRuntimeContext> saved;
         try
         {
@@ -132,7 +136,7 @@ public static class OwnedPiAcceptance
             Equal((await second.Deliver("Only second-room information.", "pi-second", cancellation)).IsSuccess, true, "Pi publishes to the second room history"); second.Acknowledge(["pi-second"]); await Idle(second, cancellation);
             Equal((await provider.Calls.ReadAsync(cancellation)).Input.GetRawText().Contains("violet 51", StringComparison.Ordinal), false, "Pi per-room context does not copy private first-room history");
             saved = adapter.SavedContexts(isolated.Workspace, isolated.StateDirectory).Value; Equal(saved.Count, 3, "Pi saved context discovery exposes exact native identities without a new writer");
-            Equal(adapter.Reset(new(isolated.Workspace, isolated.StateDirectory, Identity.Identifier())).IsSuccess, false, "Pi cannot reset a live native history owner");
+            Equal(adapter.Reset(new(isolated.Workspace, isolated.StateDirectory, isolated.OwnershipDirectory, Identity.Identifier())).IsSuccess, false, "Pi cannot reset a live native history owner");
         }
         finally { await current.DisposeAsync(); }
         var resumedInput = isolated with { AllowNewHistory = false }; current = await Start(adapter, resumedInput, cancellation);
@@ -142,7 +146,7 @@ public static class OwnedPiAcceptance
             foreach (var binding in saved.Where(value => value.Context != "control")) Equal((await current.Conversation(HistoryContext.Room(binding.Context)!)).Value.SessionId, binding.SessionId, "Pi restart resumes every exact retained room identity");
         }
         finally { await current.DisposeAsync(); }
-        var reset = Identity.Identifier(); Equal(adapter.Reset(new(isolated.Workspace, isolated.StateDirectory, reset)).IsSuccess, true, "Pi explicit reset archives native histories"); Equal(adapter.Reset(new(isolated.Workspace, isolated.StateDirectory, reset)).IsSuccess, true, "Pi reset is idempotent by reset identity");
+        var reset = Identity.Identifier(); Equal(adapter.Reset(new(isolated.Workspace, isolated.StateDirectory, isolated.OwnershipDirectory, reset)).IsSuccess, true, "Pi explicit reset archives native histories"); Equal(adapter.Reset(new(isolated.Workspace, isolated.StateDirectory, isolated.OwnershipDirectory, reset)).IsSuccess, true, "Pi reset is idempotent by reset identity");
         Equal(Directory.GetFiles(Path.Combine(isolated.StateDirectory, ".pi/archive", reset, "histories")).Length, 3, "Pi reset preserves every native history in its private archive");
         current = await Start(adapter, isolated, cancellation); string fresh;
         try { fresh = current.SessionId; Equal(saved.Any(value => value.SessionId == fresh), false, "explicit fresh start cannot reuse an archived native identity"); }

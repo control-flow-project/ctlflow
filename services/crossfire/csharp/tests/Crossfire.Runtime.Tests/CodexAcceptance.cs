@@ -52,7 +52,7 @@ public static class CodexAcceptance
                 Equal(ManagedHome.RefreshAuthentication(home, source).IsSuccess, true, "real native fixture has no host authentication");
                 var binary = Environment.GetEnvironmentVariable("CROSSFIRE_TEST_CODEX") ?? "codex";
                 using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-                var native = await OwnedProcess.Start(home, workspace, state, "csharp-proof", binary, true, source, stop.Token); Equal(native.IsSuccess, true, native.IsSuccess ? "stock Codex owned process" : native.Error.Message);
+                var native = await OwnedProcess.Start(home, workspace, state, Path.Combine(Path.GetDirectoryName(state)!, "ownership-state"), await Ownership(Path.Combine(Path.GetDirectoryName(state)!, "ownership-state"), workspace, state, home), "csharp-proof", binary, true, source, stop.Token); Equal(native.IsSuccess, true, native.IsSuccess ? "stock Codex owned process" : native.Error.Message);
                 await using var owned = native.Value;
                 var hooks = new RuntimeHooks((_, _) => ValueTask.FromResult(Results.Fail<JsonElement>("invalid", "Unexpected native decision in inert local proof")));
                 var options = CodexSettings.Parse(ModelAcceptance.Json("{\"model\":\"fixture-selected\",\"model_reasoning_effort\":\"max\",\"approval_policy\":\"never\",\"features\":{\"default_mode_request_user_input\":true}}")).Value;
@@ -126,10 +126,16 @@ public static class CodexAcceptance
         }
         finally { Directory.Delete(directory, recursive: true); }
     }
+    private static async Task<Crossfire.AdapterRuntime.NativeLease> Ownership(string directory, string workspace, string state, string home)
+    {
+        var leased = await Crossfire.AdapterRuntime.NativePlacement.Host.Open(new(directory, workspace, state, home), CancellationToken.None);
+        if (!leased.IsSuccess) throw new IOException(leased.Error.Message);
+        return leased.Value;
+    }
     private static async Task Restart(string home, string workspace, string state, string source, string binary, string sessionId, CodexOptions options,
         RuntimeHooks hooks, ChannelReader<ProviderCall> requests, CancellationToken cancellation)
     {
-        var restarted = await OwnedProcess.Start(home, workspace, state, "csharp-proof", binary, true, source, cancellation);
+        var restarted = await OwnedProcess.Start(home, workspace, state, Path.Combine(Path.GetDirectoryName(state)!, "ownership-state"), await Ownership(Path.Combine(Path.GetDirectoryName(state)!, "ownership-state"), workspace, state, home), "csharp-proof", binary, true, source, cancellation);
         Equal(restarted.IsSuccess, true, restarted.IsSuccess ? "a new native process opens the retained private home" : restarted.Error.Message); await using var native = restarted.Value;
         CodexConnection? connection = null;
         var opened = await CodexSession.Open(native.Endpoint, native.Token, workspace, options, new ResumeThread(sessionId), hooks, value => connection?.Event(value), cancellation, 10000);
@@ -144,7 +150,7 @@ public static class CodexAcceptance
                 Equal(journal.Prepare(new(null, original, "csharp-unpublished-before-restart", boundary.Value.Boundary, boundary.Value.Initializing)).IsSuccess, true,
                     "a crash before native submission can retain the original source and text locally");
             await session.DisposeAsync(); await native.DisposeAsync();
-            var next = await OwnedProcess.Start(home, workspace, state, "csharp-proof", binary, true, source, cancellation);
+            var next = await OwnedProcess.Start(home, workspace, state, Path.Combine(Path.GetDirectoryName(state)!, "ownership-state"), await Ownership(Path.Combine(Path.GetDirectoryName(state)!, "ownership-state"), workspace, state, home), "csharp-proof", binary, true, source, cancellation);
             Equal(next.IsSuccess, true, "second actual native process restart"); await using var current = next.Value;
             var resumed = await CodexSession.Open(current.Endpoint, current.Token, workspace, options, new ResumeThread(sessionId), hooks, value => connection?.Event(value), cancellation, 10000);
             Equal(resumed.IsSuccess, true, resumed.IsSuccess ? "unpublished original input retains its saved history identity" : resumed.Error.Message); session = resumed.Value;

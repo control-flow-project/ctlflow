@@ -9,7 +9,7 @@ use crate::{
     session::{self, Selection, Status},
     websocket::WebSocketProtocol,
 };
-use crossfire_adapter_filesystem::{PrivateDirectory, lock::StateLock};
+use crossfire_adapter_filesystem::PrivateDirectory;
 use crossfire_adapter_runtime::{
     clock::{self, Scope},
     journal,
@@ -66,7 +66,6 @@ pub struct Histories<H> {
     pub hooks: Arc<H>,
     pub process: OwnedProcess,
     pub attachment: Attachment,
-    ownership: Mutex<Option<StateLock>>,
     contexts: Mutex<Contexts<H>>,
     cancellation: CancellationToken,
 }
@@ -76,7 +75,6 @@ fn invalid(message: &str) -> Failure {
 }
 
 pub struct Configuration<H> {
-    pub ownership: StateLock,
     pub home: PathBuf,
     pub workspace: PathBuf,
     pub name: String,
@@ -140,7 +138,6 @@ impl<H: Hooks + 'static> Histories<H> {
             hooks: input.hooks,
             process: input.process,
             attachment: input.attachment,
-            ownership: Mutex::new(Some(input.ownership)),
             contexts: Mutex::new(Contexts {
                 registry,
                 slots: BTreeMap::new(),
@@ -521,10 +518,6 @@ impl<H: Hooks + 'static> Histories<H> {
                 });
             }
         }
-        self.ownership
-            .lock()
-            .map_err(|_| invalid("Native owner lock failed during cleanup"))?
-            .take();
         failure.map_or(Ok(()), Err)
     }
 }

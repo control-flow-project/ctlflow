@@ -3,6 +3,7 @@ using System.Text.Json;
 using Crossfire.AdapterCodex;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AdapterToml;
+using Crossfire.AdapterProcess;
 using Crossfire.AgentCore;
 using Crossfire.Kernel;
 using static Crossfire.Runtime.Tests.Checks;
@@ -58,8 +59,20 @@ public static class ConfigurationAcceptance
             PrivateFiles.DeletePrivate(auth); Equal(ManagedHome.RefreshAuthentication(home, host).IsSuccess, true, "host logout removes stale managed authentication");
             Equal(PrivateFiles.Exists(Path.Combine(home, "auth.json")), false, "logged-out account is not silently retained");
             Equal(ManagedHome.RefreshAuthentication(home, home).IsSuccess, false, "managed home cannot adopt host login storage");
-            var environment = ManagedHome.NativeEnvironment(home, state, "immutable-profile");
+            var environment = ManagedHome.NativeEnvironment(home, state, "immutable-profile", false, host);
             Equal(environment["CODEX_THREAD_ID"] is null, true, "setup never adopts the caller native thread"); Equal(environment["CROSSFIRE_AGENT_NAME"], "immutable-profile", "native tool identity is controller-assigned");
+            var trusted = ManagedHome.ReadConfiguration(host).Value;
+            var authorized = ManagedHome.Provider(trusted).Value.Settings;
+            authorized["env_key"] = "CTL_AUTHORIZED_FIXTURE_KEY";
+            PrivateFiles.WriteConfiguration(Path.Combine(host, "config.toml"), Encoding.UTF8.GetBytes(ConfigurationToml.Format(trusted).Value), 1048576);
+            ManagedHome.Provider(configuration).Value.Settings["env_key"] = "CTL_FOREIGN_FIXTURE_KEY";
+            PrivateFiles.Write(Path.Combine(home, "config.toml"), Encoding.UTF8.GetBytes(ConfigurationToml.Format(configuration).Value), 1048576);
+            Equal(ManagedHome.NativeEnvironment(home, state, null, true, host)[SshCommands.ProviderKey], "CTL_AUTHORIZED_FIXTURE_KEY",
+                "Guest-writable native configuration cannot select another host environment key");
+            authorized.Remove("env_key");
+            PrivateFiles.WriteConfiguration(Path.Combine(host, "config.toml"), Encoding.UTF8.GetBytes(ConfigurationToml.Format(trusted).Value), 1048576);
+            Equal(ManagedHome.NativeEnvironment(home, state, null, true, host).ContainsKey(SshCommands.ProviderKey), false,
+                "A guest cannot create provider-key authority absent from host configuration");
             var link = Path.Combine(directory, "linked-state"); Directory.CreateSymbolicLink(link, state);
             try { ManagedHome.Directories(host, link); throw new InvalidOperationException("linked state was accepted"); } catch (IOException) { }
             Equal(ManagedHome.ReadConfiguration(host).IsSuccess, true, "owned read-only configuration is accepted");

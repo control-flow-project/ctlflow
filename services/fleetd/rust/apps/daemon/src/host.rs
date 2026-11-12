@@ -172,6 +172,7 @@ pub async fn run(input: Input, stop: CancellationToken) -> Result<()> {
         (
             "codex".to_owned(),
             Arc::new(Adapter::Codex(CodexRuntime {
+                placement: Default::default(),
                 binary: "codex".into(),
                 host_home: std::env::var_os("CODEX_HOME")
                     .map(PathBuf::from)
@@ -181,6 +182,7 @@ pub async fn run(input: Input, stop: CancellationToken) -> Result<()> {
         (
             "pi".to_owned(),
             Arc::new(Adapter::Pi(PiRuntime {
+                placement: Default::default(),
                 binary: "pi".into(),
                 host_home: std::env::var_os("PI_CODING_AGENT_DIR")
                     .map(PathBuf::from)

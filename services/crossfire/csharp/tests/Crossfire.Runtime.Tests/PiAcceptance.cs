@@ -17,7 +17,7 @@ public static class PiAcceptance
             var home = PrivateFiles.Directory(Path.Combine(directory, "home")); var workspace = PrivateFiles.Directory(Path.Combine(directory, "workspace"));
             var history = Path.Combine(home, "native.jsonl"); PrivateFiles.Write(history, [], 1);
             using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(60)); var observed = 0;
-            var started = await PiProtocol.Start(binary, home, workspace, directory, "native-pi-proof", history, "This is an inert native capability proof. Do not start model work.", _ => Interlocked.Increment(ref observed), stop.Token, 10000);
+            var started = await PiProtocol.Start(binary, home, workspace, directory, Path.Combine(directory, "ownership"), "native-pi-proof", history, "This is an inert native capability proof. Do not start model work.", _ => Interlocked.Increment(ref observed), stop.Token, 10000);
             Equal(started.IsSuccess, true, started.IsSuccess ? "actual pinned Pi starts through the owned native process port" : started.Error.Message); var native = started.Value;
             await using (native)
             {

@@ -58,10 +58,12 @@ impl<H> Drop for Contexts<H> {
 }
 
 pub struct Configuration<H> {
+    pub execution: crossfire_adapter_process::execution::NativeExecution,
     pub binary: OsString,
     pub home: PathBuf,
     pub workspace: PathBuf,
     pub state_directory: PathBuf,
+    pub ownership_directory: PathBuf,
     pub profile: String,
     pub instructions: String,
     pub options: Options,
@@ -249,9 +251,11 @@ impl<H: Hooks + 'static> Histories<H> {
         let native = Arc::new(
             Rpc::start(
                 &Launch {
+                    execution: &self.configuration.execution,
                     binary: &self.configuration.binary,
                     workspace: &self.configuration.workspace,
                     state: &self.configuration.state_directory,
+                    ownership: &self.configuration.ownership_directory,
                     home: &self.configuration.home,
                     profile: &self.configuration.profile,
                     history: &history_file,

@@ -11,6 +11,9 @@ pub fn controller(value: &ControllerIdentity) -> Value {
 }
 pub fn instance(value: &Instance) -> Value {
     let mut wire = json!({"key":value.key,"name":value.name,"definition":value.definition,"workarea":value.workarea});
+    if value.execution != fleetd_domain::execution::Placement::Host {
+        wire["execution"] = crate::execution::placement_wire(&value.execution);
+    }
     if let Some(workspace) = &value.workspace {
         wire["workspace"] = json!(workspace);
     }

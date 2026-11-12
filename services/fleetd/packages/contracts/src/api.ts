@@ -7,13 +7,14 @@ import { page, none } from '@ctlflow/crossfire-contracts/schema/query';
 import { attachment } from './attachment.js';
 import { fleetControl, fleetMessageSummary, deliveryChange, messageCreation } from '@ctlflow/crossfire-contracts/fleet-control';
 import { setupInput } from './setup.js';
+import { executionPlacement } from './execution.js';
 import { runtimeOptions } from './configuration.js';
 import { diagnosticQuery, diagnosticReport } from './diagnostics.js';
 const releaseDirectory = check.refine(check.text(4096), value => value.startsWith('/') && !value.includes('\\')
   && value.split('/').slice(1).every(segment => segment && segment !== '.' && segment !== '..'), 'Release directory must be an absolute normalized path');
 const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
   workspace: check.optional(check.text(4096)),
-  runtimeOptions: check.optional(runtimeOptions),
+  execution: check.optional(executionPlacement), runtimeOptions: check.optional(runtimeOptions),
   listenerOptions: check.optional(check.object({ historyMode: check.optional(check.choice('shared', 'per-room')), mirrorOutput: check.optional(check.boolean) })) });
 export const phase = check.choice('stopped', 'starting', 'awaiting-approval', 'running', 'sleeping', 'waking', 'stopping', 'failed');
 export const instanceView = check.object({ instance, phase, listenerActive: check.boolean, desiredActive: check.boolean,
