@@ -3,6 +3,7 @@
 - [Install and set up](getting-started.md)
 - [Command reference](commands.md)
 - [Definitions and native settings](configuration.md)
+- [Selective VM execution](../../../docs/architecture/vm-execution.md)
 - [Session controls](sessions.md)
 - [SSH transport](remote.md)
 - [Operations and updates](operations.md)

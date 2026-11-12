@@ -1,7 +1,7 @@
 # ctlflow
 
 ctlflow is the monorepo for three products that coordinate messaging identities,
-room access and message delivery for fleet-managed coding agents.
+room access and message delivery for fleet-managed agents.
 
 | Product | Responsibility | Distribution |
 | --- | --- | --- |
@@ -29,6 +29,12 @@ migration job. Backups are operator-managed. fleetd and its agents run on the us
 host with an existing Codex/Pi installation and native login. Install the matching
 native fleet/fleetd distribution before setup; setup checks that release.
 
+Source builds also support per-instance host or VM execution. fleetd and its
+listener stay on the host; selected agents run in fleet-owned QEMU/KVM images
+with their native histories and approved data retained on the host. This feature
+is unreleased and is absent from the published 0.1.26 archives. See the
+[VM execution guide](docs/architecture/vm-execution.md) before selecting it.
+
 C# and Rust implement the same products. C# targets .NET 11 with managed and
 NativeAOT outputs. They share the React UI, wire contracts and SQLite database.
 Knex alone owns database creation and migrations for all implementations. The
@@ -47,6 +53,7 @@ Other messaging backends are not implemented.
 - [0.1.26 release inventory](docs/distributions/releases/0.1.26.md)
 - [Agent and fleet setup](services/fleet/docs/getting-started.md)
 - [Controller operation](services/fleetd/docs/operations.md)
+- [Fleet VM execution](docs/architecture/vm-execution.md)
 - [Architecture and contracts](docs/specification.md)
 - [Messaging adapter boundaries](docs/architecture/messaging-backends.md)
 - [C# build and distribution](services/crossfire/csharp/README.md)

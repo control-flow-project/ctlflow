@@ -10,6 +10,12 @@ uses the existing Codex/Pi installation and login, does not install a harness an
 does not move credentials into Docker. NativeAOT is the default; managed C# and
 Rust are explicit selections of the same current contract.
 
+Selective fleet VM execution is available in source builds of all three targets,
+not the published 0.1.26 archives. The publishers include `vm/README.md`, the host
+prerequisite helper and Packer recipe. Read the
+[VM guide](../architecture/vm-execution.md) for the supported host, fleet images,
+configuration and security limits. Server Docker deployment is unchanged.
+
 - [Local Docker server and host-native fleet](../../services/crossfire/docs/local-docker.md)
 - [0.1.26 native release inventory](releases/0.1.26.md)
 

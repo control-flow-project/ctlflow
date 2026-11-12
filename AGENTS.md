@@ -169,8 +169,10 @@ UI/content and one-shot Knex maintenance. fleet/fleetd and native agents run on
 the user's execution host, using an existing supported Codex/Pi installation and
 native login. Setup uses installed native fleet/fleetd, never installs a harness or copies provider credentials. Do not retain fleet-container images, services,
 network relays or an alternative container onboarding workflow.
-No systemd/global services, global skills, unrequested host changes, production
+No installed/autostart systemd or global services, global skills, unrequested host changes, production
 resets or unrequested deployment. Preserve credentials and shared source work.
+Explicit VM execution uses only the finite transient per-execution user services
+defined in docs/architecture/vm-execution.md; these are not fleet boot services.
 Do not delegate or start subagents without explicit authorization.
 Every authorized subagent must be forked with full parent context
 (`fork_context: true`) and work in a separate Git worktree. Scoped assignments
