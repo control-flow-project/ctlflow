@@ -9,6 +9,7 @@ settings. Definitions are trackable; `.fleet/` and workareas are private state.
 ```text
 research/
   runtime.toml
+  execution.toml     # optional fleet image/resource catalog
   rooms.toml
   .fleet/
   agents/
@@ -80,6 +81,54 @@ important listener notices remain available. Terminal final answers are also
 quiet; important results must be sent intentionally. Stop/resume using the same
 history to apply a changed listener selection. This setting is independent of
 `history_mode` and native runtime options.
+
+## Execution selection
+
+Selective VM execution is unreleased and is absent from the published 0.1.26
+archives. It uses the same configuration in source builds of managed C#,
+NativeAOT and Rust, for both Codex and Pi.
+
+Each instance defaults to host execution. The fleet author adds this table inside
+the chosen `[[instances]]` entry in `runtime.toml`, before the next instance:
+
+```toml
+[instances.execution]
+kind = "vm"
+image = "research"
+profile = "restricted"
+```
+
+The image and profile resolve only through this fleet's `execution.toml`.
+The operator supplies an existing private image and replaces the digest with its
+actual SHA256 before using this example as `research/execution.toml`:
+
+```toml
+memory_budget_mib = 4096
+host_reserve_mib = 2048
+
+[images.research]
+path = "/absolute/fleet-images/research.qcow2"
+sha256 = "replace-with-the-64-character-lowercase-sha256"
+
+[profiles.restricted]
+cpus = 2
+memory_mib = 512
+maximum_memory_mib = 1024
+network = "disabled"
+mounts = [{ path = "/absolute/research-originals", read_only = true }]
+```
+
+Use `kind = "host"` with no image/profile, or omit execution, for an intentional
+host selection. Native `sandbox_mode` and approval options are separate from VM
+placement. A VM failure never changes placement to host.
+
+Stop the instance before changing selection. Retain its exact workarea and native
+histories. VM images must contain the selected harness and dependencies at their
+configured paths; setup does not install them. The controller and listener stay
+on the host. Sleeping fleet restoration makes no model turn or VM boot; explicit
+inspection and first native-history initialization can boot without inference.
+
+- [Host prerequisites, images, mounts, memory and security](../../../docs/architecture/vm-execution.md)
 
 ## Role
 

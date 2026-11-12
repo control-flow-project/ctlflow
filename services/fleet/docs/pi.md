@@ -39,8 +39,13 @@ Per-instance overrides use the common top-level replacement resolver.
 Inspection, startup, resume, recovery and reset validate the same effective values.
 
 Pi rejects Codex sandbox, approval, bypass and effort options.
-Its tools run with the controller user's privileges; owner questions are not an
-emulated filesystem/network sandbox.
+With host execution, its tools run with the controller user's privileges; owner
+questions are not an emulated filesystem/network sandbox. Source builds can
+instead select the same fleet VM boundary as Codex. Pi and its tools then run in
+the selected guest; native histories and approved exports remain on the host.
+This is separate from Pi's native runtime options and is unreleased.
+
+- [VM execution and its limits](../../../docs/architecture/vm-execution.md)
 
 ## State and instructions
 
@@ -108,8 +113,10 @@ Pi RPC does not expose live TUI attachment to an existing engine.
 another writer, not an attachment.
 
 Orderly shutdown/interruption and idle crash recovery have test coverage.
-SIGKILL during a detached tool can leave that tool alive. Linux inert-provider
-coverage does not certify every provider/model or another platform.
+With host execution, SIGKILL during a detached tool can leave that tool alive.
+Selected VM execution closes its finite execution group before allowing another
+writer. Neither mode proves whether an external action completed. Linux
+inert-provider coverage does not certify every provider/model or another platform.
 
 - [Common session controls](sessions.md)
 - [Native runtime verification](https://github.com/control-flow-project/ctlflow/blob/main/services/fleetd/tools/README.md)

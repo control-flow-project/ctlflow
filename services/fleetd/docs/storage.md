@@ -40,6 +40,21 @@ transaction and in-memory rollback-journal protocol.
 A live/suspended owner retains exclusion; process exit releases it.
 Do not delete the inode, use guessed PIDs or break another writer's lock.
 
+The native-writer gate lives outside instance exports at the OS-user
+configuration directory's `ctlflow/native-ownership/<sha256-of-state-path>`.
+Its host-only `execution.json` fences a surviving execution group; a replacement
+cannot open native histories until that group is empty. Exported filesystem
+locks do not provide cross-kernel exclusion.
+
+For selected VM execution, `.codex`/`.pi`, exact histories, workspace and approved
+data remain on the host. Only sockets and controls use
+`$XDG_RUNTIME_DIR/cfvm-<execution-id>`. Disposable overlays, seed and helper data
+use `$XDG_CACHE_HOME/ctlflow/vm/<execution-id>` and are removed after confirmed
+closure. `vm-receipt.json` remains in the host ownership directory. Do not put
+that directory, controller credentials or peer state in a guest export.
+
+- [VM storage and lifecycle](../../../docs/architecture/vm-execution.md)
+
 ## Native contexts
 
 Codex and Pi each read their single current context registry. Resume retains the

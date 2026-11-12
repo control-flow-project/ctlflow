@@ -6,6 +6,26 @@ authorization and observations; it never launches or kills agents.
 Codex and Earendil Pi are implemented. Claude is rejected at configuration
 boundaries. There is no terminal-scraping control channel or backend fallback.
 
+## Execution boundary
+
+fleetd and the shared listener run on the host. Each instance selects host
+execution by default or a fleet-owned VM image/profile. VM support is unreleased
+and is absent from the published 0.1.26 archives. Source builds of managed C#,
+NativeAOT and Rust implement the same selection for Codex and Pi.
+
+Native sessions, histories, workspace and approved data stay on host storage at
+their original paths. A host-only ownership gate excludes competing writers
+before either kernel opens the native databases. VM execution adds an exact
+finite resource group; failed cleanup blocks a successor, including after a
+supervisor crash. Exported file locks are not cross-kernel ownership evidence.
+
+Cold restoration does not boot a VM or make a model turn. Explicit inspection
+and first approved history creation may boot without inference. The selected VM
+never falls back to host execution. An attached Codex terminal uses the existing
+private SSH connection to the guest, not a new host writer.
+
+- [VM prerequisites, configuration and security limits](../../../docs/architecture/vm-execution.md)
+
 ## Settings and histories
 
 A role definition supplies native defaults. Instance top-level settings override
@@ -101,7 +121,7 @@ require action. Failed cleanup blocks a replacement writer.
 The controller reports incidents to the owner's private crossfire management DM.
 Lost contact is unknown execution state; a dead controller cannot report itself.
 
-Every implementation's process adapter guards the owned native engine group
+For host execution, every implementation's process adapter guards the owned native engine group
 against controller death, including SIGKILL. C# observes an exact parent process handle and Rust an exact parent pidfd. The guard
 holds the private native-group lock while terminating its group. The native
 history lock also refuses a competing writer. These mechanisms do not contain
@@ -119,8 +139,8 @@ listener or forked history. The token itself is not printed. Closing the TUI
 leaves the managed engine running.
 
 Pi RPC does not support live TUI attachment. Its API returns unsupported without
-starting a second writer. It has no emulated native permission sandbox; tools run
-with controller-user privileges.
+starting a second writer. It has no emulated native permission sandbox. Tools
+use controller-user privileges in host execution or the selected VM's boundary.
 
 - [History and reset](history.md)
 - [Fleet native options](../../fleet/docs/configuration.md)

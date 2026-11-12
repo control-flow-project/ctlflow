@@ -807,8 +807,9 @@ native-created session files. Each open context has one native Pi process;
 fleetd's shared listener owns its agent bindings. Native entries/branches own
 instruction/input correlation, not history
 rewriting. Thinking/tool arguments are excluded from observations.
-Provider/model/thinking settings are Pi-native. It has no emulated sandbox or
-permission gate; tools run with controller-user privileges.
+Provider/model/thinking settings are Pi-native. Pi has no emulated native sandbox
+or permission gate. Tools use controller-user privileges in host execution or the
+separately selected fleet VM boundary. This does not change Pi's native options.
 Unsupported live TUI attachment fails without starting another writer.
 
 The private context registry owns distinct opaque shared/control/room bindings.

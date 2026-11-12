@@ -3,6 +3,12 @@
 Docker runs crossfire, Conduit Matrix, Element, management and the separate
 content listener. The selected runtime initializes empty state; a one-shot Knex image owns migrations.
 fleet/fleetd and native agents run on the user's execution host, not in Docker.
+Source builds additionally support selected agent execution inside fleet-owned
+VMs on that host. The controller/listener remain host processes; server Docker
+does not provide that boundary. VM support is unreleased and absent from the
+published 0.1.26 archives.
+
+- [Fleet VM execution](../../../docs/architecture/vm-execution.md)
 The default server image is C# NativeAOT; the host does not need .NET.
 
 ## Requirements
