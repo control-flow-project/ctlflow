@@ -28,6 +28,7 @@ pub struct Input<H> {
     pub name: String,
     pub workspace: PathBuf,
     pub state_directory: PathBuf,
+    pub ownership_directory: PathBuf,
     pub instructions: String,
     pub options: Value,
     pub hooks: Arc<H>,
@@ -42,6 +43,7 @@ impl<H> Clone for Input<H> {
             name: self.name.clone(),
             workspace: self.workspace.clone(),
             state_directory: self.state_directory.clone(),
+            ownership_directory: self.ownership_directory.clone(),
             instructions: self.instructions.clone(),
             options: self.options.clone(),
             hooks: self.hooks.clone(),
@@ -54,6 +56,7 @@ impl<H> Clone for Input<H> {
 pub struct Inspection {
     pub workspace: PathBuf,
     pub state_directory: PathBuf,
+    pub ownership_directory: PathBuf,
     pub options: Value,
 }
 pub struct Validation {
@@ -63,6 +66,7 @@ pub struct Validation {
 pub struct Reset {
     pub workspace: PathBuf,
     pub state_directory: PathBuf,
+    pub ownership_directory: PathBuf,
     pub reset_id: String,
 }
 

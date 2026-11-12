@@ -35,7 +35,12 @@ pub fn instance(value: &Value) -> Result<Instance> {
     let value = check::object(
         value,
         &["key", "name", "definition", "workarea"],
-        &["workspace", "listener_options", "runtime_options"],
+        &[
+            "workspace",
+            "listener_options",
+            "runtime_options",
+            "execution",
+        ],
     )?;
     let workspace = value
         .get("workspace")
@@ -67,6 +72,11 @@ pub fn instance(value: &Value) -> Result<Instance> {
         .map(check::boolean)
         .transpose()?;
     Ok(Instance {
+        execution: value
+            .get("execution")
+            .map(crate::execution::placement)
+            .transpose()?
+            .unwrap_or_default(),
         key: check::name(&value["key"])?.to_owned(),
         name: check::name(&value["name"])?.to_owned(),
         definition: check::name(&value["definition"])?.to_owned(),
@@ -81,7 +91,12 @@ pub fn api_instance(value: &Value) -> Result<Instance> {
     let source = check::object(
         value,
         &["key", "name", "definition", "workarea"],
-        &["workspace", "listenerOptions", "runtimeOptions"],
+        &[
+            "workspace",
+            "listenerOptions",
+            "runtimeOptions",
+            "execution",
+        ],
     )?;
     let mut canonical = source.clone();
     if let Some(options) = canonical.remove("runtimeOptions") {

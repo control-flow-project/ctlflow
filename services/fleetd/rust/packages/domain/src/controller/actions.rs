@@ -122,9 +122,6 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
         };
         self.stop_selected(fleet, &recovering, errors).await?;
         if action == Action::Reset {
-            self.execution
-                .inspect(configuration, selected, stop.clone())
-                .await?;
             let pending = selected
                 .iter()
                 .filter(|instance| {
@@ -135,6 +132,18 @@ impl<R: Registry + 'static, E: Execution + 'static, T: Clock + Clone + Send + Sy
                 .cloned()
                 .collect::<Vec<_>>();
             self.stop_selected(fleet, &pending, errors).await?;
+            let stopped = pending
+                .iter()
+                .filter(|instance| {
+                    !errors
+                        .iter()
+                        .any(|error| error.instance.as_ref() == Some(&instance.key))
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            self.execution
+                .inspect(configuration, &stopped, stop.clone())
+                .await?;
             for instance in pending {
                 if errors
                     .iter()

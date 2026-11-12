@@ -1,0 +1,418 @@
+[
+  {
+    "name": "host is the configuration default",
+    "roster": {
+      "fleet": "research",
+      "coordination": {
+        "adapter": "crossfire",
+        "server": "https://crossfire.example",
+        "owner": "@owner:matrix.example"
+      },
+      "instances": [
+        {
+          "key": "analyst",
+          "name": "analyst",
+          "definition": "research",
+          "workarea": "agents/research/workarea/analyst"
+        }
+      ]
+    },
+    "catalog": null,
+    "valid": true
+  },
+  {
+    "name": "explicit host",
+    "roster": {
+      "fleet": "research",
+      "coordination": {
+        "adapter": "crossfire",
+        "server": "https://crossfire.example",
+        "owner": "@owner:matrix.example"
+      },
+      "instances": [
+        {
+          "key": "analyst",
+          "name": "analyst",
+          "definition": "research",
+          "workarea": "agents/research/workarea/analyst",
+          "execution": {
+            "kind": "host"
+          }
+        }
+      ]
+    },
+    "catalog": null,
+    "valid": true
+  },
+  {
+    "name": "fleet-approved VM",
+    "roster": {
+      "fleet": "research",
+      "coordination": {
+        "adapter": "crossfire",
+        "server": "https://crossfire.example",
+        "owner": "@owner:matrix.example"
+      },
+      "instances": [
+        {
+          "key": "analyst",
+          "name": "analyst",
+          "definition": "research",
+          "workarea": "agents/research/workarea/analyst",
+          "execution": {
+            "kind": "vm",
+            "image": "python",
+            "profile": "research"
+          }
+        }
+      ]
+    },
+    "catalog": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    },
+    "valid": true
+  },
+  {
+    "name": "missing catalog",
+    "roster": {
+      "fleet": "research",
+      "coordination": {
+        "adapter": "crossfire",
+        "server": "https://crossfire.example",
+        "owner": "@owner:matrix.example"
+      },
+      "instances": [
+        {
+          "key": "analyst",
+          "name": "analyst",
+          "definition": "research",
+          "workarea": "agents/research/workarea/analyst",
+          "execution": {
+            "kind": "vm",
+            "image": "python",
+            "profile": "research"
+          }
+        }
+      ]
+    },
+    "catalog": null,
+    "valid": false
+  },
+  {
+    "name": "unapproved image",
+    "roster": {
+      "fleet": "research",
+      "coordination": {
+        "adapter": "crossfire",
+        "server": "https://crossfire.example",
+        "owner": "@owner:matrix.example"
+      },
+      "instances": [
+        {
+          "key": "analyst",
+          "name": "analyst",
+          "definition": "research",
+          "workarea": "agents/research/workarea/analyst",
+          "execution": {
+            "kind": "vm",
+            "image": "other",
+            "profile": "research"
+          }
+        }
+      ]
+    },
+    "catalog": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "unapproved profile",
+    "roster": {
+      "fleet": "research",
+      "coordination": {
+        "adapter": "crossfire",
+        "server": "https://crossfire.example",
+        "owner": "@owner:matrix.example"
+      },
+      "instances": [
+        {
+          "key": "analyst",
+          "name": "analyst",
+          "definition": "research",
+          "workarea": "agents/research/workarea/analyst",
+          "execution": {
+            "kind": "vm",
+            "image": "python",
+            "profile": "other"
+          }
+        }
+      ]
+    },
+    "catalog": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "VM cannot omit image",
+    "roster": {
+      "fleet": "research",
+      "coordination": {
+        "adapter": "crossfire",
+        "server": "https://crossfire.example",
+        "owner": "@owner:matrix.example"
+      },
+      "instances": [
+        {
+          "key": "analyst",
+          "name": "analyst",
+          "definition": "research",
+          "workarea": "agents/research/workarea/analyst",
+          "execution": {
+            "kind": "vm",
+            "profile": "research"
+          }
+        }
+      ]
+    },
+    "catalog": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "invalid placement never becomes host",
+    "roster": {
+      "fleet": "research",
+      "coordination": {
+        "adapter": "crossfire",
+        "server": "https://crossfire.example",
+        "owner": "@owner:matrix.example"
+      },
+      "instances": [
+        {
+          "key": "analyst",
+          "name": "analyst",
+          "definition": "research",
+          "workarea": "agents/research/workarea/analyst",
+          "execution": {
+            "kind": "automatic"
+          }
+        }
+      ]
+    },
+    "catalog": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "host cannot include a VM selector",
+    "roster": {
+      "fleet": "research",
+      "coordination": {
+        "adapter": "crossfire",
+        "server": "https://crossfire.example",
+        "owner": "@owner:matrix.example"
+      },
+      "instances": [
+        {
+          "key": "analyst",
+          "name": "analyst",
+          "definition": "research",
+          "workarea": "agents/research/workarea/analyst",
+          "execution": {
+            "kind": "host",
+            "image": "python"
+          }
+        }
+      ]
+    },
+    "catalog": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    },
+    "valid": false
+  },
+  {
+    "name": "malformed catalog is rejected even for host",
+    "roster": {
+      "fleet": "research",
+      "coordination": {
+        "adapter": "crossfire",
+        "server": "https://crossfire.example",
+        "owner": "@owner:matrix.example"
+      },
+      "instances": [
+        {
+          "key": "analyst",
+          "name": "analyst",
+          "definition": "research",
+          "workarea": "agents/research/workarea/analyst",
+          "execution": {
+            "kind": "host"
+          }
+        }
+      ]
+    },
+    "catalog": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      },
+      "extra": true
+    },
+    "valid": false
+  },
+  {
+    "name": "host can coexist with approved VM images",
+    "roster": {
+      "fleet": "research",
+      "coordination": {
+        "adapter": "crossfire",
+        "server": "https://crossfire.example",
+        "owner": "@owner:matrix.example"
+      },
+      "instances": [
+        {
+          "key": "analyst",
+          "name": "analyst",
+          "definition": "research",
+          "workarea": "agents/research/workarea/analyst",
+          "execution": {
+            "kind": "host"
+          }
+        }
+      ]
+    },
+    "catalog": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    },
+    "valid": true
+  }
+]

@@ -73,6 +73,9 @@ fn valid_name(value: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
 }
 impl<S: LocalState + 'static> Host<S> {
+    pub fn port(&self) -> u16 {
+        self.state.port
+    }
     pub async fn open(storage: Arc<S>) -> Result<Self> {
         let listener = TcpListener::bind("127.0.0.1:0").await.map_err(|_| {
             Failure::new(

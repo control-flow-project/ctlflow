@@ -40,6 +40,7 @@ public sealed class ListenerHost : IAsyncDisposable
     private readonly SemaphoreSlim requests = new(16, 16);
     private bool closing;
     private int port;
+    public int Port => port;
     public ListenerBudget Budget { get; } = new();
     private ListenerHost(WebApplication app, LocalState storage) { this.app = app; this.storage = storage; }
     public static async ValueTask<ListenerHost> Start(LocalState storage, CancellationToken cancellation)

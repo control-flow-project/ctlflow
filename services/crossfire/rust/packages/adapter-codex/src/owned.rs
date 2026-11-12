@@ -8,7 +8,7 @@ use crate::{
     session,
     websocket::WebSocketProtocol,
 };
-use crossfire_adapter_filesystem::{PrivateDirectory, lock::StateLock};
+use crossfire_adapter_filesystem::PrivateDirectory;
 use crossfire_adapter_process::NativeCommand;
 use crossfire_adapter_runtime::clock;
 use crossfire_agent_core::{
@@ -34,6 +34,7 @@ use std::{
 use tokio_util::sync::CancellationToken;
 
 pub struct CodexRuntime {
+    pub placement: crossfire_adapter_runtime::placement::NativePlacement,
     pub binary: OsString,
     pub host_home: PathBuf,
 }
@@ -85,6 +86,18 @@ impl CodexRuntime {
         let configured = options::parse(&input.options)?;
         clock::check(&cancellation)?;
         directories(&input.workspace, &input.state_directory)?;
+        let ownership = (self.placement.open)(
+            crossfire_adapter_runtime::placement::LeaseRequest {
+                directory: input.ownership_directory.clone(),
+                workspace: input.workspace.clone(),
+                state_directory: input.state_directory.clone(),
+                home: input.state_directory.join(".codex"),
+            },
+            cancellation.clone(),
+        )
+        .await?;
+        let cleanup = ownership.clone();
+        let result = async {
         let home = home::prepare(&input.state_directory, &self.host_home)?;
         let configuration = home::read(&home)?;
         let provider = home::provider(&configuration)?;
@@ -111,6 +124,14 @@ impl CodexRuntime {
                 ));
             }
         }
+        let fixture = tempfile::Builder::new()
+            .prefix(".codex-inspection-")
+            .permissions(std::fs::Permissions::from_mode(0o700))
+            .tempdir_in(&input.state_directory)
+            .map_err(|_| invalid("Cannot prepare private native inspection"))?;
+        let selected = crossfire_adapter_toml::format(&configuration)?;
+        PrivateDirectory::open(fixture.path(), false)?
+            .write_new("config.toml", selected.as_bytes())?;
         if provider.id == "openai"
             || provider
                 .settings
@@ -118,7 +139,8 @@ impl CodexRuntime {
                 .and_then(crossfire_adapter_toml::Value::as_bool)
                 == Some(true)
         {
-            let result = crossfire_adapter_process::capture(
+            home::refresh_authentication(fixture.path(), &self.host_home)?;
+            let result = ownership.execution.capture(
                 &NativeCommand {
                     binary: self.binary.clone(),
                     arguments: vec!["login".into(), "status".into()],
@@ -127,7 +149,7 @@ impl CodexRuntime {
                     environment: BTreeMap::from([
                         (
                             "CODEX_HOME".into(),
-                            Some(self.host_home.as_os_str().to_owned()),
+                            Some(fixture.path().as_os_str().to_owned()),
                         ),
                         (
                             "CROSSFIRE_PROJECT".into(),
@@ -149,20 +171,13 @@ impl CodexRuntime {
                 ));
             }
         }
-        let fixture = tempfile::Builder::new()
-            .prefix(".codex-inspection-")
-            .permissions(std::fs::Permissions::from_mode(0o700))
-            .tempdir_in(&input.state_directory)
-            .map_err(|_| invalid("Cannot prepare private native inspection"))?;
-        let selected = crossfire_adapter_toml::format(&configuration)?;
-        PrivateDirectory::open(fixture.path(), false)?
-            .write_new("config.toml", selected.as_bytes())?;
-        home::refresh_authentication(fixture.path(), &self.host_home)?;
         let native = OwnedProcess::start(
             &Launch {
                 home: fixture.path(),
                 workspace: &input.workspace,
                 state: &input.state_directory,
+                ownership: &input.ownership_directory,
+                authentication: &self.host_home,
                 profile: "crossfire-inspection",
                 binary: &self.binary,
                 questions: configured
@@ -171,6 +186,7 @@ impl CodexRuntime {
                     .and_then(|features| features.default_mode_request_user_input)
                     == Some(true),
             },
+            ownership,
             cancellation.clone(),
         )
         .await?;
@@ -185,6 +201,11 @@ impl CodexRuntime {
         }.await;
         native.close().await?;
         operation
+        }.await;
+        if result.is_err() {
+            cleanup.close().await?;
+        }
+        result
     }
 
     pub async fn start<H: Hooks + 'static>(
@@ -205,86 +226,116 @@ impl CodexRuntime {
         }
         clock::check(&cancellation)?;
         directories(&input.workspace, &input.state_directory)?;
-        let home = home::prepare(&input.state_directory, &self.host_home)?;
-        let ownership = StateLock::acquire(&home.join("owner"))?;
-        home::refresh_authentication(&home, &self.host_home)?;
-        let native = OwnedProcess::start(
-            &Launch {
-                home: &home,
-                workspace: &input.workspace,
-                state: &input.state_directory,
-                profile: &input.profile,
-                binary: &self.binary,
-                questions: configured
-                    .features
-                    .as_ref()
-                    .and_then(|features| features.default_mode_request_user_input)
-                    == Some(true),
+        let ownership = (self.placement.open)(
+            crossfire_adapter_runtime::placement::LeaseRequest {
+                directory: input.ownership_directory.clone(),
+                workspace: input.workspace.clone(),
+                state_directory: input.state_directory.clone(),
+                home: input.state_directory.join(".codex"),
             },
-            cancellation,
+            cancellation.clone(),
         )
         .await?;
-        let lifetime = native.lifetime();
-        let attachment = Attachment {
-            runtime: "codex".to_owned(),
-            session_id: String::new(),
-            workspace: input.workspace.clone(),
-            connection: BTreeMap::from([
-                ("endpoint".to_owned(), native.endpoint.clone()),
-                (
-                    "tokenFile".to_owned(),
-                    native
-                        .token_file
-                        .to_str()
-                        .ok_or_else(|| invalid("Native attachment paths must be exact UTF-8"))?
-                        .to_owned(),
-                ),
-                (
-                    "home".to_owned(),
-                    home.to_str()
-                        .ok_or_else(|| invalid("Native attachment home must be exact UTF-8"))?
-                        .to_owned(),
-                ),
-                (
-                    "binary".to_owned(),
-                    self.binary
-                        .to_str()
-                        .ok_or_else(|| invalid("Native executable must be exact UTF-8"))?
-                        .to_owned(),
-                ),
-                (
-                    "path".to_owned(),
-                    std::env::var("PATH")
-                        .map_err(|_| invalid("Native executable PATH is unavailable"))?,
-                ),
-            ]),
-        };
-        let histories = Arc::new(Histories::new(
-            histories::Configuration {
+        let cleanup = ownership.clone();
+        let result = async {
+            let home = home::prepare(&input.state_directory, &self.host_home)?;
+            let native = OwnedProcess::start(
+                &Launch {
+                    home: &home,
+                    workspace: &input.workspace,
+                    state: &input.state_directory,
+                    ownership: &input.ownership_directory,
+                    authentication: &self.host_home,
+                    profile: &input.profile,
+                    binary: &self.binary,
+                    questions: configured
+                        .features
+                        .as_ref()
+                        .and_then(|features| features.default_mode_request_user_input)
+                        == Some(true),
+                },
                 ownership,
-                home,
-                workspace: input.workspace,
-                name: input.name,
-                instructions: input.instructions,
-                configured,
-                mode: input.history_mode,
-                hooks: input.hooks,
-                process: native,
-                attachment,
-                allow_new_history: input.allow_new_history,
-            },
-            lifetime,
-        )?);
-        let primary = histories.open(histories.primary(), None).await;
-        if primary.is_err() {
-            histories.close().await?;
+                cancellation,
+            )
+            .await?;
+            let lifetime = native.lifetime();
+            let mut attachment = Attachment {
+                runtime: "codex".to_owned(),
+                session_id: String::new(),
+                workspace: input.workspace.clone(),
+                connection: BTreeMap::from([
+                    ("endpoint".to_owned(), native.native_endpoint.clone()),
+                    (
+                        "transport".to_owned(),
+                        if native.ssh.is_some() { "ssh" } else { "host" }.to_owned(),
+                    ),
+                    (
+                        "tokenFile".to_owned(),
+                        native
+                            .token_file
+                            .to_str()
+                            .ok_or_else(|| invalid("Native attachment paths must be exact UTF-8"))?
+                            .to_owned(),
+                    ),
+                    (
+                        "home".to_owned(),
+                        home.to_str()
+                            .ok_or_else(|| invalid("Native attachment home must be exact UTF-8"))?
+                            .to_owned(),
+                    ),
+                    (
+                        "binary".to_owned(),
+                        self.binary
+                            .to_str()
+                            .ok_or_else(|| invalid("Native executable must be exact UTF-8"))?
+                            .to_owned(),
+                    ),
+                    ("path".to_owned(), native.path.clone()),
+                ]),
+            };
+            if let Some(ssh) = &native.ssh {
+                attachment.connection.insert(
+                    "executionDirectory".to_owned(),
+                    ssh.directory
+                        .to_str()
+                        .ok_or_else(|| invalid("Native execution directory must be exact UTF-8"))?
+                        .to_owned(),
+                );
+                attachment
+                    .connection
+                    .insert("executionId".to_owned(), ssh.id.clone());
+            }
+            let histories = Arc::new(Histories::new(
+                histories::Configuration {
+                    home,
+                    workspace: input.workspace,
+                    name: input.name,
+                    instructions: input.instructions,
+                    configured,
+                    mode: input.history_mode,
+                    hooks: input.hooks,
+                    process: native,
+                    attachment,
+                    allow_new_history: input.allow_new_history,
+                },
+                lifetime,
+            )?);
+            let primary = histories.open(histories.primary(), None).await;
+            if primary.is_err() {
+                histories.close().await?;
+            }
+            Ok(CodexOwnedConnection {
+                context: histories.primary().to_owned(),
+                histories,
+                connection: primary?,
+                root: true,
+            })
         }
-        Ok(CodexOwnedConnection {
-            context: histories.primary().to_owned(),
-            histories,
-            connection: primary?,
-            root: true,
-        })
+        .await;
+        if result.is_err() {
+            cleanup.close().await?;
+        }
+        result
     }
 }
 
@@ -335,8 +386,12 @@ impl<H: Hooks + 'static> OwnedAdapter<H> for CodexRuntime {
     }
     async fn reset(&self, input: &Reset) -> Result<()> {
         directories(&input.workspace, &input.state_directory)?;
+        let _owner = crossfire_adapter_runtime::ownership::acquire(
+            &input.ownership_directory,
+            &input.workspace,
+            &input.state_directory.join(".codex"),
+        )?;
         let home = home::prepare(&input.state_directory, &self.host_home)?;
-        let _owner = StateLock::acquire(&home.join("owner"))?;
         context_state::reset(&home, &input.reset_id)
     }
     async fn start(

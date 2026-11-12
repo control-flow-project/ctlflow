@@ -1,6 +1,7 @@
 use crate::{capability, options};
 use crossfire_adapter_filesystem::{PrivateDirectory, owned::OwnedFile};
-use crossfire_adapter_process::{NativeCommand, NativeProcess, capture};
+use crossfire_adapter_process::{NativeCommand, NativeProcess, execution::NativeExecution};
+use crossfire_adapter_runtime::placement::NativeLease;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity, secret::Secret};
 use futures_util::FutureExt;
 use std::{
@@ -22,6 +23,8 @@ pub struct Launch<'a> {
     pub home: &'a Path,
     pub workspace: &'a Path,
     pub state: &'a Path,
+    pub ownership: &'a Path,
+    pub authentication: &'a Path,
     pub profile: &'a str,
     pub binary: &'a std::ffi::OsStr,
     pub questions: bool,
@@ -42,10 +45,14 @@ struct State {
     lifetime: CancellationToken,
     closed: CancellationToken,
     failure: Mutex<Option<Failure>>,
+    ownership: Mutex<Option<NativeLease>>,
 }
 
 pub struct OwnedProcess {
     pub endpoint: String,
+    pub native_endpoint: String,
+    pub ssh: Option<crossfire_adapter_process::ssh_commands::SshExecution>,
+    pub path: String,
     pub token: Secret,
     pub token_file: PathBuf,
     pub pid: u32,
@@ -64,8 +71,11 @@ fn failure(message: &str) -> Failure {
     Failure::new(ErrorCode::Native, message)
 }
 
-fn environment(input: &Launch<'_>) -> BTreeMap<OsString, Option<OsString>> {
-    BTreeMap::from([
+fn environment(
+    input: &Launch<'_>,
+    execution: &NativeExecution,
+) -> Result<BTreeMap<OsString, Option<OsString>>> {
+    let mut values = BTreeMap::from([
         (
             OsString::from("CODEX_HOME"),
             Some(input.home.as_os_str().to_owned()),
@@ -79,21 +89,55 @@ fn environment(input: &Launch<'_>) -> BTreeMap<OsString, Option<OsString>> {
             Some(OsString::from(input.profile)),
         ),
         (OsString::from("CODEX_THREAD_ID"), None),
-    ])
+    ]);
+    if execution.ssh.is_some() {
+        // The exported managed home is guest-writable; it cannot authorize
+        // reading another provider's key from the host environment.
+        let configuration = crate::home::read(input.authentication)?;
+        let provider = crate::home::provider(&configuration)?;
+        if let Some(key) = provider
+            .settings
+            .and_then(|settings| settings.get("env_key"))
+        {
+            let key = key
+                .as_str()
+                .filter(|key| {
+                    !key.is_empty()
+                        && key.len() <= 128
+                        && key.bytes().enumerate().all(|(index, value)| {
+                            value.is_ascii_alphabetic()
+                                || value == b'_'
+                                || index > 0 && value.is_ascii_digit()
+                        })
+                })
+                .ok_or_else(|| failure("Invalid native provider environment key"))?;
+            values.insert(
+                crossfire_adapter_process::ssh_commands::PROVIDER_KEY.into(),
+                Some(key.into()),
+            );
+            values.insert(key.into(), std::env::var_os(key));
+        }
+    }
+    Ok(values)
 }
 
-fn command(input: &Launch<'_>, arguments: impl IntoIterator<Item = OsString>) -> NativeCommand {
-    NativeCommand {
+fn command(
+    input: &Launch<'_>,
+    arguments: impl IntoIterator<Item = OsString>,
+    execution: &NativeExecution,
+) -> Result<NativeCommand> {
+    Ok(NativeCommand {
         binary: input.binary.to_owned(),
         arguments: arguments.into_iter().collect(),
         workspace: input.workspace.to_owned(),
-        environment: environment(input),
+        environment: environment(input, execution)?,
         input: false,
-    }
+    })
 }
 
 pub async fn inspect_instructions(
     input: &Launch<'_>,
+    execution: &NativeExecution,
     cancellation: CancellationToken,
 ) -> Result<()> {
     PrivateDirectory::open(input.home, false)?;
@@ -109,13 +153,14 @@ pub async fn inspect_instructions(
         directory.path().as_os_str().to_owned(),
         OsString::from("--experimental"),
     ];
-    let result = capture(
-        &command(input, parameters),
-        65_536,
-        Duration::from_secs(10),
-        cancellation,
-    )
-    .await?;
+    let result = execution
+        .capture(
+            &command(input, parameters, execution)?,
+            65_536,
+            Duration::from_secs(10),
+            cancellation,
+        )
+        .await?;
     if !result.status.success() {
         return Err(failure(
             "Cannot inspect native Codex developer-instruction capability",
@@ -239,11 +284,34 @@ async fn supervise(
     drop(completion);
 }
 
+async fn close_ownership(state: &State) -> Result<()> {
+    let ownership = state
+        .ownership
+        .lock()
+        .map_err(|_| failure("Native ownership cleanup failed"))?
+        .clone();
+    if let Some(ownership) = ownership {
+        ownership.close().await?;
+        state
+            .ownership
+            .lock()
+            .map_err(|_| failure("Native ownership cleanup failed"))?
+            .take();
+    }
+    Ok(())
+}
+
 impl OwnedProcess {
-    pub async fn start(input: &Launch<'_>, cancellation: CancellationToken) -> Result<Self> {
+    pub async fn start(
+        input: &Launch<'_>,
+        ownership: NativeLease,
+        cancellation: CancellationToken,
+    ) -> Result<Self> {
+        let execution = ownership.execution.clone();
         crossfire_adapter_runtime::clock::check(&cancellation)?;
         let home = PrivateDirectory::open(input.home, false)?;
         PrivateDirectory::open(input.state, false)?;
+        crate::home::refresh_authentication(input.home, input.authentication)?;
         if input.profile.is_empty()
             || input.profile.len() > 200
             || input.profile.chars().any(char::is_control)
@@ -253,33 +321,43 @@ impl OwnedProcess {
                 "Use an exact native agent profile",
             ));
         }
-        let version = capture(
-            &command(input, [OsString::from("--version")]),
-            4096,
-            Duration::from_secs(10),
-            cancellation.clone(),
-        )
-        .await?;
-        if !version.status.success() {
-            return Err(failure("Cannot inspect native Codex version"));
-        }
-        options::version(version.output.trim())?;
-        inspect_instructions(input, cancellation.clone()).await?;
-        if input.questions {
-            let features = capture(
-                &command(input, [OsString::from("features"), OsString::from("list")]),
-                65_536,
+        let version = execution
+            .capture(
+                &command(input, [OsString::from("--version")], &execution)?,
+                4096,
                 Duration::from_secs(10),
                 cancellation.clone(),
             )
             .await?;
+        if !version.status.success() {
+            return Err(failure("Cannot inspect native Codex version"));
+        }
+        options::version(version.output.trim())?;
+        inspect_instructions(input, &execution, cancellation.clone()).await?;
+        if input.questions {
+            let features = execution
+                .capture(
+                    &command(
+                        input,
+                        [OsString::from("features"), OsString::from("list")],
+                        &execution,
+                    )?,
+                    65_536,
+                    Duration::from_secs(10),
+                    cancellation.clone(),
+                )
+                .await?;
             if !features.status.success() {
                 return Err(failure("Cannot inspect native Codex question support"));
             }
             options::question_capability(&features.output)?;
         }
-        let path = std::env::var("PATH")
-            .map_err(|_| failure("Codex requires a native executable search path"))?;
+        let path = if execution.ssh.is_some() {
+            crossfire_adapter_process::ssh_commands::GUEST_PATH.to_owned()
+        } else {
+            std::env::var("PATH")
+                .map_err(|_| failure("Codex requires a native executable search path"))?
+        };
         if path.is_empty() || path.len() > 4096 || path.chars().any(char::is_control) {
             return Err(failure(
                 "Codex requires a bounded native executable search path",
@@ -304,13 +382,18 @@ impl OwnedProcess {
             OsString::from("--ws-token-file"),
             token_file.as_os_str().to_owned(),
         ];
-        let process = NativeProcess::guarded(&command(input, parameters), input.home, "codex")?;
+        let process = NativeProcess::guarded(
+            &(execution.command)(&command(input, parameters, &execution)?)?,
+            input.ownership,
+            "codex",
+        )?;
         let pid = process.id();
         let state = Arc::new(State {
             close: CancellationToken::new(),
             lifetime: CancellationToken::new(),
             closed: CancellationToken::new(),
             failure: Mutex::new(None),
+            ownership: Mutex::new(Some(ownership)),
         });
         let (ready, mut receive) = mpsc::channel(1);
         tokio::spawn(supervise(
@@ -325,9 +408,18 @@ impl OwnedProcess {
             _ = state.lifetime.cancelled() => Err(failure("Codex exited before readiness")),
             result = tokio::time::timeout(Duration::from_secs(15), receive.recv()) => match result { Ok(Some(endpoint)) => Ok(endpoint), _ => Err(failure("Codex readiness timed out")) }
         };
+        let selected = match selected {
+            Ok(endpoint) => (execution.endpoint)(endpoint.clone(), cancellation)
+                .await
+                .map(|reachable| (endpoint, reachable)),
+            Err(reason) => Err(reason),
+        };
         match selected {
-            Ok(endpoint) => Ok(Self {
+            Ok((native_endpoint, endpoint)) => Ok(Self {
                 endpoint,
+                native_endpoint,
+                ssh: execution.ssh,
+                path,
                 token,
                 token_file,
                 pid,
@@ -336,6 +428,7 @@ impl OwnedProcess {
             Err(reason) => {
                 state.close.cancel();
                 state.closed.cancelled().await;
+                close_ownership(&state).await?;
                 Err(reason)
             }
         }
@@ -347,6 +440,7 @@ impl OwnedProcess {
     pub async fn close(&self) -> Result<()> {
         self.state.close.cancel();
         self.state.closed.cancelled().await;
+        close_ownership(&self.state).await?;
         let value = self
             .state
             .failure

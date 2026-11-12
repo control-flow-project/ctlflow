@@ -80,16 +80,7 @@ pub fn choice<'a>(value: &'a Value, choices: &[&str]) -> Result<&'a str> {
 pub fn identifier(value: &Value) -> Result<&str> {
     value
         .as_str()
-        .filter(|value| {
-            value.len() == 36
-                && value.bytes().enumerate().all(|(position, character)| {
-                    if [8, 13, 18, 23].contains(&position) {
-                        character == b'-'
-                    } else {
-                        character.is_ascii_digit() || (b'a'..=b'f').contains(&character)
-                    }
-                })
-        })
+        .filter(|value| crossfire_kernel::identifier::uuid(value))
         .ok_or_else(|| Failure::new(ErrorCode::Invalid, "Expected an opaque UUID"))
 }
 

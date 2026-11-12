@@ -3,5 +3,6 @@
     <ProjectReference Include="../Fleetd.Storage/Fleetd.Storage.csproj" />
     <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterCrossfire/Crossfire.AdapterCrossfire.csproj" />
     <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterProcess/Crossfire.AdapterProcess.csproj" />
+    <ProjectReference Include="../../../../crossfire/csharp/packages/Crossfire.AdapterRuntime/Crossfire.AdapterRuntime.csproj" />
   </ItemGroup>
 </Project>

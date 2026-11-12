@@ -9,6 +9,7 @@ using Crossfire.AdapterMatrix;
 using Crossfire.AgentCore;
 using Crossfire.Contracts;
 using Crossfire.Kernel;
+using Crossfire.AdapterRuntime;
 using Fleetd.AdapterExecution;
 using Fleetd.Domain;
 using Fleetd.Storage;
@@ -30,7 +31,7 @@ public static class DaemonHost
         var retention = RegistryFiles.LoggingDays(root); if (!retention.IsSuccess) throw new InvalidDataException(retention.Error.Message); var clock = TimeProvider.System; using var diagnostics = new DiagnosticStore(Path.Combine(root, "logs"), retention.Value, () => clock.GetUtcNow().ToUnixTimeMilliseconds());
         var socket = Path.Combine(root, "fleetd.sock"); await PrivateSockets.RemoveStale(socket, CancellationToken.None); var release = Path.GetFullPath(options.GetValueOrDefault("--artifacts") ?? Path.Combine(AppContext.BaseDirectory, "artifacts"));
         using var messagingHttp = NativeHttp.Client();
-        await using var execution = new ExecutionHost(new Dictionary<string, OwnedRuntimeAdapter>(StringComparer.Ordinal) { ["codex"] = CodexRuntime.Create(), ["pi"] = PiRuntime.Create() }, (configuration, account) => ClientConnection.Connect(messagingHttp, configuration, account), release, diagnostics.Write, clock);
+        await using var execution = new ExecutionHost(new Dictionary<string, Func<NativePlacement, OwnedRuntimeAdapter>>(StringComparer.Ordinal) { ["codex"] = placement => CodexRuntime.Create(placement: placement), ["pi"] = placement => PiRuntime.Create(placement: placement) }, (configuration, account) => ClientConnection.Connect(messagingHttp, configuration, account), release, diagnostics.Write, clock);
         var registry = new RegistryFiles(root); var created = FleetController.Create(registry.Port, execution.Port, identity, clock); if (!created.IsSuccess) throw new InvalidDataException(created.Error.Message); await using var controller = created.Value;
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = [], ApplicationName = typeof(DaemonHost).Assembly.GetName().Name }); builder.Logging.ClearProviders(); builder.WebHost.ConfigureKestrel(server => { server.ListenUnixSocket(socket); server.Limits.MaxRequestBodySize = 1048576; server.Limits.MaxRequestHeadersTotalSize = 8192; server.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(10); server.Limits.MaxConcurrentConnections = 128; });
         await using var app = builder.Build(); app.Run(http => DaemonApi.Handle(controller, authenticationKey, () => (retention.Value, diagnostics.Error), app.Lifetime.StopApplication, http)); using var cleanup = new CancellationTokenSource();

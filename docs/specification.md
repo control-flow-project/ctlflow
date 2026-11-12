@@ -556,14 +556,59 @@ Stop completion requires exact owned-process evidence, not process-name scans.
 
 Owned native writers have a parent-lifetime guard and a private process lifetime
 lock in every implementation. C# uses the native parent process handle, and Rust uses a parent pidfd on Linux.
+Native writer and process-guard leases live in the host OS-user configuration
+directory, under `ctlflow/native-ownership/<key>`. The key is the lowercase SHA256
+of the exact absolute UTF-8 instance state-directory path. Files in native homes
+and workspaces are not the authority for admitting a native writer. Each native launch, capability
+inspection and reset uses the same explicit host ownership directory; a directory
+inside the workspace or native home, a symlink or an existing shared directory
+fails admission. Inspection does not create native histories or model turns.
+Ownership admission precedes managed-home preparation and authentication refresh;
+a rejected start, inspection or reset cannot prepare native-home files.
+An exported filesystem's locks are not a cross-kernel ownership guarantee.
+Any VM execution must retain this host-only gate, keep it outside every export,
+and close the previous native writer before another kernel opens its SQLite
+files. No concurrent host/guest or guest/guest native SQLite writers are allowed.
 Parent death terminates the exact owned native group. A replacement waits for
 exclusive ownership instead of overlapping the old writer. Guards run only while
 their native engine runs; sleeping fleets retain no native guard processes.
 No target guesses process identities, adopts orphans or rewrites native history.
 Arbitrary subprocess escape from the owned group is not a product guarantee.
+VM execution additionally uses an exact transient user service with control-group
+teardown; it does not rely on exported locks or guest cooperation to fence a
+successor. An execution record stays host-only until its resource group is empty.
 The same executable acceptance scenarios verify idle and in-flight controller
 death, exact retained histories, zero unsolicited model turns and message-driven
 wake in every target.
+
+### Selected VM execution
+
+Each roster instance selects host execution or a fleet-owned VM image/profile.
+Omitted execution selects host. `execution.toml` in that fleet directory declares
+the current image catalog, profiles, fleet memory cap and host reserve. A selected
+VM uses QEMU/KVM q35, session libvirt, virtiofs and pinned OpenSSH over a private
+virtio-serial channel. There is no automatic host, container, TCG or alternate
+image fallback. C# managed, NativeAOT and Rust implement the same contract.
+
+Native sessions and approved workspaces/data retain exact host-backed paths.
+Only execution moves into the guest. Host-only ownership, peer state, fleet
+credentials and runtime controls cannot be exported. Required native login is
+available only through that instance's own managed home. Cold restore and lazy
+factories boot no VM or model turn; explicit capability inspection may boot a
+guest without inference. Existing eligible-message wake rules remain unchanged.
+First approved native-history creation also uses that selected execution without
+inference; subsequent sleeping restores do not recreate it.
+
+One serialized fleet budget accounts for live guest targets plus helper headroom;
+finite per-execution services include all QEMU/filesystem/libvirt/SSH helpers.
+Maximum guest memory may overcommit that cap, without physical RAM reservation
+or an OOM-impossibility promise. Disposable disks use ordinary host cache storage,
+not runtime tmpfs. Teardown or confirmed closed-owner recovery removes exact
+execution scratch, preserving native histories and approved user data.
+
+The complete operator/configuration/security contract is in
+[Fleet VM execution](architecture/vm-execution.md). This feature is unreleased;
+existing published 0.1.26 artifacts are not evidence of VM support.
 
 ## 9. Controller admission
 
@@ -796,6 +841,16 @@ Attachment comes only from the current running adapter. fleet prints a command
 for the human; inspection does not start/fork/adopt execution. Tokens remain in
 private files, not output. Closing supported native TUI leaves engine/listener
 running.
+The native connection explicitly selects `transport=host` or `transport=ssh`;
+missing or unknown transport is invalid. Host Codex connections contain endpoint,
+tokenFile, home, binary, path and transport. SSH connections additionally contain
+executionDirectory and executionId for their existing private multiplex connection.
+The native adapter retains its original guest endpoint separately from any endpoint
+forwarded for controller access. Guest terminals use that guest endpoint, the
+image's executable PATH and a terminal channel inside the existing guest. They
+read the native token there and never launch a host client against guest-owned
+native SQLite files. A missing multiplex connection fails; attachment cannot open
+a replacement VM, authenticate a second connection or wake a sleeping context.
 
 ## 13. Observations, privacy and incidents
 

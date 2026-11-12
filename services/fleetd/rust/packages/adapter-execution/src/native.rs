@@ -18,6 +18,22 @@ pub enum Adapter {
     Codex(CodexRuntime),
     Pi(PiRuntime),
 }
+impl Adapter {
+    pub fn placed(&self, placement: crossfire_adapter_runtime::placement::NativePlacement) -> Self {
+        match self {
+            Self::Codex(runtime) => Self::Codex(CodexRuntime {
+                placement,
+                binary: runtime.binary.clone(),
+                host_home: runtime.host_home.clone(),
+            }),
+            Self::Pi(runtime) => Self::Pi(PiRuntime {
+                placement,
+                binary: runtime.binary.clone(),
+                host_home: runtime.host_home.clone(),
+            }),
+        }
+    }
+}
 pub enum Native<H> {
     Codex(CodexOwnedConnection<H>),
     Pi(PiOwnedConnection<H>),

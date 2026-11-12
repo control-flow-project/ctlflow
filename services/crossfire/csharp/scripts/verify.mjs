@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { verifyTestResources } from '../../../../scripts/test-resources.mjs';
+import { verifyTestResources, userManagerEnvironment } from '../../../../scripts/test-resources.mjs';
 import { migrateDatabase } from '@ctlflow/crossfire-data/management/sqlite/configuration';
 import { prepareTimeZones } from '../tests/native-time-zones.mjs';
 
@@ -19,10 +19,10 @@ const events = [];
 const disposers = [];
 let timeZones;
 
-async function command(binary, arguments_, label, workingDirectory = root) {
+async function command(binary, arguments_, label, workingDirectory = root, environment = process.env) {
   const start = performance.now();
   const result = await new Promise((complete, reject) => {
-    const child = spawn(binary, arguments_, { cwd: workingDirectory, stdio: 'inherit', env: { ...process.env,
+    const child = spawn(binary, arguments_, { cwd: workingDirectory, stdio: 'inherit', env: { ...environment,
       DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1', DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false',
       DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER: '1', MSBUILDDISABLENODEREUSE: '1', UseSharedCompilation: 'false', TZDIR: timeZones } });
     child.once('error', reject); child.once('exit', (code, signal) => complete({ code, signal }));
@@ -52,6 +52,11 @@ try {
   const controllerPublish = join(directory, 'native-controller');
   await command(dotnet, ['publish', controllerProject, '-c', 'Release', '-r', 'linux-x64', '-p:PublishAot=true', '-p:CppCompilerAndLinker=gcc', '-o', controllerPublish], 'NativeAOT controller ownership publication');
   await command(join(controllerPublish, 'Fleetd.Domain.Tests'), [], 'NativeAOT controller ownership transitions');
+  const executionProject = 'services/fleetd/csharp/tests/Fleetd.Execution.Tests';
+  await command(dotnet, ['run', '--project', executionProject, '-c', 'Release', '--no-build'], 'managed VM bootstrap preflight', root, userManagerEnvironment(process.env));
+  const executionPublish = join(directory, 'native-execution');
+  await command(dotnet, ['publish', executionProject, '-c', 'Release', '-r', 'linux-x64', '-p:PublishAot=true', '-p:CppCompilerAndLinker=gcc', '-o', executionPublish], 'NativeAOT VM bootstrap publication');
+  await command(join(executionPublish, 'Fleetd.Execution.Tests'), [], 'NativeAOT VM bootstrap preflight', root, userManagerEnvironment(process.env));
   const project = 'services/crossfire/csharp/tests/Crossfire.Storage.Tests';
   const managedDatabase = join(directory, 'managed.sqlite');
   await migrateDatabase(managedDatabase);

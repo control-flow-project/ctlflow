@@ -50,6 +50,24 @@ async fn one_actual_private_http_host_dispatches_isolated_bindings_and_rejects_o
             .read("analyst/listener.json", 65536)?
             .ok_or("metadata required")?,
     )?;
+    assert_eq!(metadata["port"].as_u64(), Some(u64::from(host.port())));
+    let mut forged = metadata.clone();
+    forged["port"] = json!(if host.port() == 1 { 2 } else { 1 });
+    storage.write(
+        "analyst/listener.json",
+        &serde_json::to_vec(&forged)?,
+        65536,
+    )?;
+    assert_eq!(
+        metadata["port"].as_u64(),
+        Some(u64::from(host.port())),
+        "Guest-writable metadata cannot select the host forwarding target"
+    );
+    storage.write(
+        "analyst/listener.json",
+        &serde_json::to_vec(&metadata)?,
+        65536,
+    )?;
     let url = format!(
         "http://127.0.0.1:{}/bindings/analyst/control",
         metadata["port"]

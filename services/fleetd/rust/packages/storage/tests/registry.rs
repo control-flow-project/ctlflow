@@ -8,6 +8,7 @@ use std::{fs, os::unix::fs::PermissionsExt};
 
 fn instance(key: &str) -> Instance {
     Instance {
+        execution: Default::default(),
         key: key.to_owned(),
         name: key.to_owned(),
         definition: "role".to_owned(),

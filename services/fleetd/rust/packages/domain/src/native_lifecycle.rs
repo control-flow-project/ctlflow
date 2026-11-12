@@ -74,6 +74,7 @@ impl<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks + 'static, T: Clock + Send 
         let inspection = Inspection {
             workspace: input.workspace.clone(),
             state_directory: input.state_directory.clone(),
+            ownership_directory: input.ownership_directory.clone(),
             options: input.options.clone(),
         };
         let contexts = adapter.saved_contexts(&inspection).await?;
@@ -144,6 +145,7 @@ impl<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks + 'static, T: Clock + Send 
             .saved_contexts(&Inspection {
                 workspace: self.input.workspace.clone(),
                 state_directory: self.input.state_directory.clone(),
+                ownership_directory: self.input.ownership_directory.clone(),
                 options: self.input.options.clone(),
             })
             .await
@@ -252,6 +254,7 @@ impl<A: OwnedAdapter<LifecycleHooks<H, T>>, H: Hooks + 'static, T: Clock + Send 
             name: input.name,
             workspace: input.workspace,
             state_directory: input.state_directory,
+            ownership_directory: input.ownership_directory,
             instructions: input.instructions,
             options: input.options,
             hooks: Arc::new(LifecycleHooks {

@@ -1,5 +1,15 @@
 # C# managed installation and packaging
 
+## VM execution in source builds
+
+Selective fleet VM execution is unreleased and is absent from the published
+0.1.26 archives. New source-built distributions include `vm/README.md`,
+`vm/setup-vm-host.sh` and `vm/fleet.pkr.hcl` alongside these instructions.
+The guide covers fleet image/profile selection, host-backed native histories,
+host prerequisites, memory limits and transient execution cleanup. VM selection
+does not install a fleet service or start sleeping agents. C# managed,
+NativeAOT and Rust use the same configuration and lifecycle contract.
+
 ## Prerequisites
 
 The current publisher targets Linux x64. Building requires a source

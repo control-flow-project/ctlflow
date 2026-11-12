@@ -7,3 +7,4 @@ pub mod project_files;
 mod remote;
 pub mod reset;
 pub mod runtime_start;
+pub mod vm;

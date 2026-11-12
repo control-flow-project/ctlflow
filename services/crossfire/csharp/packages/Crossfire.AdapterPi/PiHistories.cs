@@ -2,6 +2,7 @@ using Crossfire.Domain;
 using System.Text.Json;
 using Crossfire.AdapterFilesystem;
 using Crossfire.AdapterRuntime;
+using Crossfire.AdapterProcess;
 using Crossfire.AgentCore;
 using Crossfire.Contracts;
 using Crossfire.Kernel;
@@ -12,10 +13,11 @@ public sealed class PiHistories : OwnedRuntimeConnection, TurnControl
 {
     private sealed record Opened(PiContext Context, CancellationTokenSource Lifetime, CancellationTokenRegistration Failed);
     private readonly string binary;
+    private readonly NativeExecution execution;
     private readonly string home;
     private readonly OwnedRuntimeInput input;
     private readonly PiOptions options;
-    private readonly StateLock stateLock;
+    private readonly NativeLease stateLock;
     private readonly string primary;
     private readonly CancellationTokenSource lifetime;
     private readonly CancellationToken token;
@@ -39,14 +41,14 @@ public sealed class PiHistories : OwnedRuntimeConnection, TurnControl
     public RuntimeAttachment? Attachment => null;
     public static string Receipt(string home, string context) => Path.Combine(home, "receipts", Identity.Hash(context) + ".json");
     private static string Mode(NativeHistoryMode mode) => mode == NativeHistoryMode.Shared ? "shared" : "per-room";
-    private PiHistories(string binary, string home, StateLock stateLock, OwnedRuntimeInput input, PiOptions options, PiRegistry registry, CancellationToken cancellation)
+    private PiHistories(string binary, string home, NativeLease stateLock, OwnedRuntimeInput input, PiOptions options, PiRegistry registry, CancellationToken cancellation)
     {
-        this.binary = binary; this.home = home; this.stateLock = stateLock; this.input = input; this.options = options; this.registry = registry;
+        this.binary = binary; this.execution = stateLock.Execution; this.home = home; this.stateLock = stateLock; this.input = input; this.options = options; this.registry = registry;
         primary = input.HistoryMode == NativeHistoryMode.Shared ? "shared" : "control"; lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellation); token = lifetime.Token;
     }
-    public static async ValueTask<Result<OwnedRuntimeConnection>> Start(string binary, string home, StateLock stateLock, OwnedRuntimeInput input, PiOptions options, CancellationToken cancellation)
+    public static async ValueTask<Result<OwnedRuntimeConnection>> Start(string binary, string home, NativeLease stateLock, OwnedRuntimeInput input, PiOptions options, CancellationToken cancellation)
     {
-        var loaded = PiState.Read(home); if (!loaded.IsSuccess) { stateLock.Dispose(); return Result<OwnedRuntimeConnection>.Fail(loaded.Error); }
+        var loaded = PiState.Read(home); if (!loaded.IsSuccess) { await stateLock.DisposeAsync(); return Result<OwnedRuntimeConnection>.Fail(loaded.Error); }
         var owner = new PiHistories(binary, home, stateLock, input, options, loaded.Value, cancellation);
         try
         {
@@ -116,7 +118,7 @@ public sealed class PiHistories : OwnedRuntimeConnection, TurnControl
             }
             var initialized = PiState.ReadBinding(home, binding, input.Workspace, true); if (!initialized.IsSuccess) { result = Result<PiConnection>.Fail(initialized.Error); return; }
             var saved = Save(initialized.Value); if (!saved.IsSuccess) { result = Result<PiConnection>.Fail(saved.Error); return; }
-            var selected = await PiContext.Open(binary, home, initialized.Value, input, options, scope.Token); if (!selected.IsSuccess) { result = Result<PiConnection>.Fail(selected.Error); return; } current = selected.Value;
+            var selected = await PiContext.Open(binary, home, initialized.Value, input, options, execution, scope.Token); if (!selected.IsSuccess) { result = Result<PiConnection>.Fail(selected.Error); return; } current = selected.Value;
             saved = Save(current.Binding); if (!saved.IsSuccess) { result = Result<PiConnection>.Fail(saved.Error); return; }
             scope.Token.ThrowIfCancellationRequested(); var failed = current.Connection.Lifetime.Register(() => lifetime.Cancel());
             lock (gate) { opened.Add(context, new(current, scope, failed)); retained = true; } result = Result<PiConnection>.Success(current.Connection);
@@ -203,7 +205,7 @@ public sealed class PiHistories : OwnedRuntimeConnection, TurnControl
                 try { await context.Failed.DisposeAsync(); } catch (Exception error) { errors.Add(error); }
                 try { await context.Context.Connection.DisposeAsync(); } catch (Exception error) { errors.Add(error); } finally { context.Lifetime.Dispose(); }
             }
-            try { stateLock.Dispose(); } catch (Exception error) { errors.Add(error); }
+            try { await stateLock.DisposeAsync(); } catch (Exception error) { errors.Add(error); }
             lifetime.Dispose();
             if (errors.Count != 0) throw new AggregateException("Pi history cleanup did not complete", errors); completion.TrySetResult();
         }

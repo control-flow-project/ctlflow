@@ -374,6 +374,7 @@ fn input() -> Input<Observer> {
         name: "Analyst".to_owned(),
         workspace: PathBuf::from("/native/workspace"),
         state_directory: PathBuf::from("/native/private"),
+        ownership_directory: PathBuf::from("/host/control"),
         instructions: "Current instructions".to_owned(),
         options: json!({}),
         hooks: Arc::new(Observer),

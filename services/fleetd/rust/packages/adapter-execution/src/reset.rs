@@ -209,6 +209,7 @@ impl<C: MessagingConnector> Host<C> {
                 &Reset {
                     workspace: input.workspace,
                     state_directory: input.state_directory,
+                    ownership_directory: input.ownership_directory,
                     reset_id: generation.clone(),
                 },
             )

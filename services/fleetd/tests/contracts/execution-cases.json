@@ -1,0 +1,1013 @@
+[
+  {
+    "name": "host placement",
+    "kind": "placement",
+    "valid": true,
+    "value": {
+      "kind": "host"
+    }
+  },
+  {
+    "name": "VM placement",
+    "kind": "placement",
+    "valid": true,
+    "value": {
+      "kind": "vm",
+      "image": "python",
+      "profile": "research"
+    }
+  },
+  {
+    "name": "missing placement",
+    "kind": "placement",
+    "valid": false,
+    "value": {}
+  },
+  {
+    "name": "null placement",
+    "kind": "placement",
+    "valid": false,
+    "value": null
+  },
+  {
+    "name": "array placement",
+    "kind": "placement",
+    "valid": false,
+    "value": []
+  },
+  {
+    "name": "unknown backend",
+    "kind": "placement",
+    "valid": false,
+    "value": {
+      "kind": "docker"
+    }
+  },
+  {
+    "name": "host with image",
+    "kind": "placement",
+    "valid": false,
+    "value": {
+      "kind": "host",
+      "image": "python"
+    }
+  },
+  {
+    "name": "host with profile",
+    "kind": "placement",
+    "valid": false,
+    "value": {
+      "kind": "host",
+      "profile": "research"
+    }
+  },
+  {
+    "name": "VM without image",
+    "kind": "placement",
+    "valid": false,
+    "value": {
+      "kind": "vm",
+      "profile": "research"
+    }
+  },
+  {
+    "name": "VM without profile",
+    "kind": "placement",
+    "valid": false,
+    "value": {
+      "kind": "vm",
+      "image": "python"
+    }
+  },
+  {
+    "name": "VM with unknown option",
+    "kind": "placement",
+    "valid": false,
+    "value": {
+      "kind": "vm",
+      "image": "python",
+      "profile": "research",
+      "privileged": true
+    }
+  },
+  {
+    "name": "VM with path instead of image",
+    "kind": "placement",
+    "valid": false,
+    "value": {
+      "kind": "vm",
+      "image": "../python",
+      "profile": "research"
+    }
+  },
+  {
+    "name": "VM with invalid profile",
+    "kind": "placement",
+    "valid": false,
+    "value": {
+      "kind": "vm",
+      "image": "python",
+      "profile": "Research"
+    }
+  },
+  {
+    "name": "valid catalog",
+    "kind": "catalog",
+    "valid": true,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "CPU zero",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 0,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "CPU bound",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 65,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "fractional CPU",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 1.5,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "target below bound",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 255,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "target above maximum",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 2049,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "maximum above budget",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 4097,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "budget below bound",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 511,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "reserve below bound",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 255,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "fractional budget",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096.5,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "unknown catalog option",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      },
+      "privileged": true
+    }
+  },
+  {
+    "name": "unknown profile option",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": [],
+          "allow_host": true
+        }
+      }
+    }
+  },
+  {
+    "name": "unknown network policy",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "host",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "relative image",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "image root",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "uppercase digest",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "short digest",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "invalid digest",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "unknown image option",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "url": "https://example.test/image"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "empty image catalog",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {},
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "empty profile catalog",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {}
+    }
+  },
+  {
+    "name": "invalid image name",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "../python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "invalid profile name",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "Research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "invalid mount /",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": [
+            {
+              "path": "/",
+              "read_only": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "invalid mount /data/../secrets",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": [
+            {
+              "path": "/data/../secrets",
+              "read_only": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "invalid mount /data//raw",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": [
+            {
+              "path": "/data//raw",
+              "read_only": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "invalid mount /data/raw/",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": [
+            {
+              "path": "/data/raw/",
+              "read_only": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "invalid mount /data\\raw",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": [
+            {
+              "path": "/data\\raw",
+              "read_only": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "duplicate mounts",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": [
+            {
+              "path": "/data",
+              "read_only": true
+            },
+            {
+              "path": "/data",
+              "read_only": false
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "overlapping mounts",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": [
+            {
+              "path": "/data",
+              "read_only": true
+            },
+            {
+              "path": "/data/raw",
+              "read_only": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "sibling mounts",
+    "kind": "catalog",
+    "valid": true,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": [
+            {
+              "path": "/data/a",
+              "read_only": true
+            },
+            {
+              "path": "/data/ab",
+              "read_only": false
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "invalid mount access",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": [
+            {
+              "path": "/data",
+              "read_only": "true"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "unknown mount option",
+    "kind": "catalog",
+    "valid": false,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": [
+            {
+              "path": "/data",
+              "read_only": true,
+              "recursive": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "constructor image name",
+    "kind": "catalog",
+    "valid": true,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "constructor": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  },
+  {
+    "name": "overcommit targets with bounded maxima",
+    "kind": "catalog",
+    "valid": true,
+    "value": {
+      "memory_budget_mib": 4096,
+      "host_reserve_mib": 1024,
+      "images": {
+        "python": {
+          "path": "/srv/images/python.qcow2",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "profiles": {
+        "research": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        },
+        "other": {
+          "cpus": 2,
+          "memory_mib": 512,
+          "maximum_memory_mib": 2048,
+          "network": "disabled",
+          "mounts": []
+        }
+      }
+    }
+  }
+]

@@ -165,9 +165,11 @@ impl OwnedFile {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum DirectoryAccess {
     Configuration,
     Workspace,
+    ReadOnly,
 }
 pub fn validate_directory(path: &Path, access: DirectoryAccess) -> Result<()> {
     if !path.is_absolute()
@@ -206,8 +208,13 @@ pub fn validate_directory(path: &Path, access: DirectoryAccess) -> Result<()> {
     let mask = match access {
         DirectoryAccess::Configuration => 0o022,
         DirectoryAccess::Workspace => 0o002,
+        DirectoryAccess::ReadOnly => 0,
     };
-    if count == 0 || info.st_uid != rustix::process::getuid().as_raw() || info.st_mode & mask != 0 {
+    if count == 0
+        || !matches!(access, DirectoryAccess::ReadOnly)
+            && info.st_uid != rustix::process::getuid().as_raw()
+        || info.st_mode & mask != 0
+    {
         return Err(invalid());
     }
     Ok(())

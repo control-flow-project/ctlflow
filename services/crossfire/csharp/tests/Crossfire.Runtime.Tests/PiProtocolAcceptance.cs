@@ -35,7 +35,7 @@ public static class PiProtocolAcceptance
     {
         var binary = Path.Combine(directory, "fixture.mjs"); PrivateFiles.Write(binary, Encoding.UTF8.GetBytes(Fixture), 65536); File.SetUnixFileMode(binary, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
         var home = PrivateFiles.Directory(Path.Combine(directory, "home-" + Identity.Identifier())); var history = Path.Combine(home, "reserved.jsonl"); PrivateFiles.Write(history, [], 1);
-        var selected = await PiProtocol.Start(binary, home, directory, directory, "pi-protocol-fixture", history, "No model work.", value => events.Writer.TryWrite(value), CancellationToken.None, 10000, clock);
+        var selected = await PiProtocol.Start(binary, home, PrivateFiles.Directory(Path.Combine(directory, "workspace")), directory, Path.Combine(directory, "ownership"), "pi-protocol-fixture", history, "No model work.", value => events.Writer.TryWrite(value), CancellationToken.None, 10000, clock);
         Equal(selected.IsSuccess, true, selected.IsSuccess ? "bounded Pi protocol test double starts independently of native-provider acceptance" : selected.Error.Message); return selected.Value;
     }
     private static async Task<JsonElement> Receive(Channel<JsonElement> events) => await events.Reader.ReadAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5));

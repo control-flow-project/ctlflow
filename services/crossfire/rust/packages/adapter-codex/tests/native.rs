@@ -31,6 +31,9 @@ impl Callbacks for ReadOnly {
 async fn actual_stock_codex_owns_a_private_authenticated_process_and_resumes_exact_native_history()
 -> std::result::Result<(), Box<dyn std::error::Error>> {
     let fixture = tempfile::tempdir()?;
+    let ownership = tempfile::Builder::new()
+        .permissions(std::os::unix::fs::PermissionsExt::from_mode(0o700))
+        .tempdir()?;
     let home = fixture.path().join("home");
     let state = fixture.path().join("state");
     PrivateDirectory::open(&home, true)?;
@@ -39,12 +42,28 @@ async fn actual_stock_codex_owns_a_private_authenticated_process_and_resumes_exa
         home: &home,
         workspace: fixture.path(),
         state: &state,
+        ownership: ownership.path(),
+        authentication: &state,
         profile: "rust-native-acceptance",
         binary: OsStr::new("codex"),
         questions: true,
     };
     let cancellation = CancellationToken::new();
-    let native = OwnedProcess::start(&launch, cancellation.clone()).await?;
+    let native = OwnedProcess::start(
+        &launch,
+        (crossfire_adapter_runtime::placement::NativePlacement::default().open)(
+            crossfire_adapter_runtime::placement::LeaseRequest {
+                directory: launch.ownership.to_owned(),
+                workspace: launch.workspace.to_owned(),
+                state_directory: launch.state.to_owned(),
+                home: launch.home.to_owned(),
+            },
+            cancellation.clone(),
+        )
+        .await?,
+        cancellation.clone(),
+    )
+    .await?;
     assert!(native.token_file.is_file());
     let protocol = Arc::new(
         WebSocketProtocol::open(
@@ -101,7 +120,21 @@ async fn actual_stock_codex_owns_a_private_authenticated_process_and_resumes_exa
         !native.token_file.exists(),
         "Private process credential is removed on close"
     );
-    let restarted = OwnedProcess::start(&launch, cancellation.clone()).await?;
+    let restarted = OwnedProcess::start(
+        &launch,
+        (crossfire_adapter_runtime::placement::NativePlacement::default().open)(
+            crossfire_adapter_runtime::placement::LeaseRequest {
+                directory: launch.ownership.to_owned(),
+                workspace: launch.workspace.to_owned(),
+                state_directory: launch.state.to_owned(),
+                home: launch.home.to_owned(),
+            },
+            cancellation.clone(),
+        )
+        .await?,
+        cancellation.clone(),
+    )
+    .await?;
     let protocol = Arc::new(
         WebSocketProtocol::open(
             &restarted.endpoint,

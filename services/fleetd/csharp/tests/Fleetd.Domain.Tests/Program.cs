@@ -4,6 +4,7 @@ using Fleetd.Domain.Tests;
 if (args.Length != 0) throw new ArgumentException("Controller ownership acceptance takes no suite flags");
 var assertions = 0;
 void Check(bool condition, string label) { if (!condition) throw new InvalidOperationException(label); assertions++; }
+VmExportsAcceptance.Run(Check);
 foreach (var individual in new[] { false, true })
 {
     await using var fixture = new ControllerFixture(); await fixture.Entered.Task.WaitAsync(TimeSpan.FromSeconds(5));

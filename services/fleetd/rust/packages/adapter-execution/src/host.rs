@@ -110,6 +110,24 @@ impl<C: MessagingConnector> Host<C> {
             .cloned()
             .ok_or_else(|| Failure::new(ErrorCode::Invalid, "Unsupported native runtime"))
     }
+    pub(crate) fn selected_adapter(
+        &self,
+        configuration: &Configuration,
+        instance: &Instance,
+        listener_port: Option<u16>,
+    ) -> Result<Arc<Adapter>> {
+        let adapter = self.adapter(configuration.definitions[&instance.definition].runtime)?;
+        match instance.execution {
+            fleetd_domain::execution::Placement::Host => Ok(adapter),
+            fleetd_domain::execution::Placement::Vm { .. } => {
+                Ok(Arc::new(adapter.placed(crate::vm::placement::create(
+                    configuration.clone(),
+                    instance.clone(),
+                    listener_port,
+                ))))
+            }
+        }
+    }
     pub(crate) fn inspection(
         configuration: &Configuration,
         instance: &Instance,
@@ -117,6 +135,7 @@ impl<C: MessagingConnector> Host<C> {
         let state = configuration.directory.join(&instance.workarea);
         Ok(Inspection {
             workspace: instance.workspace.clone().unwrap_or_else(|| state.clone()),
+            ownership_directory: fleetd_storage::ownership::directory(&state)?,
             state_directory: state,
             options: Value::Object(configuration.native_options(instance)?),
         })
@@ -165,6 +184,14 @@ impl<C: MessagingConnector> Host<C> {
 }
 impl<C: MessagingConnector> Execution for Host<C> {
     fn validate(&self, configuration: &Configuration) -> Result<()> {
+        fleetd_contracts::execution::validate(
+            configuration
+                .roster
+                .instances
+                .iter()
+                .map(|instance| &instance.execution),
+            configuration.execution.as_ref(),
+        )?;
         for definition in configuration.definitions.values() {
             let adapter = self.adapter(definition.runtime)?;
             <Adapter as OwnedAdapter<AgentHooks<C::Client>>>::validate(
@@ -340,9 +367,9 @@ impl<C: MessagingConnector> Execution for Host<C> {
                 &configuration.directory.join(&instance.workarea),
                 true,
             )?;
-            let definition = &configuration.definitions[&instance.definition];
             <Adapter as OwnedAdapter<AgentHooks<C::Client>>>::inspect(
-                self.adapter(definition.runtime)?.as_ref(),
+                self.selected_adapter(configuration, instance, None)?
+                    .as_ref(),
                 &Self::inspection(configuration, instance)?,
                 stop.clone(),
             )

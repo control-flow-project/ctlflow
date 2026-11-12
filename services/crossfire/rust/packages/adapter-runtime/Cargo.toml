@@ -13,6 +13,7 @@ crossfire-domain.workspace = true
 crossfire-contracts.workspace = true
 crossfire-agent-core.workspace = true
 crossfire-adapter-filesystem.workspace = true
+crossfire-adapter-process.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true

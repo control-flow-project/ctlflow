@@ -373,6 +373,7 @@ name = "crossfire-adapter-runtime"
 version = "0.1.26"
 dependencies = [
  "crossfire-adapter-filesystem",
+ "crossfire-adapter-process",
  "crossfire-agent-core",
  "crossfire-contracts",
  "crossfire-domain",
@@ -795,6 +796,7 @@ dependencies = [
  "fleetd-storage",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "tokio",
  "tokio-util",

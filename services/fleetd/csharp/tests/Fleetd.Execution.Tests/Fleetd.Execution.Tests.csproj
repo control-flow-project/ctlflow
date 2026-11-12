@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../../tests/contracts/execution-selection-cases.json" LogicalName="Fleetd.ExecutionSelectionCases" />
+    <ProjectReference Include="../../packages/Fleetd.AdapterExecution/Fleetd.AdapterExecution.csproj" />
+  </ItemGroup>
+</Project>

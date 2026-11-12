@@ -266,10 +266,10 @@ impl<C: MessagingConnector> Host<C> {
         )?;
         software.activate(&paths.root)?;
         let definition = &configuration.definitions[&instance.definition];
-        let adapter = self.adapter(definition.runtime)?;
         let allow_new_history =
             binding::can_initialize(initialization.as_ref(), &identity.agent_id)?;
         let host = self.listener().await?;
+        let adapter = self.selected_adapter(configuration, instance, Some(host.port()))?;
         let native = Startup::new(
             adapter,
             Template {
@@ -277,6 +277,7 @@ impl<C: MessagingConnector> Host<C> {
                 name: instance.name.clone(),
                 workspace: inspection.workspace,
                 state_directory: inspection.state_directory,
+                ownership_directory: inspection.ownership_directory,
                 instructions: format!(
                     "{}\n\nCrossfire identity: {}. This instance is already enrolled and its listener is managed by fleetd. Do not reconnect, enroll or start another listener.\n\nUse the intentional Crossfire tools from CROSSFIRE_PROJECT: node \"$CROSSFIRE_PROJECT/.crossfire/client.mjs\" --profile {}. The profile is this instance's immutable local key, not its display name. Connection and telemetry require no model action. Never disclose host paths or private machine configuration outside the owner DM.\n\n{}\n\n{}",
                     definition.instructions,

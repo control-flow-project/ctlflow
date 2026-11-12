@@ -79,11 +79,17 @@ public static class NativeValuesAcceptance
     private static void Terminal()
     {
         var input = new RuntimeAttachment("codex", "42693342-3d57-40aa-9555-47eb5efab6bb", "/tmp/private project", new Dictionary<string, string>
-            { ["endpoint"] = "ws://127.0.0.1:3456", ["home"] = "/tmp/private-home", ["tokenFile"] = "/tmp/token'file", ["binary"] = "/usr/local/bin/codex", ["path"] = "/usr/bin:/bin" });
+            { ["endpoint"] = "ws://127.0.0.1:3456", ["home"] = "/tmp/private-home", ["tokenFile"] = "/tmp/token'file", ["binary"] = "/usr/local/bin/codex", ["path"] = "/usr/bin:/bin", ["transport"] = "host" });
         var command = CodexTerminal.Create().Command(input); Equal(command.IsSuccess, true, "Codex terminal adapter formats the actual saved remote attachment");
         Equal(command.Value.Contains("'--cd' '/tmp/private project' 'resume' '42693342-3d57-40aa-9555-47eb5efab6bb'", StringComparison.Ordinal), true, "terminal attachment resumes the exact native history without a new context");
         Equal(command.Value.Contains("'\\''", StringComparison.Ordinal), true, "terminal argument quoting does not turn a path into shell control");
         Equal(CodexTerminal.Create().Command(input with { Runtime = "pi" }).IsSuccess, false, "unsupported runtime attachment is not emulated as Codex");
+        var missingTransport = new Dictionary<string, string>(input.Connection); missingTransport.Remove("transport");
+        Equal(CodexTerminal.Create().Command(input with { Connection = missingTransport }).IsSuccess, false, "Attachment without current execution transport is rejected");
+        var guestFields = new Dictionary<string, string>(input.Connection) { ["transport"] = "ssh", ["executionDirectory"] = "/run/user/1001/cfvm-test", ["executionId"] = "42693342-3d57-40aa-9555-47eb5efab6bb" };
+        var guest = CodexTerminal.Create().Command(input with { Connection = guestFields });
+        Equal(guest.IsSuccess && guest.Value.StartsWith("'/usr/bin/ssh'", StringComparison.Ordinal) && guest.Value.Contains("'-tt'", StringComparison.Ordinal), true, "VM terminal executes in the existing guest with a terminal channel");
+        Equal(guest.IsSuccess && guest.Value.Contains("ProxyCommand=/usr/bin/false", StringComparison.Ordinal), true, "Missing VM terminal mux cannot open a new physical connection");
         foreach (var endpoint in new[] { "ws://example.com", "ws://127.0.0.1/?token=secret", "ws://user:secret@127.0.0.1/", "ws://127.0.0.1/path", "http://127.0.0.1" })
         { var fields = new Dictionary<string, string>(input.Connection) { ["endpoint"] = endpoint }; Equal(CodexTerminal.Create().Command(input with { Connection = fields }).IsSuccess, false, "terminal capability refuses non-private native endpoints"); }
     }

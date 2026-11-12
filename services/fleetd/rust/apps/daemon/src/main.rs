@@ -4,6 +4,9 @@ use tokio_util::sync::CancellationToken;
 async fn main() -> std::process::ExitCode {
     let result = async {
         let values = std::env::args().skip(1).collect::<Vec<_>>();
+        if values.first().is_some_and(|value| value == fleetd_adapter_execution::vm::supervisor::MODE) {
+            return fleetd_adapter_execution::vm::supervisor::run(&values).await;
+        }
         let input = fleetd_daemon::host::arguments(&values)?;
         let stop = CancellationToken::new();
         let signals = fleetd_daemon::host::signals(stop.clone());

@@ -4,5 +4,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../packages/Fleetd.Domain/Fleetd.Domain.csproj" />
+    <EmbeddedResource Include="../../../tests/contracts/vm-export-cases.json" LogicalName="Fleetd.VmExportCases" />
   </ItemGroup>
 </Project>

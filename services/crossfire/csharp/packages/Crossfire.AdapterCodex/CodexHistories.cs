@@ -204,8 +204,14 @@ public sealed class CodexHistories : OwnedRuntimeConnection, TurnControl
         }
         catch (JsonException) { return Results.Fail<string>("invalid", "Invalid captured history and turn"); }
     }
-    private RuntimeAttachment Attached(string sessionId) => new("codex", sessionId, input.Workspace, new Dictionary<string, string>(StringComparer.Ordinal)
-        { ["endpoint"] = process.Endpoint, ["tokenFile"] = process.TokenFile, ["home"] = home, ["binary"] = process.Binary, ["path"] = process.Path });
+    private RuntimeAttachment Attached(string sessionId)
+    {
+        var fields = new Dictionary<string, string>(StringComparer.Ordinal)
+        { ["endpoint"] = process.NativeEndpoint, ["tokenFile"] = process.TokenFile, ["home"] = home, ["binary"] = process.Binary,
+            ["path"] = process.Path, ["transport"] = process.Ssh is null ? "host" : "ssh" };
+        if (process.Ssh is { } ssh) { fields["executionDirectory"] = ssh.Directory; fields["executionId"] = ssh.Id; }
+        return new("codex", sessionId, input.Workspace, fields);
+    }
     public RuntimeAttachment Attachment => Attached(SessionId);
     public ValueTask<Result<IReadOnlyList<ContextAttachment>>> Attachments()
     { lock (gate) return ValueTask.FromResult(Result<IReadOnlyList<ContextAttachment>>.Success(registry.Bindings.Select(binding => new ContextAttachment(binding.Context, Attached(binding.SessionId))).ToArray())); }

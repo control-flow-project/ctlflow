@@ -1,4 +1,5 @@
 using Crossfire.AdapterFilesystem;
+using Crossfire.AdapterProcess;
 using Crossfire.AgentCore;
 using Crossfire.Contracts;
 using Crossfire.Kernel;
@@ -11,7 +12,11 @@ public static class CodexTerminal
     private static string Quote(string value) => "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
     private static Result<string> Command(RuntimeAttachment input)
     {
-        var fields = input.Connection; var names = new[] { "endpoint", "tokenFile", "home", "binary", "path" };
+        var fields = input.Connection;
+        if (!fields.TryGetValue("transport", out var transport) || transport is not ("host" or "ssh"))
+            return Results.Fail<string>("invalid", "Terminal attachment requires its explicit current execution transport");
+        var names = transport == "host" ? new[] { "endpoint", "tokenFile", "home", "binary", "path", "transport" }
+            : new[] { "endpoint", "tokenFile", "home", "binary", "path", "transport", "executionDirectory", "executionId" };
         if (input.Runtime != "codex" || !Validation.Identifier(input.SessionId) || !Path.IsPathFullyQualified(input.Workspace) || input.Workspace.Any(char.IsControl)
             || fields.Count != names.Length || names.Any(name => !fields.TryGetValue(name, out var value) || value.Length is < 1 or > 4096 || value.Any(char.IsControl))
             || !Path.IsPathFullyQualified(fields["tokenFile"]) || !Path.IsPathFullyQualified(fields["home"]))
@@ -27,7 +32,9 @@ public static class CodexTerminal
                 endpoint = uri.AbsoluteUri;
             }
             var arguments = new[] { fields["binary"], "--remote", endpoint, "--remote-auth-token-env", "FLEET_RUNTIME_AUTH_TOKEN", "--cd", input.Workspace, "resume", input.SessionId };
-            return Result<string>.Success("PATH=" + Quote(fields["path"]) + " CODEX_HOME=" + Quote(fields["home"]) + " FLEET_RUNTIME_AUTH_TOKEN=\"$(cat -- " + Quote(fields["tokenFile"]) + ")\" " + string.Join(' ', arguments.Select(Quote)));
+            var command = "PATH=" + Quote(fields["path"]) + " CODEX_HOME=" + Quote(fields["home"]) + " FLEET_RUNTIME_AUTH_TOKEN=\"$(cat -- " + Quote(fields["tokenFile"]) + ")\" " + string.Join(' ', arguments.Select(Quote));
+            return transport == "host" ? Result<string>.Success(command)
+                : SshCommands.Terminal(new(fields["executionDirectory"], fields["executionId"]), input.Workspace, command);
         }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException)
         { return Results.Fail<string>("invalid", "Invalid private Codex terminal endpoint"); }

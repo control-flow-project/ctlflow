@@ -1,3 +1,4 @@
+using Crossfire.AdapterRuntime;
 using Crossfire.Domain;
 using System.Text;
 using System.Text.Json;
@@ -13,11 +14,12 @@ public static class OwnedCodexAcceptance
 {
     public static async Task Verify(string binary, string source, string workspace, string directory, JsonElement options, RuntimeHooks hooks, CancellationToken cancellation)
     {
-        var state = PrivateFiles.Directory(Path.Combine(directory, "owned-contexts")); var adapter = CodexRuntime.Create(binary, source);
-        var inspected = await adapter.Inspect(new(workspace, state, options), cancellation);
+        var state = PrivateFiles.Directory(Path.Combine(directory, "owned-contexts")); var execution = new ExecutionRecording(); var adapter = CodexRuntime.Create(binary, source, NativePlacement.Local(execution.Port));
+        var ownership = Path.Combine(directory, "ownership-owned");
+        var inspected = await adapter.Inspect(new(workspace, state, ownership, options), cancellation);
         Equal(inspected.IsSuccess, true, inspected.IsSuccess ? "owned runtime inspection validates actual native capabilities without creating history" : inspected.Error.Message);
         Equal(adapter.SavedContexts(workspace, state).Value.Count, 0, "capability inspection creates no agent conversation");
-        var input = new OwnedRuntimeInput("csharp-owned-proof", "Owned native proof", workspace, state,
+        var input = new OwnedRuntimeInput("csharp-owned-proof", "Owned native proof", workspace, state, ownership,
             "Reply through the original Crossfire room tool. Shared-room instructions are nonexclusive. Read AGENTS.md after a restart.", options, hooks, NativeHistoryMode.PerRoom);
         var missing = await adapter.Start(input, cancellation);
         Equal(!missing.IsSuccess && missing.Error.Code == "missing", true, "normal resume cannot substitute a fresh history");
@@ -37,7 +39,7 @@ public static class OwnedCodexAcceptance
             Equal((await owner.Attachments()).Value.Count, 3, "terminal metadata includes every retained native history");
             Equal(owner.Attachment!.SessionId, first, "primary terminal metadata identifies the actual control history");
             Equal((await adapter.Start(input, cancellation)).IsSuccess, false, "a second Codex native owner is rejected before another process writes its home");
-            Equal(adapter.Reset(new(workspace, state, Identity.Identifier())).IsSuccess, false, "context reset cannot archive live Codex native ownership");
+            Equal(adapter.Reset(new(workspace, state, ownership, Identity.Identifier())).IsSuccess, false, "context reset cannot archive live Codex native ownership");
             Equal((await owner.Inspect()).Value, false, "saved instructions do not leave idle room histories reported as busy");
             original = adapter.SavedContexts(workspace, state).Value;
             Equal(original.Count, 3, "all native identities are durably discoverable without a running process");
@@ -69,15 +71,35 @@ public static class OwnedCodexAcceptance
                 Equal((await current.Attachments()).Value.Count, 4, "switching history mode does not discard saved room identities");
             }
             var nativeHome = Path.Combine(state, ".codex"); var nativeFiles = Directory.GetFiles(Path.Combine(nativeHome, "sessions"), "*.jsonl", SearchOption.AllDirectories);
-            var resetId = Identity.Identifier(); var reset = adapter.Reset(new(workspace, state, resetId));
+            var resetId = Identity.Identifier(); var reset = adapter.Reset(new(workspace, state, ownership, resetId));
             Equal(reset.IsSuccess, true, reset.IsSuccess ? "explicit reset archives native bindings without deleting user histories" : reset.Error.Message);
-            Equal(adapter.Reset(new(workspace, state, resetId)).IsSuccess, true, "reset identity is repeatable after completion");
+            Equal(adapter.Reset(new(workspace, state, ownership, resetId)).IsSuccess, true, "reset identity is repeatable after completion");
             Equal(adapter.SavedContexts(workspace, state).Value.Count, 0, "reset removes only active history bindings");
             Equal(nativeFiles.All(File.Exists), true, "native saved conversations survive context reset");
             Equal(File.Exists(Path.Combine(nativeHome, "crossfire-archive", resetId, ContextRegistry.FileName)), true, "the exact prior registry remains in a private archive");
             var fresh = await adapter.Start(input with { HistoryMode = NativeHistoryMode.Shared, AllowNewHistory = true }, cancellation);
             Equal(fresh.IsSuccess, true, fresh.IsSuccess ? "only explicit fresh start creates the replacement context" : fresh.Error.Message);
             await using (var current = fresh.Value) Equal(current.SessionId != sharedId && current.SessionId != first, true, "fresh start uses a new native context, not a renamed old one");
+        }
+        finally { PrivateFiles.DeletePrivate(auth); }
+        Equal(execution.Commands.Any(arguments => arguments.SequenceEqual(new[] { "--version" })), true, "Codex version checks cross the selected execution boundary");
+        Equal(execution.Commands.Any(arguments => arguments.Take(2).SequenceEqual(new[] { "app-server", "generate-json-schema" })), true, "Codex schema checks cross the selected execution boundary");
+        Equal(execution.Commands.Any(arguments => arguments.Take(2).SequenceEqual(new[] { "app-server", "--listen" })), true, "Codex server launches cross the selected execution boundary");
+        Equal(execution.Endpoints > 0, true, "Codex connects only through selected endpoint placement");
+        var inspectionHome = Path.Combine(state, ".codex");
+        var admissionConfig = ManagedHome.ReadConfiguration(inspectionHome).Value;
+        var providers = (Dictionary<string, object?>)admissionConfig["model_providers"]!;
+        ((Dictionary<string, object?>)providers["fixture"]!)["requires_openai_auth"] = true;
+        PrivateFiles.Write(Path.Combine(inspectionHome, "config.toml"), Encoding.UTF8.GetBytes(Crossfire.AdapterToml.ConfigurationToml.Format(admissionConfig).Value), 1048576);
+        const string activeAuth = "{\"OPENAI_API_KEY\":\"inert-active-account\"}";
+        PrivateFiles.Write(Path.Combine(inspectionHome, "auth.json"), Encoding.UTF8.GetBytes(activeAuth), 65536);
+        PrivateFiles.Write(auth, "{\"OPENAI_API_KEY\":\"inert-inspection-account\"}"u8, 65536);
+        try
+        {
+            var refused = await CodexRuntime.Create(binary, source, NativePlacement.Local(ExecutionRecording.Rejected)).Inspect(new(workspace, state, ownership, options), cancellation);
+            Equal(!refused.IsSuccess && refused.Error.Code == "forbidden", true, "Codex inspection does not run host probes after placement rejection");
+            Equal(Encoding.UTF8.GetString(PrivateFiles.Read(Path.Combine(inspectionHome, "auth.json"), 65536)), activeAuth, "Inspection leaves active native credentials unchanged");
+            Equal(Directory.GetDirectories(state, ".codex-inspection-*").Length, 0, "Rejected inspection removes its disposable login home");
         }
         finally { PrivateFiles.DeletePrivate(auth); }
     }

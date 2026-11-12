@@ -2,7 +2,7 @@ mod worker;
 use crate::options;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use crossfire_adapter_filesystem::PrivateDirectory;
-use crossfire_adapter_process::{self, NativeCommand, NativeProcess};
+use crossfire_adapter_process::{NativeCommand, NativeProcess, execution::NativeExecution};
 use crossfire_adapter_runtime::clock;
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, identity};
 use serde_json::{Value, json};
@@ -110,9 +110,11 @@ impl Drop for Registration {
     }
 }
 pub struct Launch<'a> {
+    pub execution: &'a NativeExecution,
     pub binary: &'a OsStr,
     pub workspace: &'a Path,
     pub state: &'a Path,
+    pub ownership: &'a Path,
     pub home: &'a Path,
     pub profile: &'a str,
     pub history: &'a Path,
@@ -146,19 +148,21 @@ impl Rpc {
             ("CROSSFIRE_AGENT_NAME".into(), Some(input.profile.into())),
             ("CODEX_THREAD_ID".into(), None),
         ]);
-        let version = crossfire_adapter_process::capture(
-            &NativeCommand {
-                binary: input.binary.to_owned(),
-                arguments: vec!["--version".into()],
-                workspace: input.workspace.to_owned(),
-                environment: environment.clone(),
-                input: false,
-            },
-            4096,
-            Duration::from_secs(10),
-            cancellation.clone(),
-        )
-        .await?;
+        let version = input
+            .execution
+            .capture(
+                &NativeCommand {
+                    binary: input.binary.to_owned(),
+                    arguments: vec!["--version".into()],
+                    workspace: input.workspace.to_owned(),
+                    environment: environment.clone(),
+                    input: false,
+                },
+                4096,
+                Duration::from_secs(10),
+                cancellation.clone(),
+            )
+            .await?;
         if !version.status.success() {
             return Err(error(
                 "Cannot run Pi --version; install @earendil-works/pi-coding-agent 1.0.0",
@@ -178,8 +182,13 @@ impl Rpc {
             include_bytes!("../../assets/crossfire-extension.mjs"),
         )?;
         directory.write_atomic("crossfire-instructions.txt", input.instructions.as_bytes())?;
+        crossfire_adapter_runtime::ownership::prepare(
+            input.ownership,
+            input.workspace,
+            input.home,
+        )?;
         let mut native = NativeProcess::guarded(
-            &NativeCommand {
+            &(input.execution.command)(&NativeCommand {
                 binary: input.binary.to_owned(),
                 workspace: input.workspace.to_owned(),
                 environment,
@@ -200,8 +209,8 @@ impl Rpc {
                     "--extension".into(),
                     extension.into_os_string(),
                 ],
-            },
-            input.home,
+            })?,
+            input.ownership,
             &identity::hash(
                 input
                     .history

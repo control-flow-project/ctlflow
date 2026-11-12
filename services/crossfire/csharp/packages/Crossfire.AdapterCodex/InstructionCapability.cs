@@ -27,12 +27,12 @@ public static class InstructionCapability
             && names.ValueKind == JsonValueKind.Array && names.GetArrayLength() == 1 && names[0].ValueKind == JsonValueKind.String && names[0].GetString() == "thread/inject_items"
             && fields.TryGetProperty("params", out var input) && CodexJson.String(input, "$ref") == "#/definitions/ThreadInjectItemsParams";
 
-    public static async ValueTask<Result<Unit>> Inspect(string binary, string home, string workspace, IReadOnlyDictionary<string, string?> environment, CancellationToken cancellation)
+    public static async ValueTask<Result<Unit>> Inspect(string binary, string home, string workspace, IReadOnlyDictionary<string, string?> environment, CancellationToken cancellation, NativeExecution? execution = null)
     {
         var directory = PrivateFiles.Directory(Path.Combine(home, ".crossfire-protocol-" + Identity.Identifier()));
         try
         {
-            var command = await NativeProcess.Capture(new(binary, ["app-server", "generate-json-schema", "--out", directory, "--experimental"], workspace, environment), 65536, 10000, cancellation);
+            var command = await (execution ?? NativeExecution.Host).Capture(new(binary, ["app-server", "generate-json-schema", "--out", directory, "--experimental"], workspace, environment), 65536, 10000, cancellation);
             if (!command.IsSuccess) return Result<Unit>.Fail(command.Error);
             if (command.Value.ExitCode != 0) return Results.Fail<Unit>("native", "Cannot inspect native Codex developer-instruction capability; install a supported release and repeat setup");
             using var document = JsonDocument.Parse(PrivateFiles.ReadNativeEvidence(directory, "ClientRequest.json", 2097152));

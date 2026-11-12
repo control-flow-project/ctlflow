@@ -32,6 +32,7 @@
     "publish:rust": "node scripts/publish-rust.mjs",
     "package:containers": "node scripts/container-packages.mjs",
     "verify:contracts": "node scripts/verify-contracts.mjs",
+    "verify:vm": "node scripts/verify-vm.mjs",
     "verify:parity": "node scripts/verify-parity.mjs",
     "verify:performance": "node scripts/verify-performance.mjs"
   },

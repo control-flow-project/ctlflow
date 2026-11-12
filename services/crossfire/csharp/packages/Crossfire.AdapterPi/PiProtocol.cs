@@ -44,20 +44,25 @@ public sealed class PiProtocol : IAsyncDisposable
         reading = Read(); errors = Errors(); exited = Exit(); parent = cancellation.Register(() => Fail(new("native", "Owned Pi runtime was cancelled")));
         initialized.TrySetResult();
     }
-    public static async ValueTask<Result<PiProtocol>> Start(string binary, string home, string workspace, string state, string profile, string history,
-        string instructions, Action<JsonElement> events, CancellationToken cancellation, int timeoutMs = 30000, TimeProvider? time = null)
+    public static async ValueTask<Result<PiProtocol>> Start(string binary, string home, string workspace, string state, string ownershipDirectory, string profile, string history,
+        string instructions, Action<JsonElement> events, CancellationToken cancellation, int timeoutMs = 30000, TimeProvider? time = null, NativeExecution? execution = null)
     {
         if (timeoutMs is < 100 or > 300000) return Results.Fail<PiProtocol>("invalid", "Pi request deadline must be finite");
         try
         {
             PrivateFiles.ExistingDirectory(home, true); PrivateFiles.ExistingDirectory(workspace, false); PrivateFiles.ExistingDirectory(state, true);
+            Crossfire.AdapterRuntime.NativeOwnership.Prepare(ownershipDirectory, workspace, home);
             var environment = PiValues.Environment(home, state, profile);
-            var version = await NativeProcess.Capture(new(binary, ["--version"], workspace, environment), 4096, 10000, cancellation);
-            if (!version.IsSuccess || version.Value.ExitCode != 0 || version.Value.Output.Trim() != "1.0.0") return Results.Fail<PiProtocol>("invalid", "Pi requires verified @earendil-works/pi-coding-agent 1.0.0; other native protocols have not been admitted");
+            execution ??= NativeExecution.Host;
+            var version = await execution.Capture(new(binary, ["--version"], workspace, environment), 4096, 10000, cancellation);
+            if (!version.IsSuccess) return Result<PiProtocol>.Fail(version.Error);
+            if (version.Value.ExitCode != 0 || version.Value.Output.Trim() != "1.0.0") return Results.Fail<PiProtocol>("invalid", "Pi requires verified @earendil-works/pi-coding-agent 1.0.0; other native protocols have not been admitted");
             var extension = Path.Combine(home, "crossfire-extension.mjs"); var prompt = Path.Combine(home, "crossfire-instructions.txt");
             PrivateFiles.Write(extension, Encoding.UTF8.GetBytes(PiValues.Extension()), 1048576); PrivateFiles.Write(prompt, Encoding.UTF8.GetBytes(instructions), 8388608);
-            var native = Crossfire.AdapterRuntime.NativeGuard.Start(new(binary, ["--mode", "rpc", "--offline", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--no-approve",
-                "--session", history, "--append-system-prompt", prompt, "--extension", extension], workspace, environment, Input: true), home,
+            var selected = execution.Command(new(binary, ["--mode", "rpc", "--offline", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--no-approve",
+                "--session", history, "--append-system-prompt", prompt, "--extension", extension], workspace, environment, Input: true));
+            if (!selected.IsSuccess) return Result<PiProtocol>.Fail(selected.Error);
+            var native = Crossfire.AdapterRuntime.NativeGuard.Start(selected.Value, ownershipDirectory,
                 Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(history))));
             return native.IsSuccess ? Result<PiProtocol>.Success(new(native.Value, events, timeoutMs, time ?? TimeProvider.System, cancellation)) : Result<PiProtocol>.Fail(native.Error);
         }

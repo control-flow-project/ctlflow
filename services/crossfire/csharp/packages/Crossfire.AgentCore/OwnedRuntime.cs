@@ -13,10 +13,10 @@ public sealed record NativeContextActivity(string Context, string SessionId, boo
 public sealed record NativeActivity(bool Busy, IReadOnlyList<NativeContextActivity> Contexts);
 public enum ProviderState { Present, Missing, NotRequired, Unknown }
 public sealed record NativeDiagnostic(string State, long? ObservedAt, ProviderState Provider, long? ProviderObservedAt, bool PendingInput, bool PendingDecision, long CheckedAt);
-public sealed record RuntimeInspectionInput(string Workspace, string StateDirectory, JsonElement Options);
-public sealed record RuntimeResetInput(string Workspace, string StateDirectory, string ResetId);
+public sealed record RuntimeInspectionInput(string Workspace, string StateDirectory, string OwnershipDirectory, JsonElement Options);
+public sealed record RuntimeResetInput(string Workspace, string StateDirectory, string OwnershipDirectory, string ResetId);
 public sealed record ValidatedRuntime(JsonElement Options, RuntimeApproval Approval);
-public sealed record OwnedRuntimeInput(string Profile, string Name, string Workspace, string StateDirectory, string Instructions, JsonElement Options,
+public sealed record OwnedRuntimeInput(string Profile, string Name, string Workspace, string StateDirectory, string OwnershipDirectory, string Instructions, JsonElement Options,
     RuntimeHooks Hooks, NativeHistoryMode HistoryMode = NativeHistoryMode.Shared, bool AllowNewHistory = false);
 public interface OwnedRuntimeConnection : RuntimeConnection
 {

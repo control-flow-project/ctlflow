@@ -7,14 +7,14 @@ import { verifyTestResources } from './test-resources.mjs';
 import { testEvidence } from './test-evidence.mjs';
 import { readContractMatrix } from './contract-targets.mjs';
 
-export async function runContractTargets({ manifest, worker, bank, testTimeoutMs = 840000, deadlineMs = 900000, cleanupMs = 5000, environment = {}, signal }) {
+export async function runContractTargets({ manifest, worker, bank, testTimeoutMs = 840000, deadlineMs = 900000, cleanupMs = 5000, environment = {}, signal, parallelism = availableParallelism() }) {
   if (!isAbsolute(worker) || !['contract-runs', 'container-runs'].includes(bank)
     || ![testTimeoutMs, deadlineMs, cleanupMs].every(value => Number.isSafeInteger(value) && value > 0)
-    || testTimeoutMs >= deadlineMs) throw new Error('Use an absolute worker, a known contract bank and finite ordered deadlines');
+    || testTimeoutMs >= deadlineMs || !Number.isSafeInteger(parallelism) || parallelism < 1) throw new Error('Use an absolute worker, a known contract bank, finite ordered deadlines and positive worker count');
   const resources = verifyTestResources(), targets = readContractMatrix(manifest);
   const evidence = join(repository, '.temp', bank, new Date().toISOString().replaceAll(':', '-') + '-' + process.pid);
   mkdirSync(evidence, { recursive: true, mode: 0o700 });
-  const results = [], workers = Math.min(availableParallelism(), targets.length); let next = 0;
+  const results = [], workers = Math.min(availableParallelism(), parallelism, targets.length); let next = 0;
   await Promise.all(Array.from({ length: workers }, async () => {
     for (;;) {
       const target = targets[next++]; if (!target) return;
