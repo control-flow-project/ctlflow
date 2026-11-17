@@ -4,7 +4,7 @@
 
 This is a Crossfire server/storage correction, based on main `8842dd8` and
 prepared on `fix/management-sqlite-growth-20261012`. No Bad Bets source or
-deployment is inspected or changed. GAAP, Toolsmith, production data, fleet
+deployment is inspected or changed. GAAP, production data, fleet
 intent, identities and native histories are unchanged.
 
 The SQLite opener applied `max_page_count = floor(256 MiB / page_size)` on
