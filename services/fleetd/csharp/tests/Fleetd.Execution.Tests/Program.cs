@@ -12,7 +12,7 @@ if (Supervisor.Requested(args)) { await Supervisor.Run(args); return; }
 if (args.Length != 0) throw new ArgumentException("VM execution acceptance takes no suite flags");
 var assertions = 0;
 void Check(bool value, string label) { if (!value) throw new InvalidOperationException(label); assertions++; }
-var root = PrivateFiles.Directory(Path.Combine(Path.GetTempPath(), "fleet-vm-bootstrap-" + Identity.Identifier()));
+var root = PrivateFiles.Directory(Directory.CreateTempSubdirectory("cf-vm-").FullName);
 try
 {
     await SshCommandsAcceptance.Run(root, Check);

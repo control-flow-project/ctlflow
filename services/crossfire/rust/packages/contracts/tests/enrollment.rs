@@ -56,7 +56,7 @@ fn native_enrollment_collation_and_json_bytes_match_the_current_node_contract()
         controller_credential: None,
         instances: vec![Entry {
             instance_key: "worker".to_owned(),
-            name: "worker-high".to_owned(),
+            name: "worker_ai".to_owned(),
             identity: None,
             policy: Policy {
                 mode: crossfire_domain::identity::WakeMode::Selected,
@@ -84,7 +84,7 @@ fn enrollment_wire_boundaries_reject_unknown_aliases_duplicate_sources_and_inval
     use crossfire_contracts::enrollment;
     use serde_json::json;
     let value = json!({"controller":{"name":"Controller","metadata":{"label":"owned"}},"ownerBackendUserId":"@owner:example.test","fleetKey":"fleet",
-        "instances":[{"instanceKey":"worker","name":"worker-high","coordinationPolicy":{"wakeMode":"selected","senders":[{"backendUserId":"@owner:example.test","includeAgents":true}],"permissions":["room.agent.invite"]}}]});
+        "instances":[{"instanceKey":"worker","name":"worker_ai","coordinationPolicy":{"wakeMode":"selected","senders":[{"backendUserId":"@owner:example.test","includeAgents":true}],"permissions":["room.agent.invite"]}}]});
     let parsed = enrollment::roster(&value)?;
     assert!(parsed.instances[0].policy.invite_agents);
     assert!(parsed.instances[0].policy.senders[0].include_agents);
@@ -107,7 +107,7 @@ fn enrollment_wire_boundaries_reject_unknown_aliases_duplicate_sources_and_inval
     invalid["enrollmentId"] = json!(crossfire_kernel::identity::id());
     invalid["claimSecret"] = json!(crossfire_kernel::identity::secret()?.expose());
     let introduction = enrollment::introduction(&invalid)?;
-    assert_eq!(introduction.roster.instances[0].name, "worker-high");
+    assert_eq!(introduction.roster.instances[0].name, "worker_ai");
     invalid["claimSecret"] = json!("invalid");
     assert!(enrollment::introduction(&invalid).is_err());
     assert!(enrollment::decision(&json!({"expectedRevision":0,"decision":"approve","verificationCode":"123456ABCDEF","confirm":true})).is_err());

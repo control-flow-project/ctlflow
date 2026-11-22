@@ -6,7 +6,7 @@ import { coordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-po
 
 export const enrollmentPlan = check.object({ enrollmentId: check.identifier, ownerBackendUserId: check.backendUserId,
   verificationCode: check.text(12, 12), fleetKey: check.name, controllerName: check.text(100),
-  instances: check.list(check.object({ instanceKey: check.name, currentName: check.nullable(check.name), requestedName: check.name, coordinationPolicy }), 100, 1) });
+  instances: check.list(check.object({ instanceKey: check.name, currentName: check.nullable(check.agentName), requestedName: check.agentName, coordinationPolicy }), 100, 1) });
 
 export async function reviewEnrollment(origin: string, account: Credentials, plan: check.Parsed<typeof enrollmentPlan>, execute: boolean, signal: AbortSignal) {
   return withHuman(origin, account, signal, async human => {

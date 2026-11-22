@@ -75,7 +75,7 @@ export async function serverContracts(scope: TestContext, fixture: ContractStack
     const policy = await fixture.data(operations.policy, {}, undefined, outsider); const { revision, ...values } = policy;
     const denied = await fixture.raw('/api/instance-policy', 'PATCH', { expectedRevision: revision, ...values }, fixture.headers(outsider)); assert.equal(denied.status, 403);
   });
-  const agent = await fixture.agent(); const params = { agentId: agent.id }, fleetParams = { fleetId: agent.fleetId };
+  const agent = await fixture.agent('contract_analyst_ai', fixture.owner, 'contract-analyst'); const params = { agentId: agent.id }, fleetParams = { fleetId: agent.fleetId };
   const controller = { fleetId: agent.fleetId, connectionId: agent.connectionId, credential: agent.credential }, runId = randomUUID();
   await scope.test('enrollment identities, collisions, owner directory and scoped grants', async () => {
     assert.equal((await fixture.data(operations.agent, params)).name, agent.name); await fixture.operation(operations.fleetAgents, fleetParams, undefined, agent.credential); await fixture.operation(operations.deliveryPolicy, params, undefined, agent.token);

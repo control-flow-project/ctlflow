@@ -19,7 +19,8 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
   await scope.test('a transferred derivative package imports its missing image and retains image-owned readiness', async child => {
     const original = fixture.current(), parent = inspect(fixture.containerName, '{{.Config.Image}}');
     assert.match(parent, /^sha256:[a-f0-9]{64}$/u);
-    const metadata = JSON.parse(readFileSync(join(fixture.packages, original.name, 'release.json'), 'utf8')) as { migration: { reference: string } };
+    const metadata = JSON.parse(readFileSync(join(fixture.packages, original.name, 'release.json'), 'utf8')) as { runtime: { reference: string }; migration: { reference: string } };
+    assert.equal(inspect(metadata.runtime.reference, '{{.Id}}'), parent);
     const migrationImage = inspect(metadata.migration.reference, '{{.Id}}');
     const temporary = mkdtempSync(join(fixture.directory, 'transfer-'));
     let derivative: string | undefined;
@@ -29,7 +30,7 @@ export async function containerRecoveryContracts(scope: TestContext, fixture: Co
     });
     // Restore the original container before removing its derivative image or Compose file.
     cleanup(child, () => fixture.start(original));
-    writeFileSync(join(temporary, 'Dockerfile'), 'FROM ' + parent + '\nLABEL org.crossfire.transfer=' + randomUUID() + '\n');
+    writeFileSync(join(temporary, 'Dockerfile'), 'FROM ' + metadata.runtime.reference + '\nLABEL org.crossfire.transfer=' + randomUUID() + '\n');
     derivative = docker(['build', '--quiet', '--cgroup-parent', process.env.CROSSFIRE_TEST_CGROUP_PARENT!, '--file', join(temporary, 'Dockerfile'), temporary], artifactPreparationMilliseconds);
     assert.match(derivative, /^sha256:[a-f0-9]{64}$/u);
     const output = join(temporary, 'package');

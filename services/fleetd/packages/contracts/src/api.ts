@@ -12,7 +12,7 @@ import { runtimeOptions } from './configuration.js';
 import { diagnosticQuery, diagnosticReport } from './diagnostics.js';
 const releaseDirectory = check.refine(check.text(4096), value => value.startsWith('/') && !value.includes('\\')
   && value.split('/').slice(1).every(segment => segment && segment !== '.' && segment !== '..'), 'Release directory must be an absolute normalized path');
-const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
+const instance = check.object({ key: check.name, name: check.agentName, definition: check.name, workarea: check.text(1024),
   workspace: check.optional(check.text(4096)),
   execution: check.optional(executionPlacement), runtimeOptions: check.optional(runtimeOptions),
   listenerOptions: check.optional(check.object({ historyMode: check.optional(check.choice('shared', 'per-room')), mirrorOutput: check.optional(check.boolean) })) });

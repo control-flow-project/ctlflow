@@ -336,8 +336,11 @@ A fleet contains one owner's agents. Every operational agent has one active
 fleet-instance binding. Controller labels/metadata are descriptive, not
 credentials, execution endpoints or permissions.
 
-Agent registered names are unique across the instance. All introduction/rename
-entrypoints share one canonical validator/constraint. Display labels derive
+Agent registered names are unique across the instance. A registered name has
+1–40 ASCII characters, starts with a lowercase letter, and uses lowercase
+letters, digits, hyphens or underscores. Fleet keys, immutable instance keys
+and definition keys retain their existing syntax. All introduction and rename
+entrypoints share the registered-name validator and uniqueness constraint. Display labels derive
 from registered name and owner; there is no separate override or old-name alias.
 
 Preflight checks the complete roster before native launch. Reusing an existing

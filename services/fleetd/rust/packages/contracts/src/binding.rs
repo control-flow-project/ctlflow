@@ -9,7 +9,7 @@ pub fn identity(value: &Value) -> Result<Identity> {
     let account = crossfire_contracts::messaging::account(&value["account"])?;
     Ok(Identity {
         instance_key: check::name(&value["instanceKey"])?.to_owned(),
-        name: check::name(&value["name"])?.to_owned(),
+        name: check::agent_name(&value["name"])?.to_owned(),
         agent_id: check::identifier(&value["agentId"])?.to_owned(),
         account,
     })

@@ -6,7 +6,7 @@ import { failure, success, type Result } from '@ctlflow/crossfire-kernel/result'
 import { withHuman, type Human, type Credentials } from './auth.js';
 import { wakeSelection } from '@ctlflow/crossfire-contracts/schema/request';
 
-const instancePolicy = check.refine(check.object({ instanceKey: check.name, name: check.name, mode: check.wakeMode,
+const instancePolicy = check.refine(check.object({ instanceKey: check.name, name: check.agentName, mode: check.wakeMode,
   senders: check.list(wakeSelection, 2000) }), entry => new Set(entry.senders.map(sender => sender.principalId)).size === entry.senders.length
     && (entry.mode !== 'everyone' || entry.senders.length === 0), 'Select unique identities; everyone requires no individual selections');
 export const fleetWakePlan = check.refine(check.object({ fleetId: check.identifier, fleetKey: check.name,

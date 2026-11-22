@@ -70,9 +70,9 @@ public static class Inputs
     {
         var fields = Validation.Fields(input, ["instanceKey", "name", "coordinationPolicy"], ["identity"]);
         if (!fields.IsSuccess) return Result<RosterInstance>.Fail(fields.Error);
-        var key = Name(input, "instanceKey"); var name = Name(input, "name"); var policy = CoordinationPolicy(input.GetProperty("coordinationPolicy"));
+        var key = Name(input, "instanceKey"); var name = Validation.Text(input.GetProperty("name"), 40); var policy = CoordinationPolicy(input.GetProperty("coordinationPolicy"));
         if (!key.IsSuccess) return Result<RosterInstance>.Fail(key.Error);
-        if (!name.IsSuccess) return Result<RosterInstance>.Fail(name.Error);
+        if (!name.IsSuccess || !IdentitySyntax.AgentName(name.Value)) return Results.Fail<RosterInstance>("invalid", "Invalid agent name");
         if (!policy.IsSuccess) return Result<RosterInstance>.Fail(policy.Error);
         string? agentId = null; string? accessToken = null;
         if (input.TryGetProperty("identity", out var identity))

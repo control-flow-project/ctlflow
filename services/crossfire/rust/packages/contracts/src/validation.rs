@@ -87,20 +87,23 @@ pub fn identifier(value: &Value) -> Result<&str> {
 pub fn name(value: &Value) -> Result<&str> {
     value
         .as_str()
-        .filter(|value| {
-            !value.is_empty()
-                && value.len() <= 40
-                && value.as_bytes()[0].is_ascii_lowercase()
-                && value.bytes().all(|character| {
-                    character.is_ascii_lowercase()
-                        || character.is_ascii_digit()
-                        || character == b'-'
-                })
-        })
+        .filter(|value| crossfire_kernel::identifier::name(value))
         .ok_or_else(|| {
             Failure::new(
                 ErrorCode::Invalid,
                 "Expected a lowercase name of 1–40 characters",
+            )
+        })
+}
+
+pub fn agent_name(value: &Value) -> Result<&str> {
+    value
+        .as_str()
+        .filter(|value| crossfire_kernel::identifier::agent_name(value))
+        .ok_or_else(|| {
+            Failure::new(
+                ErrorCode::Invalid,
+                "Expected a lowercase agent name of 1–40 characters",
             )
         })
 }

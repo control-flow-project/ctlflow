@@ -7,7 +7,7 @@ import { coordinationPolicy } from '@ctlflow/crossfire-contracts/coordination-po
 
 export const runtimeOptions = (input: unknown): Result<Record<string, unknown>> =>
   input && typeof input === 'object' && !Array.isArray(input) ? success(input as Record<string, unknown>) : failure('invalid', 'Expected runtime options');
-export const instance = check.object({ key: check.name, name: check.name, definition: check.name, workarea: check.text(1024),
+export const instance = check.object({ key: check.name, name: check.agentName, definition: check.name, workarea: check.text(1024),
   workspace: check.optional(check.refine(check.text(4096), value => value.startsWith('/') && !value.includes('\\')
     && value.split('/').slice(1).every(segment => segment && segment !== '.' && segment !== '..'), 'Workspace must be an absolute normalized directory')),
   execution: check.optional(executionPlacement), listener_options: check.optional(listenerOptions), runtime_options: check.optional(runtimeOptions) });

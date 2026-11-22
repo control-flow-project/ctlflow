@@ -7,7 +7,7 @@ import { statisticsBatch } from '../statistics.js';
 import { coordinationPolicy } from '../coordination-policy.js';
 const revision = check.integer();
 const accountProof = check.object({ agentId: check.identifier, accessToken: check.text(8192) });
-const instance = check.object({ instanceKey: check.name, name: check.name, identity: check.optional(accountProof), coordinationPolicy });
+const instance = check.object({ instanceKey: check.name, name: check.agentName, identity: check.optional(accountProof), coordinationPolicy });
 const roster = { controller, controllerCredential: check.optional(check.text(200)), ownerBackendUserId: check.backendUserId, fleetKey: check.name, instances: check.list(instance, 100, 1) };
 export const preflight = check.object(roster);
 export const enrollment = check.object({ ...roster, enrollmentId: check.identifier, claimSecret: check.secret });
