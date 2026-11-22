@@ -13,6 +13,10 @@ fn native_json_boundaries_match_wire_rules() {
     assert!(check::boolean(&json!("true")).is_err());
     assert!(check::name(&json!("credit-analysis-max")).is_ok());
     assert!(check::name(&json!("_credit")).is_err());
+    assert!(check::agent_name(&json!("materials_ai")).is_ok());
+    assert!(check::name(&json!("materials_ai")).is_err());
+    assert!(check::agent_name(&json!("_materials")).is_err());
+    assert!(check::agent_name(&json!("materials/ai")).is_err());
     assert!(check::secret(&json!("A".repeat(43))).is_ok());
     assert!(check::secret(&json!("A".repeat(42))).is_err());
     assert!(check::object(&json!({"known":1,"extra":2}), &["known"], &[]).is_err());

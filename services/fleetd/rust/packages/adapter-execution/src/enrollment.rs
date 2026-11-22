@@ -232,7 +232,7 @@ fn accept(
     let mut users = BTreeSet::new();
     for identity in instances {
         let key = check::name(&identity["instanceKey"])?;
-        let name = check::name(&identity["name"])?;
+        let name = check::agent_name(&identity["name"])?;
         let agent_id = check::identifier(&identity["agentId"])?;
         let account = crossfire_contracts::messaging::account(&identity["account"])?;
         if !keys.insert(key)

@@ -13,8 +13,14 @@ public static class IdentitySyntax
         return true;
     }
 
-    public static bool Name(string value) => value.Length is >= 1 and <= 40 && value[0] is >= 'a' and <= 'z'
-        && value.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-');
+    public static bool Name(string value) => Name(value, allowUnderscore: false);
+
+    public static bool AgentName(string value) => Name(value, allowUnderscore: true);
+
+    private static bool Name(string value, bool allowUnderscore) =>
+        value.Length is >= 1 and <= 40 && value[0] is >= 'a' and <= 'z'
+        && value.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-'
+            || allowUnderscore && character == '_');
 
     public static bool BackendIdentifier(string value) => value.Length is >= 1 and <= 255 && TextRules.WellFormed(value)
         && value.All(character => character is not (<= '\u001f' or '\u007f'));

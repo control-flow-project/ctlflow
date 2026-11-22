@@ -34,7 +34,7 @@ export const listenerRun = check.object({ runId: check.identifier, agentId: chec
 export const activity = check.object({ status: check.choice('online', 'offline', 'disconnecting'), activeMs: check.integer(),
   messagesDelivered: check.integer(), lastSeenAt: check.nullable(check.integer()), activeRuns: check.list(listenerRun, 100) });
 export const owner = check.object({ memberId: check.identifier, backendUserId: check.backendUserId, displayName: check.text(HUMAN_SIGNUP.labelMax), status: check.status });
-export const agent = check.object({ agentId: check.identifier, backendUserId: check.backendUserId, name: check.name, displayName: check.text(255),
+export const agent = check.object({ agentId: check.identifier, backendUserId: check.backendUserId, name: check.agentName, displayName: check.text(255),
   owner, status: check.status, revision: check.integer(), createdAt: check.integer(), application, activity, nativeRuntime: check.nullable(nativeRuntimeSummary),
   deployment: check.object({ fleetId: check.identifier, fleetKey: check.name, label: check.text(100), controllerName: check.text(100), reportedAt: check.integer(), instanceKey: check.name }),
   canRetire: check.boolean, allowedActions: check.list(check.choice('configure', 'room-grant.manage', 'retire'), 3) });
@@ -73,7 +73,7 @@ export const roomAuthority = check.object({ backendUserId: check.backendUserId, 
   permissions: check.list(check.object({ action: check.text(255), label: check.text(1000), allowed: check.boolean }), 1000) });
 export const room = check.object({ roomId: check.roomId, name: check.text(255), topic: check.text(4096, 0), alias: check.nullable(check.text(255)),
   authority: check.nullable(roomAuthority) });
-export const enrollmentItem = check.object({ instanceKey: check.name, requestedName: check.name, currentName: check.nullable(check.name), outcome: check.choice('claimed', 'existing'),
+export const enrollmentItem = check.object({ instanceKey: check.name, requestedName: check.agentName, currentName: check.nullable(check.agentName), outcome: check.choice('claimed', 'existing'),
   agentId: check.nullable(check.identifier), coordinationPolicy });
 export const enrollment = check.object({ owner: principal, controllerName: check.text(100), enrollmentId: check.identifier, ownerId: check.identifier, fleetKey: check.name,
   verificationCode: check.text(12, 12), status: check.choice('pending', 'approved', 'rejected', 'expired'), revision: check.integer(),
@@ -84,7 +84,7 @@ export const enrollmentDecision = check.object({ enrollmentId: check.identifier,
 export const preflight = check.object({ available: check.boolean, instances: check.integer(1, 100) });
 export const enrollmentExchange = check.object({ status: check.choice('pending', 'rejected', 'expired', 'provisioning', 'ready'),
   fleet: check.nullable(check.object({ fleetId: check.identifier, controllerCredential: check.nullable(check.text(200)) })),
-  ownerBackendUserId: check.backendUserId, instances: check.list(check.object({ instanceKey: check.name, name: check.name, agentId: check.nullable(check.identifier),
+  ownerBackendUserId: check.backendUserId, instances: check.list(check.object({ instanceKey: check.name, name: check.agentName, agentId: check.nullable(check.identifier),
     status: check.choice('ready', 'provisioning'), errorCode: check.nullable(check.text(100)), account: check.nullable(check.object({
       userId: check.backendUserId, accessToken: check.text(8192), native: check.backendParameters })) }), 100) });
 export const fleet = check.object({ fleetId: check.identifier, owner: principal, fleetKey: check.name, label: check.text(100), controller,

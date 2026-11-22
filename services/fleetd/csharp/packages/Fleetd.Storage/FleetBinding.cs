@@ -28,7 +28,7 @@ public static class BindingFiles
     {
         if (!Validation.Fields(value, ["instanceKey", "name", "agentId", "account"]).IsSuccess) return Results.Fail<BoundIdentity>("invalid", "Invalid enrolled identity");
         var key = WireJson.Text(value, "instanceKey"); var name = WireJson.Text(value, "name"); var agent = WireJson.Text(value, "agentId"); var account = MessagingContract.Account(value.GetProperty("account"));
-        return key is not null && IdentitySyntax.Name(key) && name is not null && IdentitySyntax.Name(name) && agent is not null && Validation.Identifier(agent) && account.IsSuccess ? Result<BoundIdentity>.Success(new(key, name, agent, account.Value)) : Results.Fail<BoundIdentity>("invalid", "Invalid immutable enrolled identity or account");
+        return key is not null && IdentitySyntax.Name(key) && name is not null && IdentitySyntax.AgentName(name) && agent is not null && Validation.Identifier(agent) && account.IsSuccess ? Result<BoundIdentity>.Success(new(key, name, agent, account.Value)) : Results.Fail<BoundIdentity>("invalid", "Invalid immutable enrolled identity or account");
     }
     public static Result<Unit> Save(string directory, FleetBinding value) => ConfigurationFiles.Boundary(() =>
     {

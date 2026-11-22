@@ -165,11 +165,16 @@ services/crossfire/csharp/packages/Crossfire.AdapterPi/PiUsage.cs	services/cross
 services/crossfire/csharp/packages/Crossfire.AdapterPi/PiValues.cs	services/crossfire/rust/packages/adapter-pi	native library
 services/crossfire/csharp/packages/Crossfire.AdapterProcess/BackgroundStdio.cs	services/crossfire/rust/packages/adapter-process	native library
 services/crossfire/csharp/packages/Crossfire.AdapterProcess/Crossfire.AdapterProcess.csproj	services/crossfire/rust/packages/adapter-process	native library
+services/crossfire/csharp/packages/Crossfire.AdapterProcess/NativeExecution.cs	services/crossfire/rust/packages/adapter-process	native library
 services/crossfire/csharp/packages/Crossfire.AdapterProcess/NativeProcess.cs	services/crossfire/rust/packages/adapter-process	native library
+services/crossfire/csharp/packages/Crossfire.AdapterProcess/SshCommands.cs	services/crossfire/rust/packages/adapter-process	native library
 services/crossfire/csharp/packages/Crossfire.AdapterRuntime/Crossfire.AdapterRuntime.csproj	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/csharp/packages/Crossfire.AdapterRuntime/ExecutionState.cs	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/csharp/packages/Crossfire.AdapterRuntime/NativeDelivery.cs	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/csharp/packages/Crossfire.AdapterRuntime/NativeGuard.cs	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/csharp/packages/Crossfire.AdapterRuntime/NativeJournal.cs	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/csharp/packages/Crossfire.AdapterRuntime/NativeOwnership.cs	services/crossfire/rust/packages/adapter-runtime	native library
+services/crossfire/csharp/packages/Crossfire.AdapterRuntime/NativePlacement.cs	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/csharp/packages/Crossfire.AdapterRuntime/ResumptionInput.cs	services/crossfire/rust/packages/adapter-runtime	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSchedule/CalendarSchedule.cs	services/crossfire/rust/packages/adapter-schedule	native library
 services/crossfire/csharp/packages/Crossfire.AdapterSchedule/Crossfire.AdapterSchedule.csproj	services/crossfire/rust/packages/adapter-schedule	native library
@@ -427,11 +432,15 @@ services/crossfire/csharp/tests/Crossfire.Runtime.Tests/CodexAcceptance.cs	servi
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ConfigurationAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/Crossfire.Runtime.Tests.csproj	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/DeliveryAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ExecutionRecording.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/FleetConnectionAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/HistoryAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ListenerReportingAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ManualTime.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/ModelAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/NativeExecutionAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/NativeLeaseAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/crossfire/csharp/tests/Crossfire.Runtime.Tests/NativeOwnershipAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/NativeValuesAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/OwnedCodexAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/crossfire/csharp/tests/Crossfire.Runtime.Tests/OwnedPiAcceptance.cs	services/crossfire/tests/contracts	target-internal test; public behavior uses one common assertion bank
@@ -521,8 +530,21 @@ services/fleetd/csharp/packages/Fleetd.AdapterExecution/InstanceReset.cs	service
 services/fleetd/csharp/packages/Fleetd.AdapterExecution/ProjectFiles.cs	services/fleetd/rust/packages/adapter-execution	native library
 services/fleetd/csharp/packages/Fleetd.AdapterExecution/RunningInstance.cs	services/fleetd/rust/packages/adapter-execution	native library
 services/fleetd/csharp/packages/Fleetd.AdapterExecution/RuntimeStartScope.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/Bootstrap.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/Budget.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/DomainXml.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/ExecutionFiles.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/Groups.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/Helpers.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/Images.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/Placement.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/Receipt.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/Request.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/Resources.cs	services/fleetd/rust/packages/adapter-execution	native library
+services/fleetd/csharp/packages/Fleetd.AdapterExecution/Vm/Supervisor.cs	services/fleetd/rust/packages/adapter-execution	native library
 services/fleetd/csharp/packages/Fleetd.Contracts/DaemonOperations.g.cs	services/fleetd/rust/packages/contracts	native library
 services/fleetd/csharp/packages/Fleetd.Contracts/DiagnosticContract.cs	services/fleetd/rust/packages/contracts	native library
+services/fleetd/csharp/packages/Fleetd.Contracts/ExecutionContract.cs	services/fleetd/rust/packages/contracts	native library
 services/fleetd/csharp/packages/Fleetd.Contracts/FleetConfigurationContract.cs	services/fleetd/rust/packages/contracts	native library
 services/fleetd/csharp/packages/Fleetd.Contracts/FleetWire.cs	services/fleetd/rust/packages/contracts	native library
 services/fleetd/csharp/packages/Fleetd.Contracts/Fleetd.Contracts.csproj	services/fleetd/rust/packages/contracts	native library
@@ -531,21 +553,37 @@ services/fleetd/csharp/packages/Fleetd.Domain/ControllerOperations.cs	services/f
 services/fleetd/csharp/packages/Fleetd.Domain/ControllerRecovery.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/ControllerSetup.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/Diagnostics.cs	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Domain/Execution.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/FleetController.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/Fleetd.Domain.csproj	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/Models.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/NativeDiagnostics.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/NativeLifecycle.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Domain/NativeLogicalConnection.cs	services/fleetd/rust/packages/domain	native library
+services/fleetd/csharp/packages/Fleetd.Domain/VmExports.cs	services/fleetd/rust/packages/domain	native library
 services/fleetd/csharp/packages/Fleetd.Storage/Authentication.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/ConfigurationFiles.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/FleetBinding.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/Fleetd.Storage.csproj	services/fleetd/rust/packages/storage	native library
+services/fleetd/csharp/packages/Fleetd.Storage/NativeOwnershipFiles.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/RegistryFiles.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/packages/Fleetd.Storage/SetupFiles.cs	services/fleetd/rust/packages/storage	native library
+services/fleetd/csharp/packages/Fleetd.Storage/VmBudgetFiles.cs	services/fleetd/rust/packages/storage	native library
 services/fleetd/csharp/tests/Fleetd.Domain.Tests/ControllerFixture.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/csharp/tests/Fleetd.Domain.Tests/Fleetd.Domain.Tests.csproj	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/csharp/tests/Fleetd.Domain.Tests/NativeLazyAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/csharp/tests/Fleetd.Domain.Tests/Program.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Domain.Tests/VmExportsAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Execution.Tests/BudgetAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Execution.Tests/Fleetd.Execution.Tests.csproj	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Execution.Tests/ImagesAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Execution.Tests/ListenerAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Execution.Tests/Program.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Execution.Tests/RequestAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Execution.Tests/ResourcesAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Execution.Tests/SshCommandsAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Storage.Tests/ExecutionAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Storage.Tests/ExecutionConfigurationAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/csharp/tests/Fleetd.Storage.Tests/Fleetd.Storage.Tests.csproj	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
+services/fleetd/csharp/tests/Fleetd.Storage.Tests/NativeOwnershipAcceptance.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank
 services/fleetd/csharp/tests/Fleetd.Storage.Tests/Program.cs	services/fleetd/tests/contracts	target-internal test; public behavior uses one common assertion bank

@@ -48,6 +48,7 @@ export function object<const Fields extends Shape>(fields: Fields): Parser<Objec
 export const identifier: Parser<string> = input => typeof input === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u.test(input)
   ? success(input) : failure('invalid', 'Expected an opaque UUID');
 export const name: Parser<string> = input => typeof input === 'string' && /^[a-z][a-z0-9-]{0,39}$/u.test(input) ? success(input) : failure('invalid', 'Expected a lowercase name of 1–40 characters');
+export const agentName: Parser<string> = input => typeof input === 'string' && /^[a-z][a-z0-9_-]{0,39}$/u.test(input) ? success(input) : failure('invalid', 'Expected a lowercase agent name of 1–40 characters');
 const opaque: Parser<string> = input => opaqueIdentifier(input) ? success(input) : failure('invalid', 'Expected an opaque backend identifier');
 export const backendUserId = opaque;
 export const roomId = opaque;

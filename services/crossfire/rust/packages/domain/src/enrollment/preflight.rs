@@ -7,19 +7,10 @@ use crate::{
         FleetRepository, RepositoryAccess,
     },
 };
+use crossfire_kernel::identifier::{agent_name, name};
 use crossfire_kernel::{Failure, Result, failure::ErrorCode, secret::Secret};
 use std::collections::BTreeSet;
 
-pub fn valid_name(value: &str) -> bool {
-    (1..=40).contains(&value.len())
-        && value
-            .bytes()
-            .next()
-            .is_some_and(|value| value.is_ascii_lowercase())
-        && value
-            .bytes()
-            .all(|value| value.is_ascii_lowercase() || value.is_ascii_digit() || value == b'-')
-}
 pub fn validate(input: &Roster) -> Result<()> {
     let controller = &input.controller;
     if controller
@@ -31,7 +22,7 @@ pub fn validate(input: &Roster) -> Result<()> {
         || controller
             .metadata
             .iter()
-            .any(|(key, value)| !valid_name(key) || value.encode_utf16().count() > 256)
+            .any(|(key, value)| !name(key) || value.encode_utf16().count() > 256)
     {
         return Err(Failure::new(
             ErrorCode::Invalid,
@@ -39,13 +30,13 @@ pub fn validate(input: &Roster) -> Result<()> {
         ));
     }
     if !crossfire_kernel::identifier::opaque(&input.owner_backend_user_id)
-        || !valid_name(&input.fleet_key)
+        || !name(&input.fleet_key)
         || input.instances.is_empty()
         || input.instances.len() > 100
         || input
             .instances
             .iter()
-            .any(|item| !valid_name(&item.instance_key) || !valid_name(&item.name))
+            .any(|item| !name(&item.instance_key) || !agent_name(&item.name))
         || input
             .instances
             .iter()

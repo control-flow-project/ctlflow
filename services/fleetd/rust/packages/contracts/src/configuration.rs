@@ -78,7 +78,7 @@ pub fn instance(value: &Value) -> Result<Instance> {
             .transpose()?
             .unwrap_or_default(),
         key: check::name(&value["key"])?.to_owned(),
-        name: check::name(&value["name"])?.to_owned(),
+        name: check::agent_name(&value["name"])?.to_owned(),
         definition: check::name(&value["definition"])?.to_owned(),
         workarea: check::text(&value["workarea"], 1, 1024)?.to_owned(),
         workspace,

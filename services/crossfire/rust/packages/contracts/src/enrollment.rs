@@ -100,7 +100,7 @@ fn decode_roster(value: &serde_json::Map<String, Value>) -> Result<Roster> {
                 .transpose()?;
             Ok(Entry {
                 instance_key: check::name(&value["instanceKey"])?.to_owned(),
-                name: check::name(&value["name"])?.to_owned(),
+                name: check::agent_name(&value["name"])?.to_owned(),
                 identity,
                 policy: policy(&value["coordinationPolicy"])?,
             })

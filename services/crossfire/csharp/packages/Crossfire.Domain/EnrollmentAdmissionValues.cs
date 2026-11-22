@@ -25,7 +25,7 @@ public static class EnrollmentValidation
     public static Result<Unit> Roster(EnrollmentRoster roster)
     {
         if (!IdentitySyntax.BackendIdentifier(roster.OwnerBackendUserId) || !IdentitySyntax.Name(roster.FleetKey) || roster.Instances.Count is < 1 or > 100
-            || roster.Instances.Any(value => !IdentitySyntax.Name(value.InstanceKey) || !IdentitySyntax.Name(value.Name))
+            || roster.Instances.Any(value => !IdentitySyntax.Name(value.InstanceKey) || !IdentitySyntax.AgentName(value.Name))
             || roster.Instances.Select(value => value.InstanceKey).Distinct(StringComparer.Ordinal).Count() != roster.Instances.Count
             || roster.Instances.Select(value => value.Name).Distinct(StringComparer.Ordinal).Count() != roster.Instances.Count)
             return Results.Fail<Unit>("invalid", "Supply one owner and a unique roster of valid lowercase names and instance keys");

@@ -5,7 +5,7 @@ import { withHuman, operatorClient, type Credentials } from './auth.js';
 import { collectPages } from '@ctlflow/crossfire-operator-support/collections';
 
 export const serverExpectations = check.object({ release: check.optional(check.text(200)), agents: check.optional(check.integer(0, 1000)),
-  names: check.optional(check.list(check.name, 1000)), online: check.optional(check.boolean), emptyRooms: check.optional(check.boolean),
+  names: check.optional(check.list(check.agentName, 1000)), online: check.optional(check.boolean), emptyRooms: check.optional(check.boolean),
   fleetKey: check.optional(check.name), controllerName: check.optional(check.text(100)) });
 export type Expectations = check.Parsed<typeof serverExpectations>;
 

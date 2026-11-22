@@ -40,9 +40,10 @@ pub fn change(
         || input.controller_name.is_empty()
         || !plain(input.controller_name, 100)
         || input.metadata.len() > 16
-        || input.metadata.iter().any(|(key, value)| {
-            !crate::enrollment::preflight::valid_name(key) || !plain(value, 256)
-        })
+        || input
+            .metadata
+            .iter()
+            .any(|(key, value)| !crossfire_kernel::identifier::name(key) || !plain(value, 256))
     {
         return Err(Failure::new(
             ErrorCode::Invalid,
